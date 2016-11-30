@@ -394,6 +394,7 @@ void DisplayBuffer::write(Device *device, const string& filename)
 	/* read buffer from device */
 	device_memory& rgba = rgba_data();
 	device->pixels_copy_from(rgba, 0, w, h);
+#ifndef NO_OIIO_LOADING
 
 	/* write image */
 	ImageOutput *out = ImageOutput::create(filename);
@@ -412,6 +413,7 @@ void DisplayBuffer::write(Device *device, const string& filename)
 	out->close();
 
 	delete out;
+#endif
 }
 
 device_memory& DisplayBuffer::rgba_data()
