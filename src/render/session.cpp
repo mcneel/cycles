@@ -775,6 +775,11 @@ void Session::set_samples(int samples)
 	}
 }
 
+bool Session::is_paused()
+{
+	return pause;
+}
+
 void Session::set_pause(bool pause_)
 {
 	bool notify = false;

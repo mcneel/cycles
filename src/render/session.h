@@ -144,6 +144,7 @@ public:
 	void reset(BufferParams& params, int samples);
 	void set_samples(int samples);
 	void set_pause(bool pause);
+	bool is_paused();
 
 	void update_scene();
 	void load_kernels();
