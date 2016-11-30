@@ -27,6 +27,7 @@ thread::thread(function<void(void)> run_cb, int group)
 	group_(group)
 {
 	pthread_create(&pthread_id_, NULL, run, (void*)this);
+	pthread_setname_np(pthread_id_, "a Cycles thread");
 }
 
 thread::~thread()

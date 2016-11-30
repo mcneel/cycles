@@ -113,6 +113,14 @@ typedef unsigned short uint16_t;
 typedef signed int int32_t;
 typedef unsigned int uint32_t;
 
+
+/* undefine int64_t and uint64_t here,
+ * because they collide with the following two
+ * typedefs.
+ */
+#undef int64_t
+#undef uint64_t
+
 typedef long long int64_t;
 typedef unsigned long long uint64_t;
 #    ifdef __KERNEL_64_BIT__
