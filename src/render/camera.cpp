@@ -265,6 +265,7 @@ void Camera::update(Scene *scene)
 	worldtoscreen = cameratoscreen * worldtocamera;
 	worldtondc = screentondc * worldtoscreen;
 	worldtoraster = ndctoraster * worldtondc;
+	cameratondc = projection_to_transform(screentondc * cameratoscreen);
 
 	/* differentials */
 	if(type == CAMERA_ORTHOGRAPHIC) {
@@ -313,6 +314,8 @@ void Camera::update(Scene *scene)
 	kcam->worldtoraster = worldtoraster;
 	kcam->worldtondc = worldtondc;
 	kcam->ndctoworld = ndctoworld;
+
+	kcam->cameratondc = cameratondc;
 
 	/* camera motion */
 	kcam->num_motion_steps = 0;
