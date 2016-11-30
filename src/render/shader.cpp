@@ -348,6 +348,7 @@ ShaderManager::ShaderManager()
 	xyz_to_g = make_float3(-0.9692660f,  1.8760108f,  0.0415560f);
 	xyz_to_b = make_float3( 0.0556434f, -0.2040259f,  1.0572252f);
 	rgb_to_y = make_float3( 0.2126729f,  0.7151522f,  0.0721750f);
+	rgb_to_lum = make_float3( 0.2989f, 0.5870f, 0.1140f);
 
 #ifdef WITH_OCIO
 	OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
@@ -565,6 +566,7 @@ void ShaderManager::device_update_common(Device *device,
 	kfilm->xyz_to_g = float3_to_float4(xyz_to_g);
 	kfilm->xyz_to_b = float3_to_float4(xyz_to_b);
 	kfilm->rgb_to_y = float3_to_float4(rgb_to_y);
+	kfilm->rgb_to_lum = float3_to_float4(rgb_to_lum);
 }
 
 void ShaderManager::device_free_common(Device *, DeviceScene *dscene, Scene *scene)
@@ -693,6 +695,11 @@ void ShaderManager::free_memory()
 float ShaderManager::linear_rgb_to_gray(float3 c)
 {
 	return dot(c, rgb_to_y);
+}
+
+float ShaderManager::linear_rgb_to_luminance(float3 c)
+{
+	return dot(c, rgb_to_lum);
 }
 
 CCL_NAMESPACE_END

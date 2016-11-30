@@ -43,6 +43,7 @@ size_t SocketType::size(Type type)
 		case INT: return sizeof(int);
 		case UINT: return sizeof(uint);
 		case COLOR: return sizeof(float3);
+		case COLOR2: return sizeof(float3);
 		case VECTOR: return sizeof(float3);
 		case POINT: return sizeof(float3);
 		case NORMAL: return sizeof(float3);
@@ -91,6 +92,7 @@ ustring SocketType::type_name(Type type)
 		ustring("int"),
 		ustring("uint"),
 		ustring("color"),
+		ustring("color2"),
 		ustring("vector"),
 		ustring("point"),
 		ustring("normal"),
@@ -118,7 +120,7 @@ ustring SocketType::type_name(Type type)
 
 bool SocketType::is_float3(Type type)
 {
-	return (type == COLOR || type == VECTOR || type == POINT || type == NORMAL);
+	return (type == COLOR || type == COLOR2 || type == VECTOR || type == POINT || type == NORMAL);
 }
 
 /* Node Type */

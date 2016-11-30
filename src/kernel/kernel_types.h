@@ -1278,6 +1278,7 @@ typedef struct KernelFilm {
 	float4 xyz_to_g;
 	float4 xyz_to_b;
 	float4 rgb_to_y;
+	float4 rgb_to_lum;
 
 #ifdef __KERNEL_DEBUG__
 	int pass_bvh_traversed_nodes;

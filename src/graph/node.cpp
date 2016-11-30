@@ -381,6 +381,7 @@ bool Node::equals_value(const Node& other, const SocketType& socket) const
 		case SocketType::INT: return is_value_equal<int>(this, &other, socket);
 		case SocketType::UINT: return is_value_equal<uint>(this, &other, socket);
 		case SocketType::COLOR: return is_value_equal<float3>(this, &other, socket);
+		case SocketType::COLOR2: return is_value_equal<float3>(this, &other, socket);
 		case SocketType::VECTOR: return is_value_equal<float3>(this, &other, socket);
 		case SocketType::POINT: return is_value_equal<float3>(this, &other, socket);
 		case SocketType::NORMAL: return is_value_equal<float3>(this, &other, socket);
@@ -472,6 +473,7 @@ void Node::hash(MD5Hash& md5)
 			case SocketType::INT: value_hash<int>(this, socket, md5); break;
 			case SocketType::UINT: value_hash<uint>(this, socket, md5); break;
 			case SocketType::COLOR: float3_hash(this, socket, md5); break;
+			case SocketType::COLOR2: float3_hash(this, socket, md5); break;
 			case SocketType::VECTOR: float3_hash(this, socket, md5); break;
 			case SocketType::POINT: float3_hash(this, socket, md5); break;
 			case SocketType::NORMAL: float3_hash(this, socket, md5); break;
@@ -520,6 +522,7 @@ size_t Node::get_total_size_in_bytes() const
 			case SocketType::INT:
 			case SocketType::UINT:
 			case SocketType::COLOR:
+			case SocketType::COLOR2:
 			case SocketType::VECTOR:
 			case SocketType::POINT:
 			case SocketType::NORMAL:
