@@ -95,6 +95,7 @@ typedef enum ShaderNodeType {
 	NODE_VECTOR_MATH,
 	NODE_VECTOR_TRANSFORM,
 	NODE_MAPPING,
+	NODE_MATRIX_MATH,
 	NODE_TEX_COORD,
 	NODE_TEX_COORD_BUMP_DX,
 	NODE_TEX_COORD_BUMP_DY,
@@ -265,6 +266,13 @@ typedef enum NodeMath {
 	NODE_MATH_ABSOLUTE,
 	NODE_MATH_CLAMP /* used for the clamp UI option */
 } NodeMath;
+
+typedef enum NodeMatrixMath {
+	NODE_MATRIX_MATH_POINT,
+	NODE_MATRIX_MATH_DIRECTION,
+	NODE_MATRIX_MATH_PERSPECTIVE,
+	NODE_MATRIX_MATH_DIR_TRANSPOSED,
+} NodeMatrixMath;
 
 typedef enum NodeVectorMath {
 	NODE_VECTOR_MATH_ADD,
