@@ -46,4 +46,39 @@ ccl_device void svm_node_vector_math(KernelGlobals *kg, ShaderData *sd, float *s
 	if(stack_valid(node1.z)) stack_store_float3(stack, node1.z, v);
 }
 
+ccl_device void svm_node_matrix_math(KernelGlobals *kg, ShaderData *sd, float *stack, uint itype, uint vec_offset, uint out_offset, int *offset)
+{
+	NodeMatrixMath type = (NodeMatrixMath)itype;
+	float3 v = stack_load_float3(stack, vec_offset);
+
+	Transform tfm;
+	tfm.x = read_node_float(kg, offset);
+	tfm.y = read_node_float(kg, offset);
+	tfm.z = read_node_float(kg, offset);
+
+	float3 r;
+	switch (type) {
+		case NODE_MATRIX_MATH_DIRECTION:
+		{
+			r = transform_direction(&tfm, v);
+			break;
+		}
+		case NODE_MATRIX_MATH_PERSPECTIVE:
+		{
+#ifndef __KERNEL_GPU__
+			r = transform_perspective(&ProjectionTransform(tfm), v);
+#endif
+			break;
+		}
+		case NODE_MATRIX_MATH_DIR_TRANSPOSED:
+		{
+			r = transform_direction_transposed(&tfm, v);
+			break;
+		}
+		default:
+			r = transform_point(&tfm, v);
+	}
+	stack_store_float3(stack, out_offset, r);
+}
+
 CCL_NAMESPACE_END
