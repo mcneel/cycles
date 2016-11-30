@@ -189,8 +189,20 @@ ccl_device void svm_node_tex_environment(KernelGlobals *kg, ShaderData *sd, floa
 
 	if(projection == 0)
 		uv = direction_to_equirectangular(co);
-	else
+	else if (projection == 1)
 		uv = direction_to_mirrorball(co);
+	else {
+		float3 P = sd->P; //ccl_fetch(sd, P);
+		Transform worldtocamera = kernel_data.cam.worldtocamera;
+		Transform cameratondc = kernel_data.cam.cameratondc;
+
+		P = normalize(P);
+		P = transform_direction(&worldtocamera, P);
+		P = P / dot(P, make_float3(0, 0, 1));
+		P = transform_point(&cameratondc, P);
+		uv.x = P.x;
+		uv.y = 1 - P.y;
+	}
 
 	uint use_alpha = stack_valid(alpha_offset);
 	float4 f = svm_image_texture(kg, id, uv.x, uv.y, srgb, use_alpha);

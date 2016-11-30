@@ -245,6 +245,7 @@ void Camera::update()
 	worldtoscreen = cameratoscreen * worldtocamera;
 	worldtondc = screentondc * worldtoscreen;
 	worldtoraster = ndctoraster * worldtondc;
+	cameratondc = screentondc * cameratoscreen;
 
 	/* differentials */
 	if(type == CAMERA_ORTHOGRAPHIC) {
@@ -322,6 +323,8 @@ void Camera::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 	kcam->worldtoscreen = worldtoscreen;
 	kcam->worldtoraster = worldtoraster;
 	kcam->worldtondc = worldtondc;
+
+	kcam->cameratondc = cameratondc;
 
 	/* camera motion */
 	kcam->have_motion = 0;

@@ -1157,6 +1157,8 @@ typedef struct KernelCamera {
 	Transform worldtondc;
 	Transform worldtocamera;
 
+	Transform cameratondc;
+
 	MotionTransform motion;
 
 	/* Denotes changes in the projective matrix, namely in rastertocamera.

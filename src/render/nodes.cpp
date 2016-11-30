@@ -3055,6 +3055,16 @@ NODE_DEFINE(TextureCoordinateNode)
 	SOCKET_OUT_POINT(window, "Window");
 	SOCKET_OUT_NORMAL(reflection, "Reflection");
 
+	SOCKET_OUT_POINT(wcsbox, "WcsBox");
+	SOCKET_OUT_POINT(envspherical, "EnvSpherical");
+	SOCKET_OUT_POINT(envemap, "EnvEmap");
+	SOCKET_OUT_POINT(envbox, "EnvBox");
+	SOCKET_OUT_POINT(envlightprobe, "EnvLightProbe");
+	SOCKET_OUT_POINT(envcubemap, "EnvCubemap");
+	SOCKET_OUT_POINT(envcubemapverticalcross, "EnvCubemapVerticalCross");
+	SOCKET_OUT_POINT(envcubemaphorizontalcross, "EnvCubemapHorizontalCross");
+	SOCKET_OUT_POINT(envhemi, "EnvHemi");
+
 	return type;
 }
 
@@ -3169,6 +3179,59 @@ void TextureCoordinateNode::compile(SVMCompiler& compiler)
 			compiler.add_node(texco_node, NODE_TEXCO_REFLECTION, compiler.stack_assign(out));
 		}
 	}
+
+	out = output("WcsBox");
+	if(!out->links.empty()) {
+		compiler.add_node(texco_node, NODE_TEXCO_WCS_BOX, compiler.stack_assign(out), use_transform);
+		if(use_transform) {
+			Transform ob_itfm = transform_inverse(ob_tfm);
+			compiler.add_node(ob_itfm.x);
+			compiler.add_node(ob_itfm.y);
+			compiler.add_node(ob_itfm.z);
+			compiler.add_node(ob_itfm.w);
+		}
+	}
+
+	out = output("EnvSpherical");
+	if(!out->links.empty()) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_SPHERICAL, compiler.stack_assign(out));
+	}
+
+	out = output("EnvEmap");
+	if(!out->links.empty()) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_EMAP, compiler.stack_assign(out));
+	}
+
+	out = output( "EnvBox" );
+	if( !out->links.empty() ) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_BOX, compiler.stack_assign(out));
+	}
+
+	out = output("EnvLightProbe");
+	if(!out->links.empty()) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_LIGHTPROBE, compiler.stack_assign(out));
+	}
+
+	out = output( "EnvCubemap" );
+	if( !out->links.empty() ) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP, compiler.stack_assign(out));
+	}
+
+	out = output( "EnvCubemapVerticalCross" );
+	if( !out->links.empty() ) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS, compiler.stack_assign(out));
+	}
+
+	out = output( "EnvCubemapHorizontalCross" );
+	if( !out->links.empty() ) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS, compiler.stack_assign(out));
+	}
+
+	out = output( "EnvHemi" );
+	if( !out->links.empty() ) {
+		compiler.add_node(texco_node, NODE_TEXCO_ENV_HEMI, compiler.stack_assign(out));
+	}
+
 }
 
 void TextureCoordinateNode::compile(OSLCompiler& compiler)
