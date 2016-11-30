@@ -154,6 +154,8 @@ public:
 	Transform worldtondc;
 	Transform worldtocamera;
 
+	Transform cameratondc;
+
 	Transform rastertocamera;
 	Transform cameratoraster;
 
