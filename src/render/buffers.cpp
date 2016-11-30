@@ -454,6 +454,7 @@ void DisplayBuffer::write(const string& filename)
 
 	/* read buffer from device */
 	uchar4 *pixels = rgba_byte.copy_from_device(0, w, h);
+#ifndef NO_OIIO_LOADING
 
 	/* write image */
 	ImageOutput *out = ImageOutput::create(filename);
@@ -471,6 +472,7 @@ void DisplayBuffer::write(const string& filename)
 	out->close();
 
 	delete out;
+#endif
 }
 
 CCL_NAMESPACE_END
