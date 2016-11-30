@@ -881,6 +881,16 @@ public:
 	bool use_clamp;
 };
 
+class MatrixMathNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(MatrixMathNode)
+
+	Transform tfm;
+	float3 vector;
+
+	NodeMatrixMath type;
+};
+
 class NormalNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(NormalNode)
