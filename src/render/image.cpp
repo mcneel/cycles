@@ -135,6 +135,7 @@ ImageDataType ImageManager::get_image_metadata(const string& filename,
 			return (channels > 1) ? IMAGE_DATA_TYPE_BYTE4 : IMAGE_DATA_TYPE_BYTE;
 		}
 	}
+#if !defined(NO_OIIO_LOADING)
 
 	/* Perform preliminary checks, with meaningful logging. */
 	if(!path_exists(filename)) {
@@ -194,7 +195,7 @@ ImageDataType ImageManager::get_image_metadata(const string& filename,
 
 		delete in;
 	}
-
+#endif
 	if(is_half) {
 		return (channels > 1) ? IMAGE_DATA_TYPE_HALF4 : IMAGE_DATA_TYPE_HALF;
 	}
@@ -472,6 +473,7 @@ bool ImageManager::file_load_image_generic(Image *img, ImageInput **in, int &wid
 	if(img->filename == "")
 		return false;
 
+#if !defined(NO_OIIO_LOADING)
 	if(!img->builtin_data) {
 		/* NOTE: Error logging is done in meta data acquisition. */
 		if(!path_exists(img->filename) || path_is_directory(img->filename)) {
@@ -501,7 +503,9 @@ bool ImageManager::file_load_image_generic(Image *img, ImageInput **in, int &wid
 		depth = spec.depth;
 		components = spec.nchannels;
 	}
-	else {
+	else
+#else
+	{
 		/* load image using builtin images callbacks */
 		if(!builtin_image_info_cb || !builtin_image_pixels_cb)
 			return false;
@@ -509,14 +513,17 @@ bool ImageManager::file_load_image_generic(Image *img, ImageInput **in, int &wid
 		bool is_float;
 		builtin_image_info_cb(img->filename, img->builtin_data, is_float, width, height, depth, components);
 	}
+#endif
 
 	/* we only handle certain number of components */
 	if(!(components >= 1 && components <= 4)) {
+#if !defined(NO_OIIO_LOADING)
 		if(*in) {
 			(*in)->close();
 			delete *in;
 			*in = NULL;
 		}
+#endif
 
 		return false;
 	}
@@ -551,6 +558,7 @@ bool ImageManager::file_load_image(Image *img,
 	}
 	bool cmyk = false;
 	const size_t num_pixels = ((size_t)width) * height * depth;
+#if !defined(NO_OIIO_LOADING)
 	if(in) {
 		StorageType *readpixels = pixels;
 		vector<StorageType> tmppixels;
@@ -584,6 +592,7 @@ bool ImageManager::file_load_image(Image *img,
 		delete in;
 	}
 	else {
+#endif
 		if(FileFormat == TypeDesc::FLOAT) {
 			builtin_image_float_pixels_cb(img->filename,
 			                              img->builtin_data,
@@ -599,6 +608,7 @@ bool ImageManager::file_load_image(Image *img,
 		else {
 			/* TODO(dingto): Support half for ImBuf. */
 		}
+#if !defined(NO_OIIO_LOADING)
 	}
 	/* Check if we actually have a float4 slot, in case components == 1,
 	 * but device doesn't support single channel textures.
@@ -680,6 +690,12 @@ bool ImageManager::file_load_image(Image *img,
 		}
 	}
 	/* Scale image down if needed. */
+#endif
+#if defined(NO_OIIO_LOADING)
+	bool is_rgba = (type == IMAGE_DATA_TYPE_FLOAT4 ||
+	                type == IMAGE_DATA_TYPE_HALF4 ||
+	                type == IMAGE_DATA_TYPE_BYTE4);
+#endif
 	if(pixels_storage.size() > 0) {
 		float scale_factor = 1.0f;
 		while(max_size * scale_factor > texture_limit) {
