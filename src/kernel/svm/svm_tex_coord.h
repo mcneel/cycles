@@ -18,6 +18,107 @@ CCL_NAMESPACE_BEGIN
 
 /* Texture Coordinate Node */
 
+/* wcs_box_coord gives a Rhino-style WCS box texture coordinate mapping. */
+ccl_device_inline void wcs_box_coord(KernelGlobals *kg, ShaderData *sd, float3 *data)
+{
+	float3 N = sd->N;
+
+	int side0 = 0;
+
+	float dx = (*data).x;
+	float dy = (*data).y;
+
+	// set side0 = side closest to the point
+	int side1 = (fabsf(dx) >= fabsf(dy)) ? 0 : 1;
+	float rr = side1 ? dy : dx;
+	if (fabsf((*data).z) > fabsf(rr))
+		side1 = 2;
+
+	float t1 = side1 ? dy : dx;
+	if (t1 < 0.0f)
+		side0 = 2 * side1 + 1;
+	else
+		side0 = 2 * side1 + 2;
+
+	side1 = (fabsf(N.x) >= fabsf(N.y)) ? 0 : 1;
+	rr = side1 ? N.y : N.x;
+	if (fabsf(N.z) > fabsf(rr))
+	{
+		side1 = 2;
+	}
+
+	switch (side1) {
+	case 0: { t1 = N.x; break; }
+	case 1: { t1 = N.y; break; }
+	default: { t1 = N.z; break; }
+	}
+	if (0.0f != t1)
+	{
+		if (t1 < 0.0f)
+			side0 = 2 * side1 + 1;
+		else
+			if (t1 > 0.0f)
+				side0 = 2 * side1 + 2;
+	}
+
+	// side flag
+	//  1 =  left side (x=-1)
+	//  2 =  right side (x=+1)
+	//  3 =  back side (y=-1)
+	//  4 =  front side (y=+1)
+	//  5 =  bottom side (z=-1)
+	//  6 =  top side (z=+1)
+	float3 v = make_float3(0.0f, 0.0f, 0.0f);
+	switch (side0)
+	{
+	case 1:
+		v.x = -(*data).y;
+		v.y = (*data).z;
+		v.z = (*data).x;
+		break;
+	case 2:
+		v.x = (*data).y;
+		v.y = (*data).z;
+		v.z = (*data).x;
+		break;
+	case 3:
+		v.x = (*data).x;
+		v.y = (*data).z;
+		v.z = (*data).y;
+		break;
+	case 4:
+		v.x = -(*data).x;
+		v.y = (*data).z;
+		v.z = (*data).y;
+		break;
+	case 5:
+		v.x = -(*data).x;
+		v.y = (*data).y;
+		v.z = (*data).z;
+		break;
+	case 6:
+	default:
+		v.x = (*data).x;
+		v.y = (*data).y;
+		v.z = (*data).z;
+		break;
+	}
+
+	*data = v;
+}
+
+ccl_device_inline float3 get_reflected_incoming_ray(KernelGlobals *kg, ShaderData *sd)
+{
+	float3 n = sd->N;
+	float3 i = sd->I;
+
+	float3 refl = 2 * n * dot(i, n) - i;
+
+	refl = normalize(refl);
+
+	return refl;
+}
+
 ccl_device void svm_node_tex_coord(KernelGlobals *kg,
                                    ShaderData *sd,
                                    int path_flag,
@@ -43,8 +144,26 @@ ccl_device void svm_node_tex_coord(KernelGlobals *kg,
 				tfm.y = read_node_float(kg, offset);
 				tfm.z = read_node_float(kg, offset);
 				tfm.w = read_node_float(kg, offset);
-				data = transform_point(&tfm, data);
+				data = transform_direction(&tfm, data);
 			}
+			break;
+		}
+		case NODE_TEXCO_WCS_BOX: {
+			data = sd->P;
+			if (node.w == 0) {
+				if (sd->object != OBJECT_NONE) {
+					object_inverse_position_transform(kg, sd, &data);
+				}
+			}
+			else {
+				Transform tfm;
+				tfm.x = read_node_float(kg, offset);
+				tfm.y = read_node_float(kg, offset);
+				tfm.z = read_node_float(kg, offset);
+				tfm.w = read_node_float(kg, offset);
+				data = transform_direction(&tfm, data);
+			}
+			wcs_box_coord(kg, sd, &data);
 			break;
 		}
 		case NODE_TEXCO_NORMAL: {
@@ -56,9 +175,9 @@ ccl_device void svm_node_tex_coord(KernelGlobals *kg,
 			Transform tfm = kernel_data.cam.worldtocamera;
 
 			if(sd->object != OBJECT_NONE)
-				data = transform_point(&tfm, sd->P);
+				data = transform_direction(&tfm, sd->P);
 			else
-				data = transform_point(&tfm, sd->P + camera_position(kg));
+				data = transform_direction(&tfm, sd->P + camera_position(kg));
 			break;
 		}
 		case NODE_TEXCO_WINDOW: {
@@ -93,6 +212,48 @@ ccl_device void svm_node_tex_coord(KernelGlobals *kg,
 #endif
 			break;
 		}
+		case NODE_TEXCO_ENV_SPHERICAL: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(data.y, -data.z, -data.x);
+			data = env_spherical(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_EMAP: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_emap_act(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_BOX: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_box(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_LIGHTPROBE: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_light_probe(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap_vertical_cross(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap_horizontal_cross(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_HEMI: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(data.y, -data.z, -data.x);
+			data = env_hemispherical(data);
+			break;
+		}
 	}
 
 	stack_store_float3(stack, out_offset, data);
@@ -124,8 +285,26 @@ ccl_device void svm_node_tex_coord_bump_dx(KernelGlobals *kg,
 				tfm.y = read_node_float(kg, offset);
 				tfm.z = read_node_float(kg, offset);
 				tfm.w = read_node_float(kg, offset);
-				data = transform_point(&tfm, data);
+				data = transform_direction(&tfm, data);
 			}
+			break;
+		}
+		case NODE_TEXCO_WCS_BOX: {
+			data = sd->P + sd->dP.dx;
+			if (node.w == 0) {
+				if (sd->object != OBJECT_NONE) {
+					object_inverse_position_transform(kg, sd, &data);
+				}
+			}
+			else {
+				Transform tfm;
+				tfm.x = read_node_float(kg, offset);
+				tfm.y = read_node_float(kg, offset);
+				tfm.z = read_node_float(kg, offset);
+				tfm.w = read_node_float(kg, offset);
+				data = transform_direction(&tfm, data);
+			}
+			wcs_box_coord(kg, sd, &data);
 			break;
 		}
 		case NODE_TEXCO_NORMAL: {
@@ -137,9 +316,9 @@ ccl_device void svm_node_tex_coord_bump_dx(KernelGlobals *kg,
 			Transform tfm = kernel_data.cam.worldtocamera;
 
 			if(sd->object != OBJECT_NONE)
-				data = transform_point(&tfm, sd->P + sd->dP.dx);
+				data = transform_direction(&tfm, sd->P + sd->dP.dx);
 			else
-				data = transform_point(&tfm, sd->P + sd->dP.dx + camera_position(kg));
+				data = transform_direction(&tfm, sd->P + sd->dP.dx + camera_position(kg));
 			break;
 		}
 		case NODE_TEXCO_WINDOW: {
@@ -172,6 +351,46 @@ ccl_device void svm_node_tex_coord_bump_dx(KernelGlobals *kg,
 			if(sd->object != OBJECT_NONE)
 				data = volume_normalized_position(kg, sd, data);
 #endif
+			break;
+		}
+		case NODE_TEXCO_ENV_SPHERICAL: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(data.y, -data.z, -data.x);
+			data = env_spherical(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_EMAP: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(-data.z, data.x, -data.y);
+			Transform tfm = kernel_data.cam.worldtocamera;
+			data = transform_direction(&tfm, data);
+			data = env_world_emap(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_LIGHTPROBE: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_light_probe( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap_vertical_cross( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap_horizontal_cross( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_HEMI: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(data.y, -data.z, -data.x);
+			data = env_hemispherical( data );
 			break;
 		}
 	}
@@ -208,8 +427,26 @@ ccl_device void svm_node_tex_coord_bump_dy(KernelGlobals *kg,
 				tfm.y = read_node_float(kg, offset);
 				tfm.z = read_node_float(kg, offset);
 				tfm.w = read_node_float(kg, offset);
-				data = transform_point(&tfm, data);
+				data = transform_direction(&tfm, data);
 			}
+			break;
+		}
+		case NODE_TEXCO_WCS_BOX: {
+			data = sd->P + sd->dP.dy;
+			if (node.w == 0) {
+				if (sd->object != OBJECT_NONE) {
+					object_inverse_position_transform(kg, sd, &data);
+				}
+			}
+			else {
+				Transform tfm;
+				tfm.x = read_node_float(kg, offset);
+				tfm.y = read_node_float(kg, offset);
+				tfm.z = read_node_float(kg, offset);
+				tfm.w = read_node_float(kg, offset);
+				data = transform_direction(&tfm, data);
+			}
+			wcs_box_coord(kg, sd, &data);
 			break;
 		}
 		case NODE_TEXCO_NORMAL: {
@@ -221,9 +458,9 @@ ccl_device void svm_node_tex_coord_bump_dy(KernelGlobals *kg,
 			Transform tfm = kernel_data.cam.worldtocamera;
 
 			if(sd->object != OBJECT_NONE)
-				data = transform_point(&tfm, sd->P + sd->dP.dy);
+				data = transform_direction(&tfm, sd->P + sd->dP.dy);
 			else
-				data = transform_point(&tfm, sd->P + sd->dP.dy + camera_position(kg));
+				data = transform_direction(&tfm, sd->P + sd->dP.dy + camera_position(kg));
 			break;
 		}
 		case NODE_TEXCO_WINDOW: {
@@ -256,6 +493,46 @@ ccl_device void svm_node_tex_coord_bump_dy(KernelGlobals *kg,
 			if(sd->object != OBJECT_NONE)
 				data = volume_normalized_position(kg, sd, data);
 #endif
+			break;
+		}
+		case NODE_TEXCO_ENV_SPHERICAL: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(data.y, -data.z, -data.x);
+			data = env_spherical(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_EMAP: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(-data.z, data.x, -data.y);
+			Transform tfm = kernel_data.cam.worldtocamera;
+			data = transform_direction(&tfm, data);
+			data = env_world_emap(data);
+			break;
+		}
+		case NODE_TEXCO_ENV_LIGHTPROBE: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_light_probe( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap_vertical_cross( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = env_cubemap_horizontal_cross( data );
+			break;
+		}
+		case NODE_TEXCO_ENV_HEMI: {
+			data = get_reflected_incoming_ray(kg, sd);
+			data = make_float3(data.y, -data.z, -data.x);
+			data = env_hemispherical( data );
 			break;
 		}
 	}
