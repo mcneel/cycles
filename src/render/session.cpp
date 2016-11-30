@@ -126,7 +126,7 @@ Session::~Session()
 
 void Session::start()
 {
-	session_thread = new thread(function_bind(&Session::run, this));
+	session_thread = new thread(function_bind(&Session::run, this), -1, "The main Cycles session thread");
 }
 
 bool Session::ready_to_reset()
