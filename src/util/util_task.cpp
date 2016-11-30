@@ -248,7 +248,7 @@ void TaskScheduler::init(int num_threads)
 				}
 				threads[thread_index] = new thread(function_bind(&TaskScheduler::thread_run,
 				                                                 thread_index + 1),
-				                                   thread_group);
+				                                   thread_group, "a Cycles task thread");
 			}
 		}
 	}
@@ -372,7 +372,7 @@ DedicatedTaskPool::DedicatedTaskPool()
 	do_exit = false;
 	num = 0;
 
-	worker_thread = new thread(function_bind(&DedicatedTaskPool::thread_run, this));
+	worker_thread = new thread(function_bind(&DedicatedTaskPool::thread_run, this), -1, "a Cycles dedicated task pool worker thread");
 }
 
 DedicatedTaskPool::~DedicatedTaskPool()
