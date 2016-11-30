@@ -253,6 +253,9 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg, ShaderData *sd, ccl_a
 			case NODE_ATTR:
 				svm_node_attr(kg, sd, stack, node);
 				break;
+			case NODE_MATRIX_MATH:
+				svm_node_matrix_math(kg, sd, stack, node.y, node.z, node.w, &offset);
+				break;
 #  if NODES_FEATURE(NODE_FEATURE_BUMP)
 			case NODE_GEOMETRY_BUMP_DX:
 				svm_node_geometry_bump_dx(kg, sd, stack, node.y, node.z);
