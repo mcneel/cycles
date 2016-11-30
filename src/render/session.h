@@ -129,8 +129,9 @@ public:
 	TileManager tile_manager;
 	Stats stats;
 
-	function<void(RenderTile&)> write_render_tile_cb;
-	function<void(RenderTile&)> update_render_tile_cb;
+	function<void(RenderTile&)> write_render_tile_cb = nullptr;
+	function<void(RenderTile&)> update_render_tile_cb = nullptr;
+	function<void(int)> display_update_cb = nullptr;
 
 	explicit Session(const SessionParams& params);
 	~Session();

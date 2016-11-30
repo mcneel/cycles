@@ -285,18 +285,27 @@ void Session::run_gpu()
 
 			/* wait for tonemap */
 			if(!params.background) {
-				while(gpu_need_tonemap) {
-					if(progress.get_cancel())
-						break;
+				/* don't do tonemap on main thread
+				 * if display_update_cb has been set
+				 */
+				if (display_update_cb == nullptr) {
+					while (gpu_need_tonemap) {
+						if (progress.get_cancel())
+							break;
 
-					gpu_need_tonemap_cond.wait(buffers_lock);
+						gpu_need_tonemap_cond.wait(buffers_lock);
+					}
+				}
+				else {
+					if (gpu_need_tonemap)
+						tonemap(tile_manager.state.sample);
 				}
 			}
 
 			if(!device->error_message().empty())
 				progress.set_error(device->error_message());
 
-			tiles_written = update_progressive_refine(progress.get_cancel());
+			tiles_written = update_progressive_refine(progress.get_cancel() || display_update_cb != nullptr);
 
 			if(progress.get_cancel())
 				break;
@@ -592,7 +601,7 @@ void Session::run_cpu()
 			if(!device->error_message().empty())
 				progress.set_error(device->error_message());
 
-			tiles_written = update_progressive_refine(progress.get_cancel());
+			tiles_written = update_progressive_refine(progress.get_cancel() || display_update_cb!=nullptr);
 		}
 
 		progress.set_update();
@@ -707,6 +716,8 @@ void Session::run()
 
 bool Session::draw(BufferParams& buffer_params, DeviceDrawParams &draw_params)
 {
+	if (display_update_cb) return false;
+
 	if(device_use_gl)
 		return draw_gpu(buffer_params, draw_params);
 	else
@@ -953,6 +964,15 @@ bool Session::update_progressive_refine(bool cancel)
 			else {
 				if(update_render_tile_cb)
 					update_render_tile_cb(rtile);
+			}
+		}
+		{
+			if (pause_mutex.try_lock()) {
+				if (!pause && display_update_cb)
+				{
+					display_update_cb(sample);
+				}
+				pause_mutex.unlock();
 			}
 		}
 	}
