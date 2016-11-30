@@ -19,6 +19,8 @@
 
 /* OpenImageIO is used for all image file reading and writing. */
 
+#ifndef NO_OIIO_LOADING
+
 #include <OpenImageIO/imageio.h>
 
 #include "util/util_vector.h"
@@ -39,6 +41,11 @@ void util_image_resize_pixels(const vector<T>& input_pixels,
                               size_t *output_depth);
 
 CCL_NAMESPACE_END
+
+#else
+#include "OpenImageIO/typedesc.h"
+OIIO_NAMESPACE_USING
+#endif
 
 #endif /* __UTIL_IMAGE_H__ */
 

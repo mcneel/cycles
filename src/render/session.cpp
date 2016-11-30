@@ -101,7 +101,7 @@ Session::~Session()
 		wait();
 	}
 
-	if(!params.output_path.empty()) {
+	if(false /*!params.output_path.empty()*/) {
 		/* tonemap and write out image if requested */
 		delete display;
 
