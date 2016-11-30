@@ -250,6 +250,11 @@ ccl_device float linear_rgb_to_gray(float3 c)
 	return c.x*0.2126f + c.y*0.7152f + c.z*0.0722f;
 }
 
+ccl_device float linear_rgb_to_luminance(float3 c)
+{
+	return c.x*0.2989f + c.y*0.5870f + c.z*0.1140f;
+}
+
 CCL_NAMESPACE_END
 
 #endif /* __UTIL_COLOR_H__ */

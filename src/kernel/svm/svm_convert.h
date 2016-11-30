@@ -37,6 +37,12 @@ ccl_device void svm_node_convert(ShaderData *sd, float *stack, uint type, uint f
 			stack_store_float(stack, to, g);
 			break;
 		}
+		case NODE_CONVERT_CF2: {
+			float3 f = stack_load_float3(stack, from);
+			float g = linear_rgb_to_luminance(f);
+			stack_store_float(stack, to, g);
+			break;
+		}
 		case NODE_CONVERT_CI: {
 			float3 f = stack_load_float3(stack, from);
 			int i = (int)linear_rgb_to_gray(f);
