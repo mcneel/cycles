@@ -120,6 +120,8 @@ public:
 
 	device_memory& rgba_data();
 
+	void DisplayBuffer::get_pixels(Device *device, float* pixels);
+
 protected:
 	void device_free();
 
