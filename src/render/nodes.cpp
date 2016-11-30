@@ -5008,6 +5008,58 @@ void MathNode::compile(OSLCompiler& compiler)
 	compiler.add(this, "node_math");
 }
 
+/* MatrixMath */
+
+NODE_DEFINE(MatrixMathNode)
+{
+	NodeType* type = NodeType::add("matrix_math", create, NodeType::SHADER);
+
+	static NodeEnum type_enum;
+	type_enum.insert("Point", NODE_MATRIX_MATH_POINT);
+	type_enum.insert("Direction", NODE_MATRIX_MATH_DIRECTION);
+	type_enum.insert("Perspective", NODE_MATRIX_MATH_PERSPECTIVE);
+	type_enum.insert("Direction Transposed", NODE_MATRIX_MATH_DIR_TRANSPOSED);
+	SOCKET_ENUM(type, "Type", type_enum, NODE_MATRIX_MATH_POINT);
+
+	SOCKET_IN_VECTOR(vector, "Vector", make_float3(0.0f, 0.0f, 0.0f));
+	SOCKET_OUT_VECTOR(vector, "Vector");
+
+	return type;
+}
+
+MatrixMathNode::MatrixMathNode()
+: ShaderNode(node_type)
+{
+	tfm = transform_identity();
+}
+
+/* TODO: ADD MATRIXMATH CONSTANT FOLD THINGY */
+
+void MatrixMathNode::compile(SVMCompiler& compiler)
+{
+	ShaderInput *vector_in = input("Vector");
+	ShaderOutput *vector_out = output("Vector");
+
+	compiler.stack_assign(vector_in);
+	compiler.stack_assign(vector_out);
+
+	if(vector_in->stack_offset == SVM_STACK_INVALID || vector_out->stack_offset == SVM_STACK_INVALID)
+		return;
+
+	compiler.add_node(NODE_MATRIX_MATH, type, compiler.stack_assign(vector_in), compiler.stack_assign(vector_out));
+
+	compiler.add_node(tfm.x);
+	compiler.add_node(tfm.y);
+	compiler.add_node(tfm.z);
+	compiler.add_node(tfm.w);
+}
+
+void MatrixMathNode::compile(OSLCompiler& compiler)
+{
+	compiler.parameter("Matrix", tfm);
+	compiler.add(this, "node_matrix_math");
+}
+
 /* VectorMath */
 
 NODE_DEFINE(VectorMathNode)
