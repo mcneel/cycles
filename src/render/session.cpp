@@ -204,10 +204,15 @@ void Session::run_gpu()
 	progress.set_render_start_time();
 
 	while(!progress.get_cancel()) {
-		/* advance to next tile */
-		bool no_tiles = !tile_manager.next();
+		/* don't advance here, but in the if-else blocks. For
+		 * interactive sessions it can happen that we're
+		 * reseeding tile manager still, so we need to do it
+		 * behind a lock. */
+		bool no_tiles = false;
 
 		if(params.background) {
+			/* not interactive, can just advance to next tile */
+			no_tiles = !tile_manager.next();
 			/* if no work left and in background mode, we can stop immediately */
 			if(no_tiles) {
 				progress.set_status("Finished");
@@ -218,6 +223,8 @@ void Session::run_gpu()
 			/* if in interactive mode, and we are either paused or done for now,
 			 * wait for pause condition notify to wake up again */
 			thread_scoped_lock pause_lock(pause_mutex);
+			/* lock acquired, now we can advance to next tile */
+			no_tiles = !tile_manager.next();
 
 			if(!pause && !tile_manager.done()) {
 				/* reset could have happened after no_tiles was set, before this lock.
@@ -264,6 +271,7 @@ void Session::run_gpu()
 			 * sample, and released/reacquired on each iteration to allow
 			 * reset and draw in between */
 			thread_scoped_lock buffers_lock(buffers_mutex);
+			thread_scoped_lock display_lock(display_mutex);
 
 			/* update status and timing */
 			update_status_time();
@@ -343,6 +351,7 @@ bool Session::draw_cpu(BufferParams& buffer_params, DeviceDrawParams& draw_param
 		/* then verify the buffers have the expected size, so we don't
 		 * draw previous results in a resized window */
 		if(!buffer_params.modified(display->params)) {
+
 			display->draw(device, draw_params);
 
 			if(display_outdated && (time_dt() - reset_time) > params.text_timeout)
@@ -807,8 +816,6 @@ void Session::wait()
 
 void Session::update_scene()
 {
-	thread_scoped_lock scene_lock(scene->mutex);
-
 	/* update camera if dimensions changed for progressive render. the camera
 	 * knows nothing about progressive or cropped rendering, it just gets the
 	 * image dimensions passed in */
