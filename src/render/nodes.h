@@ -294,6 +294,14 @@ public:
 	float3 color;
 };
 
+class RGBToLuminanceNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(RGBToLuminanceNode)
+	void constant_fold(const ConstantFolder& folder);
+
+	float3 color;
+};
+
 class ConvertNode : public ShaderNode {
 public:
 	ConvertNode(SocketType::Type from, SocketType::Type to, bool autoconvert = false);
@@ -314,7 +322,7 @@ public:
 	ustring value_string;
 
 private:
-	static const int MAX_TYPE = 12;
+	static const int MAX_TYPE = 13;
 	static bool register_types();
 	static Node* create(const NodeType *type);
 	static const NodeType *node_types[MAX_TYPE][MAX_TYPE];
