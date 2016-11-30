@@ -79,6 +79,9 @@ NODE_DEFINE(Integrator)
 	sampling_pattern_enum.insert("sobol", SAMPLING_PATTERN_SOBOL);
 	sampling_pattern_enum.insert("cmj", SAMPLING_PATTERN_CMJ);
 	SOCKET_ENUM(sampling_pattern, "Sampling Pattern", sampling_pattern_enum, SAMPLING_PATTERN_SOBOL);
+#if defined(__NO_SOBOL__) 
+	SOCKET_ENUM(sampling_pattern, "Sampling Pattern", sampling_pattern_enum, SAMPLING_PATTERN_CMJ);
+#endif
 
 	return type;
 }

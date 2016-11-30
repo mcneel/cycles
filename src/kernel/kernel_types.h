@@ -160,7 +160,9 @@ CCL_NAMESPACE_BEGIN
 #endif  /* __KERNEL_OPENCL__ */
 
 /* kernel features */
+#ifndef __NO_SOBOL__
 #define __SOBOL__
+#endif
 #define __INSTANCING__
 #define __DPDU__
 #define __UV__
