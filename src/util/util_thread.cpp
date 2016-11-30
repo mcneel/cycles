@@ -21,12 +21,13 @@
 
 CCL_NAMESPACE_BEGIN
 
-thread::thread(function<void(void)> run_cb, int group)
+thread::thread(function<void(void)> run_cb, int group, const char *name)
   : run_cb_(run_cb),
     joined_(false),
 	group_(group)
 {
 	pthread_create(&pthread_id_, NULL, run, (void*)this);
+	pthread_setname_np(pthread_id_, name);
 }
 
 thread::~thread()
@@ -53,6 +54,10 @@ void *thread::run(void *arg)
 		}
 #endif
 	}
+#ifdef _WIN32
+	HANDLE thread_handle = GetCurrentThread();
+	SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
+#endif
 	self->run_cb_();
 	return NULL;
 }
