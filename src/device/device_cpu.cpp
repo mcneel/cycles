@@ -478,7 +478,7 @@ public:
 		float sample_scale = 1.0f/(task.sample + 1);
 
 		if(task.rgba_half) {
-			void(*convert_to_half_float_kernel)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int);
+			void(*convert_to_half_float_kernel)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int);
 #ifdef WITH_CYCLES_OPTIMIZED_KERNEL_AVX2
 			if(system_cpu_support_avx2()) {
 				convert_to_half_float_kernel = kernel_cpu_avx2_convert_to_half_float;
@@ -516,10 +516,10 @@ public:
 			for(int y = task.y; y < task.y + task.h; y++)
 				for(int x = task.x; x < task.x + task.w; x++)
 					convert_to_half_float_kernel(&kernel_globals, (uchar4*)task.rgba_half, (float*)task.buffer,
-						sample_scale, x, y, task.offset, task.stride);
+						sample_scale, x, y, task.offset, task.stride, task.skip_linear_to_srgb_conversion);
 		}
 		else {
-			void(*convert_to_byte_kernel)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int);
+			void(*convert_to_byte_kernel)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int);
 #ifdef WITH_CYCLES_OPTIMIZED_KERNEL_AVX2
 			if(system_cpu_support_avx2()) {
 				convert_to_byte_kernel = kernel_cpu_avx2_convert_to_byte;
@@ -557,7 +557,7 @@ public:
 			for(int y = task.y; y < task.y + task.h; y++)
 				for(int x = task.x; x < task.x + task.w; x++)
 					convert_to_byte_kernel(&kernel_globals, (uchar4*)task.rgba_byte, (float*)task.buffer,
-						sample_scale, x, y, task.offset, task.stride);
+						sample_scale, x, y, task.offset, task.stride, task.skip_linear_to_srgb_conversion);
 
 		}
 	}

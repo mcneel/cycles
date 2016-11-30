@@ -69,6 +69,7 @@ public:
 	bool need_finish_queue;
 	bool integrator_branched;
 	int2 requested_tile_size;
+	int skip_linear_to_srgb_conversion = 0;
 protected:
 	double last_update_time;
 };
