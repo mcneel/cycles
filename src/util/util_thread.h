@@ -52,7 +52,7 @@ typedef boost::condition_variable thread_condition_variable;
 
 class thread {
 public:
-	thread(function<void(void)> run_cb, int group = -1);
+	thread(function<void(void)> run_cb, int group = -1, const char* name = "a Cycles thread");
 	~thread();
 
 	static void *run(void *arg);
