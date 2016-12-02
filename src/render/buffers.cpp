@@ -449,14 +449,25 @@ void DisplayBuffer::get_pixels(Device *device, float* pixels)
 			tileidx = y * draw_width * 4 + x * 4;
 			f = make_float4(half_to_float(in[tileidx+0]), half_to_float(in[tileidx+1]), half_to_float(in[tileidx+2]), half_to_float(in[tileidx+3]));
 
-			/* scale up pixel if necessary, taking into account final image size*/
-			for (int target_y = y*sch; target_y < min(params.height, (y*sch+sch)); target_y++) {
-				for (int target_x = x*scw; target_x < min(params.width, (x*scw+scw)); target_x++) {
-					fullimgidx = (params.height - target_y - 1) * params.width * 4 + target_x * 4;
+			if (scw == 1 && sch == 1) {
+					fullimgidx = (params.height - y - 1) * params.width * 4 + x * 4;
 					pixels[fullimgidx + 0] = f.x;
 					pixels[fullimgidx + 1] = f.y;
 					pixels[fullimgidx + 2] = f.z;
 					pixels[fullimgidx + 3] = f.w;
+
+			}
+			else {
+
+				/* scale up pixel if necessary, taking into account final image size*/
+				for (int target_y = y*sch; target_y < min(params.height, (y*sch + sch)); target_y++) {
+					for (int target_x = x*scw; target_x < min(params.width, (x*scw + scw)); target_x++) {
+						fullimgidx = (params.height - target_y - 1) * params.width * 4 + target_x * 4;
+						pixels[fullimgidx + 0] = f.x;
+						pixels[fullimgidx + 1] = f.y;
+						pixels[fullimgidx + 2] = f.z;
+						pixels[fullimgidx + 3] = f.w;
+					}
 				}
 			}
 		}
