@@ -170,6 +170,7 @@ CCL_NAMESPACE_BEGIN
 #define __CLAMP_SAMPLE__
 #define __PATCH_EVAL__
 #define __SHADOW_TRICKS__
+#define __SHADOW_CATCHER_BACKGROUND__
 
 #ifdef __KERNEL_SHADING__
 #  define __SVM__
