@@ -108,9 +108,50 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 	}
 
-	glColor3f(1.0f, 1.0f, 1.0f);
-
 	if(rgba.data_type == TYPE_HALF) {
+		GLhalf *data_pointer = (GLhalf*)rgba.data_pointer;
+
+		data_pointer += 4*y*w;
+
+		GLuint texid;
+		glGenTextures(1, &texid);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texid);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F_ARB, w, h, 0, GL_RGBA, GL_HALF_FLOAT, data_pointer);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		GLint tex = glGetUniformLocation(draw_params.program, "tex");
+		GLint subsize = glGetUniformLocation(draw_params.program, "subsize");
+
+		glUniform1i(tex, 0);
+		// the x for subsize is used for debug purposes. Actual data in yzw
+		glUniform4f(subsize, 0.1f, (float)width, (float)dy, (float)dy + height);
+
+		GLuint temp_vao = 0;
+		glGenVertexArrays(1, &temp_vao);
+		glBindVertexArray(temp_vao);
+		GLuint temp_vbo = 0;
+		glGenBuffers(1, &temp_vbo);
+
+		static const float vertices[] = { -1,-1, 1,-1, 1,1, -1,1 };
+		glBindBuffer(GL_ARRAY_BUFFER, temp_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 8, vertices, GL_STREAM_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, nullptr);
+
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+		glDisableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glDeleteBuffers(1, &temp_vbo);
+		glBindVertexArray(0);
+		glDeleteVertexArrays(1, &temp_vao);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glDeleteTextures(1, &texid);
+
+#if OLDSTUFF
 		/* for multi devices, this assumes the inefficient method that we allocate
 		 * all pixels on the device even though we only render to a subset */
 		GLhalf *data_pointer = (GLhalf*)rgba.data_pointer;
@@ -198,10 +239,12 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glDisable(GL_TEXTURE_2D);
 		glDeleteTextures(1, &texid);
+#endif
 	}
 	else {
 		/* fallback for old graphics cards that don't support GLSL, half float,
 		 * and non-power-of-two textures */
+#if OLDSTUFF
 		glPixelZoom((float)width/(float)w, (float)height/(float)h);
 		glRasterPos2f(dx, dy);
 
@@ -213,6 +256,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 
 		glRasterPos2f(0.0f, 0.0f);
 		glPixelZoom(1.0f, 1.0f);
+#endif
 	}
 
 	if(transparent)

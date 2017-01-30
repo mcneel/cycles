@@ -23,6 +23,7 @@
 #include "device/device_task.h"
 
 #include "util/util_list.h"
+#include "util/util_opengl.h"
 #include "util/util_stats.h"
 #include "util/util_string.h"
 #include "util/util_thread.h"
@@ -235,6 +236,7 @@ std::ostream& operator <<(std::ostream &os,
 struct DeviceDrawParams {
 	function<void(void)> bind_display_space_shader_cb;
 	function<void(void)> unbind_display_space_shader_cb;
+	GLuint program;
 };
 
 class Device {
