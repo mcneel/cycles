@@ -176,12 +176,12 @@ bool Session::draw_gpu(BufferParams& buffer_params, DeviceDrawParams& draw_param
 		if(!buffer_params.modified(display->params)) {
 			/* for CUDA we need to do tonemapping still, since we can
 			 * only access GL buffers from the main thread */
-			if(gpu_need_tonemap) {
+			/*if(gpu_need_tonemap) {
 				thread_scoped_lock buffers_lock(buffers_mutex);
 				tonemap(tile_manager.state.sample);
 				gpu_need_tonemap = false;
 				gpu_need_tonemap_cond.notify_all();
-			}
+			}*/
 
 			display->draw(device, draw_params);
 
@@ -193,6 +193,62 @@ bool Session::draw_gpu(BufferParams& buffer_params, DeviceDrawParams& draw_param
 	}
 
 	return false;
+}
+
+bool Session::sample_gpu()
+{
+		bool no_tiles = !tile_manager.next();
+		bool end = false;
+
+		if(!no_tiles) {
+			/* update scene */
+			scoped_timer update_timer;	// TODO: probably move this into separate function
+																	// so we can call this from controlling code
+																	// when we deem it necessary ourselves.
+			update_scene();
+			progress.add_skip_time(update_timer, params.background);
+
+			if(!device->error_message().empty())
+				progress.set_error(device->error_message());
+
+			if (progress.get_cancel())
+				end = true;
+		}
+
+		if (!end && !no_tiles) {
+			/* update status and timing */
+			update_status_time();
+
+			/* render */
+			render();
+
+			device->task_wait();
+
+			if (!device->error_message().empty())
+				progress.set_cancel(device->error_message());
+
+			/* update status and timing */
+			update_status_time();
+
+			gpu_draw_ready = true;
+			progress.set_update();
+
+
+			if (!device->error_message().empty())
+				progress.set_error(device->error_message());
+
+			if (display != nullptr || !params.background) {
+				thread_scoped_lock display_lock(display_mutex);
+				tonemap(tile_manager.state.sample);
+			}
+
+			update_progressive_refine(true);
+
+			if (progress.get_cancel())
+				end = true;
+		}
+
+	return !no_tiles;
 }
 
 void Session::run_gpu()
@@ -550,6 +606,67 @@ void Session::unmap_neighbor_tiles(RenderTile *tiles, Device *tile_device)
 	device->unmap_neighbor_tiles(tile_device, tiles);
 }
 
+bool Session::sample_cpu()
+{
+		bool no_tiles = !tile_manager.next();
+		bool end = false;
+		if (delayed_reset.do_reset) {
+			reset_(delayed_reset.params, delayed_reset.samples);
+			delayed_reset.do_reset = false;
+		}
+
+		if(!no_tiles) {
+			/* update scene */
+			scoped_timer update_timer;	// TODO: probably move this into separate function
+																	// so we can call this from controlling code
+																	// when we deem it necessary ourselves.
+			update_scene();
+			progress.add_skip_time(update_timer, params.background);
+
+			if(!device->error_message().empty())
+				progress.set_error(device->error_message());
+
+			if (progress.get_cancel())
+				end = true;
+		}
+
+		if (!end && !no_tiles) {
+			/* update status and timing */
+			update_status_time();
+
+			/* render */
+			render();
+
+			device->task_wait();
+
+			if (!device->error_message().empty())
+				progress.set_cancel(device->error_message());
+
+			/* update status and timing */
+			update_status_time();
+
+			gpu_draw_ready = true;
+			progress.set_update();
+
+
+			if (!device->error_message().empty())
+				progress.set_error(device->error_message());
+
+			if (display != nullptr || !params.background) {
+				thread_scoped_lock display_lock(display_mutex);
+				tonemap(tile_manager.state.sample);
+			}
+
+			update_progressive_refine(true);
+
+
+			if (progress.get_cancel())
+				end = true;
+		}
+
+	return !no_tiles;
+}
+
 void Session::run_cpu()
 {
 	bool tiles_written = false;
@@ -784,6 +901,40 @@ void Session::run()
 		progress.set_status("Cancel", progress.get_cancel_message());
 	else
 		progress.set_update();
+}
+
+void Session::prepare_run()
+{
+	/* load kernels */
+	load_kernels();
+
+	/* session thread loop */
+	progress.set_status("Waiting for render to start");
+
+	/* reset number of rendered samples */
+	progress.reset_sample();
+	progress.set_render_start_time();
+
+	if (!device_use_gl) {
+		reset_(delayed_reset.params, delayed_reset.samples);
+		delayed_reset.do_reset = false;
+	}
+}
+
+bool Session::sample() {
+	if (device_use_gl)
+		return sample_gpu();
+	else
+		return sample_cpu();
+}
+
+void Session::end_run() {
+	/* progress update */
+	if(progress.get_cancel())
+		progress.set_status("Cancel", progress.get_cancel_message());
+	else
+		progress.set_update();
+
 }
 
 bool Session::draw(BufferParams& buffer_params, DeviceDrawParams &draw_params)
