@@ -149,8 +149,8 @@ void Session::reset_gpu(BufferParams& buffer_params, int samples)
 	/* block for buffer access and reset immediately. we can't do this
 	 * in the thread, because we need to allocate an OpenGL buffer, and
 	 * that only works in the main thread */
-	thread_scoped_lock display_lock(display_mutex);
 	thread_scoped_lock buffers_lock(buffers_mutex);
+	thread_scoped_lock display_lock(display_mutex);
 
 	display_outdated = true;
 	reset_time = time_dt();
