@@ -54,6 +54,10 @@ void *thread::run(void *arg)
 		}
 #endif
 	}
+#ifdef _WIN32
+	HANDLE thread_handle = GetCurrentThread();
+	SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
+#endif
 	self->run_cb_();
 	return NULL;
 }
