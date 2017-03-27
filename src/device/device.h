@@ -80,9 +80,19 @@ public:
 	}
 
 	bool operator==(const DeviceInfo &info) {
-		/* Multiple Devices with the same ID would be very bad. */
-		assert(id != info.id || (type == info.type && num == info.num && description == info.description));
-		return id == info.id;
+		if (id == "MULTI" && info.id == "MULTI") {
+			bool rc = false;
+			if (multi_devices.size() != info.multi_devices.size()) return false;
+			for (int i = 0; i < multi_devices.size(); i++) {
+				rc |= multi_devices[i] == info.multi_devices[i];
+			}
+			return rc;
+		}
+		else {
+			/* Multiple Devices with the same ID would be very bad. */
+			assert(id != info.id || (type == info.type && num == info.num && description == info.description));
+			return id == info.id;
+		}
 	}
 };
 
