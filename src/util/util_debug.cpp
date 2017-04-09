@@ -148,7 +148,8 @@ std::ostream& operator <<(std::ostream &os,
 	   << "  Split  : " << string_from_bool(debug_flags.cpu.split_kernel) << "\n";
 
 	os << "CUDA flags:\n"
-	   << " Adaptive Compile: " << string_from_bool(debug_flags.cuda.adaptive_compile) << "\n";
+	   << " Adaptive Compile: " << string_from_bool(debug_flags.cuda.adaptive_compile) << "\n"
+	   << " Split Kernel: " << string_from_bool(debug_flags.cuda.split_kernel) << "\n";
 
 	const char *opencl_device_type,
 	           *opencl_kernel_type;
