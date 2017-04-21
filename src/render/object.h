@@ -54,6 +54,7 @@ public:
 	bool hide_on_missing_motion;
 	bool use_holdout;
 	bool is_shadow_catcher;
+	bool mesh_light_no_cast_shadow;
 
 	float3 dupli_generated;
 	float2 dupli_uv;
