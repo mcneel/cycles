@@ -605,6 +605,12 @@ void ObjectManager::device_update_flags(Device *device,
 		else {
 			object_flag[object_index] &= ~SD_OBJECT_SHADOW_CATCHER;
 		}
+		if(object->mesh_light_no_cast_shadow) {
+			object_flag[object_index] |= SD_OBJECT_LIGHT_NO_CAST_SHADOWS;
+		}
+		else {
+			object_flag[object_index] &= ~SD_OBJECT_LIGHT_NO_CAST_SHADOWS;
+		}
 
 		if(bounds_valid) {
 			foreach(Object *volume_object, volume_objects) {

@@ -846,6 +846,8 @@ enum ShaderDataObjectFlag {
 	SD_OBJECT_HAS_VERTEX_MOTION      = (1 << 6),
 	/* object is used to catch shadows */
 	SD_OBJECT_SHADOW_CATCHER         = (1 << 7),
+	/* object is mesh lamp, but doesn't cast shadows */
+	SD_OBJECT_LIGHT_NO_CAST_SHADOWS  = (1 << 8),
 
 	SD_OBJECT_FLAGS = (SD_OBJECT_HOLDOUT_MASK |
 	                   SD_OBJECT_MOTION |
