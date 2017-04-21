@@ -960,6 +960,8 @@ enum ShaderDataObjectFlag {
 	SD_OBJECT_SHADOW_CATCHER         = (1 << 7),
 	/* object has volume attributes */
 	SD_OBJECT_HAS_VOLUME_ATTRIBUTES  = (1 << 8),
+	/* object is mesh lamp, but doesn't cast shadows */
+	SD_OBJECT_LIGHT_NO_CAST_SHADOWS  = (1 << 9),
 
 	SD_OBJECT_FLAGS = (SD_OBJECT_HOLDOUT_MASK |
 	                   SD_OBJECT_MOTION |
