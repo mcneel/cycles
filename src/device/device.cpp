@@ -105,7 +105,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 
 	if(transparent) {
 		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
 
 	if(rgba.data_type == TYPE_HALF) {
@@ -123,10 +123,12 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 
 		GLint tex = glGetUniformLocation(draw_params.program, "tex");
 		GLint subsize = glGetUniformLocation(draw_params.program, "subsize");
+		GLint alpha = glGetUniformLocation(draw_params.program, "alpha");
 
 		glUniform1i(tex, 0);
 		// the x for subsize is used for debug purposes. Actual data in yzw
 		glUniform4f(subsize, 0.1f, (float)width, (float)dy, (float)dy + height);
+		glUniform1f(alpha, draw_params.alpha);
 
 		GLuint temp_vao = 0;
 		glGenVertexArrays(1, &temp_vao);

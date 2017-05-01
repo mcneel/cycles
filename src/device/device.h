@@ -237,6 +237,7 @@ struct DeviceDrawParams {
 	function<void(void)> bind_display_space_shader_cb;
 	function<void(void)> unbind_display_space_shader_cb;
 	GLuint program;
+	GLfloat alpha;
 };
 
 class Device {
