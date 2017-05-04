@@ -45,11 +45,14 @@ NODE_DEFINE(Object)
 	SOCKET_UINT(random_id, "Random ID", 0);
 	SOCKET_INT(pass_id, "Pass ID", 0);
 	SOCKET_BOOLEAN(use_holdout, "Use Holdout", false);
+	SOCKET_BOOLEAN(use_cutout, "Use Cutout", false);
+	SOCKET_BOOLEAN(ignore_cutout, "Ignore Cutout", false);
 	SOCKET_BOOLEAN(hide_on_missing_motion, "Hide on Missing Motion", false);
 	SOCKET_POINT(dupli_generated, "Dupli Generated", make_float3(0.0f, 0.0f, 0.0f));
 	SOCKET_POINT2(dupli_uv, "Dupli UV", make_float2(0.0f, 0.0f));
 
 	SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
+	SOCKET_BOOLEAN(mesh_light_no_cast_shadow, "No Cast Shadow", false);
 
 	return type;
 }
@@ -413,6 +416,12 @@ void ObjectManager::device_update_object_transform(UpdateObejctTransformState *s
 	/* Object flag. */
 	if(ob->use_holdout) {
 		flag |= SD_OBJECT_HOLDOUT_MASK;
+	}
+	if(ob->use_cutout) {
+		flag |= SD_OBJECT_CUTOUT;
+	}
+	if (ob->ignore_cutout) {
+		flag |= SD_OBJECT_IGNORE_CUTOUT;
 	}
 	state->object_flag[object_index] = flag;
 

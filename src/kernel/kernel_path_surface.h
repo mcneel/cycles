@@ -363,5 +363,28 @@ ccl_device bool kernel_path_surface_bounce(KernelGlobals *kg,
 	}
 }
 
+#ifdef __CUTOUT__
+ccl_device_inline bool kernel_path_surface_cutout(const ShaderData *sd,
+                                                  ccl_addr_space PathState *state,
+                                                  ccl_addr_space Ray *ray)
+{
+	if(sd->object_flag & SD_OBJECT_CUTOUT) {
+		if(sd->flag & SD_BACKFACING) {
+			state->cutout_depth = max(state->cutout_depth - 1, 0);
+		}
+		else {
+			++state->cutout_depth;
+		}
+		ray->P = ray_offset(sd->P, -sd->Ng);
+		return true;
+	}
+	else if(state->cutout_depth > 0 && (sd->object_flag & SD_OBJECT_IGNORE_CUTOUT)==0) {
+		ray->P = ray_offset(sd->P, -sd->Ng);
+		return true;
+	}
+	return false;
+}
+#endif  /* __CUTOUT__ */
+
 CCL_NAMESPACE_END
 
