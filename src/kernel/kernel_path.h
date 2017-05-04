@@ -321,6 +321,13 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 		}
 #endif  /* __SHADOW_TRICKS__ */
 
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(sd, state, ray)) {
+			continue;
+		}
+#endif  /* __CUTOUT__ */
+
 		/* blurring of bsdf after bounces, for rays that have a small likelihood
 		 * of following this particular path (diffuse, rough glossy) */
 		if(kernel_data.integrator.filter_glossy != FLT_MAX) {
@@ -649,6 +656,13 @@ ccl_device_inline float4 kernel_path_integrate(KernelGlobals *kg,
 			state.flag &= ~PATH_RAY_SHADOW_CATCHER_ONLY;
 		}
 #endif  /* __SHADOW_TRICKS__ */
+
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(&sd, &state, &ray)) {
+			continue;
+		}
+#endif  /* __CUTOUT__ */
 
 		/* holdout */
 #ifdef __HOLDOUT__

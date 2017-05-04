@@ -169,6 +169,7 @@ CCL_NAMESPACE_BEGIN
 #define __INTERSECTION_REFINE__
 #define __CLAMP_SAMPLE__
 #define __PATCH_EVAL__
+#define __CUTOUT__
 #define __SHADOW_TRICKS__
 #define __SHADOW_CATCHER_BACKGROUND__
 
@@ -848,6 +849,10 @@ enum ShaderDataObjectFlag {
 	SD_OBJECT_SHADOW_CATCHER         = (1 << 7),
 	/* object is mesh lamp, but doesn't cast shadows */
 	SD_OBJECT_LIGHT_NO_CAST_SHADOWS  = (1 << 8),
+	/* Object with cutout option was hit. */
+	SD_OBJECT_CUTOUT                 = (1 << 9),
+	/* Object with cutout option was hit. */
+	SD_OBJECT_IGNORE_CUTOUT          = (1 << 10),
 
 	SD_OBJECT_FLAGS = (SD_OBJECT_HOLDOUT_MASK |
 	                   SD_OBJECT_MOTION |
@@ -855,7 +860,10 @@ enum ShaderDataObjectFlag {
 	                   SD_OBJECT_NEGATIVE_SCALE_APPLIED |
 	                   SD_OBJECT_HAS_VOLUME |
 	                   SD_OBJECT_INTERSECTS_VOLUME |
-	                   SD_OBJECT_SHADOW_CATCHER)
+	                   SD_OBJECT_SHADOW_CATCHER |
+	                   SD_OBJECT_LIGHT_NO_CAST_SHADOWS |
+	                   SD_OBJECT_CUTOUT |
+	                   SD_OBJECT_IGNORE_CUTOUT)
 };
 
 typedef ccl_addr_space struct ShaderData {
@@ -977,6 +985,10 @@ typedef struct PathState {
 
 #ifdef __SHADOW_TRICKS__
 	int catcher_object;
+#endif
+
+#ifdef __CUTOUT__
+	int cutout_depth;
 #endif
 } PathState;
 

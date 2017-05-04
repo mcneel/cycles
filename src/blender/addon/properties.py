@@ -1076,6 +1076,11 @@ class CyclesObjectSettings(bpy.types.PropertyGroup):
                 description="Allow this object and its duplicators to be culled by camera space culling",
                 default=False,
                 )
+        cls.use_cutout = BoolProperty(
+                name="Cutout Object",
+                description="Use the object as a cutout for other objects",
+                default=False,
+                )
 
         cls.use_distance_cull = BoolProperty(
                 name="Use Distance Cull",

@@ -487,6 +487,13 @@ ccl_device float4 kernel_branched_path_integrate(KernelGlobals *kg, RNG *rng, in
 		}
 #endif  /* __SHADOW_TRICKS__ */
 
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(&sd, &state, &ray)) {
+			continue;
+		}
+#endif  /* __CUTOUT__ */
+
 		/* holdout */
 #ifdef __HOLDOUT__
 		if((sd.flag & SD_HOLDOUT) || (sd.object_flag & SD_OBJECT_HOLDOUT_MASK)) {
