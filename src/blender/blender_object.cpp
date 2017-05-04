@@ -308,7 +308,9 @@ Object *BlenderSync::sync_object(BL::Object& b_parent,
 	if(object_map.sync(&object, b_ob, b_parent, key))
 		object_updated = true;
 	
-	bool use_holdout = (layer_flag & render_layer.holdout_layer) != 0;
+	PointerRNA cobject = RNA_pointer_get(&b_ob.ptr, "cycles");
+	const bool use_holdout = (layer_flag & render_layer.holdout_layer) != 0;
+	const bool use_cutout = get_boolean(cobject, "use_cutout");
 	
 	/* mesh sync */
 	object->mesh = sync_mesh(b_ob, object_updated, hide_tris);
@@ -318,6 +320,13 @@ Object *BlenderSync::sync_object(BL::Object& b_parent,
 	/* holdout */
 	if(use_holdout != object->use_holdout) {
 		object->use_holdout = use_holdout;
+		scene->object_manager->tag_update(scene);
+		object_updated = true;
+	}
+
+	/* cutout */
+	if(use_cutout != object->use_cutout) {
+		object->use_cutout = use_cutout;
 		scene->object_manager->tag_update(scene);
 		object_updated = true;
 	}
