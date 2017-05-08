@@ -488,6 +488,17 @@ ccl_device void kernel_branched_path_integrate(KernelGlobals *kg,
 
 		/* setup shading */
 		shader_setup_from_ray(kg, &sd, &isect, &ray);
+
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(&sd, &state, &ray)) {
+			continue;
+		}
+		if (state.cutout_cap == 1 && cutout_shader_set(&state)) {
+			sd.shader = cutout_get_shader(&state);
+		}
+#endif  /* __CUTOUT__ */
+
 		shader_eval_surface(kg, &sd, &state, 0.0f, state.flag, SHADER_CONTEXT_MAIN);
 		shader_merge_closures(&sd);
 
@@ -508,13 +519,6 @@ ccl_device void kernel_branched_path_integrate(KernelGlobals *kg,
 				average(shader_bsdf_transparency(kg, &sd));
 		}
 #endif  /* __SHADOW_TRICKS__ */
-
-		/* cutout */
-#ifdef __CUTOUT__
-		if(kernel_path_surface_cutout(&sd, &state, &ray)) {
-			continue;
-		}
-#endif  /* __CUTOUT__ */
 
 		/* holdout */
 #ifdef __HOLDOUT__

@@ -303,6 +303,16 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 		                      sd,
 		                      &isect,
 		                      ray);
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(sd, state, ray)) {
+			continue;
+		}
+		if (state->cutout_cap == 1 && cutout_shader_set(state)) {
+			sd->shader = cutout_get_shader(state);
+		}
+#endif  /* __CUTOUT__ */
+
 		float rbsdf = path_state_rng_1D_for_decision(kg, state, PRNG_BSDF);
 		shader_eval_surface(kg, sd, state, rbsdf, state->flag, SHADER_CONTEXT_INDIRECT);
 #ifdef __BRANCHED_PATH__
@@ -318,13 +328,6 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 				average(shader_bsdf_transparency(kg, sd));
 		}
 #endif  /* __SHADOW_TRICKS__ */
-
-		/* cutout */
-#ifdef __CUTOUT__
-		if(kernel_path_surface_cutout(sd, state, ray)) {
-			continue;
-		}
-#endif  /* __CUTOUT__ */
 
 		/* blurring of bsdf after bounces, for rays that have a small likelihood
 		 * of following this particular path (diffuse, rough glossy) */
@@ -633,7 +636,18 @@ ccl_device_inline void kernel_path_integrate(KernelGlobals *kg,
 
 		/* setup shading */
 		shader_setup_from_ray(kg, &sd, &isect, &ray);
-		float rbsdf = path_state_rng_1D_for_decision(kg, &state, PRNG_BSDF);
+		float rbsdf = path_state_rng_1D_for_decision(kg,  &state, PRNG_BSDF);
+
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(&sd, &state, &ray)) {
+			continue;
+		}
+		if (state.cutout_cap == 1 && cutout_shader_set(&state)) {
+			sd.shader = cutout_get_shader(&state);
+		}
+#endif  /* __CUTOUT__ */
+
 		shader_eval_surface(kg, &sd, &state, rbsdf, state.flag, SHADER_CONTEXT_MAIN);
 
 #ifdef __SHADOW_TRICKS__
@@ -655,13 +669,6 @@ ccl_device_inline void kernel_path_integrate(KernelGlobals *kg,
 			        average(shader_bsdf_transparency(kg, &sd));
 		}
 #endif  /* __SHADOW_TRICKS__ */
-
-		/* cutout */
-#ifdef __CUTOUT__
-		if(kernel_path_surface_cutout(&sd, &state, &ray)) {
-			continue;
-		}
-#endif  /* __CUTOUT__ */
 
 		/* holdout */
 #ifdef __HOLDOUT__
