@@ -29,7 +29,9 @@
 #  define __KERNEL_AVX2__
 #endif
 
+#ifndef __SPLIT_KERNEL__
 #define __SPLIT_KERNEL__
+#endif
 
 #include "util/util_optimization.h"
 

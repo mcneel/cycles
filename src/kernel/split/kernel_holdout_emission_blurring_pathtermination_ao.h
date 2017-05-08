@@ -106,11 +106,12 @@ ccl_device void kernel_holdout_emission_blurring_pathtermination_ao(
 	ShaderData *sd = &kernel_split_state.sd[ray_index];
 	ccl_global float *buffer = kernel_split_params.buffer;
 
-	if(IS_STATE(ray_state, ray_index, RAY_ACTIVE)) {
-
+	if (IS_STATE(ray_state, ray_index, RAY_ACTIVE)) {
 		throughput = kernel_split_state.throughput[ray_index];
 		state = &kernel_split_state.path_state[ray_index];
+	}
 
+	if (IS_STATE(ray_state, ray_index, RAY_ACTIVE)) {
 		work_index = kernel_split_state.work_array[ray_index];
 		sample = get_work_sample(kg, work_index, ray_index) + kernel_split_params.start_sample;
 		get_work_pixel_tile_position(kg, &pixel_x, &pixel_y,
@@ -260,7 +261,6 @@ ccl_device void kernel_holdout_emission_blurring_pathtermination_ao(
 	}
 #endif  /* __AO__ */
 	kernel_split_state.rng[ray_index] = rng;
-
 
 #ifndef __COMPUTE_DEVICE_GPU__
 	}

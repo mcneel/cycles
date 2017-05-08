@@ -359,21 +359,69 @@ ccl_device bool kernel_path_surface_bounce(KernelGlobals *kg,
 }
 
 #ifdef __CUTOUT__
+
+ccl_device_inline bool cutout_shader_set(ccl_addr_space PathState *state)
+{
+	bool rc = false;
+	for (int i = 0; i < CUTOUT_STACK_SIZE; i++) {
+		rc = state->cutout_shader[i] != -1;
+		if (rc ) break;
+	}
+	return rc;
+}
+
+ccl_device_inline int cutout_get_shader(ccl_addr_space PathState *state)
+{
+	for (int i = CUTOUT_STACK_SIZE - 1; i >= 0; i--) {
+		if (state->cutout_shader[i] != -1) {
+			return state->cutout_shader[i];
+		}
+	}
+	return -1;
+}
+
 ccl_device_inline bool kernel_path_surface_cutout(const ShaderData *sd,
                                                   ccl_addr_space PathState *state,
                                                   ccl_addr_space Ray *ray)
 {
 	if(sd->object_flag & SD_OBJECT_CUTOUT) {
-		if(sd->flag & SD_BACKFACING) {
-			state->cutout_depth = max(state->cutout_depth - 1, 0);
-		}
-		else {
-			++state->cutout_depth;
+		if ((state->flag & PATH_RAY_CAMERA)) {
+			if (sd->flag & SD_BACKFACING) {
+				state->cutout_depth = max(state->cutout_depth - 1, 0);
+				state->cutout_cap = state->cutout_depth == 0 && cutout_shader_set(state) ? 1 : 0;
+				if(state->cutout_cap==0) ray->P = ray_offset(sd->P, -sd->Ng);
+				return state->cutout_cap!=1;
+			}
+			else {
+				++state->cutout_depth;
+			}
 		}
 		ray->P = ray_offset(sd->P, -sd->Ng);
 		return true;
 	}
-	else if(state->cutout_depth > 0 && (sd->object_flag & SD_OBJECT_IGNORE_CUTOUT)==0) {
+	else if(state->cutout_depth > 0 && !(sd->object_flag & SD_OBJECT_IGNORE_CUTOUT)) {
+		if (sd->flag & SD_BACKFACING) {
+			for (int i = CUTOUT_STACK_SIZE - 1; i >= 0; i--)
+			{
+				if (state->cutout_shader[i] != -1) {
+					state->cutout_shader[i] = -1;
+					break;
+				}
+			}
+		}
+		else {
+			for (int i = 0; i < CUTOUT_STACK_SIZE; i++) {
+				if (state->cutout_shader[i] == -1) {
+					state->cutout_shader[i] = sd->shader;
+					break;
+				}
+			}
+		}
+		ray->P = ray_offset(sd->P, -sd->Ng);
+		return true;
+	}
+	else if (state->cutout_cap == 1 && cutout_shader_set(state))
+	{
 		ray->P = ray_offset(sd->P, -sd->Ng);
 		return true;
 	}

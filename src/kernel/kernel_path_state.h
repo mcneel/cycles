@@ -61,6 +61,10 @@ ccl_device_inline void path_state_init(KernelGlobals *kg,
 
 #ifdef __CUTOUT__
 	state->cutout_depth = 0;
+	state->cutout_cap = 0;
+	for (int ci = 0; ci < CUTOUT_STACK_SIZE; ci++) {
+		state->cutout_shader[ci] = -1;
+	}
 #endif  /* __CUTOUT__ */
 }
 

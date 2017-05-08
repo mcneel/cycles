@@ -434,8 +434,7 @@ ccl_device_inline bool shadow_blocked(KernelGlobals *kg,
 	 * path because we don't want catcher object to be casting shadow here.
 	 */
 #ifdef __TRANSPARENT_SHADOWS__
-	if(!kernel_data.integrator.transparent_shadows &&
-	   skip_object == OBJECT_NONE)
+	if(!kernel_data.integrator.transparent_shadows && skip_object == OBJECT_NONE)
 #endif
 	{
 		return shadow_blocked_opaque(kg,

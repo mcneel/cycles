@@ -62,17 +62,17 @@ ccl_device void kernel_subsurface_scatter(KernelGlobals *kg,
 	ShaderData *sd = &kernel_split_state.sd[ray_index];
 	ShaderData *emission_sd = &kernel_split_state.sd_DL_shadow[ray_index];
 
-	if(IS_STATE(ray_state, ray_index, RAY_ACTIVE)) {
-		if(sd->flag & SD_BSSRDF) {
-			if(kernel_path_subsurface_scatter(kg,
-			                                  sd,
-			                                  emission_sd,
-			                                  L,
-			                                  state,
-			                                  &rng,
-			                                  ray,
-			                                  throughput,
-			                                  ss_indirect)) {
+	if (IS_STATE(ray_state, ray_index, RAY_ACTIVE)) {
+		if (sd->flag & SD_BSSRDF) {
+			if (kernel_path_subsurface_scatter(kg,
+				sd,
+				emission_sd,
+				L,
+				state,
+				&rng,
+				ray,
+				throughput,
+				ss_indirect)) {
 				ASSIGN_RAY_STATE(ray_state, ray_index, RAY_UPDATE_BUFFER);
 				enqueue_flag = 1;
 			}
