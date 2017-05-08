@@ -55,6 +55,7 @@ CCL_NAMESPACE_BEGIN
 #define LAMP_NONE				(~0)
 
 #define VOLUME_STACK_SIZE		16
+#define CUTOUT_STACK_SIZE		16
 
 #define WORK_POOL_SIZE_GPU 64
 #define WORK_POOL_SIZE_CPU 1
@@ -1035,6 +1036,8 @@ typedef struct PathState {
 
 #ifdef __CUTOUT__
 	int cutout_depth;
+	int cutout_cap;
+	int cutout_shader[CUTOUT_STACK_SIZE];
 #endif
 } PathState;
 
