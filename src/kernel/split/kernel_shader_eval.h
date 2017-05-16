@@ -56,14 +56,15 @@ ccl_device void kernel_shader_eval(KernelGlobals *kg,
 		Intersection isect = kernel_split_state.isect[ray_index];
 		RNG rng = kernel_split_state.rng[ray_index];
 		ccl_global PathState *state = &kernel_split_state.path_state[ray_index];
-		ccl_global Ray *ray = &kernel_split_state.ray[ray_index];
+		Ray ray = kernel_split_state.ray[ray_index];
+		ccl_global Ray *gray = &kernel_split_state.ray[ray_index];
 
 		shader_setup_from_ray(kg,
 		                      &kernel_split_state.sd[ray_index],
 		                      &isect,
-		                      ray);
+		                      &ray);
 #ifdef __CUTOUT__
-		if (kernel_path_surface_cutout(&kernel_split_state.sd[ray_index], state, ray)) {
+		if (kernel_path_surface_cutout(&kernel_split_state.sd[ray_index], state, gray)) {
 			ASSIGN_RAY_STATE(kernel_split_state.ray_state, ray_index, RAY_REGENERATED);
 		}
 		if(IS_STATE(kernel_split_state.ray_state, ray_index, RAY_ACTIVE))
