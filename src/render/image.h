@@ -62,6 +62,7 @@ public:
 	                      InterpolationType interpolation,
 	                      ExtensionType extension,
 	                      bool use_alpha);
+	void tag_reload_image(const string& filename);
 	ImageDataType get_image_metadata(const string& filename, void *builtin_data, bool& is_linear);
 
 	void device_prepare_update(DeviceScene *dscene);
