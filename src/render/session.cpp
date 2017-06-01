@@ -196,56 +196,56 @@ bool Session::draw_gpu(BufferParams& buffer_params, DeviceDrawParams& draw_param
 
 bool Session::sample_gpu()
 {
-		bool no_tiles = !tile_manager.next();
-		bool end = false;
+	bool no_tiles = !tile_manager.next();
+	bool end = false;
 
-		if(!no_tiles) {
-			/* update scene */
-			scoped_timer update_timer;	// TODO: probably move this into separate function
-																	// so we can call this from controlling code
-																	// when we deem it necessary ourselves.
-			update_scene();
-			progress.add_skip_time(update_timer, params.background);
+	if (!no_tiles) {
+		/* update scene */
+		scoped_timer update_timer;	// TODO: probably move this into separate function
+																// so we can call this from controlling code
+																// when we deem it necessary ourselves.
+		update_scene();
+		progress.add_skip_time(update_timer, params.background);
 
-			if(!device->error_message().empty())
-				progress.set_error(device->error_message());
+		if (!device->error_message().empty())
+			progress.set_error(device->error_message());
 
-			if (progress.get_cancel())
-				end = true;
+		if (progress.get_cancel())
+			end = true;
+	}
+
+	if (!end && !no_tiles) {
+		/* update status and timing */
+		update_status_time();
+
+		/* path trace */
+		path_trace();
+
+		device->task_wait();
+
+		if (!device->error_message().empty())
+			progress.set_cancel(device->error_message());
+
+		/* update status and timing */
+		update_status_time();
+
+		gpu_draw_ready = true;
+		progress.set_update();
+
+
+		if (!device->error_message().empty())
+			progress.set_error(device->error_message());
+
+		if (!params.background) {
+			thread_scoped_lock display_lock(display_mutex);
+			tonemap(tile_manager.state.sample);
 		}
 
-		if (!end && !no_tiles) {
-			/* update status and timing */
-			update_status_time();
+		update_progressive_refine(true);
 
-			/* path trace */
-			path_trace();
-
-			device->task_wait();
-
-			if (!device->error_message().empty())
-				progress.set_cancel(device->error_message());
-
-			/* update status and timing */
-			update_status_time();
-
-			gpu_draw_ready = true;
-			progress.set_update();
-
-
-			if (!device->error_message().empty())
-				progress.set_error(device->error_message());
-
-			if (!params.background) {
-				thread_scoped_lock display_lock(display_mutex);
-				tonemap(tile_manager.state.sample);
-			}
-
-			update_progressive_refine(true);
-
-			if (progress.get_cancel())
-				end = true;
-		}
+		if (progress.get_cancel())
+			end = true;
+	}
 
 	return !no_tiles;
 }
@@ -550,61 +550,61 @@ void Session::release_tile(RenderTile& rtile)
 
 bool Session::sample_cpu()
 {
-		bool no_tiles = !tile_manager.next();
-		bool end = false;
-		if (delayed_reset.do_reset) {
-			reset_(delayed_reset.params, delayed_reset.samples);
-			delayed_reset.do_reset = false;
+	bool no_tiles = !tile_manager.next();
+	bool end = false;
+	if (delayed_reset.do_reset) {
+		reset_(delayed_reset.params, delayed_reset.samples);
+		delayed_reset.do_reset = false;
+	}
+
+	if (!no_tiles) {
+		/* update scene */
+		scoped_timer update_timer;	// TODO: probably move this into separate function
+																// so we can call this from controlling code
+																// when we deem it necessary ourselves.
+		update_scene();
+		progress.add_skip_time(update_timer, params.background);
+
+		if (!device->error_message().empty())
+			progress.set_error(device->error_message());
+
+		if (progress.get_cancel())
+			end = true;
+	}
+
+	if (!end && !no_tiles) {
+		/* update status and timing */
+		update_status_time();
+
+		/* path trace */
+		path_trace();
+
+		device->task_wait();
+
+		if (!device->error_message().empty())
+			progress.set_cancel(device->error_message());
+
+		/* update status and timing */
+		update_status_time();
+
+		gpu_draw_ready = true;
+		progress.set_update();
+
+
+		if (!device->error_message().empty())
+			progress.set_error(device->error_message());
+
+		if (!params.background) {
+			thread_scoped_lock display_lock(display_mutex);
+			tonemap(tile_manager.state.sample);
 		}
 
-		if(!no_tiles) {
-			/* update scene */
-			scoped_timer update_timer;	// TODO: probably move this into separate function
-																	// so we can call this from controlling code
-																	// when we deem it necessary ourselves.
-			update_scene();
-			progress.add_skip_time(update_timer, params.background);
-
-			if(!device->error_message().empty())
-				progress.set_error(device->error_message());
-
-			if (progress.get_cancel())
-				end = true;
-		}
-
-		if (!end && !no_tiles) {
-			/* update status and timing */
-			update_status_time();
-
-			/* path trace */
-			path_trace();
-
-			device->task_wait();
-
-			if (!device->error_message().empty())
-				progress.set_cancel(device->error_message());
-
-			/* update status and timing */
-			update_status_time();
-
-			gpu_draw_ready = true;
-			progress.set_update();
+		update_progressive_refine(true);
 
 
-			if (!device->error_message().empty())
-				progress.set_error(device->error_message());
-
-			if (!params.background) {
-				thread_scoped_lock display_lock(display_mutex);
-				tonemap(tile_manager.state.sample);
-			}
-
-			update_progressive_refine(true);
-
-
-			if (progress.get_cancel())
-				end = true;
-		}
+		if (progress.get_cancel())
+			end = true;
+	}
 
 	return !no_tiles;
 }
