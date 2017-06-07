@@ -69,6 +69,8 @@ public:
 	bool sample_all_lights_indirect;
 	float light_sampling_threshold;
 
+	bool no_shadows;
+
 	enum Method {
 		BRANCHED_PATH = 0,
 		PATH = 1,
