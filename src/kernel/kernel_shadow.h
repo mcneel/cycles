@@ -76,6 +76,8 @@ ccl_device bool shadow_blocked_opaque(KernelGlobals *kg,
                                       Intersection *isect,
                                       float3 *shadow)
 {
+	if (kernel_data.integrator.no_shadows) return false;
+
 	const bool blocked = scene_intersect(kg,
 	                                     *ray,
 	                                     PATH_RAY_SHADOW_OPAQUE,
@@ -418,7 +420,7 @@ ccl_device_inline bool shadow_blocked(KernelGlobals *kg,
 	Intersection isect;
 	/* Some common early checks. */
 	*shadow = make_float3(1.0f, 1.0f, 1.0f);
-	if(ray->t == 0.0f) {
+	if(kernel_data.integrator.no_shadows || ray->t == 0.0f) {
 		return false;
 	}
 #ifdef __SHADOW_TRICKS__
