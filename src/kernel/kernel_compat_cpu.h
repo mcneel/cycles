@@ -67,7 +67,11 @@ CCL_NAMESPACE_BEGIN
 /* Assertions inside the kernel only work for the CPU device, so we wrap it in
  * a macro which is empty for other devices */
 
+#ifdef _ENABLE_KERNEL_ASSERT
 #define kernel_assert(cond) assert(cond)
+#else
+#define kernel_assert(cond)
+#endif
 
 /* Texture types to be compatible with CUDA textures. These are really just
  * simple arrays and after inlining fetch hopefully revert to being a simple
