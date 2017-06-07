@@ -409,6 +409,7 @@ public:
 
 				for(int y = tile.y; y < tile.y + tile.h; y++) {
 					for(int x = tile.x; x < tile.x + tile.w; x++) {
+						if(task.get_cancel()) break;
 						path_trace_kernel(&kg, render_buffer, rng_state,
 						                  sample, x, y, tile.offset, tile.stride);
 					}
