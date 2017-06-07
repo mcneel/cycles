@@ -172,7 +172,6 @@ CCL_NAMESPACE_BEGIN
 #define __PATCH_EVAL__
 #define __CUTOUT__
 #define __SHADOW_TRICKS__
-#define __SHADOW_CATCHER_BACKGROUND__
 
 #ifdef __KERNEL_SHADING__
 #  define __SVM__
@@ -1249,7 +1248,8 @@ typedef struct KernelIntegrator {
 	float light_inv_rr_threshold;
 
 	int start_sample;
-	int pad1, pad2, pad3;
+	int no_shadows;
+	int pad2, pad3;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 
