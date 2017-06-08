@@ -152,7 +152,7 @@ __kernel void kernel_ocl_convert_to_byte(
 	KERNEL_BUFFER_PARAMS,
 
 	float sample_scale,
-	int sx, int sy, int sw, int sh, int offset, int stride)
+	int sx, int sy, int sw, int sh, int offset, int stride, int skip_linear_to_srgb_conversion)
 {
 	KernelGlobals kglobals, *kg = &kglobals;
 
@@ -165,7 +165,7 @@ __kernel void kernel_ocl_convert_to_byte(
 	int y = sy + ccl_global_id(1);
 
 	if(x < sx + sw && y < sy + sh)
-		kernel_film_convert_to_byte(kg, rgba, buffer, sample_scale, x, y, offset, stride);
+		kernel_film_convert_to_byte(kg, rgba, buffer, sample_scale, x, y, offset, stride, skip_linear_to_srgb_conversion);
 }
 
 __kernel void kernel_ocl_convert_to_half_float(
@@ -176,7 +176,7 @@ __kernel void kernel_ocl_convert_to_half_float(
 	KERNEL_BUFFER_PARAMS,
 
 	float sample_scale,
-	int sx, int sy, int sw, int sh, int offset, int stride)
+	int sx, int sy, int sw, int sh, int offset, int stride, int skip_linear_to_srgb_conversion)
 {
 	KernelGlobals kglobals, *kg = &kglobals;
 
@@ -189,7 +189,7 @@ __kernel void kernel_ocl_convert_to_half_float(
 	int y = sy + ccl_global_id(1);
 
 	if(x < sx + sw && y < sy + sh)
-		kernel_film_convert_to_half_float(kg, rgba, buffer, sample_scale, x, y, offset, stride);
+		kernel_film_convert_to_half_float(kg, rgba, buffer, sample_scale, x, y, offset, stride, skip_linear_to_srgb_conversion);
 }
 
 __kernel void kernel_ocl_zero_buffer(ccl_global float4 *buffer, uint64_t size, uint64_t offset)

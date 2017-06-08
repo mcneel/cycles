@@ -68,25 +68,26 @@ kernel_cuda_branched_path_trace(WorkTile *tile, uint total_work_size)
 
 extern "C" __global__ void
 CUDA_LAUNCH_BOUNDS(CUDA_THREADS_BLOCK_WIDTH, CUDA_KERNEL_MAX_REGISTERS)
-kernel_cuda_convert_to_byte(uchar4 *rgba, float *buffer, float sample_scale, int sx, int sy, int sw, int sh, int offset, int stride)
+kernel_cuda_convert_to_byte(uchar4 *rgba, float *buffer, float sample_scale, int sx, int sy, int sw, int sh, int offset, int stride, int skip_linear_to_srgb_conversion)
 {
 	int x = sx + blockDim.x*blockIdx.x + threadIdx.x;
 	int y = sy + blockDim.y*blockIdx.y + threadIdx.y;
 
 	if(x < sx + sw && y < sy + sh) {
-		kernel_film_convert_to_byte(NULL, rgba, buffer, sample_scale, x, y, offset, stride);
+		kernel_film_convert_to_byte(NULL, rgba, buffer, sample_scale, x, y, offset, stride, skip_linear_to_srgb_conversion);
 	}
 }
 
 extern "C" __global__ void
 CUDA_LAUNCH_BOUNDS(CUDA_THREADS_BLOCK_WIDTH, CUDA_KERNEL_MAX_REGISTERS)
-kernel_cuda_convert_to_half_float(uchar4 *rgba, float *buffer, float sample_scale, int sx, int sy, int sw, int sh, int offset, int stride)
+kernel_cuda_convert_to_half_float(uchar4 *rgba, float *buffer, float sample_scale, int sx, int sy, int sw, int sh, int offset, int stride, int skip_linear_to_srgb_conversion)
 {
 	int x = sx + blockDim.x*blockIdx.x + threadIdx.x;
 	int y = sy + blockDim.y*blockIdx.y + threadIdx.y;
 
-	if(x < sx + sw && y < sy + sh) {
-		kernel_film_convert_to_half_float(NULL, rgba, buffer, sample_scale, x, y, offset, stride);
+	if(x < sx + sw && y < sy + sh)
+	{
+		kernel_film_convert_to_half_float(NULL, rgba, buffer, sample_scale, x, y, offset, stride, skip_linear_to_srgb_conversion);
 	}
 }
 

@@ -107,7 +107,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 float sample_scale,
                                                 int x, int y,
                                                 int offset,
-                                                int stride)
+                                                int stride,
+                                                int skip_linear_to_srgb_conversion)
 {
 #ifdef KERNEL_STUB
 	STUB_ASSERT(KERNEL_ARCH, convert_to_byte);
@@ -118,7 +119,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
 	                            sample_scale,
 	                            x, y,
 	                            offset,
-	                            stride);
+	                            stride,
+	                            skip_linear_to_srgb_conversion);
 #endif /* KERNEL_STUB */
 }
 
@@ -128,7 +130,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(KernelGlobals *kg,
                                                       float sample_scale,
                                                       int x, int y,
                                                       int offset,
-                                                      int stride)
+                                                      int stride,
+                                                      int skip_linear_to_srgb_conversion)
 {
 #ifdef KERNEL_STUB
 	STUB_ASSERT(KERNEL_ARCH, convert_to_half_float);
@@ -139,7 +142,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(KernelGlobals *kg,
 	                                  sample_scale,
 	                                  x, y,
 	                                  offset,
-	                                  stride);
+	                                  stride,
+	                                  skip_linear_to_srgb_conversion);
 #endif /* KERNEL_STUB */
 }
 
