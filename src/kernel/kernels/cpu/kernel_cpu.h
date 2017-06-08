@@ -29,7 +29,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 float *buffer,
                                                 float sample_scale,
                                                 int x, int y,
-                                                int offset, int stride);
+                                                int offset, int stride,
+                                                int skip_linear_to_srgb_conversion);
 
 void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(KernelGlobals *kg,
                                                       uchar4 *rgba,
@@ -37,7 +38,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(KernelGlobals *kg,
                                                       float sample_scale,
                                                       int x, int y,
                                                       int offset,
-                                                      int stride);
+                                                      int stride,
+                                                      int skip_linear_to_srgb_conversion);
 
 void KERNEL_FUNCTION_FULL_NAME(shader)(KernelGlobals *kg,
                                        uint4 *input,

@@ -69,6 +69,8 @@ public:
 	double text_timeout;
 	double progressive_update_timeout;
 
+	bool skip_linear_to_srgb_conversion;
+
 	ShadingSystem shadingsystem;
 
 	SessionParams()
@@ -92,6 +94,7 @@ public:
 		denoising_relative_pca = false;
 
 		display_buffer_linear = false;
+		skip_linear_to_srgb_conversion = false;
 
 		cancel_timeout = 0.1;
 		reset_timeout = 0.1;
@@ -115,6 +118,7 @@ public:
 		&& pixel_size == params.pixel_size
 		&& threads == params.threads
 		&& display_buffer_linear == params.display_buffer_linear
+		&& skip_linear_to_srgb_conversion == params.skip_linear_to_srgb_conversion
 		&& cancel_timeout == params.cancel_timeout
 		&& reset_timeout == params.reset_timeout
 		&& text_timeout == params.text_timeout
