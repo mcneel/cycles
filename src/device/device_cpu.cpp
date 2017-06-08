@@ -175,8 +175,8 @@ public:
 	DeviceRequestedFeatures requested_features;
 
 	KernelFunctions<void(*)(KernelGlobals *, float *, int, int, int, int, int)>             path_trace_kernel;
-	KernelFunctions<void(*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)> convert_to_half_float_kernel;
-	KernelFunctions<void(*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)> convert_to_byte_kernel;
+	KernelFunctions<void(*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int)> convert_to_half_float_kernel;
+	KernelFunctions<void(*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int)> convert_to_byte_kernel;
 	KernelFunctions<void(*)(KernelGlobals *, uint4 *, float4 *, int, int, int, int, int)>   shader_kernel;
 
 	KernelFunctions<void(*)(int, TilesInfo*, int, int, float*, float*, float*, float*, float*, int*, int, int)> filter_divide_shadow_kernel;
@@ -805,14 +805,13 @@ public:
 			for(int y = task.y; y < task.y + task.h; y++)
 				for(int x = task.x; x < task.x + task.w; x++)
 					convert_to_half_float_kernel()(&kernel_globals, (uchar4*)task.rgba_half, (float*)task.buffer,
-					                               sample_scale, x, y, task.offset, task.stride);
+					                               sample_scale, x, y, task.offset, task.stride, task.skip_linear_to_srgb_conversion);
 		}
 		else {
 			for(int y = task.y; y < task.y + task.h; y++)
 				for(int x = task.x; x < task.x + task.w; x++)
 					convert_to_byte_kernel()(&kernel_globals, (uchar4*)task.rgba_byte, (float*)task.buffer,
-					                         sample_scale, x, y, task.offset, task.stride);
-
+					                         sample_scale, x, y, task.offset, task.stride, task.skip_linear_to_srgb_conversion);
 		}
 	}
 

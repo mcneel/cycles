@@ -1546,7 +1546,8 @@ public:
 		                &task.w,
 		                &task.h,
 		                &task.offset,
-		                &task.stride};
+		                &task.stride,
+		                &task.skip_linear_to_srgb_conversion};
 
 		/* launch kernel */
 		int threads_per_block;
@@ -2281,7 +2282,6 @@ void device_cuda_info(vector<DeviceInfo>& devices)
 		info.type = DEVICE_CUDA;
 		info.description = string(name);
 		info.num = num;
-
 		info.advanced_shading = (major >= 2);
 		info.has_fermi_limits = !(major >= 3);
 		info.has_half_images = (major >= 3);
