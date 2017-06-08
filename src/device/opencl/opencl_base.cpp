@@ -706,6 +706,7 @@ void OpenCLDeviceBase::film_convert(DeviceTask& task, device_ptr buffer, device_
 	cl_float d_sample_scale = 1.0f/(task.sample + 1);
 	cl_int d_offset = task.offset;
 	cl_int d_stride = task.stride;
+	cl_int d_skip_linear = task.skip_linear_to_srgb_conversion;
 
 
 	cl_kernel ckFilmConvertKernel = (rgba_byte)? base_program(ustring("convert_to_byte")): base_program(ustring("convert_to_half_float"));
@@ -727,7 +728,8 @@ void OpenCLDeviceBase::film_convert(DeviceTask& task, device_ptr buffer, device_
 	                                   d_w,
 	                                   d_h,
 	                                   d_offset,
-	                                   d_stride);
+	                                   d_stride,
+	                                   d_skip_linear);
 
 	enqueue_kernel(ckFilmConvertKernel, d_w, d_h);
 }
