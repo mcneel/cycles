@@ -1014,6 +1014,7 @@ void Session::tonemap(int sample)
 	task.rgba_half = display->rgba_half.device_pointer;
 	task.buffer = buffers->buffer.device_pointer;
 	task.sample = sample;
+	task.skip_linear_to_srgb_conversion = params.skip_linear_to_srgb_conversion ? 1 : 0;
 	tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
 
 	if(task.w > 0 && task.h > 0) {
