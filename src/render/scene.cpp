@@ -355,7 +355,6 @@ bool Scene::need_reset()
 void Scene::reset()
 {
 	shader_manager->reset(this);
-	shader_manager->add_default(this);
 
 	/* ensure all objects are updated */
 	camera->tag_update();
