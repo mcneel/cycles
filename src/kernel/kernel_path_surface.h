@@ -399,6 +399,11 @@ ccl_device_inline bool kernel_path_surface_cutout(const ShaderData *sd,
 			}
 			else {
 				++state->cutout_depth;
+				if (state->cutout_depth >= CUTOUT_STACK_SIZE) {
+					state->cutout_depth = CUTOUT_STACK_SIZE - 1;
+					state->cutout_cap = cutout_shader_set(state) ? 1 : 0;
+					return false;
+				}
 			}
 		}
 		ray->P = ray_offset(sd->P, -sd->Ng);
