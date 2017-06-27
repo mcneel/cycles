@@ -346,7 +346,7 @@ ccl_device_intersect uint scene_intersect_volume_all(KernelGlobals *kg,
 ccl_device_inline float3 ray_offset(float3 P, float3 Ng)
 {
 #ifdef __INTERSECTION_REFINE__
-	const float epsilon_f = 1e-5f;
+	const float epsilon_f = 1e-4f;
 	/* ideally this should match epsilon_f, but instancing and motion blur
 	 * precision makes it problematic */
 	const float epsilon_test = 1.0f;

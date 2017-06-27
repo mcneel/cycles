@@ -178,6 +178,8 @@ CCL_NAMESPACE_BEGIN
 #define __CUTOUT__
 #define __SHADOW_TRICKS__
 
+#undef __INTERSECTION_REFINE__
+
 #define __DENOISING_FEATURES__
 
 #ifdef __KERNEL_SHADING__
