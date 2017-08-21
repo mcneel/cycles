@@ -69,6 +69,7 @@ public:
 	                      InterpolationType interpolation,
 	                      ExtensionType extension,
 	                      bool use_alpha);
+	void tag_reload_image(const string& filename);
 	bool get_image_metadata(const string& filename,
 	                        void *builtin_data,
 	                        ImageMetaData& metadata);
