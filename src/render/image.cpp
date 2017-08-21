@@ -416,6 +416,19 @@ void ImageManager::remove_image(const string& filename,
 		}
 	}
 }
+void ImageManager::tag_reload_image(const string& filename)
+{
+	for(size_t type = 0; type < IMAGE_DATA_NUM_TYPES; type++) {
+		for(size_t slot = 0; slot < images[type].size(); slot++) {
+			if(images[type][slot] && images[type][slot]->filename==filename)
+			{
+				images[type][slot]->need_load = true;
+				need_update = true;
+				break;
+			}
+		}
+	}
+}
 
 /* TODO(sergey): Deduplicate with the iteration above, but make it pretty,
  * without bunch of arguments passing around making code readability even
