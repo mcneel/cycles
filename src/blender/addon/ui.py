@@ -862,6 +862,10 @@ class CyclesObject_PT_cycles_settings(CyclesButtonsPanel, Panel):
         layout.prop(cob, "is_shadow_catcher")
 
         col = layout.column()
+        col.label(text="Specials:")
+        col.prop(cob, "use_cutout")
+
+        col = layout.column()
         col.label(text="Performance:")
         row = col.row()
         sub = row.row()

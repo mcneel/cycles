@@ -53,6 +53,8 @@ public:
 	bool use_motion;
 	bool hide_on_missing_motion;
 	bool use_holdout;
+	bool use_cutout;
+	bool ignore_cutout;
 	bool is_shadow_catcher;
 	bool mesh_light_no_cast_shadow;
 
