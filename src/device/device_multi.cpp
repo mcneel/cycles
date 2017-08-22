@@ -225,7 +225,7 @@ public:
 			/* adjust math for w/width */
 
 			rgba.device_pointer = sub.ptr_map[key];
-			sub.device->draw_pixels(rgba, sy, w, sh, dx, sdy, width, sheight, transparent, draw_params);
+			sub.device->draw_pixels(rgba, sy, w, sh, dx, sdy, width, sheight, width, height, transparent, draw_params);
 			i++;
 		}
 
