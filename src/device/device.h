@@ -331,7 +331,7 @@ public:
 	
 	/* opengl drawing */
 	virtual void draw_pixels(device_memory& mem, int y, int w, int h,
-		int dx, int dy, int width, int height, bool transparent,
+		int dx, int dy, int width, int height, int full_width, int full_height, bool transparent,
 		const DeviceDrawParams &draw_params);
 
 #ifdef WITH_NETWORK
