@@ -1848,7 +1848,7 @@ public:
 			return;
 		}
 
-		Device::draw_pixels(mem, y, w, h, dx, dy, width, height, transparent, draw_params);
+		Device::draw_pixels(mem, y, w, h, dx, dy, width, height, width, height, transparent, draw_params);
 	}
 
 	void thread_run(DeviceTask *task)

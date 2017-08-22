@@ -84,7 +84,44 @@ Device::~Device()
 	}
 }
 
-void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int dy, int width, int height, bool transparent,
+void GetGLViewportData(GLint width, GLint height, GLint& vp_offset_x, GLint& vp_offset_y, GLint& vp_width, GLint& vp_height)
+{
+	GLint vp_dims[4] = { 0 };
+	glGetIntegerv(GL_VIEWPORT, vp_dims);
+
+	vp_offset_x = vp_dims[0];
+	vp_offset_y = vp_dims[1];
+	vp_width    = vp_dims[2];
+	vp_height   = vp_dims[3];
+
+	// If the width of the GL_VIEWPORT is smaller than the width of the
+	// render, then we are dealing with a Rhino Detail which has been
+	// moved partially outside the window.
+	if (vp_width < width)
+	{
+		// If the x offset is 0, it has been clamped to 0 due to being partially outside
+		// the window to the left.
+		if (vp_offset_x == 0)
+		{
+			// We want to express the offset as negative coordinates instead of clamping to 0.
+			vp_offset_x = vp_width - width;
+		}
+		// In all cases we want the width to be the render width.
+		vp_width = width;
+	}
+
+	// See comments above.
+	if (vp_height < height)
+	{
+		if (vp_offset_y == 0)
+		{
+			vp_offset_y = vp_height - height;
+		}
+		vp_height = height;
+	}
+}
+
+void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int dy, int width, int height, int full_width, int full_height, bool transparent,
 	const DeviceDrawParams &draw_params)
 {
 	assert(rgba.type == MEM_PIXELS);
@@ -97,7 +134,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 	}
 
 	if(rgba.data_type == TYPE_HALF) {
-		GLhalf *data_pointer = (GLhalf*)rgba.data_pointer;
+		GLhalf *data_pointer = (GLhalf*)rgba.host_pointer;
 
 		data_pointer += 4*y*w;
 
@@ -109,14 +146,20 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-		GLint tex = glGetUniformLocation(draw_params.program, "tex");
+		// We need to know the GL_VIEWPORT rect information to be able to
+		// calculate the correct viewport uv-coordinates when using a Rhino Detail.
+		GLint vp_offset_x, vp_offset_y, vp_width, vp_height;
+		GetGLViewportData(full_width, full_height, vp_offset_x, vp_offset_y, vp_width, vp_height);
+
+		GLint tex     = glGetUniformLocation(draw_params.program, "tex");
 		GLint subsize = glGetUniformLocation(draw_params.program, "subsize");
-		GLint alpha = glGetUniformLocation(draw_params.program, "alpha");
+		GLint alpha   = glGetUniformLocation(draw_params.program, "alpha");
+		GLint vp_rect = glGetUniformLocation(draw_params.program, "vp_rect");
 
 		glUniform1i(tex, 0);
-		// the x for subsize is used for debug purposes. Actual data in yzw
-		glUniform4f(subsize, 0.1f, (float)width, (float)dy, (float)dy + height);
+		glUniform4f(subsize, (float)dx, (float)dy, (float)width, (float)height);
 		glUniform1f(alpha, draw_params.alpha);
+		glUniform4f(vp_rect, (float)vp_offset_x, (float)vp_offset_y, (float)vp_width, (float)vp_height);
 
 		GLuint temp_vao = 0;
 		glGenVertexArrays(1, &temp_vao);
