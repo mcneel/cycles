@@ -137,7 +137,7 @@ void GetGLViewportData(GLint width, GLint height, GLint& vp_offset_x, GLint& vp_
 	}
 }
 
-void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int dy, int width, int height, bool transparent,
+void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int dy, int width, int height, int full_width, int full_height, bool transparent,
 	const DeviceDrawParams &draw_params)
 {
 	pixels_copy_from(rgba, y, w, h);
@@ -163,7 +163,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 		// We need to know the GL_VIEWPORT rect information to be able to
 		// calculate the correct viewport uv-coordinates when using a Rhino Detail.
 		GLint vp_offset_x, vp_offset_y, vp_width, vp_height;
-		GetGLViewportData(width, height, vp_offset_x, vp_offset_y, vp_width, vp_height);
+		GetGLViewportData(full_width, full_height, vp_offset_x, vp_offset_y, vp_width, vp_height);
 
 		GLint tex     = glGetUniformLocation(draw_params.program, "tex");
 		GLint subsize = glGetUniformLocation(draw_params.program, "subsize");
