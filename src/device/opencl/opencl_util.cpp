@@ -450,7 +450,11 @@ void OpenCLDeviceBase::OpenCLProgram::load()
 
 		string basename = "cycles_kernel_" + program_name + "_" + device_md5 + "_" + util_md5_string(source);
 		basename = path_cache_get(path_join("kernels", basename));
+#ifdef _WIN32
+		string clbin = "\\\\?\\" + basename + ".clbin";
+#else
 		string clbin = basename + ".clbin";
+#endif
 
 		/* path to preprocessed source for debugging */
 		string clsrc, *debug_src = NULL;

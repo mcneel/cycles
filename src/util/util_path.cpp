@@ -602,6 +602,7 @@ bool path_exists(const string& path)
 {
 #ifdef _WIN32
 	string fixed_path = path_make_compatible(path);
+	if (fixed_path.length() >= 260) fixed_path = "\\\\?\\" + fixed_path;
 	wstring path_wc = string_to_wstring(fixed_path);
 	path_stat_t st;
 	if(path_wstat(path_wc, &st) != 0) {
