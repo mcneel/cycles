@@ -804,6 +804,13 @@ DeviceRequestedFeatures Session::get_requested_device_features()
 	requested_features.use_integrator_branched = (scene->integrator->method == Integrator::BRANCHED_PATH);
 	requested_features.use_denoising = params.use_denoising;
 
+	// always enable these for RhinoCycles
+	requested_features.use_shadow_tricks = true;
+	requested_features.use_principled = true;
+	requested_features.use_subsurface = true;
+	requested_features.use_transparent = true;
+	requested_features.use_volume = true;
+
 	return requested_features;
 }
 
