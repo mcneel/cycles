@@ -21,7 +21,7 @@ CCL_NAMESPACE_BEGIN
 /* wcs_box_coord gives a Rhino-style WCS box texture coordinate mapping. */
 ccl_device_inline void wcs_box_coord(KernelGlobals *kg, ShaderData *sd, float3 *data)
 {
-	float3 N = sd->N; //ccl_fetch(sd, N);
+	float3 N = sd->N;
 
 	int side0 = 0;
 
@@ -35,7 +35,7 @@ ccl_device_inline void wcs_box_coord(KernelGlobals *kg, ShaderData *sd, float3 *
 		side1 = 2;
 
 	float t1 = side1 ? dy : dx;
-	if (t1 < 0.0)
+	if (t1 < 0.0f)
 		side0 = 2 * side1 + 1;
 	else
 		side0 = 2 * side1 + 2;
@@ -52,12 +52,12 @@ ccl_device_inline void wcs_box_coord(KernelGlobals *kg, ShaderData *sd, float3 *
 	case 1: { t1 = N.y; break; }
 	default: { t1 = N.z; break; }
 	}
-	if (0.0 != t1)
+	if (0.0f != t1)
 	{
-		if (t1 < 0.0)
+		if (t1 < 0.0f)
 			side0 = 2 * side1 + 1;
 		else
-			if (t1 > 0.0)
+			if (t1 > 0.0f)
 				side0 = 2 * side1 + 2;
 	}
 
@@ -109,8 +109,8 @@ ccl_device_inline void wcs_box_coord(KernelGlobals *kg, ShaderData *sd, float3 *
 
 ccl_device_inline float3 get_reflected_incoming_ray(KernelGlobals *kg, ShaderData *sd)
 {
-	float3 n = sd->N; //ccl_fetch(sd, N);
-	float3 i = sd->I; //ccl_fetch(sd, I);
+	float3 n = sd->N;
+	float3 i = sd->I;
 
 	float3 refl = 2 * n * dot(i, n) - i;
 
@@ -131,30 +131,30 @@ ccl_device_inline float3 env_spherical(KernelGlobals *kg, ShaderData *sd)
 
 	float theta, phi;
 
-	if( x == 0.0 && y == 0.0 ) {
-		theta = 0.0;
-		phi = ( z >= 0.0 ? 0.5*M_PI_F : -0.5*M_PI_F );
+	if( x == 0.0f && y == 0.0f ) {
+		theta = 0.0f;
+		phi = ( z >= 0.0f ? 0.5f*M_PI_F : -0.5f*M_PI_F );
 	}
 	else {
 		theta = atan2( y, x );
-		if( theta < 0.0 )
-			theta += 2.0*M_PI_F;
+		if( theta < 0.0f )
+			theta += 2.0f*M_PI_F;
 
 		float r;
 		if ( fabsf( x ) >= fabsf( y ) ) {
 			r = y/x;
-			r = fabsf(x)*sqrt(1.0+r*r);
+			r = fabsf(x)*sqrt(1.0f+r*r);
 		}
 		else {
 			r = x/y;
-			r = fabsf(y)*sqrt(1.0+r*r);
+			r = fabsf(y)*sqrt(1.0f+r*r);
 		}
 
 		phi = atan( z/r );
 	}
 
-	float u = theta / (2.0*M_PI_F);
-	float v = (-phi + 0.5*M_PI_F) / M_PI_F;
+	float u = theta / (2.0f*M_PI_F);
+	float v = (-phi + 0.5f*M_PI_F) / M_PI_F;
 
 	return make_float3(u, v, 0.0f);
 }
@@ -228,47 +228,47 @@ ccl_device_inline float3 env_box( KernelGlobals *kg, ShaderData *sd )
 	float3 face_o, face_x, face_y;
 
 	if( x_abs > y_abs && x_abs > z_abs ) {
-		if( R.x > 0.0 )
+		if( R.x > 0.0f )
 		{
-			face_o = make_float3( +1, +1, -1 );
-			face_x = make_float3(  0, -1,  0 );
-			face_y = make_float3(  0,  0, +1 );
+			face_o = make_float3( +1.f, +1.f, -1.f );
+			face_x = make_float3(  0.f, -1.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
 		}
 		else
 		{
-			face_o = make_float3( -1, -1, -1 );
-			face_x = make_float3(  0, +1,  0 );
-			face_y = make_float3(  0,  0, +1 );
+			face_o = make_float3( -1.f, -1.f, -1.f );
+			face_x = make_float3(  0.f, +1.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
 		}
 	}
 	else if( y_abs > z_abs )
 	{
-		if( R.y > 0.0 )
+		if( R.y > 0.0f )
 		{
-			face_o = make_float3( -1, +1, -1 );
-			face_x = make_float3( +1,  0,  0 );
-			face_y = make_float3(  0,  0, +1 );
+			face_o = make_float3( -1.f, +1.f, -1.f );
+			face_x = make_float3( +1.f,  0.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
 		}
 		else
 		{
-			face_o = make_float3( +1, -1, -1 );
-			face_x = make_float3( -1,  0,  0 );
-			face_y = make_float3(  0,  0, +1 );
+			face_o = make_float3( +1.f, -1.f, -1.f );
+			face_x = make_float3( -1.f,  0.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
 		}
 	}
 	else
 	{
-		if( R.z > 0.0 )
+		if( R.z > 0.0f )
 		{
-			face_o = make_float3( +1, +1, +1 );
-			face_x = make_float3(  0, -1,  0 );
-			face_y = make_float3( -1,  0,  0 );
+			face_o = make_float3( +1.f, +1.f, +1.f );
+			face_x = make_float3(  0.f, -1.f,  0.f );
+			face_y = make_float3( -1.f,  0.f,  0.f );
 		}
 		else
 		{
-			face_o = make_float3( -1, +1, -1 );
-			face_x = make_float3(  0, -1,  0 );
-			face_y = make_float3( +1,  0,  0 );
+			face_o = make_float3( -1.f, +1.f, -1.f );
+			face_x = make_float3(  0.f, -1.f,  0.f );
+			face_y = make_float3( +1.f,  0.f,  0.f );
 		}
 	}
 
@@ -285,7 +285,7 @@ ccl_device_inline float3 env_box( KernelGlobals *kg, ShaderData *sd )
 	float u = dot( local_isect, face_x ) / 2.0f;
 	float v = dot( local_isect, face_y ) / 2.0f;
 
-	return make_float3( u, v, 0.0 );
+	return make_float3( u, v, 0.0f );
 }
 
 ccl_device_inline int GetMainAxisIndex( float3 v )
@@ -522,9 +522,9 @@ ccl_device void svm_node_tex_coord(KernelGlobals *kg,
 			break;
 		}
 		case NODE_TEXCO_WCS_BOX: {
-			data = sd->P; //ccl_fetch(sd, P);
+			data = sd->P;
 			if (node.w == 0) {
-				if (sd->object != OBJECT_NONE) { //if (ccl_fetch(sd, object) != OBJECT_NONE) {
+				if (sd->object != OBJECT_NONE) {
 					object_inverse_position_transform(kg, sd, &data);
 				}
 			}
@@ -653,9 +653,9 @@ ccl_device void svm_node_tex_coord_bump_dx(KernelGlobals *kg,
 			break;
 		}
 		case NODE_TEXCO_WCS_BOX: {
-			data = sd->P + sd->dP.dx; //ccl_fetch(sd, P) + ccl_fetch(sd, dP).dx;
+			data = sd->P + sd->dP.dx;
 			if (node.w == 0) {
-				if (sd->object != OBJECT_NONE) {//if (ccl_fetch(sd, object) != OBJECT_NONE) {
+				if (sd->object != OBJECT_NONE) {
 					object_inverse_position_transform(kg, sd, &data);
 				}
 			}
@@ -783,9 +783,9 @@ ccl_device void svm_node_tex_coord_bump_dy(KernelGlobals *kg,
 			break;
 		}
 		case NODE_TEXCO_WCS_BOX: {
-			data = sd->P + sd->dP.dy; //ccl_fetch(sd, P) + ccl_fetch(sd, dP).dy;
+			data = sd->P + sd->dP.dy;
 			if (node.w == 0) {
-				if (sd->object != OBJECT_NONE) {//if (ccl_fetch(sd, object) != OBJECT_NONE) {
+				if (sd->object != OBJECT_NONE) {
 					object_inverse_position_transform(kg, sd, &data);
 				}
 			}
