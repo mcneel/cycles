@@ -174,6 +174,376 @@ ccl_device void svm_node_tex_image_box(KernelGlobals *kg, ShaderData *sd, float 
 		stack_store_float(stack, alpha_offset, f.w);
 }
 
+/*** Rhino-style environment projections *****/
+
+ccl_device_inline float3 env_spherical(float3 R)
+{
+	//float3 Rc = make_float3(R.y, -R.z, -R.x);
+
+	float x = -R.z;
+	float y = -R.x;
+	float z = R.y;
+
+	float theta, phi;
+
+	if( x == 0.0f && y == 0.0f ) {
+		theta = 0.0f;
+		phi = ( z >= 0.0f ? 0.5f*M_PI_F : -0.5f*M_PI_F );
+	}
+	else {
+		theta = atan2( y, x );
+		if( theta < 0.0f )
+			theta += 2.0f*M_PI_F;
+
+		float r;
+		if ( fabsf( x ) >= fabsf( y ) ) {
+			r = y/x;
+			r = fabsf(x)*sqrt(1.0f+r*r);
+		}
+		else {
+			r = x/y;
+			r = fabsf(y)*sqrt(1.0f+r*r);
+		}
+
+		phi = atan( z/r );
+	}
+
+	float u = theta / (2.0f*M_PI_F);
+	float v = (-phi + 0.5f*M_PI_F) / M_PI_F;
+
+	return make_float3(u, v, 0.0f);
+}
+
+ccl_device_inline float3 env_world_emap(float3 R)
+{
+	float x = R.x;
+	float y = R.y;
+	float z = R.z;
+
+	float m = 2.0f*sqrt((x * x) + (y * y) + (z + 1.0f)*(z + 1.0f));
+
+	float u = x / m + 0.5f;
+	float v = y / m + 0.5f;
+
+	return make_float3(u, v, 0.0f);
+}
+
+ccl_device_inline float3 env_emap_act( float3 R )
+{
+	float x = R.x;
+	float y = R.y;
+	float z = R.z;
+
+	float fDivisor = sqrt((x * x) + (y * y));
+
+	if (fDivisor < FLT_MIN) fDivisor = FLT_MIN;
+
+	float f = sin(0.5f * acos(z)) / fDivisor;
+
+	float px = -x * f;
+	float py = y * f;
+
+	float u = (1.0f + px) * 0.5f;
+	float v = (1.0f - py) * 0.5f;
+
+	return make_float3(u, v, 0.0f);
+}
+
+ccl_device_inline float3 env_emap(float3 R)
+{
+	R = make_float3( R.y, -R.z, -R.x );
+
+	return env_emap_act( R );
+}
+
+ccl_device_inline float3 env_light_probe(float3 R)
+{
+	R = make_float3( R.y, -R.z, -R.x );
+
+	float x = R.x;
+	float y = R.y;
+	float z = R.z;
+
+	float fDivisor = sqrt( (x * x) + (y * y) );
+
+	if( fDivisor < FLT_MIN ) fDivisor = FLT_MIN;
+
+	float f = (acos( z ) / M_PI_F) / fDivisor;
+
+	float px = x * f;
+	float py = y * f;
+
+	float u = (1.0f + px) * 0.5f;
+	float v = (1.0f - py) * 0.5f;
+
+	return make_float3( u, v , 0.0f);
+}
+
+ccl_device_inline float3 env_box(float3 R)
+{
+	float x_abs = fabsf( R.x );
+	float y_abs = fabsf( R.y );
+	float z_abs = fabsf( R.z );
+
+	float3 face_o, face_x, face_y;
+
+	if( x_abs > y_abs && x_abs > z_abs ) {
+		if( R.x > 0.0f )
+		{
+			face_o = make_float3( +1.f, +1.f, -1.f );
+			face_x = make_float3(  0.f, -1.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
+		}
+		else
+		{
+			face_o = make_float3( -1.f, -1.f, -1.f );
+			face_x = make_float3(  0.f, +1.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
+		}
+	}
+	else if( y_abs > z_abs )
+	{
+		if( R.y > 0.0f )
+		{
+			face_o = make_float3( -1.f, +1.f, -1.f );
+			face_x = make_float3( +1.f,  0.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
+		}
+		else
+		{
+			face_o = make_float3( +1.f, -1.f, -1.f );
+			face_x = make_float3( -1.f,  0.f,  0.f );
+			face_y = make_float3(  0.f,  0.f, +1.f );
+		}
+	}
+	else
+	{
+		if( R.z > 0.0f )
+		{
+			face_o = make_float3( +1.f, +1.f, +1.f );
+			face_x = make_float3(  0.f, -1.f,  0.f );
+			face_y = make_float3( -1.f,  0.f,  0.f );
+		}
+		else
+		{
+			face_o = make_float3( -1.f, +1.f, -1.f );
+			face_x = make_float3(  0.f, -1.f,  0.f );
+			face_y = make_float3( +1.f,  0.f,  0.f );
+		}
+	}
+
+	float3 plane_normal = cross( face_x, face_y );
+
+	float rp_dot = dot( R, plane_normal );
+	kernel_assert( rp_dot != 0.0f );
+
+	float t = dot( face_o, plane_normal ) / rp_dot;
+
+	float3 isect = t*R;
+	float3 local_isect = isect - face_o;
+
+	float u = dot( local_isect, face_x ) / 2.0f;
+	float v = dot( local_isect, face_y ) / 2.0f;
+
+	return make_float3( u, v , 0.0f);
+}
+
+ccl_device_inline int env_get_main_axis_index( float3 v )
+{
+	float x_abs = fabsf( v.x );
+	float y_abs = fabsf( v.y );
+	float z_abs = fabsf( v.z );
+
+	if( x_abs > y_abs && x_abs > z_abs ) {
+		return 0;
+	}
+	else if( y_abs > z_abs ) {
+		return 1;
+	}
+	else {
+		return 2;
+	}
+}
+
+ccl_device_inline float3 env_cubemap(float3 R)
+{
+	R = make_float3( R.y, -R.z, -R.x );
+
+	int main_axis = env_get_main_axis_index( R );
+	float main_axis_dir = (main_axis == 0 ? R.x : (main_axis == 1 ? R.y : R.z));
+
+	int sub_texture_index;
+
+	if( main_axis == 0 ) {
+		sub_texture_index = (main_axis_dir >= 0.0f ? 0 : 1);
+	}
+	else if( main_axis == 1 ) {
+		sub_texture_index = (main_axis_dir >= 0.0f ? 3 : 2);
+	}
+	else {
+		sub_texture_index = (main_axis_dir >= 0.0f ? 4 : 5);
+	}
+
+	float sub_texture_offset = (float)( sub_texture_index ) / 6.0f;
+	float ma = fabsf( main_axis_dir );
+
+	float sc = 0.0f;
+	float tc = 0.0f;
+
+	if( sub_texture_index == 0 )
+	{
+		sc = -R.z;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 1 )
+	{
+		sc = R.z;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 2 )
+	{
+		sc = R.x;
+		tc = -R.z;
+	}
+	else if( sub_texture_index == 3 )
+	{
+		sc = R.x;
+		tc = R.z;
+	}
+	else if( sub_texture_index == 4 )
+	{
+		sc = R.x;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 5 )
+	{
+		sc = -R.x;
+		tc = -R.y;
+	}
+
+	float u = (sc / ma + 1.0f) / 12.0f + sub_texture_offset;
+	float v = (tc / ma + 1.0f) / 2.0f;
+
+	return make_float3( u, v , 0.0f);
+}
+
+ccl_device_inline float3 env_cubemap_vertical_cross(float3 R)
+{
+	R = make_float3( R.y, -R.z, -R.x );
+
+	int main_axis = env_get_main_axis_index( R );
+	float main_axis_dir = (main_axis == 0 ? R.x : ( main_axis == 1 ? R.y : R.z ) );
+
+	int sub_texture_index = (2 * main_axis) + (main_axis_dir >= 0.0f ? 0 : 1);
+
+	float u_sub_tex_start = (sub_texture_index == 1 ? 0.0f : (sub_texture_index == 0 ? (2.0f / 3.0f) : (1.0f / 3.0f ) ) );
+	float v_sub_tex_start = (sub_texture_index == 5 ? 0.0f : (sub_texture_index == 2 ? (1.0f / 4.0f) : (sub_texture_index == 3 ? (3.0f / 4.0f) : (2.0f / 4.0f ) ) ) );
+
+	float ma = fabsf( main_axis_dir );
+
+	float sc = 0.0f;
+	float tc = 0.0f;
+
+	if( sub_texture_index == 0 )
+	{
+		sc = -R.z;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 1 )
+	{
+		sc = R.z;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 2 )
+	{
+		sc = R.x;
+		tc = R.z;
+	}
+	else if( sub_texture_index == 3 )
+	{
+		sc = R.x;
+		tc = -R.z;
+	}
+	else if( sub_texture_index == 4 )
+	{
+		sc = R.x;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 5 )
+	{
+		sc = R.x;
+		tc = R.y;
+	}
+
+	float u = (sc / ma + 1.0f) / 6.0f + u_sub_tex_start;
+	float v = (tc / ma + 1.0f) / 8.0f + v_sub_tex_start;
+
+	return make_float3( u, v , 0.0f);
+}
+
+ccl_device_inline float3 env_cubemap_horizontal_cross(float3 R)
+{
+	R = make_float3( R.y, -R.z, -R.x );
+
+	int main_axis = env_get_main_axis_index( R );
+	float main_axis_dir = (main_axis == 0 ? R.x : (main_axis == 1 ? R.y : R.z));
+
+	int sub_texture_index = (2 * main_axis) + (main_axis_dir >= 0.0f ? 0 : 1);
+
+	float u_sub_tex_start = sub_texture_index == 1 ? 0.0f : (sub_texture_index == 0 ? (2.0f / 4.0f) : (sub_texture_index == 5 ? (3.0f / 4.0f) : (1.0f / 4.0f) ) );
+	float v_sub_tex_start = sub_texture_index == 2 ? 0.0f : (sub_texture_index == 3 ? (2.0f / 3.0f) : (1.0f / 3.0f) );
+
+	float ma = fabsf( main_axis_dir );
+
+	float sc = 0.0f;
+	float tc = 0.0f;
+
+	if( sub_texture_index == 0 )
+	{
+		sc = -R.z;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 1 )
+	{
+		sc = R.z;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 2 )
+	{
+		sc = R.x;
+		tc = R.z;
+	}
+	else if( sub_texture_index == 3 )
+	{
+		sc = R.x;
+		tc = -R.z;
+	}
+	else if( sub_texture_index == 4 )
+	{
+		sc = R.x;
+		tc = -R.y;
+	}
+	else if( sub_texture_index == 5 )
+	{
+		sc = -R.x;
+		tc = -R.y;
+	}
+
+	float u = (sc / ma + 1.0f) / 8.0f + u_sub_tex_start;
+	float v = (tc / ma + 1.0f) / 6.0f + v_sub_tex_start;
+
+	return make_float3( u, v , 0.0f);
+}
+
+ccl_device_inline float3 env_hemispherical(float3 R)
+{
+	R = make_float3( R.y, -R.z, -R.x );
+	float3 hemi = normalize( make_float3( R.x, min( R.y, 0.0f ), R.z ) );
+	float3 uv = env_spherical(hemi);
+	uv.y = 2.0f*uv.y - 1.0f;
+
+	return uv;
+}
 ccl_device void svm_node_tex_environment(KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node)
 {
 	uint id = node.y;
@@ -201,10 +571,38 @@ ccl_device void svm_node_tex_environment(KernelGlobals *kg, ShaderData *sd, floa
 		P = P / dot(P, make_float3(0.0f, 0.0f, 1.0f));
 		P = transform_point(&cameratondc, P);
 		uv.x = P.x;
-		uv.y = 1.f - P.y;
+		uv.y = P.y;
 	}
-	else {
-		uv = make_float2(co.x, co.y);
+	else if (projection == 3) {
+		co = env_emap(co);
+	}
+	else if (projection == 4) {
+		co = env_box(co);
+	}
+	else if (projection == 5) {
+		co = env_light_probe(co);
+	}
+	else if (projection == 6) {
+		co = env_cubemap(co);
+	}
+	else if (projection == 7) {
+		co = env_cubemap_horizontal_cross(co);
+	}
+	else if (projection == 8) {
+		co = env_cubemap_vertical_cross(co);
+	}
+	else if (projection == 9) {
+		co = env_hemispherical(co);
+	}
+	else if (projection == 10) {
+		co = make_float3(co.y, -co.z, -co.x);
+		co = env_spherical(co);
+	}
+
+	if (projection >= 3 && projection <= 10)
+	{
+		uv.x = co.x;
+		uv.y = co.y;
 	}
 
 	uint use_alpha = stack_valid(alpha_offset);
