@@ -652,7 +652,7 @@ ccl_device_inline void kernel_path_integrate(KernelGlobals *kg,
 
 #ifdef __SHADOW_TRICKS__
 		if((sd.object_flag & SD_OBJECT_SHADOW_CATCHER)) {
-			//if(state.flag & PATH_RAY_CAMERA) {
+			if(state.flag & (PATH_RAY_CAMERA | PATH_RAY_TRANSMIT | PATH_RAY_TRANSPARENT | PATH_RAY_GLOSSY)) {
 				state.flag |= (PATH_RAY_SHADOW_CATCHER |
 				               PATH_RAY_STORE_SHADOW_INFO);
 				if(!kernel_data.background.transparent) {
@@ -661,7 +661,7 @@ ccl_device_inline void kernel_path_integrate(KernelGlobals *kg,
 				}
 				L->shadow_radiance_sum = path_radiance_clamp_and_sum(kg, L);
 				L->shadow_throughput = average(throughput);
-			//}
+			}
 		}
 		else if(state.flag & PATH_RAY_SHADOW_CATCHER) {
 			/* Only update transparency after shadow catcher bounce. */

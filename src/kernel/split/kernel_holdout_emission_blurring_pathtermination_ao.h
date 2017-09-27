@@ -117,7 +117,7 @@ ccl_device void kernel_holdout_emission_blurring_pathtermination_ao(
 
 #ifdef __SHADOW_TRICKS__
 		if((sd->object_flag & SD_OBJECT_SHADOW_CATCHER)) {
-			//if(state->flag & PATH_RAY_CAMERA) {
+			if(state->flag & (PATH_RAY_CAMERA | PATH_RAY_TRANSMIT | PATH_RAY_TRANSPARENT | PATH_RAY_GLOSSY)) {
 				PathRadiance *L = &kernel_split_state.path_radiance[ray_index];
 				state->flag |= (PATH_RAY_SHADOW_CATCHER |
 				                PATH_RAY_STORE_SHADOW_INFO);
@@ -131,7 +131,7 @@ ccl_device void kernel_holdout_emission_blurring_pathtermination_ao(
 				}
 				L->shadow_radiance_sum = path_radiance_clamp_and_sum(kg, L);
 				L->shadow_throughput = average(throughput);
-			//}
+			}
 		}
 		else if(state->flag & PATH_RAY_SHADOW_CATCHER) {
 			/* Only update transparency after shadow catcher bounce. */
