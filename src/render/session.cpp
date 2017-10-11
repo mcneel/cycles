@@ -229,28 +229,30 @@ int Session::sample_gpu()
 		if (!device->error_message().empty())
 			progress.set_cancel(device->error_message());
 
-		/* update status and timing */
-		update_status_time();
+		if (!progress.get_cancel()) {
+			/* update status and timing */
+			update_status_time();
 
-		gpu_draw_ready = true;
-		progress.set_update();
+			gpu_draw_ready = true;
+			progress.set_update();
 
 
-		if (!device->error_message().empty())
-			progress.set_error(device->error_message());
+			if (!device->error_message().empty())
+				progress.set_error(device->error_message());
 
-		if (display != nullptr || !params.background) {
-			thread_scoped_lock display_lock(display_mutex);
-			tonemap(tile_manager.state.sample);
+			if (display != nullptr || !params.background) {
+				thread_scoped_lock display_lock(display_mutex);
+				tonemap(tile_manager.state.sample);
+			}
+
+			update_progressive_refine(true);
 		}
-
-		update_progressive_refine(true);
 
 		if (progress.get_cancel())
 			end = true;
 	}
 
-	return !no_tiles ? sample : -1;
+	return !no_tiles && !end ? sample : -1;
 }
 
 void Session::run_gpu()
@@ -609,29 +611,32 @@ int Session::sample_cpu()
 		if (!device->error_message().empty())
 			progress.set_cancel(device->error_message());
 
-		/* update status and timing */
-		update_status_time();
+		if (!progress.get_cancel()) {
 
-		gpu_draw_ready = true;
-		progress.set_update();
+			/* update status and timing */
+			update_status_time();
+
+			gpu_draw_ready = true;
+			progress.set_update();
 
 
-		if (!device->error_message().empty())
-			progress.set_error(device->error_message());
+			if (!device->error_message().empty())
+				progress.set_error(device->error_message());
 
-		if (display != nullptr || !params.background) {
-			thread_scoped_lock display_lock(display_mutex);
-			tonemap(tile_manager.state.sample);
+			if (display != nullptr || !params.background) {
+				thread_scoped_lock display_lock(display_mutex);
+				tonemap(tile_manager.state.sample);
+			}
+
+			update_progressive_refine(true);
 		}
-
-		update_progressive_refine(true);
 
 
 		if (progress.get_cancel())
 			end = true;
 	}
 
-	return !no_tiles ? sample : -1;
+	return !no_tiles && !end ? sample : -1;
 }
 
 void Session::run_cpu()
