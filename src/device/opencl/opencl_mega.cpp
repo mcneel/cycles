@@ -35,7 +35,7 @@ public:
 
 	OpenCLDeviceMegaKernel(DeviceInfo& info, Stats &stats, bool background_)
 	: OpenCLDeviceBase(info, stats, background_),
-	  path_trace_program(this, "megakernel", "kernel.cl", "-D__COMPILE_ONLY_MEGAKERNEL__ ")
+	  path_trace_program(this, "megakernel", "kernel.cl", "-D__COMPILE_ONLY_MEGAKERNEL__  -D__NO_CAMERA_MOTION__ -D__NO_OBJECT_MOTION__ -D__NO_HAIR__ -D__NO_BAKING__ -D__NO_VOLUME__ -D__NO_BRANCHED_PATH__ -D__NO_PATCH_EVAL__ -D__NO_DENOISING__")
 	{
 	}
 
