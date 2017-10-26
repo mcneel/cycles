@@ -49,7 +49,8 @@ Session::Session(const SessionParams& params_)
        max(params.device.multi_devices.size(), 1), params.pixel_size),
   stats()
 {
-	device_use_gl = ((params.device.type != DEVICE_CPU) && !params.background);
+	//device_use_gl = ((params.device.type != DEVICE_CPU) && !params.background);
+	device_use_gl = (params.device.type != DEVICE_CPU);
 
 	TaskScheduler::init(params.threads);
 
