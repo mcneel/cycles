@@ -58,7 +58,8 @@ typedef struct KernelGlobalsDummy {
 static string get_build_options(OpenCLDeviceBase *device, const DeviceRequestedFeatures& requested_features)
 {
 	string build_options = "-D__SPLIT_KERNEL__ ";
-	build_options += requested_features.get_build_options();
+	//build_options += requested_features.get_build_options();
+	build_options += "  -D__NO_CAMERA_MOTION__ -D__NO_OBJECT_MOTION__ -D__NO_HAIR__ -D__NO_BAKING__ -D__NO_VOLUME__ -D__NO_BRANCHED_PATH__ -D__NO_PATCH_EVAL__ -D__NO_DENOISING__ ";
 
 	/* Set compute device build option. */
 	cl_device_type device_type;

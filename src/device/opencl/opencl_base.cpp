@@ -1364,7 +1364,7 @@ string OpenCLDeviceBase::build_options_for_base_program(
 		return "-D__NO_BAKING__";
 	}
 
-	return "";
+	return " -D__NO_CAMERA_MOTION__ -D__NO_OBJECT_MOTION__ -D__NO_HAIR__ -D__NO_BAKING__ -D__NO_VOLUME__ -D__NO_BRANCHED_PATH__ -D__NO_PATCH_EVAL__ -D__NO_DENOISING__";
 }
 
 CCL_NAMESPACE_END
