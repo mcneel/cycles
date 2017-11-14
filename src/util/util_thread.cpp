@@ -27,7 +27,9 @@ thread::thread(function<void(void)> run_cb, int group, const char *name)
 	group_(group)
 {
 	pthread_create(&pthread_id_, NULL, run, (void*)this);
+#ifdef WIN32
 	pthread_setname_np(pthread_id_, name);
+#endif
 }
 
 thread::~thread()
