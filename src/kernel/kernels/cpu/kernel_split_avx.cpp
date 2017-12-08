@@ -18,7 +18,9 @@
  * optimization flags and nearly all functions inlined, while kernel.cpp
  * is compiled without for other CPU's. */
 
+#ifndef __SPLIT_KERNEL__
 #define __SPLIT_KERNEL__
+#endif
 
 #include "util/util_optimization.h"
 

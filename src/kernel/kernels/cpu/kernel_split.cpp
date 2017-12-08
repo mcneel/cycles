@@ -23,7 +23,9 @@
 #  define __KERNEL_SSE2__
 #endif
 
+#ifndef __SPLIT_KERNEL__
 #define __SPLIT_KERNEL__
+#endif
 
 /* When building kernel for native machine detect kernel features from the flags
  * set by compiler.
