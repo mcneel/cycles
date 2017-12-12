@@ -280,7 +280,7 @@ ccl_device_forceinline bool kernel_path_shader_apply(
 {
 #ifdef __SHADOW_TRICKS__
 	if((sd->object_flag & SD_OBJECT_SHADOW_CATCHER)) {
-		if(state->flag & PATH_RAY_CAMERA) {
+		if(state->flag & (PATH_RAY_CAMERA | PATH_RAY_TRANSMIT | PATH_RAY_TRANSPARENT | PATH_RAY_GLOSSY)) {
 			state->flag |= (PATH_RAY_SHADOW_CATCHER |
 						   PATH_RAY_STORE_SHADOW_INFO);
 
