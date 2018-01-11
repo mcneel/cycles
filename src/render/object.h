@@ -55,6 +55,7 @@ public:
 	bool use_holdout;
 	bool is_shadow_catcher;
 	bool mesh_light_no_cast_shadow;
+	bool is_block_instance;
 
 	float3 dupli_generated;
 	float2 dupli_uv;
@@ -81,6 +82,7 @@ public:
 	 * kernel scene.
 	 */
 	bool is_traceable() const;
+
 
 	/* Combine object's visibility with all possible internal run-time
 	 * determined flags which denotes trace-time visibility.

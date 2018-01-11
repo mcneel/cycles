@@ -97,6 +97,8 @@ NODE_DEFINE(Object)
 	SOCKET_TRANSFORM_ARRAY(motion, "Motion", array<Transform>());
 
 	SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
+	SOCKET_BOOLEAN(mesh_light_no_cast_shadow, "No Cast Shadow Mesh Light", false);
+	SOCKET_BOOLEAN(is_block_instance, "Block Instance", false);
 
 	return type;
 }
@@ -810,24 +812,27 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
 		 *
 		 * Could be solved by moving reference counter to Mesh.
 		 */
-		if((mesh_users[object->mesh] == 1 && !object->mesh->has_surface_bssrdf) &&
-		   !object->mesh->has_true_displacement() && object->mesh->subdivision_type == Mesh::SUBDIVISION_NONE)
-		{
-			if(!(motion_blur && object->use_motion())) {
-				if(!object->mesh->transform_applied) {
-					object->apply_transform(apply_to_motion);
-					object->mesh->transform_applied = true;
+		if(!object->is_block_instance)
+			if((mesh_users[object->mesh] == 1 && !object->mesh->has_surface_bssrdf) &&
+			   !object->mesh->has_true_displacement() && object->mesh->subdivision_type == Mesh::SUBDIVISION_NONE)
+			{
+				if(!(motion_blur && object->use_motion())) {
+					if(!object->mesh->transform_applied) {
+						object->apply_transform(apply_to_motion);
+						object->mesh->transform_applied = true;
 
-					if(progress.get_cancel()) return;
+						if(progress.get_cancel()) return;
+					}
+
+					object_flag[i] |= SD_OBJECT_TRANSFORM_APPLIED;
+					if(object->mesh->transform_negative_scaled)
+						object_flag[i] |= SD_OBJECT_NEGATIVE_SCALE_APPLIED;
 				}
-
-				object_flag[i] |= SD_OBJECT_TRANSFORM_APPLIED;
-				if(object->mesh->transform_negative_scaled)
-					object_flag[i] |= SD_OBJECT_NEGATIVE_SCALE_APPLIED;
+				else
+					have_instancing = true;
 			}
 			else
 				have_instancing = true;
-		}
 		else
 			have_instancing = true;
 
