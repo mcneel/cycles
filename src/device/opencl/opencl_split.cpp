@@ -58,14 +58,14 @@ static string get_build_options(OpenCLDeviceBase *device, const DeviceRequestedF
 {
 	string build_options = "-D__SPLIT_KERNEL__ ";
 	//build_options += requested_features.get_build_options();
-	build_options += "  -D__NO_CAMERA_MOTION__ -D__NO_OBJECT_MOTION__ -D__NO_HAIR__ -D__NO_BAKING__ -D__NO_VOLUME__ -D__NO_BRANCHED_PATH__ -D__NO_PATCH_EVAL__ -D__NO_DENOISING__ ";
+	build_options += "-D__NO_CAMERA_MOTION__ -D__NO_OBJECT_MOTION__ -D__NO_HAIR__ -D__NO_BAKING__ -D__NO_VOLUME__ -D__NO_BRANCHED_PATH__ -D__NO_PATCH_EVAL__ -D__NO_DENOISING__ ";
 
 	/* Set compute device build option. */
 	cl_device_type device_type;
 	OpenCLInfo::get_device_type(device->cdDevice, &device_type, &device->ciErr);
 	assert(device->ciErr == CL_SUCCESS);
 	if(device_type == CL_DEVICE_TYPE_GPU) {
-		build_options += " -D__COMPUTE_DEVICE_GPU__";
+		build_options += "-D__COMPUTE_DEVICE_GPU__ ";
 	}
 
 	return build_options;
