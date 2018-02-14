@@ -864,18 +864,27 @@ bool OpenCLInfo::get_platforms(vector<cl_platform_id> *platform_ids,
 	/* Get actual platforms. */
 	cl_int err;
 	platform_ids->resize(num_platforms);
-	if((err = clGetPlatformIDs(num_platforms,
-	                           &platform_ids->at(0),
-	                           NULL)) != CL_SUCCESS) {
-		if(error != NULL) {
-			*error = err;
+	if (num_platforms) {
+		if ((err = clGetPlatformIDs(num_platforms,
+		                            &platform_ids->at(0),
+		                            NULL)) != CL_SUCCESS) {
+			if (error != NULL) {
+				*error = err;
+			}
+			return false;
+		}
+		if (error != NULL) {
+			*error = CL_SUCCESS;
+		}
+		return true;
+	}
+	else {
+		if (error != NULL) {
+			*error = CL_INVALID_PLATFORM;
 		}
 		return false;
+
 	}
-	if(error != NULL) {
-		*error = CL_SUCCESS;
-	}
-	return true;
 }
 
 vector<cl_platform_id> OpenCLInfo::get_platforms()
@@ -989,24 +998,36 @@ bool OpenCLInfo::get_platform_devices(cl_platform_id platform_id,
 	{
 		return false;
 	}
-	/* Get actual device list. */
-	device_ids->resize(num_devices);
-	cl_int err;
-	if((err = clGetDeviceIDs(platform_id,
-	                         device_type,
-	                         num_devices,
-	                         &device_ids->at(0),
-	                         NULL)) != CL_SUCCESS)
-	{
-		if(error != NULL) {
-			*error = err;
+
+	/* only query devices when we are told there are devices. */
+	if (num_devices) {
+		/* Get actual device list. */
+		device_ids->resize(num_devices);
+		cl_int err;
+		if ((err = clGetDeviceIDs(platform_id,
+		                          device_type,
+		                          num_devices,
+		                          &device_ids->at(0),
+		                          NULL)) != CL_SUCCESS)
+		{
+			if (error != NULL) {
+				*error = err;
+			}
+			return false;
+		}
+		if (error != NULL) {
+			*error = CL_SUCCESS;
+		}
+		return true;
+	}
+	else {
+		/* no devices found, error out. */
+		if (error != NULL) {
+			*error = CL_INVALID_DEVICE;
 		}
 		return false;
+
 	}
-	if(error != NULL) {
-		*error = CL_SUCCESS;
-	}
-	return true;
 }
 
 vector<cl_device_id> OpenCLInfo::get_platform_devices(cl_platform_id platform_id,
