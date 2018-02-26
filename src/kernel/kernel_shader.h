@@ -91,7 +91,8 @@ ccl_device_noinline void shader_setup_from_ray(KernelGlobals *kg,
 	if(sd->type & PRIMITIVE_TRIANGLE) {
 		/* static triangle */
 		float3 Ng = triangle_normal(kg, sd);
-		sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		//sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		sd->shader = object_shader(kg, sd->object); //kernel_tex_fetch(__objects, sd->object);
 
 		/* vectors */
 		sd->P = triangle_refine(kg, sd, isect, ray);
@@ -179,7 +180,8 @@ void shader_setup_from_subsurface(
 	/* fetch triangle data */
 	if(sd->type == PRIMITIVE_TRIANGLE) {
 		float3 Ng = triangle_normal(kg, sd);
-		sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		//sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		sd->shader = object_shader(kg, sd->object); //kernel_tex_fetch(__objects, sd->object);
 
 		/* static triangle */
 		sd->P = triangle_refine_local(kg, sd, isect, ray);

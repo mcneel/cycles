@@ -63,6 +63,8 @@ public:
 	ParticleSystem *particle_system;
 	int particle_index;
 
+	int shader;
+
 	Object();
 	~Object();
 

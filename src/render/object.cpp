@@ -432,6 +432,9 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
 	if(mesh->num_curves()) {
 		state->have_curves = true;
 	}
+
+	ccl::Shader* shader = state->scene->shaders[ob->shader];
+	objects[offset + 16] = make_float4(__int_as_float(state->scene->shader_manager->get_shader_id(shader, true)), 0.0f, 0.0f, 0.0f);
 }
 
 bool ObjectManager::device_update_object_transform_pop_work(
