@@ -417,6 +417,9 @@ void ShaderManager::device_update_shaders_used(Scene *scene)
 	if(scene->background->shader)
 		scene->background->shader->used = true;
 
+	foreach(Object *ob, scene->objects)
+		ob->shader->used = true;
+
 	foreach(Mesh *mesh, scene->meshes)
 		foreach(Shader *shader, mesh->used_shaders)
 			shader->used = true;

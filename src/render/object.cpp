@@ -66,6 +66,7 @@ Object::Object()
 	motion.mid = transform_empty();
 	motion.post = transform_empty();
 	use_motion = false;
+	shader = NULL;
 }
 
 Object::~Object()
@@ -227,6 +228,9 @@ void Object::tag_update(Scene *scene)
 				scene->light_manager->need_update = true;
 		}
 	}
+
+	if(shader && shader->use_mis && shader->has_surface_emission)
+		scene->light_manager->need_update = true;
 
 	scene->camera->need_flags_update = true;
 	scene->curve_system_manager->need_update = true;
@@ -433,8 +437,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
 		state->have_curves = true;
 	}
 
-	ccl::Shader* shader = state->scene->shaders[ob->shader];
-	objects[offset + 16] = make_float4(__int_as_float(state->scene->shader_manager->get_shader_id(shader, true)), 0.0f, 0.0f, 0.0f);
+	objects[offset + 16] = make_float4(__int_as_float(state->scene->shader_manager->get_shader_id(ob->shader, true)), 0.0f, 0.0f, 0.0f);
 }
 
 bool ObjectManager::device_update_object_transform_pop_work(
