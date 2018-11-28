@@ -183,6 +183,9 @@ bool ImageManager::get_image_metadata(const string& filename,
 		return true;
 	}
 
+#if defined(NO_OIIO_LOADING)
+	return false;
+#else
 	/* Perform preliminary checks, with meaningful logging. */
 	if(!path_exists(filename)) {
 		VLOG(1) << "File '" << filename << "' does not exist.";
@@ -273,6 +276,7 @@ bool ImageManager::get_image_metadata(const string& filename,
 	delete in;
 
 	return true;
+#endif
 }
 
 static bool image_equals(ImageManager::Image *image,
@@ -474,6 +478,7 @@ bool ImageManager::file_load_image_generic(Image *img,
 		return false;
 
 	if(!img->builtin_data) {
+#if !defined(NO_OIIO_LOADING)
 		/* NOTE: Error logging is done in meta data acquisition. */
 		if(!path_exists(img->filename) || path_is_directory(img->filename)) {
 			return false;
@@ -496,6 +501,7 @@ bool ImageManager::file_load_image_generic(Image *img,
 			*in = NULL;
 			return false;
 		}
+#endif
 	}
 	else {
 		/* load image using builtin images callbacks */
@@ -503,6 +509,7 @@ bool ImageManager::file_load_image_generic(Image *img,
 			return false;
 	}
 
+#if !defined(NO_OIIO_LOADING)
 	/* we only handle certain number of components */
 	if(!(img->metadata.channels >= 1 && img->metadata.channels <= 4)) {
 		if(*in) {
@@ -513,6 +520,7 @@ bool ImageManager::file_load_image_generic(Image *img,
 
 		return false;
 	}
+#endif
 
 	return true;
 }
@@ -559,6 +567,7 @@ bool ImageManager::file_load_image(Image *img,
 	bool cmyk = false;
 	const size_t num_pixels = ((size_t)width) * height * depth;
 	if(in) {
+#if !defined(NO_OIIO_LOADING)
 		StorageType *readpixels = pixels;
 		vector<StorageType> tmppixels;
 		if(components > 4) {
@@ -589,6 +598,7 @@ bool ImageManager::file_load_image(Image *img,
 		cmyk = strcmp(in->format_name(), "jpeg") == 0 && components == 4;
 		in->close();
 		delete in;
+#endif
 	}
 	else {
 		if(FileFormat == TypeDesc::FLOAT) {

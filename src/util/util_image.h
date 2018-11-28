@@ -19,7 +19,11 @@
 
 /* OpenImageIO is used for all image file reading and writing. */
 
+#if !defined(NO_OIIO_LOADING)
 #include <OpenImageIO/imageio.h>
+#else
+#include "OpenImageIO/typedesc.h"
+#endif
 
 #include "util/util_vector.h"
 

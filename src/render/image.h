@@ -27,6 +27,11 @@
 
 CCL_NAMESPACE_BEGIN
 
+#if defined(NO_OIIO_LOADING)
+class ImageInput {
+};
+#endif
+
 class Device;
 class Progress;
 class RenderStats;
