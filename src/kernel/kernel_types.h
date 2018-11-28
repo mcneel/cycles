@@ -1461,11 +1461,11 @@ typedef struct KernelObject {
 	int numkeys;
 	int numsteps;
 	int numverts;
+	int shader;
 
 	uint patch_map_offset;
 	uint attribute_map_offset;
 	uint motion_offset;
-	uint pad;
 } KernelObject;
 static_assert_align(KernelObject, 16);
 

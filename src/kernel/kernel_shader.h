@@ -91,7 +91,8 @@ ccl_device_noinline void shader_setup_from_ray(KernelGlobals *kg,
 	if(sd->type & PRIMITIVE_TRIANGLE) {
 		/* static triangle */
 		float3 Ng = triangle_normal(kg, sd);
-		sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		//sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		sd->shader = object_shader(kg, sd->object);
 
 		/* vectors */
 		sd->P = triangle_refine(kg, sd, isect, ray);
@@ -164,6 +165,9 @@ void shader_setup_from_subsurface(
         const Ray *ray)
 {
 	const bool backfacing = sd->flag & SD_BACKFACING;
+#ifdef __INSTANCING__
+	sd->object = (isect->object == PRIM_NONE)? kernel_tex_fetch(__prim_object, isect->prim): isect->object;
+#endif
 
 	/* object, matrices, time, ray_length stay the same */
 	sd->flag = 0;
@@ -179,7 +183,8 @@ void shader_setup_from_subsurface(
 	/* fetch triangle data */
 	if(sd->type == PRIMITIVE_TRIANGLE) {
 		float3 Ng = triangle_normal(kg, sd);
-		sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		//sd->shader = kernel_tex_fetch(__tri_shader, sd->prim);
+		sd->shader = object_shader(kg, sd->object);
 
 		/* static triangle */
 		sd->P = triangle_refine_local(kg, sd, isect, ray);
@@ -1258,11 +1263,13 @@ ccl_device bool shader_transparent_shadow(KernelGlobals *kg, Intersection *isect
 {
 	int prim = kernel_tex_fetch(__prim_index, isect->prim);
 	int shader = 0;
+	int object = (isect->object == PRIM_NONE)? kernel_tex_fetch(__prim_object, isect->prim): isect->object;
 
 #ifdef __HAIR__
 	if(kernel_tex_fetch(__prim_type, isect->prim) & PRIMITIVE_ALL_TRIANGLE) {
 #endif
-		shader = kernel_tex_fetch(__tri_shader, prim);
+		//shader = kernel_tex_fetch(__tri_shader, prim);
+		shader = object_shader(kg, object);
 #ifdef __HAIR__
 	}
 	else {

@@ -109,6 +109,7 @@ Object::Object()
 	particle_system = NULL;
 	particle_index = 0;
 	bounds = BoundBox::empty;
+	shader = NULL;
 }
 
 Object::~Object()
@@ -284,6 +285,9 @@ void Object::tag_update(Scene *scene)
 				scene->light_manager->need_update = true;
 		}
 	}
+
+	if(shader && shader->use_mis && shader->has_surface_emission)
+		scene->light_manager->need_update = true;
 
 	scene->camera->need_flags_update = true;
 	scene->curve_system_manager->need_update = true;
@@ -496,6 +500,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
 	if(mesh->num_curves()) {
 		state->have_curves = true;
 	}
+	kobject.shader = state->scene->shader_manager->get_shader_id(ob->shader, true);
 }
 
 bool ObjectManager::device_update_object_transform_pop_work(

@@ -297,6 +297,16 @@ ccl_device_inline uint object_patch_map_offset(KernelGlobals *kg, int object)
 	return kernel_tex_fetch(__objects, object).patch_map_offset;
 }
 
+/* Shader ID for object */
+
+ccl_device_inline int object_shader(KernelGlobals *kg, int object)
+{
+	if(object == OBJECT_NONE)
+		return 0;
+
+	return kernel_tex_fetch(__objects, object).shader;
+}
+
 /* Pass ID for shader */
 
 ccl_device int shader_pass_id(KernelGlobals *kg, const ShaderData *sd)
