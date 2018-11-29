@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#if defined(STANDALONE_OGL)
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -272,3 +274,5 @@ void view_redraw()
 }
 
 CCL_NAMESPACE_END
+
+#endif

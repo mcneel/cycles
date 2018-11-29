@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#if defined(WITH_XMl_PARSING)
+
 #include "graph/node_xml.h"
 
 #include "util/util_foreach.h"
@@ -458,3 +460,4 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
 }
 
 CCL_NAMESPACE_END
+#endif

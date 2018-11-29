@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#if defined(WITH_PUGIXML)
 #ifndef __UTIL_XML_H__
 #define __UTIL_XML_H__
 
@@ -39,3 +40,4 @@ using PUGIXML_NAMESPACE::xml_parse_result;
 CCL_NAMESPACE_END
 
 #endif /* __UTIL_XML_H__ */
+#endif
