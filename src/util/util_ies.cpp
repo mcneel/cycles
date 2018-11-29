@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "util/util_algorithm.h"
 #include "util/util_foreach.h"
 #include "util/util_ies.h"
 #include "util/util_math.h"
