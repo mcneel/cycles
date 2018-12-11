@@ -66,7 +66,8 @@ ccl_device void svm_node_matrix_math(KernelGlobals *kg, ShaderData *sd, float *s
 		case NODE_MATRIX_MATH_PERSPECTIVE:
 		{
 #ifndef __KERNEL_GPU__
-			r = transform_perspective(&ProjectionTransform(tfm), v);
+			ProjectionTransform pt(tfm);
+			r = transform_perspective(&pt, v);
 #endif
 			break;
 		}
