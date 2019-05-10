@@ -125,7 +125,7 @@ ccl_device void svm_node_tex_voronoi(KernelGlobals *kg, ShaderData *sd, float *s
 	voronoi_neighbors(co*scale, (NodeVoronoiDistanceMetric)distance, exponent, dist, neighbor);
 
 	float3 color;
-	float fac;
+	float fac = 0.0f;
 	if(coloring == NODE_VORONOI_INTENSITY) {
 		switch(feature) {
 			case NODE_VORONOI_F1: fac = dist[0]; break;

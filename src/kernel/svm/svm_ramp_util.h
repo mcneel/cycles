@@ -31,7 +31,7 @@ ccl_device_inline float3 rgb_ramp_lookup(const float3 *ramp,
 		float3 t0, dy;
 		if(f < 0.0f) {
 			t0 = ramp[0];
-			dy = t0 - ramp[1],
+			dy = t0 - ramp[1];
 			f = -f;
 		}
 		else {
@@ -67,7 +67,7 @@ ccl_device float float_ramp_lookup(const float *ramp,
 		float t0, dy;
 		if(f < 0.0f) {
 			t0 = ramp[0];
-			dy = t0 - ramp[1],
+			dy = t0 - ramp[1];
 			f = -f;
 		}
 		else {

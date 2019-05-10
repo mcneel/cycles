@@ -61,7 +61,7 @@ ccl_device void kernel_queue_enqueue(KernelGlobals *kg,
 		queue_number = QUEUE_ACTIVE_AND_REGENERATED_RAYS;
 	}
 
-	unsigned int my_lqidx;
+	unsigned int my_lqidx = 0;
 	if(queue_number != -1) {
 		my_lqidx = get_local_queue_index(queue_number, locals->queue_atomics);
 	}

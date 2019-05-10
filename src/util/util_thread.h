@@ -30,7 +30,7 @@
 #endif
 
 #ifdef __APPLE__
-#  include <libkern/OSAtomic.h>
+#  include <os/lock.h>
 #endif
 
 #include "util/util_function.h"
@@ -65,15 +65,15 @@ class thread_spin_lock {
 public:
 #ifdef __APPLE__
 	inline thread_spin_lock() {
-		spin_ = OS_SPINLOCK_INIT;
+		spin_ = OS_UNFAIR_LOCK_INIT;
 	}
 
 	inline void lock() {
-		OSSpinLockLock(&spin_);
+		os_unfair_lock_lock(&spin_);
 	}
 
 	inline void unlock() {
-		OSSpinLockUnlock(&spin_);
+		os_unfair_lock_unlock(&spin_);
 	}
 #elif defined(_WIN32)
 	inline thread_spin_lock() {
@@ -111,7 +111,7 @@ public:
 #endif
 protected:
 #ifdef __APPLE__
-	OSSpinLock spin_;
+	os_unfair_lock spin_;
 #elif defined(_WIN32)
 	CRITICAL_SECTION cs_;
 #else
