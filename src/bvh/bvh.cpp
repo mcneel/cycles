@@ -532,8 +532,9 @@ void BVH::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
 				       nsize_bbox*sizeof(int4));
 
 				/* Modify offsets into arrays */
-				int4 data = bvh_nodes[i + nsize_bbox];
-				int4 data1 = bvh_nodes[i + nsize_bbox-1];
+				int idx = i + nsize_bbox;
+				int4 data = bvh_nodes[idx];
+				int4 data1 = (idx > 0) ? bvh_nodes[idx-1] : data;
 				if(use_obvh) {
 					data.z += (data.z < 0) ? -noffset_leaf : noffset;
 					data.w += (data.w < 0) ? -noffset_leaf : noffset;
