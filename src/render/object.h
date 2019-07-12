@@ -57,6 +57,9 @@ public:
 	bool mesh_light_no_cast_shadow;
 	bool is_block_instance;
 
+	bool use_cutout;
+	bool ignore_cutout;
+
 	float3 dupli_generated;
 	float2 dupli_uv;
 

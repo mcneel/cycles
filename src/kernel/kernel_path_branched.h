@@ -502,6 +502,12 @@ ccl_device void kernel_branched_path_integrate(KernelGlobals *kg,
 			break;
 		}
 
+#ifdef __CUTOUT__
+		if (kernel_path_surface_cutout(&sd, &state, &ray)) {
+			continue;
+		}
+#endif /* __CUTOUT__ */
+
 		/* transparency termination */
 		if(state.flag & PATH_RAY_TRANSPARENT) {
 			/* path termination. this is a strange place to put the termination, it's

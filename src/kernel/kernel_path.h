@@ -470,6 +470,13 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 			break;
 		}
 
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(sd, state, ray)) {
+			continue;
+		}
+#endif  /* __CUTOUT__ */
+
 		/* path termination. this is a strange place to put the termination, it's
 		 * mainly due to the mixed in MIS that we use. gives too many unneeded
 		 * shader evaluations, only need emission if we are going to terminate */
@@ -640,6 +647,13 @@ ccl_device_forceinline void kernel_path_integrate(
 		{
 			break;
 		}
+
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(&sd, state, ray)) {
+			continue;
+		}
+#endif  /* __CUTOUT__ */
 
 		/* path termination. this is a strange place to put the termination, it's
 		 * mainly due to the mixed in MIS that we use. gives too many unneeded

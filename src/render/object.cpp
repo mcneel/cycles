@@ -100,6 +100,9 @@ NODE_DEFINE(Object)
 	SOCKET_BOOLEAN(mesh_light_no_cast_shadow, "No Cast Shadow Mesh Light", false);
 	SOCKET_BOOLEAN(is_block_instance, "Block Instance", false);
 
+	SOCKET_BOOLEAN(use_cutout, "Use Cutout", false);
+	SOCKET_BOOLEAN(ignore_cutout, "Ignore Cutout", false);
+
 	return type;
 }
 
@@ -493,6 +496,12 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
 	/* Object flag. */
 	if(ob->use_holdout) {
 		flag |= SD_OBJECT_HOLDOUT_MASK;
+	}
+	if (ob->use_cutout) {
+		flag |= SD_OBJECT_CUTOUT;
+	}
+	if (ob->ignore_cutout) {
+		flag |= SD_OBJECT_IGNORE_CUTOUT;
 	}
 	state->object_flag[object_index] = flag;
 

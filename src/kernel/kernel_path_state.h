@@ -65,6 +65,11 @@ ccl_device_inline void path_state_init(KernelGlobals *kg,
 		state->volume_stack[0].shader = SHADER_NONE;
 	}
 #endif
+
+#ifdef __CUTOUT__
+	state->cutout_depth = 0;
+	state->prev_prim = PRIM_NONE;
+#endif /* __CUTOUT__ */
 }
 
 ccl_device_inline void path_state_next(KernelGlobals *kg, ccl_addr_space PathState *state, int label)

@@ -320,11 +320,24 @@ ccl_device bool kernel_path_surface_bounce(KernelGlobals *kg,
 		ray->dD = bsdf_domega_in;
 #endif
 
-#ifdef __VOLUME__
 		/* enter/exit volume */
-		if(label & LABEL_TRANSMIT)
+		if(label & LABEL_TRANSMIT) {
+#ifdef __VOLUME__
 			kernel_volume_stack_enter_exit(kg, sd, state->volume_stack);
 #endif
+/*#ifdef __CUTOUT__
+			if(sd->object_flag & SD_OBJECT_CUTOUT) {
+				if(sd->flag & SD_BACKFACING) {
+					kernel_assert(state->cutout_depth <= 1);
+					state->cutout_depth = max(state->cutout_depth-1, 0);
+				}
+				else {
+					kernel_assert(state->cutout_depth == 0);
+					state->cutout_depth++;
+				}
+			}
+#endif*/
+		}
 		return true;
 	}
 #ifdef __VOLUME__
@@ -354,5 +367,32 @@ ccl_device bool kernel_path_surface_bounce(KernelGlobals *kg,
 		return false;
 	}
 }
+
+#ifdef __CUTOUT__
+ccl_device_inline bool kernel_path_surface_cutout(const ShaderData *sd,
+                                                  ccl_addr_space PathState *state,
+                                                  ccl_addr_space Ray *ray)
+{
+	if (sd->object_flag & SD_OBJECT_CUTOUT) {
+		if (sd->flag & SD_BACKFACING) {
+			state->cutout_depth = max(state->cutout_depth - 1, 0);
+		}
+		else {
+			state->cutout_depth++;
+		}
+		ray->P = ray_offset(sd->P, -sd->N);
+		return true;
+
+	}
+	else if(state->cutout_depth > 0) {
+		if (sd->object_flag & SD_OBJECT_IGNORE_CUTOUT) {
+			return false;
+		}
+		ray->P = ray_offset(sd->P, -sd->N);
+		return true;
+	}
+	return false;
+}
+#endif  /* __CUTOUT__ */
 
 CCL_NAMESPACE_END

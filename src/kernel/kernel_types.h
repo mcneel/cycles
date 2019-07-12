@@ -178,6 +178,7 @@ CCL_NAMESPACE_BEGIN
 #define __SHADOW_TRICKS__
 #define __DENOISING_FEATURES__
 #define __SHADER_RAYTRACE__
+#define __CUTOUT__
 
 #ifdef __KERNEL_SHADING__
 #  define __SVM__
@@ -962,6 +963,10 @@ enum ShaderDataObjectFlag {
 	SD_OBJECT_HAS_VOLUME_ATTRIBUTES  = (1 << 8),
 	/* object is mesh lamp, but doesn't cast shadows */
 	SD_OBJECT_LIGHT_NO_CAST_SHADOWS  = (1 << 9),
+	/* use cutout */
+	SD_OBJECT_CUTOUT                 = (1 << 10),
+	/* object ignores cutout */
+	SD_OBJECT_IGNORE_CUTOUT          = (1 << 11),
 
 	SD_OBJECT_FLAGS = (SD_OBJECT_HOLDOUT_MASK |
 	                   SD_OBJECT_MOTION |
@@ -970,7 +975,10 @@ enum ShaderDataObjectFlag {
 	                   SD_OBJECT_HAS_VOLUME |
 	                   SD_OBJECT_INTERSECTS_VOLUME |
 	                   SD_OBJECT_SHADOW_CATCHER |
-	                   SD_OBJECT_HAS_VOLUME_ATTRIBUTES)
+	                   SD_OBJECT_HAS_VOLUME_ATTRIBUTES |
+	                   SD_OBJECT_LIGHT_NO_CAST_SHADOWS |
+	                   SD_OBJECT_CUTOUT |
+	                   SD_OBJECT_IGNORE_CUTOUT)
 };
 
 typedef ccl_addr_space struct ShaderData {
@@ -1108,6 +1116,11 @@ typedef struct PathState {
 	int volume_bounce;
 	int volume_bounds_bounce;
 	VolumeStack volume_stack[VOLUME_STACK_SIZE];
+#endif
+
+#ifdef __CUTOUT__
+		int cutout_depth;
+		int prev_prim;
 #endif
 } PathState;
 
