@@ -68,6 +68,7 @@ ccl_device_inline void path_state_init(KernelGlobals *kg,
 
 #ifdef __CUTOUT__
 	state->cutout_depth = 0;
+	state->hit_count = 0;
 	state->prev_prim = PRIM_NONE;
 #endif /* __CUTOUT__ */
 }

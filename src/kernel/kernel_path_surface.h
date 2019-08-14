@@ -373,6 +373,8 @@ ccl_device_inline bool kernel_path_surface_cutout(const ShaderData *sd,
                                                   ccl_addr_space PathState *state,
                                                   ccl_addr_space Ray *ray)
 {
+	if ((state->flag & PATH_RAY_CAMERA) != PATH_RAY_CAMERA) return false;
+
 	if (sd->object_flag & SD_OBJECT_CUTOUT) {
 		if (sd->flag & SD_BACKFACING) {
 			state->cutout_depth = max(state->cutout_depth - 1, 0);
@@ -381,6 +383,14 @@ ccl_device_inline bool kernel_path_surface_cutout(const ShaderData *sd,
 			state->cutout_depth++;
 		}
 		ray->P = ray_offset(sd->P, -sd->N);
+
+		if(state->cutout_depth>1 && state->prev_prim!=PRIM_NONE && state->prev_prim==sd->prim)
+		{
+			kernel_assert(state->cutout_depth <= 1);
+			state->cutout_depth = 0;
+			return false;
+		}
+		state->prev_prim = sd->prim;
 		return true;
 
 	}
@@ -388,6 +398,21 @@ ccl_device_inline bool kernel_path_surface_cutout(const ShaderData *sd,
 		if (sd->object_flag & SD_OBJECT_IGNORE_CUTOUT) {
 			return false;
 		}
+
+		if (state->hit_count > 0 && state->prev_prim != sd->prim) {
+			state->hit_count = 0;
+			state->prev_prim = sd->prim;
+		}
+		if (state->prev_prim != PRIM_NONE) state->hit_count++;
+
+		if (state->hit_count > 10)
+		{
+			kernel_assert(state->hit_count <= 10);
+			state->hit_count = 0;
+			state->prev_prim = PRIM_NONE;
+			return false;
+		}
+
 		ray->P = ray_offset(sd->P, -sd->N);
 		return true;
 	}

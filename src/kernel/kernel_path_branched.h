@@ -489,6 +489,12 @@ ccl_device void kernel_branched_path_integrate(KernelGlobals *kg,
 		shader_eval_surface(kg, &sd, &state, state.flag);
 		shader_merge_closures(&sd);
 
+#ifdef __CUTOUT__
+		if (kernel_path_surface_cutout(&sd, &state, &ray)) {
+			continue;
+		}
+#endif /* __CUTOUT__ */
+
 		/* Apply shadow catcher, holdout, emission. */
 		if(!kernel_path_shader_apply(kg,
 		                             &sd,
@@ -501,12 +507,6 @@ ccl_device void kernel_branched_path_integrate(KernelGlobals *kg,
 		{
 			break;
 		}
-
-#ifdef __CUTOUT__
-		if (kernel_path_surface_cutout(&sd, &state, &ray)) {
-			continue;
-		}
-#endif /* __CUTOUT__ */
 
 		/* transparency termination */
 		if(state.flag & PATH_RAY_TRANSPARENT) {

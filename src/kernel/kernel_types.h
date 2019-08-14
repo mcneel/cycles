@@ -1120,6 +1120,7 @@ typedef struct PathState {
 
 #ifdef __CUTOUT__
 		int cutout_depth;
+		int hit_count;
 		int prev_prim;
 #endif
 } PathState;

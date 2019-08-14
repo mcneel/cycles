@@ -37,8 +37,8 @@ CCL_NAMESPACE_BEGIN
 
 #ifndef __KERNEL_GPU__
 
-struct ccl_try_align(16) float8 {
 #ifdef __KERNEL_AVX2__
+struct ccl_try_align(32) float8 {
 	union {
 		__m256 m256;
 		struct { float a, b, c, d, e, f, g, h; };
@@ -54,6 +54,7 @@ struct ccl_try_align(16) float8 {
 	__forceinline float8& operator =(const float8& a);
 
 #else  /* __KERNEL_AVX2__ */
+struct ccl_try_align(16) float8 {
 	float a, b, c, d, e, f, g, h;
 #endif  /* __KERNEL_AVX2__ */
 

@@ -457,6 +457,13 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 		shader_eval_surface(kg, sd, state, state->flag);
 		shader_prepare_closures(sd, state);
 
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(sd, state, ray)) {
+			continue;
+		}
+#endif  /* __CUTOUT__ */
+
 		/* Apply shadow catcher, holdout, emission. */
 		if(!kernel_path_shader_apply(kg,
 		                             sd,
@@ -470,12 +477,6 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 			break;
 		}
 
-		/* cutout */
-#ifdef __CUTOUT__
-		if(kernel_path_surface_cutout(sd, state, ray)) {
-			continue;
-		}
-#endif  /* __CUTOUT__ */
 
 		/* path termination. this is a strange place to put the termination, it's
 		 * mainly due to the mixed in MIS that we use. gives too many unneeded
@@ -635,6 +636,13 @@ ccl_device_forceinline void kernel_path_integrate(
 		shader_eval_surface(kg, &sd, state, state->flag);
 		shader_prepare_closures(&sd, state);
 
+		/* cutout */
+#ifdef __CUTOUT__
+		if(kernel_path_surface_cutout(&sd, state, ray)) {
+			continue;
+		}
+#endif  /* __CUTOUT__ */
+
 		/* Apply shadow catcher, holdout, emission. */
 		if(!kernel_path_shader_apply(kg,
 		                             &sd,
@@ -647,13 +655,6 @@ ccl_device_forceinline void kernel_path_integrate(
 		{
 			break;
 		}
-
-		/* cutout */
-#ifdef __CUTOUT__
-		if(kernel_path_surface_cutout(&sd, state, ray)) {
-			continue;
-		}
-#endif  /* __CUTOUT__ */
 
 		/* path termination. this is a strange place to put the termination, it's
 		 * mainly due to the mixed in MIS that we use. gives too many unneeded
