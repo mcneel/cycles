@@ -65,6 +65,9 @@ ccl_device_inline void path_state_init(KernelGlobals *kg,
 		state->volume_stack[0].shader = SHADER_NONE;
 	}
 #endif
+	state->prev_P = make_float3(FLT_MAX, FLT_MAX, FLT_MAX);
+	state->prev_prim = PRIM_NONE;
+	state->clip_depth = 0;
 }
 
 ccl_device_inline void path_state_next(KernelGlobals *kg, ccl_addr_space PathState *state, int label)

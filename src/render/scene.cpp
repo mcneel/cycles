@@ -51,6 +51,7 @@ DeviceScene::DeviceScene(Device *device)
   prim_index(device, "__prim_index", MEM_TEXTURE),
   prim_object(device, "__prim_object", MEM_TEXTURE),
   prim_time(device, "__prim_time", MEM_TEXTURE),
+  clipping_planes(device, "__clipping_planes", MEM_TEXTURE),
   tri_shader(device, "__tri_shader", MEM_TEXTURE),
   tri_vnormal(device, "__tri_vnormal", MEM_TEXTURE),
   tri_vindex(device, "__tri_vindex", MEM_TEXTURE),
@@ -129,6 +130,7 @@ void Scene::free_memory(bool final)
 	shaders.clear();
 	meshes.clear();
 	objects.clear();
+	clipping_planes.clear();
 	lights.clear();
 	particle_systems.clear();
 
@@ -210,6 +212,9 @@ void Scene::device_update(Device *device_, Progress& progress)
 	mesh_manager->device_update_preprocess(device, this, progress);
 
 	if(progress.get_cancel() || device->have_error()) return;
+
+	progress.set_status("Updating Clipping Planes");
+	object_manager->device_update_clipping_planes(device, &dscene, this, progress);
 
 	progress.set_status("Updating Objects");
 	object_manager->device_update(device, &dscene, this, progress);

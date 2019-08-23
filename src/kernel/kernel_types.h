@@ -1109,6 +1109,10 @@ typedef struct PathState {
 	int volume_bounds_bounce;
 	VolumeStack volume_stack[VOLUME_STACK_SIZE];
 #endif
+
+	float3 prev_P;
+	int prev_prim;
+	int clip_depth;
 } PathState;
 
 /* Struct to gather multiple nearby intersections. */
@@ -1380,7 +1384,9 @@ typedef struct KernelIntegrator {
 
 	int max_closures;
 
-	int pad1, pad2, pad3;
+	int num_clipping_planes;
+
+	int pad1, pad2;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 

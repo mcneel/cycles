@@ -355,4 +355,43 @@ ccl_device bool kernel_path_surface_bounce(KernelGlobals *kg,
 	}
 }
 
+ccl_device_forceinline bool path_clip_ray(
+	KernelGlobals* kg,
+	ccl_addr_space PathState* state,
+	ShaderData* sd,
+	Ray* ray)
+{
+	/* Check against clipping planes. If camera ray and
+	 * clipped by planes adjust ray position and iterate
+	 * for next potential hit.
+	 */
+	if ((state->flag & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+		for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+			float4 cpeq = kernel_tex_fetch(__clipping_planes, cpi);
+			float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
+			if (testdist < 0) {
+
+				if (
+					state->clip_depth > 9 ||
+					(state->prev_P.x == sd->P.x
+					&& state->prev_P.y == sd->P.y
+					&& state->prev_P.z == sd->P.z
+					&& state->prev_prim == sd->prim)) {
+					break;
+				}
+				state->prev_P = sd->P;
+				state->prev_prim = sd->prim;
+				state->clip_depth++;
+				ray->P = ray_offset(sd->P, -sd->Ng); // start ray a bit after hit point, using negative geometry normal
+				return true;
+			}
+		}
+	}
+	state->prev_P = make_float3(FLT_MAX, FLT_MAX, FLT_MAX);
+	state->prev_prim = PRIM_NONE;
+	state->clip_depth = 0;
+	return false;
+}
+
+
 CCL_NAMESPACE_END

@@ -74,6 +74,9 @@ public:
 	device_vector<int> prim_object;
 	device_vector<float2> prim_time;
 
+	/* Clipping planes float4 contains a,b,c,d to plane equation ax+by+cz+d. */
+	device_vector<float4> clipping_planes;
+
 	/* mesh */
 	device_vector<uint> tri_shader;
 	device_vector<float4> tri_vnormal;
@@ -207,6 +210,7 @@ public:
 
 	/* data lists */
 	vector<Object*> objects;
+	vector<float4> clipping_planes;
 	vector<Mesh*> meshes;
 	vector<Shader*> shaders;
 	vector<Light*> lights;

@@ -60,11 +60,20 @@ ccl_device void kernel_shader_setup(KernelGlobals *kg,
 		Intersection isect = kernel_split_state.isect[ray_index];
 		Ray ray = kernel_split_state.ray[ray_index];
 		ShaderData *sd = kernel_split_sd(sd, ray_index);
+		ccl_global PathState *state = &kernel_split_state.path_state[ray_index];
 
 		shader_setup_from_ray(kg,
 		                      sd,
 		                      &isect,
 		                      &ray);
+
+		if (path_clip_ray(kg, state, sd, &ray)) {
+			ASSIGN_RAY_STATE(kernel_split_state.ray_state, ray_index, RAY_REGENERATED);
+			/* Ray has been offset to handle clipped geometry. Make sure
+			 * the new ray is used on next scene intersection. */
+			kernel_split_state.ray[ray_index] = ray;
+			return;
+		}
 
 #ifdef __VOLUME__
 		if(sd->flag & SD_HAS_ONLY_VOLUME) {

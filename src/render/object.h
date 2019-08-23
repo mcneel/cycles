@@ -97,12 +97,16 @@ public:
 class ObjectManager {
 public:
 	bool need_update;
+	bool need_clipping_plane_update;
 	bool need_flags_update;
 
 	ObjectManager();
 	~ObjectManager();
 
 	void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress& progress);
+	void device_update_clipping_planes(Device *device, DeviceScene* dscene,
+	                                   Scene *scene,
+	                                   Progress& progress);
 	void device_update_transforms(DeviceScene *dscene,
 	                              Scene *scene,
 	                              Progress& progress);
