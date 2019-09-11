@@ -549,6 +549,7 @@ void ObjectManager::device_update_clipping_planes(Device *, DeviceScene* dscene,
                                                   Progress& progress)
 {
 	float4* cps;
+	need_clipping_plane_update = false;
 	/* Set the clipping planes. */
 	dscene->clipping_planes.free();
 	int num_cps = 0;
@@ -881,6 +882,7 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
 void ObjectManager::tag_update(Scene *scene)
 {
 	need_update = true;
+	need_clipping_plane_update = true;
 	scene->curve_system_manager->need_update = true;
 	scene->mesh_manager->need_update = true;
 	scene->light_manager->need_update = true;

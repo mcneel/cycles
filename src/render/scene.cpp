@@ -345,6 +345,7 @@ bool Scene::need_data_update()
 	return (background->need_update
 		|| image_manager->need_update
 		|| object_manager->need_update
+		|| object_manager->need_clipping_plane_update
 		|| mesh_manager->need_update
 		|| light_manager->need_update
 		|| lookup_tables->need_update
