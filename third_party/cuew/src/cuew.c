@@ -23,7 +23,7 @@
 #  define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include <cuew.h>
+#include "cuew.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
