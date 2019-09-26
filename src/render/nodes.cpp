@@ -214,6 +214,7 @@ NODE_DEFINE(ImageTextureNode)
 	SOCKET_ENUM(color_space, "Color Space", color_space_enum, NODE_COLOR_SPACE_COLOR);
 
 	SOCKET_BOOLEAN(use_alpha, "Use Alpha", true);
+	SOCKET_BOOLEAN(alternate_tiles, "Alternate Tiles", false);
 
 	static NodeEnum interpolation_enum;
 	interpolation_enum.insert("closest", INTERPOLATION_CLOSEST);
@@ -326,6 +327,7 @@ void ImageTextureNode::compile(SVMCompiler& compiler)
 					compiler.stack_assign_if_linked(alpha_out),
 					srgb),
 				projection);
+			compiler.add_node(alternate_tiles ? 1 : 0);
 		}
 		else {
 			compiler.add_node(NODE_TEX_IMAGE_BOX,

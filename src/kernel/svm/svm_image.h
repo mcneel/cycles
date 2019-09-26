@@ -46,10 +46,23 @@ ccl_device_inline float3 texco_remap_square(float3 co)
 	return (co - make_float3(0.5f, 0.5f, 0.5f)) * 2.0f;
 }
 
-ccl_device void svm_node_tex_image(KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node)
+ccl_device float alternate_tile(float p)
+{
+	int mod = (int)p % 2;
+	if (p > 0.0f) {
+		if (mod == 0) return p;
+		return (float)(2 * (int)p) - p + 1;
+	}
+
+	if (mod != 0) return p;
+	return (float)(2 * (int)p) - p - 1;
+}
+
+ccl_device void svm_node_tex_image(KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
 	uint id = node.y;
 	uint co_offset, out_offset, alpha_offset, srgb;
+	uint4 node2 = read_node(kg, offset);
 
 	decode_node_uchar4(node.z, &co_offset, &out_offset, &alpha_offset, &srgb);
 
@@ -65,6 +78,10 @@ ccl_device void svm_node_tex_image(KernelGlobals *kg, ShaderData *sd, float *sta
 		tex_co = map_to_tube(co);
 	}
 	else {
+		if (node2.x != 0) {
+			co.x = alternate_tile(co.x);
+			co.y = alternate_tile(co.y);
+		}
 		tex_co = make_float2(co.x, co.y);
 	}
 	float4 f = svm_image_texture(kg, id, tex_co.x, tex_co.y, srgb, use_alpha);

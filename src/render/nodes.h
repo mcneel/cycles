@@ -89,6 +89,7 @@ public:
 	int is_float;
 	bool is_linear;
 	bool use_alpha;
+	bool alternate_tiles;
 	ustring filename;
 	void *builtin_data;
 	NodeImageColorSpace color_space;
