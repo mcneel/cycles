@@ -726,7 +726,12 @@ ccl_device_inline uint find_first_set(uint x)
   return (x != 0) ? (32 - count_leading_zeros(x & (-x))) : 0;
 #else
 #  ifdef _MSC_VER
+/* Disable C4146: unary minus operator applie to unsigned typed,
+   result still unsigned. */
+#    pragma warning(push)
+#    pragma warning(disable : 4146)
   return (x != 0) ? (32 - count_leading_zeros(x & (-x))) : 0;
+#    pragma warning(pop)
 #  else
   return __builtin_ffs(x);
 #  endif

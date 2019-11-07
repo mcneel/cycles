@@ -604,7 +604,7 @@ bool ImageManager::file_load_image(Image *img,
       in->read_image(FileFormat,
                      (uchar *)readpixels + (height - 1) * scanlinesize,
                      AutoStride,
-                     -scanlinesize,
+                     -(long long)scanlinesize,
                      AutoStride);
     }
     else {
@@ -806,7 +806,7 @@ void ImageManager::device_load_image(
     device_vector<float4> *tex_img = new device_vector<float4>(
         device, img->mem_name.c_str(), MEM_TEXTURE);
 
-    if (!file_load_image<TypeDesc::FLOAT, float>(img, type, texture_limit, *tex_img)) {
+    if (!file_load_image<TypeDesc::FLOAT, float, float4>(img, type, texture_limit, *tex_img)) {
       /* on failure to load, we set a 1x1 pixels pink image */
       thread_scoped_lock device_lock(device_mutex);
       float *pixels = (float *)tex_img->alloc(1, 1);
