@@ -1862,6 +1862,43 @@ void RGBToBWNode::compile(OSLCompiler &compiler)
   compiler.add(this, "node_rgb_to_bw");
 }
 
+/* RGB to Luminance */
+
+NODE_DEFINE(RGBToLuminanceNode)
+{
+	NodeType* type = NodeType::add("rgb_to_luminance", create, NodeType::SHADER);
+	SOCKET_IN_COLOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
+	SOCKET_OUT_FLOAT(val, "Val");
+
+	return type;
+}
+
+RGBToLuminanceNode::RGBToLuminanceNode()
+: ShaderNode(node_type)
+{
+}
+
+void RGBToLuminanceNode::constant_fold(const ConstantFolder& folder)
+{
+	if(folder.all_inputs_constant()) {
+		float val = folder.scene->shader_manager->linear_rgb_to_luminance(color);
+		folder.make_constant(val);
+	}
+}
+
+void RGBToLuminanceNode::compile(SVMCompiler& compiler)
+{
+	compiler.add_node(NODE_CONVERT,
+	                 NODE_CONVERT_CF2,
+	                 compiler.stack_assign(inputs[0]),
+	                 compiler.stack_assign(outputs[0]));
+}
+
+void RGBToLuminanceNode::compile(OSLCompiler& compiler)
+{
+	compiler.add(this, "node_rgb_to_luminance");
+}
+
 /* Convert */
 
 const NodeType *ConvertNode::node_types[ConvertNode::MAX_TYPE][ConvertNode::MAX_TYPE];
@@ -1874,10 +1911,11 @@ Node *ConvertNode::create(const NodeType *type)
 
 bool ConvertNode::register_types()
 {
-  const int num_types = 8;
+  const int num_types = 9;
   SocketType::Type types[num_types] = {SocketType::FLOAT,
                                        SocketType::INT,
                                        SocketType::COLOR,
+                                       SocketType::COLOR2,
                                        SocketType::VECTOR,
                                        SocketType::POINT,
                                        SocketType::NORMAL,
@@ -1949,6 +1987,11 @@ void ConvertNode::constant_fold(const ConstantFolder &folder)
           float val = folder.scene->shader_manager->linear_rgb_to_gray(value_color);
           folder.make_constant(val);
         }
+        else if (from == SocketType::COLOR2) {
+          /* color to float */
+          float val = folder.scene->shader_manager->linear_rgb_to_luminance(value_color);
+          folder.make_constant(val);
+        }
         else {
           /* vector/point/normal to float */
           folder.make_constant(average(value_vector));
@@ -2008,6 +2051,10 @@ void ConvertNode::compile(SVMCompiler &compiler)
       /* color to float */
       compiler.add_node(
           NODE_CONVERT, NODE_CONVERT_CF, compiler.stack_assign(in), compiler.stack_assign(out));
+    else if (from == SocketType::COLOR2)
+      /* color to float */
+      compiler.add_node(
+          NODE_CONVERT, NODE_CONVERT_CF2, compiler.stack_assign(in), compiler.stack_assign(out));
     else
       /* vector/point/normal to float */
       compiler.add_node(
@@ -2047,6 +2094,8 @@ void ConvertNode::compile(OSLCompiler &compiler)
   else if (from == SocketType::INT)
     compiler.add(this, "node_convert_from_int");
   else if (from == SocketType::COLOR)
+    compiler.add(this, "node_convert_from_color");
+  else if (from == SocketType::COLOR2)
     compiler.add(this, "node_convert_from_color");
   else if (from == SocketType::VECTOR)
     compiler.add(this, "node_convert_from_vector");
