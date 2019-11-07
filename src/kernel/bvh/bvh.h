@@ -347,12 +347,17 @@ ccl_device_intersect bool scene_intersect_local(KernelGlobals *kg,
       float3 idir = ray->D;
       const int object_flag = kernel_tex_fetch(__object_flag, local_object);
       if (!(object_flag & SD_OBJECT_TRANSFORM_APPLIED)) {
+#      ifdef __OBJECT_MOTION__
         Transform ob_itfm;
         rtc_ray.tfar = bvh_instance_motion_push(
             kg, local_object, ray, &P, &dir, &idir, ray->t, &ob_itfm);
         /* bvh_instance_motion_push() returns the inverse transform but
          * it's not needed here. */
         (void)ob_itfm;
+#      else
+        rtc_ray.tfar = bvh_instance_push(
+            kg, local_object, ray, &P, &dir, &idir, ray->t);
+#      endif
 
         rtc_ray.org_x = P.x;
         rtc_ray.org_y = P.y;
