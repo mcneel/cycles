@@ -201,6 +201,7 @@ class ShaderManager {
   static void free_memory();
 
   float linear_rgb_to_gray(float3 c);
+  float linear_rgb_to_luminance(float3 c);
 
   string get_cryptomatte_materials(Scene *scene);
 
@@ -225,6 +226,7 @@ class ShaderManager {
   float3 xyz_to_g;
   float3 xyz_to_b;
   float3 rgb_to_y;
+  float3 rgb_to_lum;
 };
 
 CCL_NAMESPACE_END
