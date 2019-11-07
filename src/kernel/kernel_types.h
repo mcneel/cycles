@@ -1173,6 +1173,8 @@ typedef struct KernelCamera {
   ProjectionTransform worldtondc;
   Transform worldtocamera;
 
+  Transform cameratondc;
+
   /* Stores changes in the projection matrix. Use for camera zoom motion
    * blur and motion pass output for perspective camera. */
   ProjectionTransform perspective_pre;

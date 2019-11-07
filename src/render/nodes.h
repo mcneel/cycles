@@ -444,10 +444,10 @@ class RGBToBWNode : public ShaderNode {
 
 class RGBToLuminanceNode : public ShaderNode {
 public:
-	SHADER_NODE_CLASS(RGBToLuminanceNode)
-	void constant_fold(const ConstantFolder& folder);
+  SHADER_NODE_CLASS(RGBToLuminanceNode)
+  void constant_fold(const ConstantFolder& folder);
 
-	float3 color;
+  float3 color;
 };
 
 class ConvertNode : public ShaderNode {
@@ -1372,6 +1372,16 @@ class NormalNode : public ShaderNode {
 
   float3 direction;
   float3 normal;
+};
+
+class MatrixMathNode : public ShaderNode {
+public:
+  SHADER_NODE_CLASS(MatrixMathNode)
+
+  Transform tfm;
+  float3 vector;
+
+  NodeMatrixMath type;
 };
 
 class VectorMathNode : public ShaderNode {

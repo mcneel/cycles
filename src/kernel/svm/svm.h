@@ -289,6 +289,9 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
       case NODE_ATTR:
         svm_node_attr(kg, sd, stack, node);
         break;
+      case NODE_MATRIX_MATH:
+        svm_node_matrix_math(kg, sd, stack, node.y, node.z, node.w, &offset);
+        break;
       case NODE_VERTEX_COLOR:
         svm_node_vertex_color(kg, sd, stack, node.y, node.z, node.w);
         break;

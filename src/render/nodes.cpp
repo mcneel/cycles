@@ -577,6 +577,15 @@ NODE_DEFINE(EnvironmentTextureNode)
   static NodeEnum projection_enum;
   projection_enum.insert("equirectangular", NODE_ENVIRONMENT_EQUIRECTANGULAR);
   projection_enum.insert("mirror_ball", NODE_ENVIRONMENT_MIRROR_BALL);
+  projection_enum.insert("wallpaper", NODE_ENVIRONMENT_WALLPAPER);
+  projection_enum.insert("emap", NODE_ENVIRONMENT_EMAP);
+  projection_enum.insert("box", NODE_ENVIRONMENT_BOX);
+  projection_enum.insert("light_probe", NODE_ENVIRONMENT_LIGHT_PROBE);
+  projection_enum.insert("cubemap", NODE_ENVIRONMENT_CUBEMAP);
+  projection_enum.insert("cubemap_horizontal", NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL);
+  projection_enum.insert("cubemap_vertical", NODE_ENVIRONMENT_CUBEMAP_VERTICAL);
+  projection_enum.insert("hemispherical", NODE_ENVIRONMENT_HEMISPHERICAL);
+  projection_enum.insert("spherical", NODE_ENVIRONMENT_SPHERICAL);
   SOCKET_ENUM(projection, "Projection", projection_enum, NODE_ENVIRONMENT_EQUIRECTANGULAR);
 
   SOCKET_IN_POINT(vector, "Vector", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_POSITION);
@@ -1983,11 +1992,11 @@ void RGBToBWNode::compile(OSLCompiler &compiler)
 
 NODE_DEFINE(RGBToLuminanceNode)
 {
-	NodeType* type = NodeType::add("rgb_to_luminance", create, NodeType::SHADER);
-	SOCKET_IN_COLOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
-	SOCKET_OUT_FLOAT(val, "Val");
+  NodeType* type = NodeType::add("rgb_to_luminance", create, NodeType::SHADER);
+  SOCKET_IN_COLOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_OUT_FLOAT(val, "Val");
 
-	return type;
+  return type;
 }
 
 RGBToLuminanceNode::RGBToLuminanceNode()
@@ -1997,23 +2006,23 @@ RGBToLuminanceNode::RGBToLuminanceNode()
 
 void RGBToLuminanceNode::constant_fold(const ConstantFolder& folder)
 {
-	if(folder.all_inputs_constant()) {
-		float val = folder.scene->shader_manager->linear_rgb_to_luminance(color);
-		folder.make_constant(val);
-	}
+  if(folder.all_inputs_constant()) {
+    float val = folder.scene->shader_manager->linear_rgb_to_luminance(color);
+    folder.make_constant(val);
+  }
 }
 
 void RGBToLuminanceNode::compile(SVMCompiler& compiler)
 {
-	compiler.add_node(NODE_CONVERT,
-	                 NODE_CONVERT_CF2,
-	                 compiler.stack_assign(inputs[0]),
-	                 compiler.stack_assign(outputs[0]));
+  compiler.add_node(NODE_CONVERT,
+                   NODE_CONVERT_CF2,
+                   compiler.stack_assign(inputs[0]),
+                   compiler.stack_assign(outputs[0]));
 }
 
 void RGBToLuminanceNode::compile(OSLCompiler& compiler)
 {
-	compiler.add(this, "node_rgb_to_luminance");
+  compiler.add(this, "node_rgb_to_luminance");
 }
 
 /* Convert */
@@ -3817,6 +3826,16 @@ NODE_DEFINE(TextureCoordinateNode)
   SOCKET_OUT_POINT(window, "Window");
   SOCKET_OUT_NORMAL(reflection, "Reflection");
 
+  SOCKET_OUT_POINT(wcsbox, "WcsBox");
+  SOCKET_OUT_POINT(envspherical, "EnvSpherical");
+  SOCKET_OUT_POINT(envemap, "EnvEmap");
+  SOCKET_OUT_POINT(envbox, "EnvBox");
+  SOCKET_OUT_POINT(envlightprobe, "EnvLightProbe");
+  SOCKET_OUT_POINT(envcubemap, "EnvCubemap");
+  SOCKET_OUT_POINT(envcubemapverticalcross, "EnvCubemapVerticalCross");
+  SOCKET_OUT_POINT(envcubemaphorizontalcross, "EnvCubemapHorizontalCross");
+  SOCKET_OUT_POINT(envhemi, "EnvHemi");
+
   return type;
 }
 
@@ -3929,6 +3948,58 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
       compiler.add_node(texco_node, NODE_TEXCO_REFLECTION, compiler.stack_assign(out));
     }
   }
+
+  out = output("WcsBox");
+  if(!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_WCS_BOX, compiler.stack_assign(out), use_transform);
+    if(use_transform) {
+      Transform ob_itfm = transform_inverse(ob_tfm);
+      compiler.add_node(ob_itfm.x);
+      compiler.add_node(ob_itfm.y);
+      compiler.add_node(ob_itfm.z);
+    }
+  }
+
+  out = output("EnvSpherical");
+  if(!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_SPHERICAL, compiler.stack_assign(out));
+  }
+
+  out = output("EnvEmap");
+  if(!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_EMAP, compiler.stack_assign(out));
+  }
+
+  out = output( "EnvBox" );
+  if( !out->links.empty() ) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_BOX, compiler.stack_assign(out));
+  }
+
+  out = output("EnvLightProbe");
+  if(!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_LIGHTPROBE, compiler.stack_assign(out));
+  }
+
+  out = output( "EnvCubemap" );
+  if( !out->links.empty() ) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP, compiler.stack_assign(out));
+  }
+
+  out = output( "EnvCubemapVerticalCross" );
+  if( !out->links.empty() ) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS, compiler.stack_assign(out));
+  }
+
+  out = output( "EnvCubemapHorizontalCross" );
+  if( !out->links.empty() ) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS, compiler.stack_assign(out));
+  }
+
+  out = output( "EnvHemi" );
+  if( !out->links.empty() ) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_HEMI, compiler.stack_assign(out));
+  }
+
 }
 
 void TextureCoordinateNode::compile(OSLCompiler &compiler)
@@ -6040,6 +6111,57 @@ void MathNode::compile(OSLCompiler &compiler)
 {
   compiler.parameter(this, "type");
   compiler.add(this, "node_math");
+}
+
+/* MatrixMath */
+
+NODE_DEFINE(MatrixMathNode)
+{
+  NodeType* type = NodeType::add("matrix_math", create, NodeType::SHADER);
+
+  static NodeEnum type_enum;
+  type_enum.insert("Point", NODE_MATRIX_MATH_POINT);
+  type_enum.insert("Direction", NODE_MATRIX_MATH_DIRECTION);
+  type_enum.insert("Perspective", NODE_MATRIX_MATH_PERSPECTIVE);
+  type_enum.insert("Direction Transposed", NODE_MATRIX_MATH_DIR_TRANSPOSED);
+  SOCKET_ENUM(type, "Type", type_enum, NODE_MATRIX_MATH_POINT);
+
+  SOCKET_IN_VECTOR(vector, "Vector", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_OUT_VECTOR(vector, "Vector");
+
+  return type;
+}
+
+MatrixMathNode::MatrixMathNode()
+: ShaderNode(node_type)
+{
+  tfm = transform_identity();
+}
+
+/* TODO: ADD MATRIXMATH CONSTANT FOLD THINGY */
+
+void MatrixMathNode::compile(SVMCompiler& compiler)
+{
+  ShaderInput *vector_in = input("Vector");
+  ShaderOutput *vector_out = output("Vector");
+
+  compiler.stack_assign(vector_in);
+  compiler.stack_assign(vector_out);
+
+  if(vector_in->stack_offset == SVM_STACK_INVALID || vector_out->stack_offset == SVM_STACK_INVALID)
+    return;
+
+  compiler.add_node(NODE_MATRIX_MATH, type, compiler.stack_assign(vector_in), compiler.stack_assign(vector_out));
+
+  compiler.add_node(tfm.x);
+  compiler.add_node(tfm.y);
+  compiler.add_node(tfm.z);
+}
+
+void MatrixMathNode::compile(OSLCompiler& compiler)
+{
+  compiler.parameter("Matrix", tfm);
+  compiler.add(this, "node_matrix_math");
 }
 
 /* VectorMath */
