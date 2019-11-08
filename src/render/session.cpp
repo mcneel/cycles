@@ -857,6 +857,13 @@ DeviceRequestedFeatures Session::get_requested_device_features()
     requested_features.use_shadow_tricks = true;
   }
 
+  // always enable these for RhinoCycles
+  requested_features.use_shadow_tricks = true;
+  requested_features.use_principled = true;
+  requested_features.use_subsurface = true;
+  requested_features.use_transparent = true;
+  requested_features.use_volume = true;
+
   return requested_features;
 }
 
