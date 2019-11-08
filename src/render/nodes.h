@@ -103,6 +103,7 @@ class ImageTextureNode : public ImageSlotTextureNode {
   }
 
   /* Parameters. */
+  bool alternate_tiles;
   ustring filename;
   void *builtin_data;
   ustring colorspace;
