@@ -30,6 +30,9 @@ KERNEL_TEX(uint, __prim_object)
 KERNEL_TEX(uint, __object_node)
 KERNEL_TEX(float2, __prim_time)
 
+/* clipping planes */
+KERNEL_TEX(float4, __clipping_planes)
+
 /* objects */
 KERNEL_TEX(KernelObject, __objects)
 KERNEL_TEX(Transform, __object_motion_pass)
