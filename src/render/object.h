@@ -68,6 +68,8 @@ class Object : public Node {
   ParticleSystem *particle_system;
   int particle_index;
 
+  Shader *shader;
+
   Object();
   ~Object();
 
