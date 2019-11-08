@@ -229,16 +229,53 @@ bool Device::bind_fallback_display_space_shader(const float width, const float h
   return true;
 }
 
+void get_glviewport_data(GLint width, GLint height, GLint& vp_offset_x, GLint& vp_offset_y, GLint& vp_width, GLint& vp_height)
+{
+  GLint vp_dims[4] = { 0 };
+  glGetIntegerv(GL_VIEWPORT, vp_dims);
+
+  vp_offset_x = vp_dims[0];
+  vp_offset_y = vp_dims[1];
+  vp_width    = vp_dims[2];
+  vp_height   = vp_dims[3];
+
+  // If the width of the GL_VIEWPORT is smaller than the width of the
+  // render, then we are dealing with a Rhino Detail which has been
+  // moved partially outside the window.
+  if (vp_width < width)
+  {
+    // If the x offset is 0, it has been clamped to 0 due to being partially outside
+    // the window to the left.
+    if (vp_offset_x == 0)
+    {
+      // We want to express the offset as negative coordinates instead of clamping to 0.
+      vp_offset_x = vp_width - width;
+    }
+    // In all cases we want the width to be the render width.
+    vp_width = width;
+  }
+
+  // See comments above.
+  if (vp_height < height)
+  {
+    if (vp_offset_y == 0)
+    {
+      vp_offset_y = vp_height - height;
+    }
+    vp_height = height;
+  }
+}
+
 void Device::draw_pixels(device_memory &rgba,
                          int y,
                          int w,
                          int h,
-                         int width,
-                         int height,
                          int dx,
                          int dy,
-                         int dw,
-                         int dh,
+                         int width,
+                         int height,
+                         int full_width,
+                         int full_height,
                          bool transparent,
                          const DeviceDrawParams &draw_params)
 {
@@ -360,16 +397,21 @@ void Device::draw_pixels(device_memory &rgba,
   glBindTexture(GL_TEXTURE_2D, 0);
   glDeleteTextures(1, &texid);
 #endif
+    // We need to know the GL_VIEWPORT rect information to be able to
+    // calculate the correct viewport uv-coordinates when using a Rhino Detail.
+    GLint vp_offset_x, vp_offset_y, vp_width, vp_height;
+    get_glviewport_data(full_width, full_height, vp_offset_x, vp_offset_y, vp_width, vp_height);
 
     /* TODO [NATHANLOOK] use bind/unbind shader cbs. */
     GLint tex = glGetUniformLocation(draw_params.program, "tex");
     GLint subsize = glGetUniformLocation(draw_params.program, "subsize");
     GLint alpha = glGetUniformLocation(draw_params.program, "alpha");
+    GLint vp_rect = glGetUniformLocation(draw_params.program, "vp_rect");
 
     glUniform1i(tex, 0);
-    // the x for subsize is used for debug purposes. Actual data in yzw
-    glUniform4f(subsize, 0.1f, (float)width, (float)dy, (float)dy + height);
+    glUniform4f(subsize, (float)dx, (float)dy, (float)width, (float)height);
     glUniform1f(alpha, draw_params.alpha);
+    glUniform4f(vp_rect, (float)vp_offset_x, (float)vp_offset_y, (float)vp_width, (float)vp_height);
 
     GLuint temp_vao = 0;
     glGenVertexArrays(1, &temp_vao);

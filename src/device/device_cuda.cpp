@@ -2204,7 +2204,8 @@ class CUDADevice : public Device {
       return;
     }
 
-    Device::draw_pixels(mem, y, w, h, width, height, dx, dy, dw, dh, transparent, draw_params);
+	/* TODO [NATHANLOOK] verify drawing code, esp with multi device. */
+    Device::draw_pixels(mem, y, w, h, dx, dy, width, height, width, height, transparent, draw_params);
   }
 
   void thread_run(DeviceTask *task)

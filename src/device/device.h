@@ -409,12 +409,12 @@ class Device {
                            int y,
                            int w,
                            int h,
-                           int width,
-                           int height,
                            int dx,
                            int dy,
-                           int dw,
-                           int dh,
+                           int width,
+                           int height,
+                           int full_width,
+                           int full_height,
                            bool transparent,
                            const DeviceDrawParams &draw_params);
 
