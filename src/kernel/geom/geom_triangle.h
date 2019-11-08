@@ -62,7 +62,13 @@ ccl_device_inline void triangle_point_normal(
     *Ng = normalize(cross(v1 - v0, v2 - v0));
   }
   /* shader`*/
-  *shader = kernel_tex_fetch(__tri_shader, prim);
+  int sh= kernel_tex_fetch(__tri_shader, prim);
+  if (object_flag & SD_OBJECT_LIGHT_NO_CAST_SHADOWS) {
+    *shader = sh & ~SHADER_CAST_SHADOW;
+  }
+  else {
+    *shader = sh | SHADER_CAST_SHADOW;
+  }
 }
 
 /* Triangle vertex locations */
