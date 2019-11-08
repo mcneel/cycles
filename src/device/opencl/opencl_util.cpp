@@ -563,7 +563,11 @@ bool OpenCLDevice::OpenCLProgram::load()
     string basename = "cycles_kernel_" + program_name + "_" + device_md5 + "_" +
                       util_md5_string(source);
     basename = path_cache_get(path_join("kernels", basename));
-    string clbin = basename + ".clbin";
+#ifdef _WIN32
+    string clbin = "\\\\?\\" + basename + ".clbin";
+#else
+     string clbin = basename + ".clbin";
+#endif
 
     /* If binary kernel exists already, try use it. */
     if (path_exists(clbin) && load_binary(clbin)) {
@@ -609,7 +613,11 @@ void OpenCLDevice::OpenCLProgram::compile()
     string basename = "cycles_kernel_" + program_name + "_" + device_md5 + "_" +
                       util_md5_string(source);
     basename = path_cache_get(path_join("kernels", basename));
-    string clbin = basename + ".clbin";
+#ifdef _WIN32
+    string clbin = "\\\\?\\" + basename + ".clbin";
+#else
+     string clbin = basename + ".clbin";
+#endif
 
     /* path to preprocessed source for debugging */
     string clsrc, *debug_src = NULL;
