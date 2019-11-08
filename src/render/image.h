@@ -100,6 +100,7 @@ class ImageManager {
                         ExtensionType extension,
                         ImageAlphaType alpha_type,
                         ustring colorspace);
+  void tag_reload_image(const string &filename);
   bool get_image_metadata(const string &filename,
                           void *builtin_data,
                           ustring colorspace,
