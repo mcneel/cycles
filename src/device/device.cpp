@@ -229,33 +229,76 @@ bool Device::bind_fallback_display_space_shader(const float width, const float h
   return true;
 }
 
+void get_glviewport_data(GLint width, GLint height, GLint& vp_offset_x, GLint& vp_offset_y, GLint& vp_width, GLint& vp_height)
+{
+  GLint vp_dims[4] = { 0 };
+  glGetIntegerv(GL_VIEWPORT, vp_dims);
+
+  vp_offset_x = vp_dims[0];
+  vp_offset_y = vp_dims[1];
+  vp_width    = vp_dims[2];
+  vp_height   = vp_dims[3];
+
+  // If the width of the GL_VIEWPORT is smaller than the width of the
+  // render, then we are dealing with a Rhino Detail which has been
+  // moved partially outside the window.
+  if (vp_width < width)
+  {
+    // If the x offset is 0, it has been clamped to 0 due to being partially outside
+    // the window to the left.
+    if (vp_offset_x == 0)
+    {
+      // We want to express the offset as negative coordinates instead of clamping to 0.
+      vp_offset_x = vp_width - width;
+    }
+    // In all cases we want the width to be the render width.
+    vp_width = width;
+  }
+
+  // See comments above.
+  if (vp_height < height)
+  {
+    if (vp_offset_y == 0)
+    {
+      vp_offset_y = vp_height - height;
+    }
+    vp_height = height;
+  }
+}
+
 void Device::draw_pixels(device_memory &rgba,
                          int y,
                          int w,
                          int h,
-                         int width,
-                         int height,
                          int dx,
                          int dy,
-                         int dw,
-                         int dh,
+                         int width,
+                         int height,
+                         int full_width,
+                         int full_height,
                          bool transparent,
                          const DeviceDrawParams &draw_params)
 {
-  const bool use_fallback_shader = (draw_params.bind_display_space_shader_cb == NULL);
+  //const bool use_fallback_shader = (draw_params.bind_display_space_shader_cb == NULL);
 
   assert(rgba.type == MEM_PIXELS);
   mem_copy_from(rgba, y, w, h, rgba.memory_elements_size(1));
 
+  if (transparent) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  }
+
+
   GLuint texid;
-  glActiveTexture(GL_TEXTURE0);
   glGenTextures(1, &texid);
+  glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texid);
 
   if (rgba.data_type == TYPE_HALF) {
     GLhalf *data_pointer = (GLhalf *)rgba.host_pointer;
     data_pointer += 4 * y * w;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, data_pointer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F_ARB, w, h, 0, GL_RGBA, GL_HALF_FLOAT, data_pointer);
   }
   else {
     uint8_t *data_pointer = (uint8_t *)rgba.host_pointer;
@@ -266,11 +309,7 @@ void Device::draw_pixels(device_memory &rgba,
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  if (transparent) {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-  }
-
+#if OLDSTUFF
   GLint shader_program;
   if (use_fallback_shader) {
     if (!bind_fallback_display_space_shader(dw, dh)) {
@@ -358,6 +397,45 @@ void Device::draw_pixels(device_memory &rgba,
   glDeleteVertexArrays(1, &vertex_array_object);
   glBindTexture(GL_TEXTURE_2D, 0);
   glDeleteTextures(1, &texid);
+#endif
+    // We need to know the GL_VIEWPORT rect information to be able to
+    // calculate the correct viewport uv-coordinates when using a Rhino Detail.
+    GLint vp_offset_x, vp_offset_y, vp_width, vp_height;
+    get_glviewport_data(full_width, full_height, vp_offset_x, vp_offset_y, vp_width, vp_height);
+
+    /* TODO [NATHANLOOK] use bind/unbind shader cbs. */
+    GLint tex = glGetUniformLocation(draw_params.program, "tex");
+    GLint subsize = glGetUniformLocation(draw_params.program, "subsize");
+    GLint alpha = glGetUniformLocation(draw_params.program, "alpha");
+    GLint vp_rect = glGetUniformLocation(draw_params.program, "vp_rect");
+
+    glUniform1i(tex, 0);
+    glUniform4f(subsize, (float)dx, (float)dy, (float)width, (float)height);
+    glUniform1f(alpha, draw_params.alpha);
+    glUniform4f(vp_rect, (float)vp_offset_x, (float)vp_offset_y, (float)vp_width, (float)vp_height);
+
+    GLuint temp_vao = 0;
+    glGenVertexArrays(1, &temp_vao);
+    glBindVertexArray(temp_vao);
+    GLuint temp_vbo = 0;
+    glGenBuffers(1, &temp_vbo);
+
+    static const float vertices[] = { -1,-1, 1,-1, 1,1, -1,1 };
+    glBindBuffer(GL_ARRAY_BUFFER, temp_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 8, vertices, GL_STREAM_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, nullptr);
+
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+    glDisableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDeleteBuffers(1, &temp_vbo);
+    glBindVertexArray(0);
+    glDeleteVertexArrays(1, &temp_vao);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDeleteTextures(1, &texid);
 
   if (transparent) {
     glDisable(GL_BLEND);

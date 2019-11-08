@@ -25,6 +25,7 @@
 #include "device/device_task.h"
 
 #include "util/util_list.h"
+#include "util/util_opengl.h"
 #include "util/util_stats.h"
 #include "util/util_string.h"
 #include "util/util_thread.h"
@@ -281,6 +282,8 @@ std::ostream &operator<<(std::ostream &os, const DeviceRequestedFeatures &reques
 struct DeviceDrawParams {
   function<void()> bind_display_space_shader_cb;
   function<void()> unbind_display_space_shader_cb;
+  GLuint program;
+  GLuint alpha;
 };
 
 class Device {
@@ -406,12 +409,12 @@ class Device {
                            int y,
                            int w,
                            int h,
-                           int width,
-                           int height,
                            int dx,
                            int dy,
-                           int dw,
-                           int dh,
+                           int width,
+                           int height,
+                           int full_width,
+                           int full_height,
                            bool transparent,
                            const DeviceDrawParams &draw_params);
 
