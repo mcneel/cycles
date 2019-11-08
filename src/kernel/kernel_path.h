@@ -427,6 +427,10 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
       /* Setup shader data. */
       shader_setup_from_ray(kg, sd, &isect, ray);
 
+    if (path_clip_ray(kg, state, sd, ray)) {
+      continue;
+    }
+
       /* Skip most work for volume bounding surface. */
 #    ifdef __VOLUME__
       if (!(sd->flag & SD_HAS_ONLY_VOLUME)) {
@@ -564,6 +568,10 @@ ccl_device_forceinline void kernel_path_integrate(KernelGlobals *kg,
 
       /* Setup shader data. */
       shader_setup_from_ray(kg, &sd, &isect, ray);
+
+    if (path_clip_ray(kg, state, &sd, ray)) {
+      continue;
+    }
 
       /* Skip most work for volume bounding surface. */
 #  ifdef __VOLUME__
