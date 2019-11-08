@@ -971,18 +971,26 @@ bool OpenCLInfo::get_platforms(vector<cl_platform_id> *platform_ids, cl_int *err
     return false;
   }
   /* Get actual platforms. */
-  cl_int err;
-  platform_ids->resize(num_platforms);
-  if ((err = clGetPlatformIDs(num_platforms, &platform_ids->at(0), NULL)) != CL_SUCCESS) {
-    if (error != NULL) {
-      *error = err;
+  if (num_platforms) {
+    cl_int err;
+    platform_ids->resize(num_platforms);
+    if ((err = clGetPlatformIDs(num_platforms, &platform_ids->at(0), NULL)) != CL_SUCCESS) {
+      if (error != NULL) {
+        *error = err;
+      }
+      return false;
     }
+    if (error != NULL) {
+      *error = CL_SUCCESS;
+    }
+    return true;
+  }
+  else {
+    if (error != NULL) {
+      *error = CL_INVALID_PLATFORM;
+  }
     return false;
   }
-  if (error != NULL) {
-    *error = CL_SUCCESS;
-  }
-  return true;
 }
 
 vector<cl_platform_id> OpenCLInfo::get_platforms()
