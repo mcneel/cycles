@@ -212,6 +212,7 @@ NODE_DEFINE(ImageTextureNode)
 
   SOCKET_STRING(filename, "Filename", ustring());
   SOCKET_STRING(colorspace, "Colorspace", u_colorspace_auto);
+  SOCKET_BOOLEAN(alternate_tiles, "Alternate Tiles", false);
 
   static NodeEnum alpha_type_enum;
   alpha_type_enum.insert("auto", IMAGE_ALPHA_AUTO);
@@ -342,6 +343,7 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
                                                compiler.stack_assign_if_linked(alpha_out),
                                                flags),
                         projection);
+      compiler.add_node(alternate_tiles ? 1 : 0);
     }
     else {
       compiler.add_node(NODE_TEX_IMAGE_BOX,
