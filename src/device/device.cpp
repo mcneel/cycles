@@ -268,9 +268,10 @@ void Device::draw_pixels(device_memory &rgba,
 
   if (transparent) {
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   }
 
+#if OLDSTUFF
   GLint shader_program;
   if (use_fallback_shader) {
     if (!bind_fallback_display_space_shader(dw, dh)) {
@@ -358,6 +359,40 @@ void Device::draw_pixels(device_memory &rgba,
   glDeleteVertexArrays(1, &vertex_array_object);
   glBindTexture(GL_TEXTURE_2D, 0);
   glDeleteTextures(1, &texid);
+#endif
+
+    /* TODO [NATHANLOOK] use bind/unbind shader cbs. */
+    GLint tex = glGetUniformLocation(draw_params.program, "tex");
+    GLint subsize = glGetUniformLocation(draw_params.program, "subsize");
+    GLint alpha = glGetUniformLocation(draw_params.program, "alpha");
+
+    glUniform1i(tex, 0);
+    // the x for subsize is used for debug purposes. Actual data in yzw
+    glUniform4f(subsize, 0.1f, (float)width, (float)dy, (float)dy + height);
+    glUniform1f(alpha, draw_params.alpha);
+
+    GLuint temp_vao = 0;
+    glGenVertexArrays(1, &temp_vao);
+    glBindVertexArray(temp_vao);
+    GLuint temp_vbo = 0;
+    glGenBuffers(1, &temp_vbo);
+
+    static const float vertices[] = { -1,-1, 1,-1, 1,1, -1,1 };
+    glBindBuffer(GL_ARRAY_BUFFER, temp_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 8, vertices, GL_STREAM_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, nullptr);
+
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+    glDisableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDeleteBuffers(1, &temp_vbo);
+    glBindVertexArray(0);
+    glDeleteVertexArrays(1, &temp_vao);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDeleteTextures(1, &texid);
 
   if (transparent) {
     glDisable(GL_BLEND);
