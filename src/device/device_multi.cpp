@@ -300,8 +300,11 @@ class MultiDevice : public Device {
       /* adjust math for w/width */
 
       rgba.device_pointer = sub.ptr_map[key];
+      //sub.device->draw_pixels(
+      //    rgba, sy, w, sh, width, sheight, dx, sdy, dw, dh, transparent, draw_params);
+      /* TODO [NATHANLOOK] verify drawing code. */
       sub.device->draw_pixels(
-          rgba, sy, w, sh, width, sheight, dx, sdy, dw, dh, transparent, draw_params);
+          rgba, sy, w, sh, dx, sdy, width, sheight, width, height, transparent, draw_params);
       i++;
     }
 
