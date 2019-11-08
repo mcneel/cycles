@@ -60,6 +60,7 @@ class Object : public Node {
   bool use_holdout;
   bool is_shadow_catcher;
   bool mesh_light_no_cast_shadow;
+  bool is_block_instance;
 
   float3 dupli_generated;
   float2 dupli_uv;
