@@ -51,6 +51,7 @@ DeviceScene::DeviceScene(Device *device)
       prim_index(device, "__prim_index", MEM_TEXTURE),
       prim_object(device, "__prim_object", MEM_TEXTURE),
       prim_time(device, "__prim_time", MEM_TEXTURE),
+      clipping_planes(device, "__clipping_planes", MEM_TEXTURE),
       tri_shader(device, "__tri_shader", MEM_TEXTURE),
       tri_vnormal(device, "__tri_vnormal", MEM_TEXTURE),
       tri_vindex(device, "__tri_vindex", MEM_TEXTURE),
@@ -130,6 +131,7 @@ void Scene::free_memory(bool final)
   shaders.clear();
   meshes.clear();
   objects.clear();
+  clipping_planes.clear();
   lights.clear();
   particle_systems.clear();
 
@@ -215,6 +217,9 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   if (progress.get_cancel() || device->have_error())
     return;
+
+  progress.set_status("Updating Clipping Planes");
+  object_manager->device_update_clipping_planes(device, &dscene, this, progress);
 
   progress.set_status("Updating Objects");
   object_manager->device_update(device, &dscene, this, progress);
@@ -355,7 +360,8 @@ bool Scene::need_update()
 
 bool Scene::need_data_update()
 {
-  return (background->need_update || image_manager->need_update || object_manager->need_update ||
+  return (background->need_update || image_manager->need_update ||
+          object_manager->need_update || object_manager->need_clipping_plane_update ||
           mesh_manager->need_update || light_manager->need_update || lookup_tables->need_update ||
           integrator->need_update || shader_manager->need_update ||
           particle_system_manager->need_update || curve_system_manager->need_update ||

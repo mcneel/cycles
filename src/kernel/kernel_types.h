@@ -1069,6 +1069,10 @@ typedef struct PathState {
   int volume_bounds_bounce;
   VolumeStack volume_stack[VOLUME_STACK_SIZE];
 #endif
+
+  float3 prev_P;
+  int prev_prim;
+  int clip_depth;
 } PathState;
 
 #ifdef __VOLUME__
@@ -1360,7 +1364,7 @@ typedef struct KernelIntegrator {
 
   int max_closures;
 
-  int pad1;
+  int num_clipping_planes;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 
