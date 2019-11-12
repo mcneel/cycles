@@ -554,6 +554,16 @@ vector<DeviceInfo> Device::available_devices(uint mask)
   thread_scoped_lock lock(device_mutex);
   vector<DeviceInfo> devices;
 
+  if (mask & DEVICE_MASK_CPU) {
+    if (!(devices_initialized_mask & DEVICE_MASK_CPU)) {
+      device_cpu_info(cpu_devices);
+      devices_initialized_mask |= DEVICE_MASK_CPU;
+    }
+    foreach (DeviceInfo &info, cpu_devices) {
+      devices.push_back(info);
+    }
+  }
+
 #ifdef WITH_OPENCL
   if (mask & DEVICE_MASK_OPENCL) {
     if (!(devices_initialized_mask & DEVICE_MASK_OPENCL)) {
@@ -595,16 +605,6 @@ vector<DeviceInfo> Device::available_devices(uint mask)
     }
   }
 #endif
-
-  if (mask & DEVICE_MASK_CPU) {
-    if (!(devices_initialized_mask & DEVICE_MASK_CPU)) {
-      device_cpu_info(cpu_devices);
-      devices_initialized_mask |= DEVICE_MASK_CPU;
-    }
-    foreach (DeviceInfo &info, cpu_devices) {
-      devices.push_back(info);
-    }
-  }
 
 #ifdef WITH_NETWORK
   if (mask & DEVICE_MASK_NETWORK) {
