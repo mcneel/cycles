@@ -216,7 +216,9 @@ int Session::sample_gpu()
     scoped_timer update_timer;  // TODO: probably move this into separate function
                                 // so we can call this from controlling code
                                 // when we deem it necessary ourselves.
-    update_scene();
+    if (update_scene()) {
+      profiler.reset(scene->shaders.size(), scene->objects.size());
+    }
     progress.add_skip_time(update_timer, params.background);
 
     if (!device->error_message().empty())
@@ -616,7 +618,9 @@ int Session::sample_cpu()
     scoped_timer update_timer;  // TODO: probably move this into separate function
                                 // so we can call this from controlling code
                                 // when we deem it necessary ourselves.
-    update_scene();
+    if (update_scene()) {
+      profiler.reset(scene->shaders.size(), scene->objects.size());
+    }
     progress.add_skip_time(update_timer, params.background);
 
     if (!device->error_message().empty())
