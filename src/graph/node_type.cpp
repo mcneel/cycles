@@ -114,7 +114,8 @@ ustring SocketType::type_name(Type type)
 
                             ustring("boolean"),       ustring("float"),
                             ustring("int"),           ustring("uint"),
-                            ustring("color"),         ustring("vector"),
+                            ustring("color"),         ustring("color2"),
+                            ustring("vector"),
                             ustring("point"),         ustring("normal"),
                             ustring("point2"),        ustring("closure"),
                             ustring("string"),        ustring("enum"),
