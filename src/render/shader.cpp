@@ -596,6 +596,7 @@ void ShaderManager::device_update_common(Device *device,
   kfilm->xyz_to_g = float3_to_float4(xyz_to_g);
   kfilm->xyz_to_b = float3_to_float4(xyz_to_b);
   kfilm->rgb_to_y = float3_to_float4(rgb_to_y);
+  kfilm->rgb_to_lum = float3_to_float4(rgb_to_lum);
 }
 
 void ShaderManager::device_free_common(Device *, DeviceScene *dscene, Scene *scene)
