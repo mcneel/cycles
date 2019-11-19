@@ -240,23 +240,22 @@ int Session::sample_gpu()
     if (!device->error_message().empty())
       progress.set_cancel(device->error_message());
 
-  if (!progress.get_cancel()) {
-      /* update status and timing */
-      update_status_time();
+    /* update status and timing */
+    update_status_time();
 
-      gpu_draw_ready = true;
-      progress.set_update();
+    gpu_draw_ready = true;
+    progress.set_update();
 
-      if (!device->error_message().empty())
-        progress.set_error(device->error_message());
+    if (!device->error_message().empty())
+      progress.set_error(device->error_message());
 
-      if (display != nullptr || !params.background) {
-        thread_scoped_lock display_lock(display_mutex);
-        // tonemap(tile_manager.state.sample);
-      }
-
-      update_progressive_refine(true);
+    if (display != nullptr || !params.background) {
+      thread_scoped_lock display_lock(display_mutex);
+      // tonemap(tile_manager.state.sample);
+      copy_to_display_buffer(tile_manager.state.sample);
     }
+
+    update_progressive_refine(true);
 
     if (progress.get_cancel())
       end = true;
@@ -642,24 +641,23 @@ int Session::sample_cpu()
     if (!device->error_message().empty())
       progress.set_cancel(device->error_message());
 
-    if (progress.get_cancel()) {
-      /* update status and timing */
-      update_status_time();
+    /* update status and timing */
+    update_status_time();
 
-      gpu_draw_ready = true;
-      progress.set_update();
+    gpu_draw_ready = true;
+    progress.set_update();
 
-      if (!device->error_message().empty())
-        progress.set_error(device->error_message());
+    if (!device->error_message().empty())
+      progress.set_error(device->error_message());
 
-      if (display != nullptr || !params.background) {
-        thread_scoped_lock display_lock(display_mutex);
-        /* TODO [NATHANLOOK] Figure out tonemap changes. */
-        // tonemap(tile_manager.state.sample);
-      }
-
-      update_progressive_refine(true);
+    if (display != nullptr || !params.background) {
+      thread_scoped_lock display_lock(display_mutex);
+      /* TODO [NATHANLOOK] Figure out tonemap changes. */
+      // tonemap(tile_manager.state.sample);
+      copy_to_display_buffer(tile_manager.state.sample);
     }
+
+    update_progressive_refine(true);
 
     if (progress.get_cancel())
       end = true;
