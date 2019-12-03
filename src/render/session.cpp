@@ -1081,7 +1081,7 @@ bool Session::update_scene()
     bool new_kernels_needed = load_kernels(false);
 
     /* Update max_closures. */
-    KernelIntegrator *kintegrator = &scene->dscene.data.integrator;
+    KernelIntegrator *kintegrator = &(scene->dscene->data.integrator);
     if (params.background) {
       kintegrator->max_closures = get_max_closure_count();
     }
