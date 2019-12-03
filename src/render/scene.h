@@ -240,7 +240,7 @@ class Scene {
 
   /* device */
   Device *device;
-  DeviceScene dscene;
+  DeviceScene *dscene; /* NOTE: In upstream this is not a pointer. Made a pointer, otherwise heap corruption errors happen during debug. */
 
   /* parameters */
   SceneParams params;

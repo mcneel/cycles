@@ -84,11 +84,10 @@ DeviceScene::DeviceScene(Device *device)
   memset((void *)&data, 0, sizeof(data));
 }
 
-Scene::Scene(const SceneParams &params_, Device *device)
-    : name("Scene"), device(device), dscene(device), params(params_)
+Scene::Scene(const SceneParams &params_, Device *device_)
+    : name("Scene"), device(device_), params(params_)
 {
-  memset((void *)&dscene.data, 0, sizeof(dscene.data));
-
+  dscene = new DeviceScene(device);
   camera = new Camera();
   dicing_camera = new Camera();
   lookup_tables = new LookupTables();
@@ -136,27 +135,27 @@ void Scene::free_memory(bool final)
   particle_systems.clear();
 
   if (device) {
-    camera->device_free(device, &dscene, this);
-    film->device_free(device, &dscene, this);
-    background->device_free(device, &dscene);
-    integrator->device_free(device, &dscene);
+    camera->device_free(device, dscene, this);
+    film->device_free(device, dscene, this);
+    background->device_free(device, dscene);
+    integrator->device_free(device, dscene);
 
-    object_manager->device_free(device, &dscene);
-    mesh_manager->device_free(device, &dscene);
-    shader_manager->device_free(device, &dscene, this);
-    light_manager->device_free(device, &dscene);
+    object_manager->device_free(device, dscene);
+    mesh_manager->device_free(device, dscene);
+    shader_manager->device_free(device, dscene, this);
+    light_manager->device_free(device, dscene);
 
-    particle_system_manager->device_free(device, &dscene);
-    curve_system_manager->device_free(device, &dscene);
+    particle_system_manager->device_free(device, dscene);
+    curve_system_manager->device_free(device, dscene);
 
-    bake_manager->device_free(device, &dscene);
+    bake_manager->device_free(device, dscene);
 
     if (!params.persistent_data || final)
       image_manager->device_free(device);
     else
       image_manager->device_free_builtin(device);
 
-    lookup_tables->device_free(device, &dscene);
+    lookup_tables->device_free(device, dscene);
   }
 
   if (final) {
@@ -174,6 +173,7 @@ void Scene::free_memory(bool final)
     delete curve_system_manager;
     delete image_manager;
     delete bake_manager;
+    delete dscene;
   }
 }
 
@@ -196,19 +196,19 @@ void Scene::device_update(Device *device_, Progress &progress)
    */
 
   progress.set_status("Updating Shaders");
-  shader_manager->device_update(device, &dscene, this, progress);
+  shader_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Background");
-  background->device_update(device, &dscene, this);
+  background->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Camera");
-  camera->device_update(device, &dscene, this);
+  camera->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
@@ -219,34 +219,34 @@ void Scene::device_update(Device *device_, Progress &progress)
     return;
 
   progress.set_status("Updating Clipping Planes");
-  object_manager->device_update_clipping_planes(device, &dscene, this, progress);
+  object_manager->device_update_clipping_planes(device, dscene, this, progress);
 
   progress.set_status("Updating Objects");
-  object_manager->device_update(device, &dscene, this, progress);
+  object_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Hair Systems");
-  curve_system_manager->device_update(device, &dscene, this, progress);
+  curve_system_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Particle Systems");
-  particle_system_manager->device_update(device, &dscene, this, progress);
+  particle_system_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Meshes");
-  mesh_manager->device_update(device, &dscene, this, progress);
+  mesh_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Objects Flags");
-  object_manager->device_update_flags(device, &dscene, this, progress);
+  object_manager->device_update_flags(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
@@ -258,50 +258,50 @@ void Scene::device_update(Device *device_, Progress &progress)
     return;
 
   progress.set_status("Updating Camera Volume");
-  camera->device_update_volume(device, &dscene, this);
+  camera->device_update_volume(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Lookup Tables");
-  lookup_tables->device_update(device, &dscene);
+  lookup_tables->device_update(device, dscene);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Lights");
-  light_manager->device_update(device, &dscene, this, progress);
+  light_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Integrator");
-  integrator->device_update(device, &dscene, this);
+  integrator->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Film");
-  film->device_update(device, &dscene, this);
+  film->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Lookup Tables");
-  lookup_tables->device_update(device, &dscene);
+  lookup_tables->device_update(device, dscene);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Baking");
-  bake_manager->device_update(device, &dscene, this, progress);
+  bake_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   if (device->have_error() == false) {
     progress.set_status("Updating Device", "Writing constant memory");
-    device->const_copy_to("__data", &dscene.data, sizeof(dscene.data));
+    device->const_copy_to("__data", &(dscene->data), sizeof(dscene->data));
   }
 
   if (print_stats) {
