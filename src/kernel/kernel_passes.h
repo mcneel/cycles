@@ -394,14 +394,21 @@ ccl_device_inline void kernel_write_result(KernelGlobals *kg,
   PROFILING_INIT(kg, PROFILING_WRITE_RESULT);
   PROFILING_OBJECT(PRIM_NONE);
 
+#if TESTERTHINGY
+  float3 L_sum = make_float3(0.25f, 0.5f, 0.75f);
+  kernel_write_pass_float4(buffer, make_float4(L_sum.x, L_sum.y, L_sum.z, 1.0f));
+#else
+  
   float alpha;
   float3 L_sum = path_radiance_clamp_and_sum(kg, L, &alpha);
+
 
   if (kernel_data.film.pass_flag & PASSMASK(COMBINED)) {
     kernel_write_pass_float4(buffer, make_float4(L_sum.x, L_sum.y, L_sum.z, alpha));
   }
 
   kernel_write_light_passes(kg, buffer, L);
+#endif
 
 #ifdef __DENOISING_FEATURES__
   if (kernel_data.film.pass_denoising_data) {
@@ -440,7 +447,7 @@ ccl_device_inline void kernel_write_result(KernelGlobals *kg,
 #endif /* __DENOISING_FEATURES__ */
 
 #ifdef __KERNEL_DEBUG__
-  kernel_write_debug_passes(kg, buffer, L);
+  //kernel_write_debug_passes(kg, buffer, L);
 #endif
 }
 

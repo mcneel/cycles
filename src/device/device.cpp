@@ -279,20 +279,27 @@ void Device::draw_pixels(device_memory &rgba,
                          bool transparent,
                          const DeviceDrawParams &draw_params)
 {
-  const bool use_fallback_shader = (draw_params.bind_display_space_shader_cb == NULL);
+  //const bool use_fallback_shader = (draw_params.bind_display_space_shader_cb == NULL);
 
   assert(rgba.type == MEM_PIXELS);
   mem_copy_from(rgba, y, w, h, rgba.memory_elements_size(1));
 
+  if (transparent) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  }
+
+
   GLuint texid;
-  glActiveTexture(GL_TEXTURE0);
   glGenTextures(1, &texid);
+  glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texid);
 
   if (rgba.data_type == TYPE_HALF) {
     GLhalf *data_pointer = (GLhalf *)rgba.host_pointer;
+    //GLhalf *data_pointer = (GLhalf *)rgba.device_pointer;
     data_pointer += 4 * y * w;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, data_pointer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F_ARB, w, h, 0, GL_RGBA, GL_HALF_FLOAT, data_pointer);
   }
   else {
     uint8_t *data_pointer = (uint8_t *)rgba.host_pointer;
@@ -302,11 +309,6 @@ void Device::draw_pixels(device_memory &rgba,
 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-  if (transparent) {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  }
 
 #if OLDSTUFF
   GLint shader_program;

@@ -696,8 +696,10 @@ ccl_device void kernel_path_trace(
       reinterpret_cast<unsigned char *>(&L)[-pass_stride + i] = 0;
 #  endif
 
+# ifndef TESTERTHINGY
   /* Integrate. */
   kernel_path_integrate(kg, &state, throughput, &ray, &L, buffer, emission_sd);
+#endif
 
   kernel_write_result(kg, buffer, sample, &L);
 }
