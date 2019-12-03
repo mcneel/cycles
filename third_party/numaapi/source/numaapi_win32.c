@@ -252,6 +252,9 @@ bool numaAPI_RunProcessOnNode(int node) {
 bool numaAPI_RunThreadOnNode(int node) {
   HANDLE thread_handle = GetCurrentThread();
   GROUP_AFFINITY group_affinity = { 0 };
+
+  // NATHANLOOK TODO thread priority
+  SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
   if (_GetNumaNodeProcessorMaskEx(node, &group_affinity) == 0) {
     return false;
   }
