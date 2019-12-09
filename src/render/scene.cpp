@@ -81,13 +81,13 @@ DeviceScene::DeviceScene(Device *device)
       sobol_directions(device, "__sobol_directions", MEM_TEXTURE),
       ies_lights(device, "__ies", MEM_TEXTURE)
 {
-  memset((void *)&data, 0, sizeof(data));
+  memset((void *)&data, 0, sizeof(KernelData));
 }
 
 Scene::Scene(const SceneParams &params_, Device *device)
     : name("Scene"), device(device), dscene(device), params(params_)
 {
-  memset((void *)&dscene.data, 0, sizeof(dscene.data));
+  memset((void *)&dscene.data, 0, sizeof(KernelData));
 
   camera = new Camera();
   dicing_camera = new Camera();

@@ -41,7 +41,7 @@ void BVH2::pack_leaf(const BVHStackEntry &e, const LeafNode *leaf)
 {
   assert(e.idx + BVH_NODE_LEAF_SIZE <= pack.leaf_nodes.size());
   float4 data[BVH_NODE_LEAF_SIZE];
-  memset(data, 0, sizeof(data));
+  memset(data, 0, sizeof(float4)*BVH_NODE_LEAF_SIZE);
   if (leaf->num_triangles() == 1 && pack.prim_index[leaf->lo] == -1) {
     /* object */
     data[0].x = __int_as_float(~(leaf->lo));
