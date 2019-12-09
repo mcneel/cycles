@@ -103,7 +103,7 @@ BVHNode *BVH4::widen_children_nodes(const BVHNode *root)
 void BVH4::pack_leaf(const BVHStackEntry &e, const LeafNode *leaf)
 {
   float4 data[BVH_QNODE_LEAF_SIZE];
-  memset(data, 0, sizeof(float4)*BVH_QNODE_LEAF_SIZE);
+  memset(data, 0, sizeof(data));
   if (leaf->num_triangles() == 1 && pack.prim_index[leaf->lo] == -1) {
     /* object */
     data[0].x = __int_as_float(~(leaf->lo));
@@ -169,7 +169,7 @@ void BVH4::pack_aligned_node(int idx,
                              const int num)
 {
   float4 data[BVH_QNODE_SIZE];
-  memset(data, 0, sizeof(float4)*BVH_QNODE_SIZE);
+  memset(data, 0, sizeof(data));
 
   data[0].x = __uint_as_float(visibility & ~PATH_RAY_NODE_UNALIGNED);
   data[0].y = time_from;
@@ -238,7 +238,7 @@ void BVH4::pack_unaligned_node(int idx,
                                const int num)
 {
   float4 data[BVH_UNALIGNED_QNODE_SIZE];
-  memset(data, 0, sizeof(float4)*BVH_UNALIGNED_QNODE_SIZE);
+  memset(data, 0, sizeof(data));
 
   data[0].x = __uint_as_float(visibility | PATH_RAY_NODE_UNALIGNED);
   data[0].y = time_from;

@@ -1191,7 +1191,7 @@ typedef struct KernelCamera {
   int rolling_shutter_type;
   float rolling_shutter_duration;
 
-  //int pad;
+  int pad;
 } KernelCamera;
 static_assert_align(KernelCamera, 16);
 

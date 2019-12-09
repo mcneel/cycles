@@ -183,7 +183,7 @@ Camera::Camera() : Node(node_type)
   need_flags_update = true;
   previous_need_motion = -1;
 
-  memset((void *)&kernel_camera, 0, sizeof(KernelCamera));
+  memset((void *)&kernel_camera, 0, sizeof(kernel_camera));
 }
 
 Camera::~Camera()

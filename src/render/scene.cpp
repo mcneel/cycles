@@ -81,7 +81,7 @@ DeviceScene::DeviceScene(Device *device)
       sobol_directions(device, "__sobol_directions", MEM_TEXTURE),
       ies_lights(device, "__ies", MEM_TEXTURE)
 {
-  memset((void *)&data, 0, sizeof(KernelData));
+  memset((void *)&data, 0, sizeof(data));
 }
 
 Scene::Scene(const SceneParams &params_, Device *device_)

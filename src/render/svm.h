@@ -139,7 +139,7 @@ class SVMCompiler {
   struct Stack {
     Stack()
     {
-      memset(users, 0, sizeof(int)*255);
+      memset(users, 0, sizeof(users));
     }
     Stack(const Stack &other)
     {

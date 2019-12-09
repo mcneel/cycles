@@ -222,7 +222,7 @@ static CPUCapabilities &system_cpu_capabilities()
   if (!caps_init) {
     int result[4], num;
 
-    memset(&caps, 0, sizeof(CPUCapabilities));
+    memset(&caps, 0, sizeof(caps));
 
     __cpuid(result, 0);
     num = result[0];
