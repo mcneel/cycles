@@ -1139,7 +1139,7 @@ class CUDADevice : public Device {
       }
 
       CUDA_MEMCPY3D param;
-      memset(&param, 0, sizeof(param));
+      memset(&param, 0, sizeof(CUDA_MEMCPY3D));
       param.dstMemoryType = CU_MEMORYTYPE_ARRAY;
       param.dstArray = array_3d;
       param.srcMemoryType = CU_MEMORYTYPE_HOST;
@@ -1173,7 +1173,7 @@ class CUDADevice : public Device {
       }
 
       CUDA_MEMCPY2D param;
-      memset(&param, 0, sizeof(param));
+      memset(&param, 0, sizeof(CUDA_MEMCPY2D));
       param.dstMemoryType = CU_MEMORYTYPE_DEVICE;
       param.dstDevice = mem.device_pointer;
       param.dstPitch = dst_pitch;
@@ -1206,7 +1206,7 @@ class CUDADevice : public Device {
     }
 
     CUDA_RESOURCE_DESC resDesc;
-    memset(&resDesc, 0, sizeof(resDesc));
+    memset(&resDesc, 0, sizeof(CUDA_RESOURCE_DESC));
 
     if (array_3d) {
       resDesc.resType = CU_RESOURCE_TYPE_ARRAY;
@@ -1231,7 +1231,7 @@ class CUDADevice : public Device {
     }
 
     CUDA_TEXTURE_DESC texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
+    memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
     texDesc.addressMode[0] = address_mode;
     texDesc.addressMode[1] = address_mode;
     texDesc.addressMode[2] = address_mode;
