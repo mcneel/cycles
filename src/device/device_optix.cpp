@@ -1059,7 +1059,7 @@ class OptiXDevice : public Device {
         aabb.maxZ = ob->bounds.max.z;
 
         OptixInstance &instance = instances[num_instances++];
-        memset(&instance, 0, sizeof(OptixInstance));
+        memset(&instance, 0, sizeof(instance));
 
         // Clear transform to identity matrix
         instance.transform[0] = 1.0f;
@@ -1417,7 +1417,7 @@ class OptiXDevice : public Device {
       }
 
       CUDA_MEMCPY3D param;
-      memset(&param, 0, sizeof(CUDA_MEMCPY3D));
+      memset(&param, 0, sizeof(param));
       param.dstMemoryType = CU_MEMORYTYPE_ARRAY;
       param.dstArray = array_3d;
       param.srcMemoryType = CU_MEMORYTYPE_HOST;
@@ -1451,7 +1451,7 @@ class OptiXDevice : public Device {
       }
 
       CUDA_MEMCPY2D param;
-      memset(&param, 0, sizeof(CUDA_MEMCPY2D));
+      memset(&param, 0, sizeof(param));
       param.dstMemoryType = CU_MEMORYTYPE_DEVICE;
       param.dstDevice = mem.device_pointer;
       param.dstPitch = dst_pitch;
@@ -1484,7 +1484,7 @@ class OptiXDevice : public Device {
     }
 
     CUDA_RESOURCE_DESC resDesc;
-    memset(&resDesc, 0, sizeof(CUDA_RESOURCE_DESC));
+    memset(&resDesc, 0, sizeof(resDesc));
 
     if (array_3d) {
       resDesc.resType = CU_RESOURCE_TYPE_ARRAY;
@@ -1509,7 +1509,7 @@ class OptiXDevice : public Device {
     }
 
     CUDA_TEXTURE_DESC texDesc;
-    memset(&texDesc, 0, sizeof(CUDA_TEXTURE_DESC));
+    memset(&texDesc, 0, sizeof(texDesc));
     texDesc.addressMode[0] = address_mode;
     texDesc.addressMode[1] = address_mode;
     texDesc.addressMode[2] = address_mode;

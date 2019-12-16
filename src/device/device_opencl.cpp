@@ -154,7 +154,7 @@ string device_opencl_capabilities()
 #  define APPEND_INFO(func, id, name, what, type) \
     do { \
       type data; \
-      memset(&data, 0, sizeof(type)); \
+      memset(&data, 0, sizeof(data)); \
       opencl_assert(func(id, what, sizeof(data), &data, NULL)); \
       result += string_printf("%s: %s\n", name, to_string(data).c_str()); \
     } while (false)
