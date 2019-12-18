@@ -230,10 +230,10 @@ class Scene {
   BakeManager *bake_manager;
 
   /* default shaders */
-  Shader *default_surface;
-  Shader *default_light;
-  Shader *default_background;
-  Shader *default_empty;
+  Shader *default_surface = nullptr;
+  Shader *default_light = nullptr;
+  Shader *default_background = nullptr;
+  Shader *default_empty = nullptr;
 
   /* device */
   Device *device;
