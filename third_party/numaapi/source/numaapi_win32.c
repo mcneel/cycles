@@ -155,9 +155,8 @@ NUMAAPI_Result numaAPI_Initialize(void) {
     // Require Windows 7 or higher.
     NUMAAPI_NOT_AVAILABLE;
   }
-  //loadNumaSymbols();
-  return NUMAAPI_NOT_AVAILABLE;
-  //return NUMAAPI_SUCCESS;
+  loadNumaSymbols();
+  return NUMAAPI_SUCCESS;
 #endif
 }
 
