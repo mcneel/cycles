@@ -424,7 +424,7 @@ ShaderManager *ShaderManager::create(Scene *scene, int shadingsystem)
     manager = new SVMShaderManager();
   }
 
-  add_default(scene);
+  //add_default(scene);
 
   return manager;
 }
