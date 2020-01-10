@@ -390,6 +390,10 @@ void TaskScheduler::thread_run(int thread_id)
 
   /* todo: test affinity/denormal mask */
 
+#ifdef _WIN32
+  HANDLE thread_handle = GetCurrentThread();
+  SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
+#endif
   /* keep popping off tasks */
   while (thread_wait_pop(entry)) {
     /* run task */
@@ -556,6 +560,11 @@ bool DedicatedTaskPool::thread_wait_pop(Task *&task)
 void DedicatedTaskPool::thread_run()
 {
   Task *task;
+
+#ifdef _WIN32
+  HANDLE thread_handle = GetCurrentThread();
+  SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
+#endif
 
   /* keep popping off tasks */
   while (thread_wait_pop(task)) {

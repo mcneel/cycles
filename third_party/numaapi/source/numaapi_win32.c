@@ -218,6 +218,8 @@ int numaAPI_GetNumCurrentNodesProcessors(void) {
   HANDLE thread_handle = GetCurrentThread();
   GROUP_AFFINITY group_affinity;
   // TODO(sergey): Needs implementation.
+
+  SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
   if (!_GetThreadGroupAffinity(thread_handle, &group_affinity)) {
     return 0;
   }
