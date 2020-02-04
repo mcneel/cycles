@@ -101,12 +101,12 @@ CCL_NAMESPACE_BEGIN
 #define __AO__
 #define __PASSES__
 #define __HAIR__
+#define __TEXTURES__
 
 /* Without these we get an AO render, used by OpenCL preview kernel. */
 #ifndef __KERNEL_AO_PREVIEW__
 #  define __SVM__
 #  define __EMISSION__
-#  define __TEXTURES__
 #  define __EXTRA_NODES__
 #  define __HOLDOUT__
 #  define __MULTI_CLOSURE__
