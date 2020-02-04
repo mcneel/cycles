@@ -623,7 +623,11 @@ void OpenCLDevice::OpenCLProgram::compile()
     string clsrc, *debug_src = NULL;
 
     if (OpenCLInfo::use_debug()) {
+#  ifdef _WIN32
+      clsrc = "\\\\?\\" + basename + ".cl";
+#  else
       clsrc = basename + ".cl";
+#  endif
       debug_src = &clsrc;
     }
 
