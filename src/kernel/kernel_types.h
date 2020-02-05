@@ -1458,6 +1458,7 @@ static_assert_align(KernelData, 16);
 typedef struct KernelObject {
   Transform tfm;
   Transform itfm;
+  Transform ocs_frame; /* OCS frame for further control of WCS and WCS Box */
 
   float surface_area;
   float pass_id;
@@ -1472,6 +1473,7 @@ typedef struct KernelObject {
   int numsteps;
   int numverts;
 
+  int use_ocs_frame;
   int shader;
 
   uint patch_map_offset;
