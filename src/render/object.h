@@ -68,6 +68,8 @@ class Object : public Node {
   ParticleSystem *particle_system;
   int particle_index;
 
+  bool use_ocs_frame;
+  Transform ocs_frame; /* OCS frame for controlling WCS and WCS Box. */
   Shader *shader;
 
   Object();

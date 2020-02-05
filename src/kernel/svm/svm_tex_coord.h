@@ -22,6 +22,10 @@ CCL_NAMESPACE_BEGIN
 ccl_device_inline void wcs_box_coord(KernelGlobals *kg, ShaderData *sd, float3 *data)
 {
   float3 N = sd->N;
+  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+    Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+    *data = transform_point(&tfm, *data);
+  }
 
   int side0 = 0;
 
@@ -134,6 +138,10 @@ ccl_device void svm_node_tex_coord(
   switch (type) {
     case NODE_TEXCO_OBJECT: {
       data = sd->P;
+	  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+		Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+		data = transform_point(&tfm, data);
+	  }
       if (node.w == 0) {
         if (sd->object != OBJECT_NONE) {
           object_inverse_position_transform(kg, sd, &data);
@@ -271,6 +279,10 @@ ccl_device void svm_node_tex_coord_bump_dx(
   switch (type) {
     case NODE_TEXCO_OBJECT: {
       data = sd->P + sd->dP.dx;
+	  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+		Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+		data = transform_point(&tfm, data);
+	  }
       if (node.w == 0) {
         if (sd->object != OBJECT_NONE) {
           object_inverse_position_transform(kg, sd, &data);
@@ -369,6 +381,10 @@ ccl_device void svm_node_tex_coord_bump_dy(
   switch (type) {
     case NODE_TEXCO_OBJECT: {
       data = sd->P + sd->dP.dy;
+	  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+		Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+		data = transform_point(&tfm, data);
+	  }
       if (node.w == 0) {
         if (sd->object != OBJECT_NONE) {
           object_inverse_position_transform(kg, sd, &data);
