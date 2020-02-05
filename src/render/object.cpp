@@ -103,6 +103,9 @@ NODE_DEFINE(Object)
   SOCKET_BOOLEAN(mesh_light_no_cast_shadow, "No Cast Shadow as Mesh Light", false);
   SOCKET_BOOLEAN(is_block_instance, "Block Instance", false);
 
+  SOCKET_BOOLEAN(use_ocs_frame, "UseOcsFrame", false);
+  SOCKET_TRANSFORM(ocs_frame, "OcsFrame", transform_identity());
+
   return type;
 }
 
@@ -433,6 +436,8 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
 
   kobject.tfm = tfm;
   kobject.itfm = itfm;
+  kobject.ocs_frame = ob->ocs_frame;
+  kobject.use_ocs_frame = ob->use_ocs_frame ? 1 : 0;
   kobject.surface_area = surface_area;
   kobject.color[0] = color.x;
   kobject.color[1] = color.y;

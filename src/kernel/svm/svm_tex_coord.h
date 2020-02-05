@@ -22,6 +22,10 @@ CCL_NAMESPACE_BEGIN
 ccl_device_inline void wcs_box_coord(KernelGlobals *kg, ShaderData *sd, float3 *data)
 {
   float3 N = sd->N;
+  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+    Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+    *data = transform_point(&tfm, *data);
+  }
 
   int side0 = 0;
 
