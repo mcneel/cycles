@@ -932,9 +932,6 @@ void Session::run()
 
 void Session::prepare_run()
 {
-  /* load kernels */
-  load_kernels();
-
   /* session thread loop */
   progress.set_status("Waiting for render to start");
 
