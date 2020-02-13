@@ -2802,6 +2802,7 @@ PrincipledBsdfNode::PrincipledBsdfNode() : BsdfBaseNode(node_type)
 
 void PrincipledBsdfNode::expand(ShaderGraph *graph)
 {
+#if defined(PBR_EXPAND)
   ShaderOutput *principled_out = output("BSDF");
 
   ShaderInput *emission_in = input("Emission");
@@ -2840,6 +2841,7 @@ void PrincipledBsdfNode::expand(ShaderGraph *graph)
 
   remove_input(emission_in);
   remove_input(alpha_in);
+#endif
 }
 
 bool PrincipledBsdfNode::has_surface_bssrdf()
