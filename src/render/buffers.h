@@ -109,11 +109,11 @@ class DisplayBuffer {
   int draw_width, draw_height;
   /* draw alpha channel? */
   bool transparent;
-  /* use half float? */
-  bool half_float;
+  /* use float? */
+  bool use_float;
   /* byte buffer for converted result */
   device_pixels<uchar4> rgba_byte;
-  device_pixels<half4> rgba_half;
+  device_pixels<float4> rgba_float;
 
   DisplayBuffer(Device *device, bool linear = false);
   ~DisplayBuffer();
@@ -121,6 +121,7 @@ class DisplayBuffer {
   void reset(BufferParams &params);
 
   void draw_set(int width, int height);
+  void* prepare_pixels(Device *device, const DeviceDrawParams &draw_params);
   void draw(Device *device, const DeviceDrawParams &draw_params);
   bool draw_ready();
 };

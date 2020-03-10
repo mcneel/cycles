@@ -69,7 +69,7 @@ class DeviceTask : public Task {
 
   int x, y, w, h;
   device_ptr rgba_byte;
-  device_ptr rgba_half;
+  device_ptr rgba_float;
   device_ptr buffer;
   int sample;
   int num_samples;

@@ -116,14 +116,14 @@ ccl_device void kernel_film_convert_to_byte(KernelGlobals *kg,
   *rgba = uchar_result;
 }
 
-ccl_device void kernel_film_convert_to_half_float(KernelGlobals *kg,
-                                                  ccl_global uchar4 *rgba,
-                                                  ccl_global float *buffer,
-                                                  float sample_scale,
-                                                  int x,
-                                                  int y,
-                                                  int offset,
-                                                  int stride)
+ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
+                                             ccl_global float *rgba,
+                                             ccl_global float *buffer,
+                                             float sample_scale,
+                                             int x,
+                                             int y,
+                                             int offset,
+                                             int stride)
 {
   /* buffer offset */
   int index = offset + x + y * stride;
@@ -131,8 +131,8 @@ ccl_device void kernel_film_convert_to_half_float(KernelGlobals *kg,
   bool use_display_sample_scale = (kernel_data.film.display_divide_pass_stride == -1);
   float4 rgba_in = film_get_pass_result(kg, buffer, sample_scale, index, use_display_sample_scale);
 
-  ccl_global half *out = (ccl_global half *)rgba + index * 4;
-  float4_store_half(out, rgba_in, use_display_sample_scale ? sample_scale : 1.0f);
+  ccl_global float *out = (ccl_global float *)rgba + index * 4;
+  float4_store_float(out, rgba_in, use_display_sample_scale ? sample_scale : 1.0f);
 }
 
 CCL_NAMESPACE_END

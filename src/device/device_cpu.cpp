@@ -179,8 +179,8 @@ class CPUDevice : public Device {
   DeviceRequestedFeatures requested_features;
 
   KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> path_trace_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)>
-      convert_to_half_float_kernel;
+  KernelFunctions<void (*)(KernelGlobals *, float *, float *, float, int, int, int, int)>
+      convert_to_float_kernel;
   KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)>
       convert_to_byte_kernel;
   KernelFunctions<void (*)(KernelGlobals *, uint4 *, float4 *, int, int, int, int, int)>
@@ -264,7 +264,7 @@ class CPUDevice : public Device {
         texture_info(this, "__texture_info", MEM_TEXTURE),
 #define REGISTER_KERNEL(name) name##_kernel(KERNEL_FUNCTIONS(name))
         REGISTER_KERNEL(path_trace),
-        REGISTER_KERNEL(convert_to_half_float),
+        REGISTER_KERNEL(convert_to_float),
         REGISTER_KERNEL(convert_to_byte),
         REGISTER_KERNEL(shader),
         REGISTER_KERNEL(filter_divide_shadow),
@@ -958,11 +958,11 @@ class CPUDevice : public Device {
   {
     float sample_scale = 1.0f / (task.sample + 1);
 
-    if (task.rgba_half) {
+    if (task.rgba_float) {
       for (int y = task.y; y < task.y + task.h; y++)
         for (int x = task.x; x < task.x + task.w; x++)
-          convert_to_half_float_kernel()(&kernel_globals,
-                                         (uchar4 *)task.rgba_half,
+          convert_to_float_kernel()(&kernel_globals,
+                                         (float *)task.rgba_float,
                                          (float *)task.buffer,
                                          sample_scale,
                                          x,
