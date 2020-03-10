@@ -32,6 +32,8 @@ CCL_NAMESPACE_BEGIN
 
 #  define float4_store_half(h, f, scale) vstore_half4(f *(scale), 0, h);
 
+#  define float4_store_float(dest, f, scale) vstore4(f *(scale), 0, dest);
+
 #else
 
 /* CUDA has its own half data type, no need to define then */
