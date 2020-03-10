@@ -179,9 +179,9 @@ class CPUDevice : public Device {
   DeviceRequestedFeatures requested_features;
 
   KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> path_trace_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, float *, float *, float, int, int, int, int)>
+  KernelFunctions<void (*)(KernelGlobals *, float *, float *, float, int, int, int, int, int)>
       convert_to_float_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)>
+  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int)>
       convert_to_byte_kernel;
   KernelFunctions<void (*)(KernelGlobals *, uint4 *, float4 *, int, int, int, int, int)>
       shader_kernel;
@@ -962,13 +962,14 @@ class CPUDevice : public Device {
       for (int y = task.y; y < task.y + task.h; y++)
         for (int x = task.x; x < task.x + task.w; x++)
           convert_to_float_kernel()(&kernel_globals,
-                                         (float *)task.rgba_float,
-                                         (float *)task.buffer,
-                                         sample_scale,
-                                         x,
-                                         y,
-                                         task.offset,
-                                         task.stride);
+                                    (float *)task.rgba_float,
+                                    (float *)task.buffer,
+                                    sample_scale,
+                                    x,
+                                    y,
+                                    task.fh,
+                                    task.offset,
+                                    task.stride);
     }
     else {
       for (int y = task.y; y < task.y + task.h; y++)
@@ -979,6 +980,7 @@ class CPUDevice : public Device {
                                    sample_scale,
                                    x,
                                    y,
+                                   task.fh,
                                    task.offset,
                                    task.stride);
     }

@@ -99,6 +99,7 @@ ccl_device void kernel_film_convert_to_byte(KernelGlobals *kg,
                                             float sample_scale,
                                             int x,
                                             int y,
+                                            int height,
                                             int offset,
                                             int stride)
 {
@@ -122,16 +123,18 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
                                              float sample_scale,
                                              int x,
                                              int y,
+                                             int height,
                                              int offset,
                                              int stride)
 {
   /* buffer offset */
   int index = offset + x + y * stride;
+  int out_index = offset + (height - (y + 1)) * stride + x;
 
   bool use_display_sample_scale = (kernel_data.film.display_divide_pass_stride == -1);
   float4 rgba_in = film_get_pass_result(kg, buffer, sample_scale, index, use_display_sample_scale);
 
-  ccl_global float *out = (ccl_global float *)rgba + index * 4;
+  ccl_global float *out = (ccl_global float *)rgba + out_index * 4;
   float4_store_float(out, rgba_in, use_display_sample_scale ? sample_scale : 1.0f);
 }
 

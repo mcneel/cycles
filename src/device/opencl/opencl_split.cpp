@@ -1367,6 +1367,7 @@ void OpenCLDevice::film_convert(DeviceTask &task,
   cl_int d_y = task.y;
   cl_int d_w = task.w;
   cl_int d_h = task.h;
+  cl_int d_fh = task.fh;
   cl_float d_sample_scale = 1.0f / (task.sample + 1);
   cl_int d_offset = task.offset;
   cl_int d_stride = task.stride;
@@ -1385,6 +1386,7 @@ void OpenCLDevice::film_convert(DeviceTask &task,
                                      d_y,
                                      d_w,
                                      d_h,
+                                     d_fh,
                                      d_offset,
                                      d_stride);
 

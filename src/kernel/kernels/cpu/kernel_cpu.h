@@ -25,6 +25,7 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 float sample_scale,
                                                 int x,
                                                 int y,
+                                                int height,
                                                 int offset,
                                                 int stride);
 
@@ -34,6 +35,7 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
                                                       float sample_scale,
                                                       int x,
                                                       int y,
+                                                      int height,
                                                       int offset,
                                                       int stride);
 
