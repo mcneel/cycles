@@ -100,13 +100,14 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 float sample_scale,
                                                 int x,
                                                 int y,
+                                                int height,
                                                 int offset,
                                                 int stride)
 {
 #  ifdef KERNEL_STUB
   STUB_ASSERT(KERNEL_ARCH, convert_to_byte);
 #  else
-  kernel_film_convert_to_byte(kg, rgba, buffer, sample_scale, x, y, offset, stride);
+  kernel_film_convert_to_byte(kg, rgba, buffer, sample_scale, x, y, height, offset, stride);
 #  endif /* KERNEL_STUB */
 }
 
@@ -116,13 +117,14 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
                                                       float sample_scale,
                                                       int x,
                                                       int y,
+                                                      int height,
                                                       int offset,
                                                       int stride)
 {
 #  ifdef KERNEL_STUB
   STUB_ASSERT(KERNEL_ARCH, convert_to_float);
 #  else
-  kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, x, y, offset, stride);
+  kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, x, y, height, offset, stride);
 #  endif /* KERNEL_STUB */
 }
 

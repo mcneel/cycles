@@ -1213,7 +1213,7 @@ void Session::copy_to_display_buffer(int sample)
   task.x = tile_manager.state.buffer.full_x;
   task.y = tile_manager.state.buffer.full_y;
   task.w = tile_manager.state.buffer.width;
-  task.h = tile_manager.state.buffer.height;
+  task.h = task.fh = tile_manager.state.buffer.height;
   task.rgba_byte = display->rgba_byte.device_pointer;
   task.rgba_float = display->rgba_float.device_pointer;
   task.buffer = buffers->buffer.device_pointer;

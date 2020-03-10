@@ -1095,6 +1095,7 @@ class OptiXDevice : public Device {
                     &task.y,
                     &task.w,
                     &task.h,
+                    &task.fh,
                     &task.offset,
                     &task.stride};
 
