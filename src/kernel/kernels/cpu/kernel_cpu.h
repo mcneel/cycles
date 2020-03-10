@@ -28,8 +28,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 int offset,
                                                 int stride);
 
-void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(KernelGlobals *kg,
-                                                      uchar4 *rgba,
+void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
+                                                      float *rgba,
                                                       float *buffer,
                                                       float sample_scale,
                                                       int x,

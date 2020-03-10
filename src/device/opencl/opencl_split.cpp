@@ -802,7 +802,7 @@ void OpenCLDevice::load_required_kernels(const DeviceRequestedFeatures &requeste
   base_program = OpenCLProgram(
       this, "base", "kernel_base.cl", get_build_options(requested_features, "base"));
   base_program.add_kernel(ustring("convert_to_byte"));
-  base_program.add_kernel(ustring("convert_to_half_float"));
+  base_program.add_kernel(ustring("convert_to_float"));
   base_program.add_kernel(ustring("zero_buffer"));
   programs.push_back(&base_program);
 
@@ -1309,7 +1309,7 @@ void OpenCLDevice::thread_run(DeviceTask *task)
   flush_texture_buffers();
 
   if (task->type == DeviceTask::FILM_CONVERT) {
-    film_convert(*task, task->buffer, task->rgba_byte, task->rgba_half);
+    film_convert(*task, task->buffer, task->rgba_byte, task->rgba_float);
   }
   else if (task->type == DeviceTask::SHADER) {
     shader(*task);
@@ -1357,11 +1357,11 @@ void OpenCLDevice::thread_run(DeviceTask *task)
 void OpenCLDevice::film_convert(DeviceTask &task,
                                 device_ptr buffer,
                                 device_ptr rgba_byte,
-                                device_ptr rgba_half)
+                                device_ptr rgba_float)
 {
   /* cast arguments to cl types */
   cl_mem d_data = CL_MEM_PTR(const_mem_map["__data"]->device_pointer);
-  cl_mem d_rgba = (rgba_byte) ? CL_MEM_PTR(rgba_byte) : CL_MEM_PTR(rgba_half);
+  cl_mem d_rgba = (rgba_byte) ? CL_MEM_PTR(rgba_byte) : CL_MEM_PTR(rgba_float);
   cl_mem d_buffer = CL_MEM_PTR(buffer);
   cl_int d_x = task.x;
   cl_int d_y = task.y;
@@ -1372,7 +1372,7 @@ void OpenCLDevice::film_convert(DeviceTask &task,
   cl_int d_stride = task.stride;
 
   cl_kernel ckFilmConvertKernel = (rgba_byte) ? base_program(ustring("convert_to_byte")) :
-                                                base_program(ustring("convert_to_half_float"));
+                                                base_program(ustring("convert_to_float"));
 
   cl_uint start_arg_index = kernel_set_args(ckFilmConvertKernel, 0, d_data, d_rgba, d_buffer);
 

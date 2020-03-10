@@ -404,6 +404,19 @@ class Device {
   virtual void task_wait() = 0;
   virtual void task_cancel() = 0;
 
+  virtual void prepare_pixels(device_memory &rgba,
+                              int y,
+                              int w,
+                              int h,
+                              int dx,
+                              int dy,
+                              int width,
+                              int height,
+                              int full_width,
+                              int full_height,
+                              bool transparent,
+                              const DeviceDrawParams &draw_params);
+
   /* opengl drawing */
   virtual void draw_pixels(device_memory &mem,
                            int y,

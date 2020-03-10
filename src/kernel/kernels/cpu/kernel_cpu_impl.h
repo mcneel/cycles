@@ -110,8 +110,8 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
 #  endif /* KERNEL_STUB */
 }
 
-void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(KernelGlobals *kg,
-                                                      uchar4 *rgba,
+void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
+                                                      float *rgba,
                                                       float *buffer,
                                                       float sample_scale,
                                                       int x,
@@ -120,9 +120,9 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(KernelGlobals *kg,
                                                       int stride)
 {
 #  ifdef KERNEL_STUB
-  STUB_ASSERT(KERNEL_ARCH, convert_to_half_float);
+  STUB_ASSERT(KERNEL_ARCH, convert_to_float);
 #  else
-  kernel_film_convert_to_half_float(kg, rgba, buffer, sample_scale, x, y, offset, stride);
+  kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, x, y, offset, stride);
 #  endif /* KERNEL_STUB */
 }
 

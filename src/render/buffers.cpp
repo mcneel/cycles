@@ -444,16 +444,16 @@ DisplayBuffer::DisplayBuffer(Device *device, bool linear)
     : draw_width(0),
       draw_height(0),
       transparent(true), /* todo: determine from background */
-      half_float(linear),
+      use_float(linear),
       rgba_byte(device, "display buffer byte"),
-      rgba_half(device, "display buffer half")
+      rgba_float(device, "display buffer float")
 {
 }
 
 DisplayBuffer::~DisplayBuffer()
 {
   rgba_byte.free();
-  rgba_half.free();
+  rgba_float.free();
 }
 
 void DisplayBuffer::reset(BufferParams &params_)
@@ -464,8 +464,8 @@ void DisplayBuffer::reset(BufferParams &params_)
   params = params_;
 
   /* allocate display pixels */
-  if (half_float) {
-    rgba_half.alloc_to_device(params.width, params.height);
+  if (use_float) {
+    rgba_float.alloc_to_device(params.width, params.height);
   }
   else {
     rgba_byte.alloc_to_device(params.width, params.height);
@@ -483,7 +483,7 @@ void DisplayBuffer::draw_set(int width, int height)
 void DisplayBuffer::draw(Device *device, const DeviceDrawParams &draw_params)
 {
   if (draw_width != 0 && draw_height != 0) {
-    device_memory &rgba = (half_float) ? (device_memory &)rgba_half : (device_memory &)rgba_byte;
+    device_memory &rgba = (use_float) ? (device_memory &)rgba_float : (device_memory &)rgba_byte;
 
 	/* TODO [NATHANLOOK] verify drawing code after ogl updates. */
     device->draw_pixels(rgba,
@@ -499,6 +499,31 @@ void DisplayBuffer::draw(Device *device, const DeviceDrawParams &draw_params)
                         transparent,
                         draw_params);
   }
+}
+
+void* DisplayBuffer::prepare_pixels(Device *device, const DeviceDrawParams &draw_params)
+{
+  if (draw_width != 0 && draw_height != 0) {
+    assert(use_float);
+    device_memory &rgba = (device_memory &)rgba_float;
+
+    device->prepare_pixels(rgba,
+                        0,
+                        draw_width,
+                        draw_height,
+                        params.full_x,
+                        params.full_y,
+                        params.width,
+                        params.height,
+                        params.full_width,
+                        params.full_height,
+                        transparent,
+                        draw_params);
+
+	return rgba.host_pointer;
+  }
+
+  return nullptr;
 }
 
 bool DisplayBuffer::draw_ready()

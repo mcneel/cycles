@@ -32,6 +32,8 @@ CCL_NAMESPACE_BEGIN
 
 #  define float4_store_half(h, f, scale) vstore_half4(f *(scale), 0, h);
 
+#  define float4_store_float(dest, f, scale) vstore4(f *(scale), 0, dest);
+
 #else
 
 /* CUDA has its own half data type, no need to define then */
@@ -75,6 +77,14 @@ ccl_device_inline void float4_store_half(half *h, float4 f, float scale)
   h[3] = __float2half(f.w * scale);
 }
 
+ccl_device_inline void float4_store_float(float *h, float4 f, float scale)
+{
+  h[0] = f.x * scale;
+  h[1] = f.y * scale;
+  h[2] = f.z * scale;
+  h[3] = f.w * scale;
+}
+
 #  else
 
 ccl_device_inline void float4_store_half(half *h, float4 f, float scale)
@@ -115,6 +125,13 @@ ccl_device_inline void float4_store_half(half *h, float4 f, float scale)
 
   _mm_storel_pi((__m64 *)h, _mm_castsi128_ps(rpack));
 #    endif
+}
+
+ccl_device_inline void float4_store_float(float *h, float4 f, float scale)
+{
+  for (int i = 0; i < 4; i++) {
+    h[i] = f[i] * scale;
+  }
 }
 
 ccl_device_inline float half_to_float(half h)

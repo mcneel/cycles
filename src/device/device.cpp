@@ -266,6 +266,23 @@ void get_glviewport_data(GLint width, GLint height, GLint& vp_offset_x, GLint& v
   }
 }
 
+void Device::prepare_pixels(device_memory &rgba,
+                         int y,
+                         int w,
+                         int h,
+                         int dx,
+                         int dy,
+                         int width,
+                         int height,
+                         int full_width,
+                         int full_height,
+                         bool transparent,
+                         const DeviceDrawParams &draw_params)
+{
+  assert(rgba.type == MEM_PIXELS);
+  mem_copy_from(rgba, y, w, h, rgba.memory_elements_size(1));
+}
+
 void Device::draw_pixels(device_memory &rgba,
                          int y,
                          int w,

@@ -1215,7 +1215,7 @@ void Session::copy_to_display_buffer(int sample)
   task.w = tile_manager.state.buffer.width;
   task.h = tile_manager.state.buffer.height;
   task.rgba_byte = display->rgba_byte.device_pointer;
-  task.rgba_half = display->rgba_half.device_pointer;
+  task.rgba_float = display->rgba_float.device_pointer;
   task.buffer = buffers->buffer.device_pointer;
   task.sample = sample;
   tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
