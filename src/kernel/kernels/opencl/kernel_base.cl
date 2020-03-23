@@ -22,6 +22,7 @@
 
 #include "kernel/kernel_film.h"
 
+#if 0
 
 __kernel void kernel_ocl_convert_to_byte(
 	ccl_constant KernelData *data,
@@ -46,6 +47,7 @@ __kernel void kernel_ocl_convert_to_byte(
 	if(x < sx + sw && y < sy + sh)
 		kernel_film_convert_to_byte(kg, rgba, buffer, sample_scale, x, y, height, offset, stride);
 }
+#endif
 
 __kernel void kernel_ocl_convert_to_float(
 	ccl_constant KernelData *data,
@@ -55,6 +57,7 @@ __kernel void kernel_ocl_convert_to_float(
 	KERNEL_BUFFER_PARAMS,
 
 	float sample_scale,
+	int pass_type,
 	int sx, int sy, int sw, int sh, int height, int offset, int stride)
 {
 	KernelGlobals kglobals, *kg = &kglobals;
@@ -68,7 +71,7 @@ __kernel void kernel_ocl_convert_to_float(
 	int y = sy + ccl_global_id(1);
 
 	if(x < sx + sw && y < sy + sh)
-		kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, x, y, height, offset, stride);
+		kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, pass_type, x, y, height, offset, stride);
 }
 
 __kernel void kernel_ocl_zero_buffer(ccl_global float4 *buffer, uint64_t size, uint64_t offset)

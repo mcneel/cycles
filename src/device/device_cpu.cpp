@@ -179,10 +179,10 @@ class CPUDevice : public Device {
   DeviceRequestedFeatures requested_features;
 
   KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> path_trace_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, float *, float *, float, int, int, int, int, int)>
+  KernelFunctions<void (*)(KernelGlobals *, float *, float *, float, int, int, int, int, int, int)>
       convert_to_float_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int)>
-      convert_to_byte_kernel;
+  //KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int)>
+  //    convert_to_byte_kernel;
   KernelFunctions<void (*)(KernelGlobals *, uint4 *, float4 *, int, int, int, int, int)>
       shader_kernel;
 
@@ -265,7 +265,7 @@ class CPUDevice : public Device {
 #define REGISTER_KERNEL(name) name##_kernel(KERNEL_FUNCTIONS(name))
         REGISTER_KERNEL(path_trace),
         REGISTER_KERNEL(convert_to_float),
-        REGISTER_KERNEL(convert_to_byte),
+        //REGISTER_KERNEL(convert_to_byte),
         REGISTER_KERNEL(shader),
         REGISTER_KERNEL(filter_divide_shadow),
         REGISTER_KERNEL(filter_get_feature),
@@ -958,19 +958,20 @@ class CPUDevice : public Device {
   {
     float sample_scale = 1.0f / (task.sample + 1);
 
-    if (task.rgba_float) {
+    //if (task.rgba_float) {
       for (int y = task.y; y < task.y + task.h; y++)
         for (int x = task.x; x < task.x + task.w; x++)
           convert_to_float_kernel()(&kernel_globals,
                                     (float *)task.rgba_float,
                                     (float *)task.buffer,
                                     sample_scale,
+                                    task.pass_type,
                                     x,
                                     y,
                                     task.fh,
                                     task.offset,
                                     task.stride);
-    }
+    /*}
     else {
       for (int y = task.y; y < task.y + task.h; y++)
         for (int x = task.x; x < task.x + task.w; x++)
@@ -983,7 +984,7 @@ class CPUDevice : public Device {
                                    task.fh,
                                    task.offset,
                                    task.stride);
-    }
+    }*/
   }
 
   void thread_shader(DeviceTask &task)

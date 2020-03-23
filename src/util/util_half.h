@@ -32,7 +32,14 @@ CCL_NAMESPACE_BEGIN
 
 #  define float4_store_half(h, f, scale) vstore_half4(f *(scale), 0, h);
 
-#  define float4_store_float(dest, f, scale) vstore4(f *(scale), 0, dest);
+#  define float4_store_float4(dest, f, scale) vstore4(f *(scale), 0, dest);
+
+ccl_device_inline void float4_store_float3(ccl_global float *dest, float4 f, float scale)
+{
+  dest[0] = f.x * scale;
+  dest[1] = f.y * scale;
+  dest[2] = f.z * scale;
+}
 
 #else
 
@@ -77,12 +84,18 @@ ccl_device_inline void float4_store_half(half *h, float4 f, float scale)
   h[3] = __float2half(f.w * scale);
 }
 
-ccl_device_inline void float4_store_float(float *h, float4 f, float scale)
+ccl_device_inline void float4_store_float4(float *h, float4 f, float scale)
 {
   h[0] = f.x * scale;
   h[1] = f.y * scale;
   h[2] = f.z * scale;
   h[3] = f.w * scale;
+}
+ccl_device_inline void float4_store_float3(float *h, float4 f, float scale)
+{
+  h[0] = f.x * scale;
+  h[1] = f.y * scale;
+  h[2] = f.z * scale;
 }
 
 #  else
@@ -127,9 +140,16 @@ ccl_device_inline void float4_store_half(half *h, float4 f, float scale)
 #    endif
 }
 
-ccl_device_inline void float4_store_float(float *h, float4 f, float scale)
+ccl_device_inline void float4_store_float4(float *h, float4 f, float scale)
 {
   for (int i = 0; i < 4; i++) {
+    h[i] = f[i] * scale;
+  }
+}
+
+ccl_device_inline void float4_store_float3(float *h, float4 f, float scale)
+{
+  for (int i = 0; i < 3; i++) {
     h[i] = f[i] * scale;
   }
 }

@@ -440,19 +440,21 @@ bool RenderBuffers::get_pass_rect(
 
 /* Display Buffer */
 
-DisplayBuffer::DisplayBuffer(Device *device, bool linear)
+DisplayBuffer::DisplayBuffer(Device *device, int comps)
     : draw_width(0),
       draw_height(0),
       transparent(true), /* todo: determine from background */
-      use_float(linear),
-      rgba_byte(device, "display buffer byte"),
-      rgba_float(device, "display buffer float")
+      components(comps),
+      one_float(device, "display buffer one"),
+      three_float(device, "display buffer three floats"),
+      rgba_float(device, "display buffer four floats")
 {
 }
 
 DisplayBuffer::~DisplayBuffer()
 {
-  rgba_byte.free();
+  one_float.free();
+  three_float.free();
   rgba_float.free();
 }
 
@@ -464,11 +466,14 @@ void DisplayBuffer::reset(BufferParams &params_)
   params = params_;
 
   /* allocate display pixels */
-  if (use_float) {
+  if (components==4) {
     rgba_float.alloc_to_device(params.width, params.height);
   }
+  else if (components==3) {
+    three_float.alloc_to_device(params.width, params.height);
+  }
   else {
-    rgba_byte.alloc_to_device(params.width, params.height);
+    one_float.alloc_to_device(params.width, params.height);
   }
 }
 
@@ -483,7 +488,7 @@ void DisplayBuffer::draw_set(int width, int height)
 void DisplayBuffer::draw(Device *device, const DeviceDrawParams &draw_params)
 {
   if (draw_width != 0 && draw_height != 0) {
-    device_memory &rgba = (use_float) ? (device_memory &)rgba_float : (device_memory &)rgba_byte;
+    device_memory &rgba = components == 4 ? (device_memory &)rgba_float : (components == 3 ? (device_memory&)three_float : (device_memory &)one_float);
 
 	/* TODO [NATHANLOOK] verify drawing code after ogl updates. */
     device->draw_pixels(rgba,
@@ -504,8 +509,7 @@ void DisplayBuffer::draw(Device *device, const DeviceDrawParams &draw_params)
 void* DisplayBuffer::prepare_pixels(Device *device, const DeviceDrawParams &draw_params)
 {
   if (draw_width != 0 && draw_height != 0) {
-    assert(use_float);
-    device_memory &rgba = (device_memory &)rgba_float;
+    device_memory &rgba = components == 4 ? (device_memory &)rgba_float : (components == 3 ? (device_memory&)three_float : (device_memory &)one_float);
 
     device->prepare_pixels(rgba,
                         0,

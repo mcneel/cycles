@@ -68,12 +68,14 @@ class DeviceTask : public Task {
   Type type;
 
   int x, y, w, h, fh;
-  device_ptr rgba_byte;
   device_ptr rgba_float;
   device_ptr buffer;
   int sample;
   int num_samples;
   int offset, stride;
+
+  int pass_type;
+  int pass_components;
 
   device_ptr shader_input;
   device_ptr shader_output;

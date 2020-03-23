@@ -66,10 +66,14 @@ Session::Session(const SessionParams &params_)
   if (params.background && !params.write_render_cb) {
     buffers = NULL;
     display = NULL;
+    normal = NULL;
+    depth = NULL;
   }
   else {
     buffers = new RenderBuffers(device);
-    display = new DisplayBuffer(device, params.display_buffer_linear);
+    display = new DisplayBuffer(device, 4);
+    normal = new DisplayBuffer(device, 3);
+    depth = new DisplayBuffer(device, 1);
   }
 
   session_thread = NULL;
@@ -109,6 +113,7 @@ Session::~Session()
     wait();
   }
 
+  #if 0
   if (params.write_render_cb) {
     /* Copy to display buffer and write out image if requested */
     delete display;
@@ -122,12 +127,15 @@ Session::~Session()
     uchar4 *pixels = display->rgba_byte.copy_from_device(0, w, h);
     params.write_render_cb((uchar *)pixels, w, h, 4);
   }
+  #endif
 
   /* clean up */
   tile_manager.device_free();
 
   delete buffers;
   delete display;
+  delete normal;
+  delete depth;
   delete scene;
   delete device;
 
@@ -977,6 +985,12 @@ void Session::reset_(BufferParams &buffer_params, int samples)
     if (display) {
       display->reset(buffer_params);
     }
+    if (normal) {
+      normal->reset(buffer_params);
+    }
+    if (depth) {
+      depth->reset(buffer_params);
+    }
   }
 
   tile_manager.reset(buffer_params, samples);
@@ -1214,18 +1228,49 @@ void Session::copy_to_display_buffer(int sample)
   task.y = tile_manager.state.buffer.full_y;
   task.w = tile_manager.state.buffer.width;
   task.h = task.fh = tile_manager.state.buffer.height;
-  task.rgba_byte = display->rgba_byte.device_pointer;
+  task.pass_type = PassType::PASS_COMBINED;
   task.rgba_float = display->rgba_float.device_pointer;
   task.buffer = buffers->buffer.device_pointer;
   task.sample = sample;
   tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
 
+  DeviceTask normal_task(DeviceTask::FILM_CONVERT);
+
+  normal_task.x = tile_manager.state.buffer.full_x;
+  normal_task.y = tile_manager.state.buffer.full_y;
+  normal_task.w = tile_manager.state.buffer.width;
+  normal_task.h = normal_task.fh = tile_manager.state.buffer.height;
+  normal_task.pass_type = PassType::PASS_NORMAL;
+  normal_task.rgba_float = normal->three_float.device_pointer;
+  normal_task.buffer = buffers->buffer.device_pointer;
+  normal_task.sample = sample;
+  tile_manager.state.buffer.get_offset_stride(normal_task.offset, normal_task.stride);
+
+  DeviceTask depth_task(DeviceTask::FILM_CONVERT);
+
+  depth_task.x = tile_manager.state.buffer.full_x;
+  depth_task.y = tile_manager.state.buffer.full_y;
+  depth_task.w = tile_manager.state.buffer.width;
+  depth_task.h = depth_task.fh = tile_manager.state.buffer.height;
+  //depth_task.rgba_byte = display->rgba_byte.device_pointer;
+  depth_task.pass_type = PassType::PASS_DEPTH;
+  depth_task.rgba_float = depth->one_float.device_pointer;
+  depth_task.buffer = buffers->buffer.device_pointer;
+  depth_task.sample = sample;
+  tile_manager.state.buffer.get_offset_stride(depth_task.offset, depth_task.stride);
+
   if (task.w > 0 && task.h > 0) {
     device->task_add(task);
+    device->task_wait();
+    device->task_add(normal_task);
+    device->task_wait();
+    device->task_add(depth_task);
     device->task_wait();
 
     /* set display to new size */
     display->draw_set(task.w, task.h);
+    normal->draw_set(task.w, task.h);
+    depth->draw_set(task.w, task.h);
   }
 
   display_outdated = false;

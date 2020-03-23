@@ -94,6 +94,7 @@ void KERNEL_FUNCTION_FULL_NAME(path_trace)(
 
 /* Film */
 
+#if 0
 void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 uchar4 *rgba,
                                                 float *buffer,
@@ -110,11 +111,13 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
   kernel_film_convert_to_byte(kg, rgba, buffer, sample_scale, x, y, height, offset, stride);
 #  endif /* KERNEL_STUB */
 }
+#endif
 
 void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
                                                       float *rgba,
                                                       float *buffer,
                                                       float sample_scale,
+                                                      int pass_type,
                                                       int x,
                                                       int y,
                                                       int height,
@@ -124,7 +127,7 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
 #  ifdef KERNEL_STUB
   STUB_ASSERT(KERNEL_ARCH, convert_to_float);
 #  else
-  kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, x, y, height, offset, stride);
+  kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, pass_type, x, y, height, offset, stride);
 #  endif /* KERNEL_STUB */
 }
 

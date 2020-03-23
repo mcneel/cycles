@@ -442,7 +442,6 @@ class OpenCLDevice : public Device {
 
   void film_convert(DeviceTask &task,
                     device_ptr buffer,
-                    device_ptr rgba_byte,
                     device_ptr rgba_half);
   void shader(DeviceTask &task);
 

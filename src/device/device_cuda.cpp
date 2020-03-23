@@ -1847,7 +1847,6 @@ class CUDADevice : public Device {
 
   void film_convert(DeviceTask &task,
                     device_ptr buffer,
-                    device_ptr rgba_byte,
                     device_ptr rgba_float)
   {
     if (have_error())
@@ -1856,7 +1855,7 @@ class CUDADevice : public Device {
     CUDAContextScope scope(this);
 
     CUfunction cuFilmConvert;
-    CUdeviceptr d_rgba = map_pixels((rgba_byte) ? rgba_byte : rgba_float);
+    CUdeviceptr d_rgba = map_pixels(rgba_float);
     CUdeviceptr d_buffer = cuda_device_ptr(buffer);
 
     /* get kernel function */
@@ -1874,6 +1873,7 @@ class CUDADevice : public Device {
     void *args[] = {&d_rgba,
                     &d_buffer,
                     &sample_scale,
+                    &task.pass_type,
                     &task.x,
                     &task.y,
                     &task.w,
@@ -1906,7 +1906,7 @@ class CUDADevice : public Device {
                                args,
                                0));
 
-    unmap_pixels((rgba_byte) ? rgba_byte : rgba_float);
+    unmap_pixels(rgba_float);
 
     cuda_assert(cuCtxSynchronize());
   }
@@ -2312,7 +2312,7 @@ class CUDADevice : public Device {
 
     if (task.type == DeviceTask::FILM_CONVERT) {
       /* must be done in main thread due to opengl access */
-      film_convert(task, task.buffer, task.rgba_byte, task.rgba_float);
+      film_convert(task, task.buffer, task.rgba_float);
     }
     else {
       task_pool.push(new CUDADeviceTask(this, task));

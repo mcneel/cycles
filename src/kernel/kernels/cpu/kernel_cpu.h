@@ -19,6 +19,7 @@
 void KERNEL_FUNCTION_FULL_NAME(path_trace)(
     KernelGlobals *kg, float *buffer, int sample, int x, int y, int offset, int stride);
 
+#if 0
 void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 uchar4 *rgba,
                                                 float *buffer,
@@ -28,11 +29,13 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_byte)(KernelGlobals *kg,
                                                 int height,
                                                 int offset,
                                                 int stride);
+#endif
 
 void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
                                                       float *rgba,
                                                       float *buffer,
                                                       float sample_scale,
+                                                      int pass_type,
                                                       int x,
                                                       int y,
                                                       int height,

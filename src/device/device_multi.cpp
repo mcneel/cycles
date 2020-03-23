@@ -411,8 +411,8 @@ class MultiDevice : public Device {
 
         if (task.buffer)
           subtask.buffer = sub.ptr_map[task.buffer];
-        if (task.rgba_byte)
-          subtask.rgba_byte = sub.ptr_map[task.rgba_byte];
+        /*if (task.rgba_byte)
+          subtask.rgba_byte = sub.ptr_map[task.rgba_byte];*/
         if (task.rgba_float)
           subtask.rgba_float = sub.ptr_map[task.rgba_float];
         if (task.shader_input)

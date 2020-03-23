@@ -1091,6 +1091,7 @@ class OptiXDevice : public Device {
     void *args[] = {&rgba,
                     &task.buffer,
                     &sample_scale,
+                    &task.pass_type,
                     &task.x,
                     &task.y,
                     &task.w,

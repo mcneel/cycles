@@ -20,12 +20,37 @@ ccl_device float4 film_get_pass_result(KernelGlobals *kg,
                                        ccl_global float *buffer,
                                        float sample_scale,
                                        int index,
-                                       bool use_display_sample_scale)
+                                       bool use_display_sample_scale,
+                                       int display_pass_type)
 {
   float4 pass_result;
 
   int display_pass_stride = kernel_data.film.display_pass_stride;
   int display_pass_components = kernel_data.film.display_pass_components;
+  int pass_flag = (1 << (display_pass_type % 32));
+  if (kernel_data.film.pass_flag & pass_flag) {
+    switch (display_pass_type) {
+      case PASS_COMBINED:
+        display_pass_components = 4;
+        display_pass_stride = kernel_data.film.pass_combined;
+        break;
+      case PASS_NORMAL:
+        display_pass_components = 4;
+        display_pass_stride = kernel_data.film.pass_normal;
+        break;
+      case PASS_DEPTH:
+        display_pass_components = 1;
+        display_pass_stride = kernel_data.film.pass_depth;
+        break;
+    }
+  }
+
+  if (display_pass_type == PASS_COMBINED || display_pass_type == PASS_NORMAL) {
+    display_pass_components = 4;
+  }
+  else if (display_pass_type == PASS_DEPTH) {
+    display_pass_components = 1;
+  }
 
   if (display_pass_components == 4) {
     ccl_global float4 *in = (ccl_global float4 *)(buffer + display_pass_stride +
@@ -80,6 +105,7 @@ ccl_device float4 film_map(KernelGlobals *kg, float4 rgba_in, float scale)
   return result;
 }
 
+#if 0
 ccl_device uchar4 film_float_to_byte(float4 color)
 {
   uchar4 result;
@@ -105,6 +131,7 @@ ccl_device void kernel_film_convert_to_byte(KernelGlobals *kg,
 {
   /* buffer offset */
   int index = offset + x + y * stride;
+  int out_index = offset + (height - (y + 1)) * stride + x;
 
   bool use_display_sample_scale = (kernel_data.film.display_divide_pass_stride == -1);
   float4 rgba_in = film_get_pass_result(kg, buffer, sample_scale, index, use_display_sample_scale);
@@ -113,14 +140,16 @@ ccl_device void kernel_film_convert_to_byte(KernelGlobals *kg,
   float4 float_result = film_map(kg, rgba_in, use_display_sample_scale ? sample_scale : 1.0f);
   uchar4 uchar_result = film_float_to_byte(float_result);
 
-  rgba += index;
+  rgba += out_index;
   *rgba = uchar_result;
 }
+#endif
 
 ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
                                              ccl_global float *rgba,
                                              ccl_global float *buffer,
                                              float sample_scale,
+                                             int pass_type,
                                              int x,
                                              int y,
                                              int height,
@@ -132,10 +161,20 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
   int out_index = offset + (height - (y + 1)) * stride + x;
 
   bool use_display_sample_scale = (kernel_data.film.display_divide_pass_stride == -1);
-  float4 rgba_in = film_get_pass_result(kg, buffer, sample_scale, index, use_display_sample_scale);
-
-  ccl_global float *out = (ccl_global float *)rgba + out_index * 4;
-  float4_store_float(out, rgba_in, use_display_sample_scale ? sample_scale : 1.0f);
+  float4 rgba_in = film_get_pass_result(kg, buffer, sample_scale, index, use_display_sample_scale, pass_type);
+  float scale = use_display_sample_scale ? sample_scale : 1.0f;
+  if (pass_type == PASS_COMBINED) {
+    ccl_global float *out = (ccl_global float *)rgba + out_index * 4;
+    float4_store_float4(out, rgba_in, scale);
+  }
+  else if (pass_type == PASS_NORMAL) {
+    ccl_global float *out = (ccl_global float *)rgba + out_index * 3;
+    float4_store_float3(out, rgba_in, scale);
+  }
+  else if (pass_type == PASS_DEPTH) {
+    ccl_global float *out = (ccl_global float *)rgba + out_index;
+    *out = rgba_in.x * scale; 
+  }
 }
 
 CCL_NAMESPACE_END

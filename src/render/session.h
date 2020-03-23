@@ -134,6 +134,8 @@ class Session {
   Scene *scene;
   RenderBuffers *buffers;
   DisplayBuffer *display;
+  DisplayBuffer *normal;
+  DisplayBuffer *depth;
   Progress progress;
   SessionParams params;
   TileManager tile_manager;

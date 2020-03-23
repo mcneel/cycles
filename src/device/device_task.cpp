@@ -34,7 +34,7 @@ DeviceTask::DeviceTask(Type type_)
       y(0),
       w(0),
       h(0),
-      rgba_byte(0),
+      //rgba_byte(0),
       rgba_float(0),
       buffer(0),
       sample(0),
