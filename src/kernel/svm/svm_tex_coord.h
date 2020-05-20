@@ -138,10 +138,10 @@ ccl_device void svm_node_tex_coord(
   switch (type) {
     case NODE_TEXCO_OBJECT: {
       data = sd->P;
-	  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
-		Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
-		data = transform_point(&tfm, data);
-	  }
+      if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+        Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+        data = transform_point(&tfm, data);
+      }
       if (node.w == 0) {
         if (sd->object != OBJECT_NONE) {
           object_inverse_position_transform(kg, sd, &data);
@@ -152,8 +152,8 @@ ccl_device void svm_node_tex_coord(
         tfm.x = read_node_float(kg, offset);
         tfm.y = read_node_float(kg, offset);
         tfm.z = read_node_float(kg, offset);
-        //data = transform_point(&tfm, data);
-        data = transform_direction(&tfm, data);
+        data = transform_point(&tfm, data);
+        //data = transform_direction(&tfm, data);
       }
       break;
     }
@@ -279,10 +279,10 @@ ccl_device void svm_node_tex_coord_bump_dx(
   switch (type) {
     case NODE_TEXCO_OBJECT: {
       data = sd->P + sd->dP.dx;
-	  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
-		Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
-		data = transform_point(&tfm, data);
-	  }
+      if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+        Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+        data = transform_point(&tfm, data);
+      }
       if (node.w == 0) {
         if (sd->object != OBJECT_NONE) {
           object_inverse_position_transform(kg, sd, &data);
@@ -293,8 +293,8 @@ ccl_device void svm_node_tex_coord_bump_dx(
         tfm.x = read_node_float(kg, offset);
         tfm.y = read_node_float(kg, offset);
         tfm.z = read_node_float(kg, offset);
-        //data = transform_point(&tfm, data);
-        data = transform_direction(&tfm, data);
+        data = transform_point(&tfm, data);
+        //data = transform_direction(&tfm, data);
       }
       break;
     }
@@ -381,10 +381,10 @@ ccl_device void svm_node_tex_coord_bump_dy(
   switch (type) {
     case NODE_TEXCO_OBJECT: {
       data = sd->P + sd->dP.dy;
-	  if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
-		Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
-		data = transform_point(&tfm, data);
-	  }
+      if (sd->object != OBJECT_NONE && kernel_tex_fetch(__objects, sd->object).use_ocs_frame>0)  {
+        Transform tfm = kernel_tex_fetch(__objects, sd->object).ocs_frame;
+        data = transform_point(&tfm, data);
+      }
       if (node.w == 0) {
         if (sd->object != OBJECT_NONE) {
           object_inverse_position_transform(kg, sd, &data);
@@ -395,8 +395,8 @@ ccl_device void svm_node_tex_coord_bump_dy(
         tfm.x = read_node_float(kg, offset);
         tfm.y = read_node_float(kg, offset);
         tfm.z = read_node_float(kg, offset);
-        //data = transform_point(&tfm, data);
-    data = transform_direction(&tfm, data);
+        data = transform_point(&tfm, data);
+        //data = transform_direction(&tfm, data);
       }
       break;
     }
