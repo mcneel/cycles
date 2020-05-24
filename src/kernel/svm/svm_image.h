@@ -66,22 +66,21 @@ ccl_device void svm_node_tex_image(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
   uint co_offset, out_offset, alpha_offset, flags;
+  uint alternate_tiles, decal_usage_offset, tmp3, tmp4;
+  float decalusage;
+
   uint4 node2 = read_node(kg, offset);
 
   svm_unpack_node_uchar4(node.z, &co_offset, &out_offset, &alpha_offset, &flags);
 
+  svm_unpack_node_uchar4(node2.x, &alternate_tiles, &decal_usage_offset, &tmp3, &tmp4);
+
+  decalusage = stack_load_float_default(stack, decal_usage_offset, 0.0f);
+
   float3 co = stack_load_float3(stack, co_offset);
   float2 tex_co;
-  if (node.w == NODE_IMAGE_PROJ_SPHERE) {
-    co = texco_remap_square(co);
-    tex_co = map_to_sphere(co);
-  }
-  else if (node.w == NODE_IMAGE_PROJ_TUBE) {
-    co = texco_remap_square(co);
-    tex_co = map_to_tube(co);
-  }
-  else {
-    if (node2.x != 0) {
+  {
+    if (alternate_tiles != 0) {
       co.x = alternate_tile(co.x);
       co.y = alternate_tile(co.y);
     }
@@ -131,7 +130,21 @@ ccl_device void svm_node_tex_image(
     id = -num_nodes;
   }
 
-  float4 f = svm_image_texture(kg, id, tex_co.x, tex_co.y, flags);
+  float4 f;
+  f = svm_image_texture(kg, id, tex_co.x, tex_co.y, flags);
+
+
+  if(decalusage > 0.0f && co.z < 0.0f)
+    f.w = 0.0f;
+
+#if 0
+  // following used when debugging - pass on coordinates as received
+  // includes potential alternation
+  f.x = co.x;
+  f.y = co.y;
+  f.z = co.z;
+  f.w = 1.0f;
+#endif
 
   if (stack_valid(out_offset))
     stack_store_float3(stack, out_offset, make_float3(f.x, f.y, f.z));

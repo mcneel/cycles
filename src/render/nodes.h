@@ -103,6 +103,8 @@ class ImageTextureNode : public ImageSlotTextureNode {
   }
 
   /* Parameters. */
+
+  /* Rhino mirror alternate tiles in across UV space boundaries. */
   bool alternate_tiles;
   ustring filename;
   void *builtin_data;
@@ -115,6 +117,9 @@ class ImageTextureNode : public ImageSlotTextureNode {
   bool animated;
   float3 vector;
   ccl::vector<int> tiles;
+
+  float decalforward;
+  float decalusage;
 
   /* Runtime. */
   bool is_float;
@@ -911,10 +916,31 @@ class TextureCoordinateNode : public ShaderNode {
     return use_transform;
   }
 
+  void decal_setup(ShaderOutput *out, ShaderNodeType texco_node, NodeTexCoord texcoord, SVMCompiler &compiler);
+
   float3 normal_osl;
   bool from_dupli;
   bool use_transform;
   Transform ob_tfm;
+
+  /* decal origin */
+  float3 decal_origin;
+  /* decal across vector */
+  float3 decal_across;
+  /* decal up vector */
+  float3 decal_up;
+  /* Pxyz transform to map ShaderData->P to normalized mapping primitive */
+  Transform pxyz;
+  /* Nxyz transform to map ShaderData->N to normalized mapping primitive */
+  Transform nxyz;
+  /* UVW transform to map point to UV(W) space*/
+  Transform uvw;
+  /* Sweep used in spherical and tubular projections t. */
+  float horizontal_sweep_start, horizontal_sweep_end, vertical_sweep_start, vertical_sweep_end;
+  /* Height used in tubular, radius in spherical and tubular projections. */
+  float height, radius;
+  /* Projection used by decal: both, forward or backward */
+  NodeImageDecalProjection decal_projection;
 };
 
 class UVMapNode : public ShaderNode {

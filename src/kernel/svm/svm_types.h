@@ -245,6 +245,10 @@ typedef enum NodeTexCoord {
   NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS,
   NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS,
   NODE_TEXCO_ENV_HEMI,
+  NODE_TEXCO_ENV_DECAL_UV,
+  NODE_TEXCO_ENV_DECAL_PLANAR,
+  NODE_TEXCO_ENV_DECAL_SPHERICAL,
+  NODE_TEXCO_ENV_DECAL_CYLINDRICAL,
 } NodeTexCoord;
 
 typedef enum NodeMix {
@@ -460,6 +464,17 @@ typedef enum NodeImageProjection {
   NODE_IMAGE_PROJ_SPHERE = 2,
   NODE_IMAGE_PROJ_TUBE = 3,
 } NodeImageProjection;
+
+typedef enum NodeImageDecalProjection {
+  NODE_IMAGE_DECAL_BOTH = 0,
+  NODE_IMAGE_DECAL_FORWARD = 1,
+  NODE_IMAGE_DECAL_BACKWARD = 2,
+} NodeImageDecalProjection;
+
+typedef enum NodeImageDecalMapSide {
+  NODE_IMAGE_DECAL_MAP_OUTSIDE = 0,
+  NODE_IMAGE_DECAL_MAP_INSIDE = 1,
+} NodeImageDecalMapSide;
 
 typedef enum NodeImageFlags {
   NODE_IMAGE_COMPRESS_AS_SRGB = 1,

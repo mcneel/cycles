@@ -128,6 +128,333 @@ ccl_device_inline float3 get_reflected_incoming_ray(KernelGlobals *kg, ShaderDat
   return refl;
 }
 
+/* Rhino Decal Data */
+typedef struct DecalData{
+  float radius;
+  float height;
+  float3 data;
+  float4 sweeps;
+  Transform pxyz;
+  Transform nxyz;
+  Transform uvw;
+  bool on_correct_side;
+  float3 cur_uv;
+} DecalData;
+
+ccl_device_inline float principal_value_angle_rad(float angleRad)
+{
+  if (angleRad >= M_2PI_F)
+  {
+    angleRad = angleRad - floorf(angleRad / M_2PI_F) * M_2PI_F;
+  }
+  else if (angleRad <= 0.0f)
+  {
+    angleRad = angleRad + ceilf(-angleRad / M_2PI_F) * M_2PI_F;
+  }
+  if (angleRad < 1e-12f)
+    angleRad = 0.0f;
+  if (angleRad > M_2PI_F)
+    angleRad = M_2PI_F;
+  return angleRad;
+}
+
+ccl_device_inline float3 map_to_uv(const float3 co, const DecalData decal)
+{
+  float3 ptUVW;
+  float3 ptPoint = make_float3(decal.cur_uv.x, decal.cur_uv.y, 0.0f);
+  // UV bounds are in sweeps
+  if (decal.sweeps.x <= ptPoint.x && decal.sweeps.y >= ptPoint.x && decal.sweeps.z <= ptPoint.y &&
+      decal.sweeps.w >= ptPoint.y) {
+    ptUVW.x = (ptPoint.x - decal.sweeps.x) / (decal.sweeps.y - decal.sweeps.x);
+    ptUVW.y = (ptPoint.y - decal.sweeps.z) / (decal.sweeps.w - decal.sweeps.z);
+    ptUVW.z = 1.0f;
+  }
+  else {
+    ptUVW.z = -1.0f;
+  }
+
+  return ptUVW;
+}
+
+ccl_device_inline float3 map_to_plane(const float3 co, const DecalData decal)
+{
+  float3 rst = transform_point(&decal.pxyz, co);
+  rst.x = 0.5f * rst.x + 0.5f;
+  rst.y = 0.5f * rst.y + 0.5f;
+
+  rst = transform_point(&decal.uvw, rst);
+  rst.z = 0.0f;
+
+  return rst;
+}
+
+// sweeps.x/y = horizontal start/end
+ccl_device_inline float3 map_to_cylinder_section(const float3 co, const DecalData decal)
+{
+  float len, u, v, hit, t, height;
+  float4 sweeps;
+
+  sweeps = decal.sweeps;
+  height = decal.height;
+
+  float3 rst = transform_point(&decal.pxyz, co);
+
+  hit = u = v = t = 0.0f;
+  len = sqrtf(rst.x * rst.x + rst.y * rst.y);
+  if (len > 0.0f) {
+    t = ((rst.x!=0.0f || rst.y!=0.0f) ? atan2f(rst.y, rst.x) : 0.0f);
+    rst.x = 0.5 * M_1_PI_F * t;
+    if (rst.x < 0.0f) {
+      rst.x += 1.0f;
+    }
+
+    rst.x = clamp(rst.x, 0.0f, 1.0f);
+    rst.y = 0.5f * /*(1.0f / height) **/ rst.z + 0.5f;
+    rst.z = len;
+
+    rst = transform_point(&decal.uvw, rst);
+
+    u = rst.x;
+    v = rst.y;
+
+    float pt_longitude = u * M_2PI_F;
+
+    float sta_longitude = sweeps.x, end_longitude = sweeps.y;
+
+    // Longitudes relative to decal start longitudeitude
+    float rel_decal_sta_longitude = 0.0;
+    float rel_decal_end_longitude = principal_value_angle_rad(end_longitude - sta_longitude);
+    float rel_pt_longitude = principal_value_angle_rad(pt_longitude - sta_longitude);
+
+    // If end and start longitudeitudes have same value then decal is supposed to go around the cylinder
+    if (rel_decal_end_longitude == 0.0)
+      rel_decal_end_longitude = M_2PI_F;
+
+    if (rel_decal_sta_longitude <= rel_pt_longitude && rel_decal_end_longitude >= rel_pt_longitude)
+    {
+      // Scale longitudeitude to texture u-coordinate
+      u = rel_pt_longitude / rel_decal_end_longitude;
+      if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
+        hit = 1.0f;
+      }
+      else {
+        u = v = 0.0f;
+        hit = -1.0f;
+      }
+    }
+    else {
+      u = v = 0.0f;
+      hit = -1.0f;
+    }
+  }
+  else {
+    u = v = 0.0f;
+    hit = -1.0f;
+  }
+  /*
+  if(hit>0.0f) {
+    u = 0.0f;
+    v = 1.0f;
+    hit = 0.0f;
+  } else {
+    u = 1.0f;
+    v = 0.0f;
+    hit = 0.0f;
+  }*/
+  return make_float3(u, v, hit);
+}
+
+ccl_device_inline float3 map_to_sphere_section(const float3 co, const DecalData decal)
+{
+  float r, len, u, v, longitude, latitude, hit;
+  float4 sweeps;
+
+  float3 rst = transform_point(&decal.pxyz, co);
+
+  sweeps = decal.sweeps;
+
+  len = u = v = longitude = latitude = hit = 0.0f;
+
+  r = sqrtf(rst.x * rst.x + rst.y * rst.y + rst.z * rst.z);
+  len = sqrtf(rst.x * rst.x + rst.y * rst.y);
+  if (len > 0.0f) {
+
+    longitude = (rst.y != 0.0f || rst.x != 0.0f) ? atan2f(rst.y, rst.x) : 0.0f;
+    latitude = (rst.z != 0.0f) ? atan2f(rst.z, len) : 0.0f;
+
+    if (latitude > M_PI_F) {
+      latitude -= M_2PI_F;
+    }
+
+    rst.x = 0.5f * longitude * M_1_PI_F;
+    if (rst.x < 1e-12f) {
+      rst.x += 1.0f;
+    }
+    if (rst.x < 0.0f) {
+      rst.x = 0.0f;
+    }
+    else if (rst.x > 1.0f) {
+      rst.x = 1.0f;
+    }
+
+    rst.y = clamp(M_1_PI_F * latitude + 0.5f, 0.0f, 1.0f);
+
+    rst.z = r;
+
+    rst = transform_point(&decal.uvw, rst);
+
+    u = rst.x;
+    v = rst.y;
+
+    // Map u rstordinate to longitude
+    float point_longitude = u * M_2PI_F;
+
+    float long_start = sweeps.x;
+    float long_end = sweeps.y;
+    float lat_start = sweeps.z;
+    float lat_end = sweeps.w;
+
+    // Longitudes relative to decal start longitude
+    float rel_decal_end_longitude = principal_value_angle_rad(long_end - long_start);
+    float rel_point_longitude = principal_value_angle_rad(point_longitude - long_start);
+
+    // If end and start longitudes have same value then decal is supposed to go full circle around
+    // the vertical axis
+    if (rel_decal_end_longitude == 0.0f)
+      rel_decal_end_longitude = M_2PI_F;
+
+    float v_start = M_1_PI_F * lat_start + 0.5f;
+    float v_end = M_1_PI_F * lat_end + 0.5f;
+
+    if (rel_decal_end_longitude >= rel_point_longitude && v_start <= v && v_end >= v) {
+      u = rel_point_longitude / rel_decal_end_longitude;
+      v = (v - v_start) / (v_end - v_start);
+      hit = 1.0f;
+    }
+    else {
+      u = v = 0.0f;
+      hit = -1.0f;
+    }
+  }
+  else {
+    u = v = 0.0f;
+    hit = -1.0f;
+  }
+
+  return make_float3(u, v, hit);
+}
+
+ccl_device_inline void decal_data_read(KernelGlobals *kg, ShaderData *sd, float* stack, uint4 node, int* offset, DecalData* decal, int derivative)
+{
+  uint decal_forward_offset, decal_usage_offset;
+  uint decal_direction;
+  uint decal_map_side;
+  uint type = node.y;
+  uint out_offset = node.z;
+
+  float3 uv = stack_load_float3(stack, out_offset);
+
+  // float decalforward;
+  svm_unpack_node_uchar2(node.w, &decal_forward_offset, &decal_usage_offset);
+  float3 data;
+  if (derivative == 0) {
+    data = sd->P;
+  }
+  else if (derivative == 1) {
+    data = sd->P + sd->dP.dx;
+  }
+  else if (derivative == 2) {
+    data = sd->P + sd->dP.dy;
+  }
+  Transform tfm, itfm, pxyz, nxyz, uvw;
+  float3 n = sd->N;
+  tfm.x = read_node_float(kg, offset);
+  tfm.y = read_node_float(kg, offset);
+  tfm.z = read_node_float(kg, offset);
+  itfm.x = read_node_float(kg, offset);
+  itfm.y = read_node_float(kg, offset);
+  itfm.z = read_node_float(kg, offset);
+  pxyz.x = read_node_float(kg, offset);
+  pxyz.y = read_node_float(kg, offset);
+  pxyz.z = read_node_float(kg, offset);
+  nxyz.x = read_node_float(kg, offset);
+  nxyz.y = read_node_float(kg, offset);
+  nxyz.z = read_node_float(kg, offset);
+  uvw.x = read_node_float(kg, offset);
+  uvw.y = read_node_float(kg, offset);
+  uvw.z = read_node_float(kg, offset);
+
+  decal->pxyz = pxyz;
+  decal->nxyz = nxyz;
+  decal->uvw = uvw;
+
+  uint4 node2 = read_node(kg, offset);
+  svm_unpack_node_uchar2(node2.x, &decal_map_side, &decal_direction);
+
+  decal->radius = __int_as_float(node2.y);
+  decal->height = __int_as_float(node2.z); //  *0.5f;
+  decal->sweeps = read_node_float(kg, offset);
+
+  float4 origin4 = read_node_float(kg, offset);
+  float3 origin = make_float3(origin4.x, origin4.y, origin4.z);
+
+  float4 across4 = read_node_float(kg, offset);
+  float3 across = make_float3(across4.x, across4.y, across4.z);
+
+  float4 decal_up4 = read_node_float(kg, offset);
+  float3 decal_up = make_float3(decal_up4.x, decal_up4.y, decal_up4.z);
+
+  decal->data = data;
+
+  if(type == NODE_TEXCO_ENV_DECAL_UV)
+  {
+    decal->cur_uv.x = uv.x;
+    decal->cur_uv.y = uv.y;
+    decal->data = map_to_uv(data, *decal);
+  }
+  else {
+
+    // transform_direction(&itfm, n);
+    // n = transform_direction(&decal->nxyz, n);
+    float3 crossp = cross(across, decal_up);
+    float dotp = dot(crossp, n);
+    bool inside = dot(n, decal->data - origin) < 0.0f;
+
+    // decal->data = transform_point(&itfm, data);
+
+    decal->on_correct_side = false;
+
+    if (decal_direction == NODE_IMAGE_DECAL_BOTH || type == NODE_TEXCO_ENV_DECAL_UV) {
+      decal->on_correct_side = true;
+    }
+    else if (decal_direction == NODE_IMAGE_DECAL_FORWARD) {
+      switch (type) {
+        case NODE_TEXCO_ENV_DECAL_PLANAR: {
+          decal->on_correct_side = dotp > 0.0f;
+        } break;
+        case NODE_TEXCO_ENV_DECAL_SPHERICAL:
+        case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+          decal->on_correct_side = !inside;
+        } break;
+      }
+    }
+    else {  // forward
+      switch (type) {
+        case NODE_TEXCO_ENV_DECAL_PLANAR: {
+          decal->on_correct_side = dotp < 0.0f;
+        } break;
+        case NODE_TEXCO_ENV_DECAL_SPHERICAL:
+        case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+          decal->on_correct_side = inside;
+        } break;
+      }
+    }
+  }
+
+  // stack_store_float(stack, decal_forward_offset, dotp > 0.0f ? 1.0f : -1.0f);
+  stack_store_float(stack, decal_usage_offset, 1.0f);
+}
+
 ccl_device void svm_node_tex_coord(
     KernelGlobals *kg, ShaderData *sd, int path_flag, float *stack, uint4 node, int *offset)
 {
@@ -153,25 +480,7 @@ ccl_device void svm_node_tex_coord(
         tfm.y = read_node_float(kg, offset);
         tfm.z = read_node_float(kg, offset);
         data = transform_point(&tfm, data);
-        //data = transform_direction(&tfm, data);
       }
-      break;
-    }
-    case NODE_TEXCO_WCS_BOX: {
-      data = sd->P;
-      if (node.w == 0) {
-        if (sd->object != OBJECT_NONE) {
-          object_inverse_position_transform(kg, sd, &data);
-        }
-      }
-      else {
-        Transform tfm;
-        tfm.x = read_node_float(kg, offset);
-        tfm.y = read_node_float(kg, offset);
-        tfm.z = read_node_float(kg, offset);
-        data = transform_direction(&tfm, data);
-      }
-      wcs_box_coord(kg, sd, &data);
       break;
     }
     case NODE_TEXCO_NORMAL: {
@@ -221,6 +530,23 @@ ccl_device void svm_node_tex_coord(
 #endif
       break;
     }
+    case NODE_TEXCO_WCS_BOX: {
+      data = sd->P;
+      if (node.w == 0) {
+        if (sd->object != OBJECT_NONE) {
+          object_inverse_position_transform(kg, sd, &data);
+        }
+      }
+      else {
+        Transform tfm;
+        tfm.x = read_node_float(kg, offset);
+        tfm.y = read_node_float(kg, offset);
+        tfm.z = read_node_float(kg, offset);
+        data = transform_direction(&tfm, data);
+      }
+      wcs_box_coord(kg, sd, &data);
+      break;
+    }
     case NODE_TEXCO_ENV_SPHERICAL: {
       data = get_reflected_incoming_ray(kg, sd);
       data = make_float3(data.y, -data.z, -data.x);
@@ -263,6 +589,43 @@ ccl_device void svm_node_tex_coord(
       data = env_hemispherical(data);
       break;
     }
+    case NODE_TEXCO_ENV_DECAL_UV: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 0);
+      data = decal.data;
+      //data = map_to_uv(data, decal);
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_PLANAR: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 0);
+      data = decal.data;
+      data = map_to_plane(data, decal);
+      if (!(data.x >= 0.0f && data.x <= 1.0f && data.y >= 0 && data.y <= 1.0f) || !decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_SPHERICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 0);
+      data = decal.data;
+      data = map_to_sphere_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 0);
+      data = decal.data;
+      data = map_to_cylinder_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
   }
 
   stack_store_float3(stack, out_offset, data);
@@ -294,25 +657,7 @@ ccl_device void svm_node_tex_coord_bump_dx(
         tfm.y = read_node_float(kg, offset);
         tfm.z = read_node_float(kg, offset);
         data = transform_point(&tfm, data);
-        //data = transform_direction(&tfm, data);
       }
-      break;
-    }
-    case NODE_TEXCO_WCS_BOX: {
-      data = sd->P + sd->dP.dx;
-      if (node.w == 0) {
-        if (sd->object != OBJECT_NONE) {
-          object_inverse_position_transform(kg, sd, &data);
-        }
-      }
-      else {
-        Transform tfm;
-        tfm.x = read_node_float(kg, offset);
-        tfm.y = read_node_float(kg, offset);
-        tfm.z = read_node_float(kg, offset);
-        data = transform_direction(&tfm, data);
-      }
-      wcs_box_coord(kg, sd, &data);
       break;
     }
     case NODE_TEXCO_NORMAL: {
@@ -362,6 +707,107 @@ ccl_device void svm_node_tex_coord_bump_dx(
 #  endif
       break;
     }
+    case NODE_TEXCO_WCS_BOX: {
+      data = sd->P + sd->dP.dx;
+      if (node.w == 0) {
+        if (sd->object != OBJECT_NONE) {
+          object_inverse_position_transform(kg, sd, &data);
+        }
+      }
+      else {
+        Transform tfm;
+        tfm.x = read_node_float(kg, offset);
+        tfm.y = read_node_float(kg, offset);
+        tfm.z = read_node_float(kg, offset);
+        data = transform_direction(&tfm, data);
+      }
+      wcs_box_coord(kg, sd, &data);
+      break;
+    }
+    case NODE_TEXCO_ENV_SPHERICAL: {
+      data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dx;
+      data = make_float3(data.y, -data.z, -data.x);
+      data = env_spherical(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_EMAP: {
+      data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dx;
+      data = make_float3(-data.z, data.x, -data.y);
+      Transform tfm = kernel_data.cam.worldtocamera;
+      data = transform_direction(&tfm, data);
+      data = env_world_emap(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_LIGHTPROBE: {
+      data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dx;
+      data = env_light_probe( data );
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP: {
+      data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dx;
+      data = env_cubemap( data );
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS: {
+      data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dx;
+      data = env_cubemap_vertical_cross( data );
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS: {
+      data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dx;
+      data = env_cubemap_horizontal_cross( data );
+      break;
+    }
+    case NODE_TEXCO_ENV_HEMI: {
+      data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dx;
+      data = make_float3(data.y, -data.z, -data.x);
+      data = env_hemispherical( data );
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_UV: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 0);
+      data = decal.data;
+      //data = map_to_uv(data, decal);
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_PLANAR: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 1);
+      data = decal.data;
+      data = map_to_plane(data, decal);
+      if (!(data.x >= 0.0f && data.x <= 1.0f && data.y >= 0 && data.y <= 1.0f) || !decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_SPHERICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 1);
+      data = decal.data;
+      data = map_to_sphere_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 1);
+      data = decal.data;
+      data = map_to_cylinder_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
   }
 
   stack_store_float3(stack, out_offset, data);
@@ -396,25 +842,7 @@ ccl_device void svm_node_tex_coord_bump_dy(
         tfm.y = read_node_float(kg, offset);
         tfm.z = read_node_float(kg, offset);
         data = transform_point(&tfm, data);
-        //data = transform_direction(&tfm, data);
       }
-      break;
-    }
-    case NODE_TEXCO_WCS_BOX: {
-      data = sd->P + sd->dP.dy;
-      if (node.w == 0) {
-        if (sd->object != OBJECT_NONE) {
-          object_inverse_position_transform(kg, sd, &data);
-        }
-      }
-      else {
-        Transform tfm;
-        tfm.x = read_node_float(kg, offset);
-        tfm.y = read_node_float(kg, offset);
-        tfm.z = read_node_float(kg, offset);
-        data = transform_direction(&tfm, data);
-      }
-      wcs_box_coord(kg, sd, &data);
       break;
     }
     case NODE_TEXCO_NORMAL: {
@@ -464,14 +892,33 @@ ccl_device void svm_node_tex_coord_bump_dy(
 #  endif
       break;
     }
+    case NODE_TEXCO_WCS_BOX: {
+      data = sd->P + sd->dP.dy;
+      if (node.w == 0) {
+        if (sd->object != OBJECT_NONE) {
+          object_inverse_position_transform(kg, sd, &data);
+        }
+      }
+      else {
+        Transform tfm;
+        tfm.x = read_node_float(kg, offset);
+        tfm.y = read_node_float(kg, offset);
+        tfm.z = read_node_float(kg, offset);
+        data = transform_direction(&tfm, data);
+      }
+      wcs_box_coord(kg, sd, &data);
+      break;
+    }
     case NODE_TEXCO_ENV_SPHERICAL: {
       data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dy;
       data = make_float3(data.y, -data.z, -data.x);
       data = env_spherical(data);
       break;
     }
     case NODE_TEXCO_ENV_EMAP: {
       data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dy;
       data = make_float3(-data.z, data.x, -data.y);
       Transform tfm = kernel_data.cam.worldtocamera;
       data = transform_direction(&tfm, data);
@@ -480,28 +927,70 @@ ccl_device void svm_node_tex_coord_bump_dy(
     }
     case NODE_TEXCO_ENV_LIGHTPROBE: {
       data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dy;
       data = env_light_probe( data );
       break;
     }
     case NODE_TEXCO_ENV_CUBEMAP: {
       data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dy;
       data = env_cubemap( data );
       break;
     }
     case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS: {
       data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dy;
       data = env_cubemap_vertical_cross( data );
       break;
     }
     case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS: {
       data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dy;
       data = env_cubemap_horizontal_cross( data );
       break;
     }
     case NODE_TEXCO_ENV_HEMI: {
       data = get_reflected_incoming_ray(kg, sd);
+      data = data + sd->dP.dy;
       data = make_float3(data.y, -data.z, -data.x);
       data = env_hemispherical( data );
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_UV: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 0);
+      data = decal.data;
+      //data = map_to_uv(data, decal);
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_PLANAR: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 2);
+      data = decal.data;
+      data = map_to_plane(data, decal);
+      if (!(data.x >= 0.0f && data.x <= 1.0f && data.y >= 0 && data.y <= 1.0f) || !decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_SPHERICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 2);
+      data = decal.data;
+      data = map_to_sphere_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, offset, &decal, 2);
+      data = decal.data;
+      data = map_to_cylinder_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
       break;
     }
   }

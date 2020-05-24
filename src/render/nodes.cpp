@@ -267,6 +267,8 @@ NODE_DEFINE(ImageTextureNode)
   SOCKET_FLOAT(projection_blend, "Projection Blend", 0.0f);
 
   SOCKET_IN_POINT(vector, "Vector", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_UV);
+  SOCKET_IN_FLOAT(decalforward, "DecalForward", 0.5f);
+  SOCKET_IN_FLOAT(decalusage, "DecalUsage", 0.0f);
 
   SOCKET_OUT_COLOR(color, "Color");
   SOCKET_OUT_FLOAT(alpha, "Alpha");
@@ -447,6 +449,17 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
                                                flags),
                         projection);
 
+      ShaderInput* decalusage_input = input("DecalUsage");
+      // add information about alternate tiles. In Rhino box projection isn't used.
+      // so add support only here
+      uint encode = compiler.encode_uchar4(
+            alternate_tiles ? 1 : 0,
+            compiler.stack_assign_if_linked(decalusage_input),
+            0,
+            0
+            );
+      compiler.add_node(encode);
+
       if (num_nodes > 0) {
         for (int i = 0; i < num_nodes; i++) {
           int4 node;
@@ -463,9 +476,6 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
           compiler.add_node(node.x, node.y, node.z, node.w);
         }
       }
-      // add information about alternate tiles. In Rhino box projection isn't used.
-      // so add support only here
-      compiler.add_node(alternate_tiles ? 1 : 0);
     }
     else {
       assert(slots.size() == 1);
@@ -3824,6 +3834,19 @@ NODE_DEFINE(TextureCoordinateNode)
                    make_float3(0.0f, 0.0f, 0.0f),
                    SocketType::LINK_NORMAL | SocketType::OSL_INTERNAL);
 
+  SOCKET_FLOAT(horizontal_sweep_start, "Horizontal Sweep Start", 0.0);
+  SOCKET_FLOAT(horizontal_sweep_end, "Horizontal Sweep End", 1.0);
+  SOCKET_FLOAT(vertical_sweep_start, "Vertical Sweep Start", 0.0);
+  SOCKET_FLOAT(vertical_sweep_end, "Vertical Sweep End", 1.0);
+  SOCKET_FLOAT(height, "Height", 1.0);
+  SOCKET_FLOAT(radius, "Radius", 1.0);
+
+  static NodeEnum decal_projection_enum;
+  decal_projection_enum.insert("both", NODE_IMAGE_DECAL_BOTH);
+  decal_projection_enum.insert("forward", NODE_IMAGE_DECAL_FORWARD);
+  decal_projection_enum.insert("backward", NODE_IMAGE_DECAL_BACKWARD);
+  SOCKET_ENUM(decal_projection, "Decal Direction", decal_projection_enum, NODE_IMAGE_DECAL_BOTH);
+
   SOCKET_OUT_POINT(generated, "Generated");
   SOCKET_OUT_NORMAL(normal, "Normal");
   SOCKET_OUT_POINT(UV, "UV");
@@ -3841,6 +3864,13 @@ NODE_DEFINE(TextureCoordinateNode)
   SOCKET_OUT_POINT(envcubemapverticalcross, "EnvCubemapVerticalCross");
   SOCKET_OUT_POINT(envcubemaphorizontalcross, "EnvCubemapHorizontalCross");
   SOCKET_OUT_POINT(envhemi, "EnvHemi");
+  SOCKET_OUT_POINT(decaluv, "DecalUv");
+  SOCKET_OUT_POINT(decalplanar, "DecalPlanar");
+  SOCKET_OUT_POINT(decalspherical, "DecalSpherical");
+  SOCKET_OUT_POINT(decalcylindrical, "DecalCylindrical");
+
+  SOCKET_OUT_FLOAT(decalforward, "DecalForward");
+  SOCKET_OUT_FLOAT(decalusage, "DecalUsage");
 
   return type;
 }
@@ -3857,6 +3887,8 @@ void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attr
         attributes->add(ATTR_STD_GENERATED);
       if (!output("UV")->links.empty())
         attributes->add(ATTR_STD_UV);
+      if (!output("DecalUv")->links.empty())
+        attributes->add(ustring("uvmap"));
     }
   }
 
@@ -3871,6 +3903,42 @@ void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attr
   ShaderNode::attributes(shader, attributes);
 }
 
+
+void TextureCoordinateNode::decal_setup(ShaderOutput *out, ShaderNodeType texco_node, NodeTexCoord texcoord, SVMCompiler &compiler)
+{
+  ShaderOutput *decalforward_out = output("DecalForward");
+  ShaderOutput *decalusage_out = output("DecalUsage");
+  uint encoded = compiler.encode_uchar4(compiler.stack_assign_if_linked(decalforward_out),
+                                        compiler.stack_assign_if_linked(decalusage_out));
+  compiler.add_node(texco_node, texcoord, compiler.stack_assign(out), encoded);
+  Transform ob_itfm = transform_inverse(ob_tfm);
+  compiler.add_node(ob_tfm.x);
+  compiler.add_node(ob_tfm.y);
+  compiler.add_node(ob_tfm.z);
+  compiler.add_node(ob_itfm.x);
+  compiler.add_node(ob_itfm.y);
+  compiler.add_node(ob_itfm.z);
+  compiler.add_node(pxyz.x);
+  compiler.add_node(pxyz.y);
+  compiler.add_node(pxyz.z);
+  compiler.add_node(nxyz.x);
+  compiler.add_node(nxyz.y);
+  compiler.add_node(nxyz.z);
+  compiler.add_node(uvw.x);
+  compiler.add_node(uvw.y);
+  compiler.add_node(uvw.z);
+  // add information about alternate tiles. In Rhino box projection isn't used.
+  // so add support only here
+  uint encode = compiler.encode_uchar4(0, decal_projection);
+  compiler.add_node(encode, __float_as_int(radius), __float_as_int(height));
+  // further add decal sweeps
+  compiler.add_node(make_float4(
+      horizontal_sweep_start, horizontal_sweep_end, vertical_sweep_start, vertical_sweep_end));
+  compiler.add_node(make_float4(decal_origin.x, decal_origin.y, decal_origin.z, 0.0f));
+  compiler.add_node(make_float4(decal_across.x, decal_across.y, decal_across.z, 0.0f));
+  compiler.add_node(make_float4(decal_up.x, decal_up.y, decal_up.z, 0.0f));
+}
+
 void TextureCoordinateNode::compile(SVMCompiler &compiler)
 {
   ShaderOutput *out;
@@ -3878,6 +3946,7 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
   ShaderNodeType attr_node = NODE_ATTR;
   ShaderNodeType geom_node = NODE_GEOMETRY;
 
+  // temporarily disable
   if (bump == SHADER_BUMP_DX) {
     texco_node = NODE_TEX_COORD_BUMP_DX;
     attr_node = NODE_ATTR_BUMP_DX;
@@ -3928,10 +3997,9 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
   if (!out->links.empty()) {
     compiler.add_node(texco_node, NODE_TEXCO_OBJECT, compiler.stack_assign(out), use_transform);
     if (use_transform) {
-      Transform ob_itfm = transform_inverse(ob_tfm);
-      compiler.add_node(ob_itfm.x);
-      compiler.add_node(ob_itfm.y);
-      compiler.add_node(ob_itfm.z);
+      compiler.add_node(ob_tfm.x);
+      compiler.add_node(ob_tfm.y);
+      compiler.add_node(ob_tfm.z);
     }
   }
 
@@ -4004,6 +4072,28 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
   out = output( "EnvHemi" );
   if( !out->links.empty() ) {
     compiler.add_node(texco_node, NODE_TEXCO_ENV_HEMI, compiler.stack_assign(out));
+  }
+
+  out = output( "DecalUv" );
+  if (!out->links.empty()) {
+    int attr = compiler.attribute(ustring("uvmap")); //ATTR_STD_UV);
+    compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_UV, compiler);
+  }
+
+  out = output( "DecalPlanar" );
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_PLANAR, compiler);
+  }
+
+  out = output( "DecalSpherical" );
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_SPHERICAL, compiler);
+  }
+
+  out = output( "DecalCylindrical" );
+  if( !out->links.empty() ) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_CYLINDRICAL, compiler);
   }
 
 }
