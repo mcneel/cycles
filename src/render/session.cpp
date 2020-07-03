@@ -68,12 +68,14 @@ Session::Session(const SessionParams &params_)
     display = NULL;
     normal = NULL;
     depth = NULL;
+    albedo = NULL;
   }
   else {
     buffers = new RenderBuffers(device);
     display = new DisplayBuffer(device, 4);
     normal = new DisplayBuffer(device, 3);
     depth = new DisplayBuffer(device, 1);
+    albedo = new DisplayBuffer(device, 3);
   }
 
   session_thread = NULL;
@@ -136,6 +138,7 @@ Session::~Session()
   delete display;
   delete normal;
   delete depth;
+  delete albedo;
   delete scene;
   delete device;
 
@@ -991,6 +994,9 @@ void Session::reset_(BufferParams &buffer_params, int samples)
     if (depth) {
       depth->reset(buffer_params);
     }
+    if (albedo) {
+      albedo->reset(buffer_params);
+    }
   }
 
   tile_manager.reset(buffer_params, samples);
@@ -1252,25 +1258,45 @@ void Session::copy_to_display_buffer(int sample)
   depth_task.y = tile_manager.state.buffer.full_y;
   depth_task.w = tile_manager.state.buffer.width;
   depth_task.h = depth_task.fh = tile_manager.state.buffer.height;
-  //depth_task.rgba_byte = display->rgba_byte.device_pointer;
   depth_task.pass_type = PassType::PASS_DEPTH;
   depth_task.rgba_float = depth->one_float.device_pointer;
   depth_task.buffer = buffers->buffer.device_pointer;
   depth_task.sample = sample;
   tile_manager.state.buffer.get_offset_stride(depth_task.offset, depth_task.stride);
 
-  if (task.w > 0 && task.h > 0) {
-    device->task_add(task);
-    device->task_wait();
-    device->task_add(normal_task);
-    device->task_wait();
-    device->task_add(depth_task);
-    device->task_wait();
+  DeviceTask albedo_task(DeviceTask::FILM_CONVERT);
 
-    /* set display to new size */
-    display->draw_set(task.w, task.h);
-    normal->draw_set(task.w, task.h);
-    depth->draw_set(task.w, task.h);
+  albedo_task.x = tile_manager.state.buffer.full_x;
+  albedo_task.y = tile_manager.state.buffer.full_y;
+  albedo_task.w = tile_manager.state.buffer.width;
+  albedo_task.h = albedo_task.fh = tile_manager.state.buffer.height;
+  albedo_task.pass_type = PassType::PASS_DIFFUSE_COLOR;
+  albedo_task.rgba_float = albedo->three_float.device_pointer;
+  albedo_task.buffer = buffers->buffer.device_pointer;
+  albedo_task.sample = sample;
+  tile_manager.state.buffer.get_offset_stride(albedo_task.offset, albedo_task.stride);
+
+  if (task.w > 0 && task.h > 0) {
+    if (Pass::contains(tile_manager.params.passes, PassType::PASS_COMBINED)) {
+		device->task_add(task);
+		device->task_wait();
+		display->draw_set(task.w, task.h);
+    }
+    if (Pass::contains(tile_manager.params.passes, PassType::PASS_NORMAL)) {
+		device->task_add(normal_task);
+		device->task_wait();
+		normal->draw_set(task.w, task.h);
+    }
+    if (Pass::contains(tile_manager.params.passes, PassType::PASS_DEPTH)) {
+		device->task_add(depth_task);
+		device->task_wait();
+		depth->draw_set(task.w, task.h);
+    }
+    if (Pass::contains(tile_manager.params.passes, PassType::PASS_DIFFUSE_COLOR)) {
+		device->task_add(albedo_task);
+		device->task_wait();
+		albedo->draw_set(task.w, task.h);
+    }
   }
 
   display_outdated = false;

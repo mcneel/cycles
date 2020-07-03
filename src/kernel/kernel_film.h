@@ -45,12 +45,23 @@ ccl_device float4 film_get_pass_result(KernelGlobals *kg,
     }
   }
 
-  if (display_pass_type == PASS_COMBINED || display_pass_type == PASS_NORMAL) {
+  if (display_pass_type > PASS_CATEGORY_MAIN_END) {
+    if (kernel_data.film.light_pass_flag & pass_flag) {
+      switch (display_pass_type) {
+        case PASS_DIFFUSE_COLOR:
+          display_pass_components = 4;
+          display_pass_stride = kernel_data.film.pass_diffuse_color;
+          break;
+      }
+    }
+  }
+
+  /*if (display_pass_type == PASS_COMBINED || display_pass_type == PASS_NORMAL || display_pass_type == PASS_DIFFUSE_COLOR) {
     display_pass_components = 4;
   }
   else if (display_pass_type == PASS_DEPTH) {
     display_pass_components = 1;
-  }
+  }*/
 
   if (display_pass_components == 4) {
     ccl_global float4 *in = (ccl_global float4 *)(buffer + display_pass_stride +
@@ -62,6 +73,12 @@ ccl_device float4 film_get_pass_result(KernelGlobals *kg,
     pass_result = make_float4(in->x, in->y, in->z, alpha);
 
     int display_divide_pass_stride = kernel_data.film.display_divide_pass_stride;
+
+    if (display_pass_type == PASS_DIFFUSE_COLOR) {
+      display_divide_pass_stride = display_pass_stride;
+      alpha = 1.0f;
+    }
+
     if (display_divide_pass_stride != -1) {
       ccl_global float4 *divide_in = (ccl_global float4 *)(buffer + display_divide_pass_stride +
                                                            index * kernel_data.film.pass_stride);
@@ -167,7 +184,7 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
     ccl_global float *out = (ccl_global float *)rgba + out_index * 4;
     float4_store_float4(out, rgba_in, scale);
   }
-  else if (pass_type == PASS_NORMAL) {
+  else if (pass_type == PASS_NORMAL || pass_type == PASS_DIFFUSE_COLOR) {
     ccl_global float *out = (ccl_global float *)rgba + out_index * 3;
     float4_store_float3(out, rgba_in, scale);
   }

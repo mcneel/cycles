@@ -136,6 +136,7 @@ class Session {
   DisplayBuffer *display;
   DisplayBuffer *normal;
   DisplayBuffer *depth;
+  DisplayBuffer *albedo;
   Progress progress;
   SessionParams params;
   TileManager tile_manager;
