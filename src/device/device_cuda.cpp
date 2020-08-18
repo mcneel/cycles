@@ -958,7 +958,7 @@ class CUDADevice : public Device {
   void mem_alloc(device_memory &mem)
   {
     if (mem.type == MEM_PIXELS && !background) {
-      pixels_alloc(mem);
+      generic_alloc(mem); // Original pixels_alloc(mem); fails often with CUDA interop errors. Using generic_alloc() for now.
     }
     else if (mem.type == MEM_TEXTURE) {
       assert(!"mem_alloc not supported for textures.");
