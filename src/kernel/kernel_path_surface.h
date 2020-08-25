@@ -367,7 +367,7 @@ ccl_device_forceinline bool path_clip_ray(
    * clipped by planes adjust ray position and iterate
    * for next potential hit.
    */
-  if ((state->flag & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+  //if ((state->flag & PATH_RAY_SHADOW) == PATH_RAY_CAMERA) {
     for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
       float4 cpeq = kernel_tex_fetch(__clipping_planes, cpi);
       float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
@@ -388,7 +388,7 @@ ccl_device_forceinline bool path_clip_ray(
         return true;
       }
     }
-  }
+  //}
   state->prev_P = make_float3(FLT_MAX, FLT_MAX, FLT_MAX);
   state->prev_prim = PRIM_NONE;
   state->clip_depth = 0;
