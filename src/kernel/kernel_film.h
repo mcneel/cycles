@@ -186,11 +186,11 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
   }
   else if (pass_type == PASS_NORMAL || pass_type == PASS_DIFFUSE_COLOR) {
     ccl_global float *out = (ccl_global float *)rgba + out_index * 3;
-    float4_store_float3(out, rgba_in, scale);
+    float4_store_float3(out, rgba_in, 1.0f);
   }
   else if (pass_type == PASS_DEPTH) {
     ccl_global float *out = (ccl_global float *)rgba + out_index;
-    *out = rgba_in.x * scale; 
+    *out = rgba_in.x;
   }
 }
 
