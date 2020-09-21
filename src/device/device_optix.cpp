@@ -1082,11 +1082,10 @@ class OptiXDevice : public Device {
     CUfunction film_convert_func;
     check_result_cuda(cuModuleGetFunction(&film_convert_func,
                                           cuda_module,
-                                          task.rgba_byte ? "kernel_cuda_convert_to_byte" :
-                                                           "kernel_cuda_convert_to_float"));
+                                          "kernel_cuda_convert_to_float"));
 
     float sample_scale = 1.0f / (task.sample + 1);
-    CUdeviceptr rgba = (task.rgba_byte ? task.rgba_byte : task.rgba_float);
+    CUdeviceptr rgba = task.rgba_float;
 
     void *args[] = {&rgba,
                     &task.buffer,
