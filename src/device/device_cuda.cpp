@@ -988,7 +988,7 @@ class CUDADevice : public Device {
 
   void mem_copy_from(device_memory &mem, int y, int w, int h, int elem)
   {
-    if (mem.type == MEM_PIXELS && !background) {
+    if (false && mem.type == MEM_PIXELS && !background) {
       pixels_copy_from(mem, y, w, h);
     }
     else if (mem.type == MEM_TEXTURE) {
@@ -1033,7 +1033,7 @@ class CUDADevice : public Device {
   void mem_free(device_memory &mem)
   {
     if (mem.type == MEM_PIXELS && !background) {
-      pixels_free(mem);
+      generic_free(mem); //pixels_free(mem);
     }
     else if (mem.type == MEM_TEXTURE) {
       tex_free(mem);
@@ -1855,7 +1855,7 @@ class CUDADevice : public Device {
     CUDAContextScope scope(this);
 
     CUfunction cuFilmConvert;
-    CUdeviceptr d_rgba = map_pixels(rgba_float);
+    CUdeviceptr d_rgba = rgba_float; //map_pixels(rgba_float);
     CUdeviceptr d_buffer = cuda_device_ptr(buffer);
 
     /* get kernel function */
@@ -1906,7 +1906,7 @@ class CUDADevice : public Device {
                                args,
                                0));
 
-    unmap_pixels(rgba_float);
+    //unmap_pixels(rgba_float);
 
     cuda_assert(cuCtxSynchronize());
   }
