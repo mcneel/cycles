@@ -613,7 +613,7 @@ OpenCLDevice::OpenCLDevice(DeviceInfo &info, Stats &stats, Profiler &profiler, b
   cqCommandQueue = NULL;
   device_initialized = false;
   textures_need_update = true;
-  use_preview_kernels = !background;
+  use_preview_kernels = false; // jesterKing: Rhino doesn't do preview kernels
 
   vector<OpenCLPlatformDevice> usable_devices;
   OpenCLInfo::get_usable_devices(&usable_devices);
@@ -850,6 +850,8 @@ void OpenCLDevice::load_preview_kernels()
 
 bool OpenCLDevice::wait_for_availability(const DeviceRequestedFeatures &requested_features)
 {
+  load_kernel_task_pool.wait_work();
+#ifdef WEDONTUSETHIS
   if (background) {
     load_kernel_task_pool.wait_work();
     use_preview_kernels = false;
@@ -862,6 +864,7 @@ bool OpenCLDevice::wait_for_availability(const DeviceRequestedFeatures &requeste
       use_preview_kernels = !load_kernel_task_pool.finished();
     }
   }
+#endif
   return split_kernel->load_kernels(requested_features);
 }
 

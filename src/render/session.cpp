@@ -825,6 +825,7 @@ DeviceRequestedFeatures Session::get_requested_device_features()
   /* TODO(sergey): Consider moving this to the Scene level. */
   DeviceRequestedFeatures requested_features;
   requested_features.experimental = params.experimental;
+#ifdef WEDONTUSETHIS
 
   scene->shader_manager->get_requested_features(scene, &requested_features);
 
@@ -865,13 +866,27 @@ DeviceRequestedFeatures Session::get_requested_device_features()
     requested_features.use_denoising = true;
     requested_features.use_shadow_tricks = true;
   }
+#endif
 
   // always enable these for RhinoCycles
+  requested_features.max_nodes_group = NODE_GROUP_LEVEL_MAX;
+  requested_features.nodes_features = NODE_FEATURE_ALL;
+
+  requested_features.use_hair = false;
+  requested_features.use_object_motion = false;
+  requested_features.use_camera_motion = false;
+  requested_features.use_baking = false;
+  requested_features.use_subsurface = true;
+  requested_features.use_volume = true;
+  requested_features.use_integrator_branched = false;
+  requested_features.use_patch_evaluation = false;
+  requested_features.use_transparent = true;
   requested_features.use_shadow_tricks = true;
   requested_features.use_principled = true;
-  requested_features.use_subsurface = true;
-  requested_features.use_transparent = true;
-  requested_features.use_volume = true;
+  requested_features.use_denoising = false;
+  requested_features.use_shader_raytrace = false; // set to true if/when we add AmbientOcclusion and Bevel nodes
+  requested_features.use_true_displacement = true;
+  requested_features.use_background_light = false;
 
   return requested_features;
 }
