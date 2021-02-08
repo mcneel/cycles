@@ -100,6 +100,24 @@ void OpenCLDevice::enable_default_features(DeviceRequestedFeatures &features)
     features.use_camera_motion = false;
     features.use_object_motion = false;
   }
+  features.max_nodes_group = NODE_GROUP_LEVEL_MAX;
+  features.nodes_features = NODE_FEATURE_ALL;
+
+  features.use_hair = false;
+  features.use_object_motion = false;
+  features.use_camera_motion = false;
+  features.use_baking = false;
+  features.use_subsurface = true;
+  features.use_volume = true;
+  features.use_integrator_branched = false;
+  features.use_patch_evaluation = false;
+  features.use_transparent = true;
+  features.use_shadow_tricks = true;
+  features.use_principled = true;
+  features.use_denoising = false;
+  features.use_shader_raytrace = false; // set to true if/when we add AmbientOcclusion and Bevel nodes
+  features.use_true_displacement = true;
+  features.use_background_light = false;
 }
 
 string OpenCLDevice::get_build_options(const DeviceRequestedFeatures &requested_features,
