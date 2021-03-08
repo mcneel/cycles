@@ -442,7 +442,7 @@ static void xml_read_mesh(const XMLReadState &state, xml_node node)
     }
 
     if (xml_read_float_array(UV, node, "UV")) {
-      ustring name = ustring("UVMap");
+      ustring name = ustring("uvmap1");
       Attribute *attr = mesh->attributes.add(ATTR_STD_UV, name);
       float2 *fdata = attr->data_float2();
 
@@ -490,7 +490,7 @@ static void xml_read_mesh(const XMLReadState &state, xml_node node)
 
     /* uv map */
     if (xml_read_float_array(UV, node, "UV")) {
-      ustring name = ustring("UVMap");
+      ustring name = ustring("uvmap1");
       Attribute *attr = mesh->subd_attributes.add(ATTR_STD_UV, name);
       float3 *fdata = attr->data_float3();
 

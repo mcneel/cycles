@@ -3886,9 +3886,9 @@ void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attr
       if (!output("Generated")->links.empty())
         attributes->add(ATTR_STD_GENERATED);
       if (!output("UV")->links.empty())
-        attributes->add(ATTR_STD_UV);
+        attributes->add(uvmap.length()==0?ustring("uvmap1"): uvmap);
       if (!output("DecalUv")->links.empty())
-        attributes->add(ustring("uvmap"));
+        attributes->add(uvmap.length()==0?ustring("uvmap1"): uvmap);
     }
   }
 
@@ -3988,7 +3988,7 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
       compiler.add_node(texco_node, NODE_TEXCO_DUPLI_UV, compiler.stack_assign(out));
     }
     else {
-      int attr = compiler.attribute(ATTR_STD_UV);
+      int attr = compiler.attribute(uvmap.length()==0?ustring("uvmap1") : uvmap);
       compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
     }
   }
@@ -4075,8 +4075,9 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
   }
 
   out = output( "DecalUv" );
+
   if (!out->links.empty()) {
-    int attr = compiler.attribute(ustring("uvmap")); //ATTR_STD_UV);
+    int attr = compiler.attribute(uvmap.length()==0?ustring("uvmap1"): uvmap);
     compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
     decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_UV, compiler);
   }

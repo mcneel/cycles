@@ -916,6 +916,19 @@ class TextureCoordinateNode : public ShaderNode {
     return use_transform;
   }
 
+  virtual bool equals(const ShaderNode &other)
+  {
+    const TextureCoordinateNode &texco_node = (const TextureCoordinateNode &)other;
+    return ShaderNode::equals(other) && uvmap == texco_node.uvmap &&
+           decal_origin == texco_node.decal_origin && decal_across == texco_node.decal_across &&
+           decal_up == texco_node.decal_up && pxyz == texco_node.pxyz && nxyz == texco_node.nxyz &&
+           uvw == texco_node.uvw && horizontal_sweep_start == texco_node.horizontal_sweep_start &&
+           horizontal_sweep_end == texco_node.horizontal_sweep_end &&
+           vertical_sweep_start == texco_node.vertical_sweep_start &&
+           vertical_sweep_end == texco_node.vertical_sweep_end && height == texco_node.height &&
+           radius == texco_node.radius && decal_projection && texco_node.decal_projection;
+  }
+
   void decal_setup(ShaderOutput *out, ShaderNodeType texco_node, NodeTexCoord texcoord, SVMCompiler &compiler);
 
   float3 normal_osl;
@@ -941,6 +954,8 @@ class TextureCoordinateNode : public ShaderNode {
   float height, radius;
   /* Projection used by decal: both, forward or backward */
   NodeImageDecalProjection decal_projection;
+  /* UV Map to use, used for Decals */
+  ustring uvmap;
 };
 
 class UVMapNode : public ShaderNode {
