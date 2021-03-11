@@ -1293,24 +1293,26 @@ void Session::copy_to_display_buffer(int sample)
 
   if (task.w > 0 && task.h > 0) {
     if (Pass::contains(tile_manager.params.passes, PassType::PASS_COMBINED)) {
-		device->task_add(task);
-		device->task_wait();
-		display->draw_set(task.w, task.h);
+      device->task_add(task);
+      device->task_wait();
+      display->draw_set(task.w, task.h);
     }
-    if (Pass::contains(tile_manager.params.passes, PassType::PASS_NORMAL)) {
-		device->task_add(normal_task);
-		device->task_wait();
-		normal->draw_set(task.w, task.h);
-    }
-    if (Pass::contains(tile_manager.params.passes, PassType::PASS_DEPTH)) {
-		device->task_add(depth_task);
-		device->task_wait();
-		depth->draw_set(task.w, task.h);
+    if (sample <= 1) {
+      if (Pass::contains(tile_manager.params.passes, PassType::PASS_NORMAL)) {
+        device->task_add(normal_task);
+        device->task_wait();
+        normal->draw_set(task.w, task.h);
+      }
+      if (Pass::contains(tile_manager.params.passes, PassType::PASS_DEPTH)) {
+        device->task_add(depth_task);
+        device->task_wait();
+        depth->draw_set(task.w, task.h);
+      }
     }
     if (Pass::contains(tile_manager.params.passes, PassType::PASS_DIFFUSE_COLOR)) {
-		device->task_add(albedo_task);
-		device->task_wait();
-		albedo->draw_set(task.w, task.h);
+      device->task_add(albedo_task);
+      device->task_wait();
+      albedo->draw_set(task.w, task.h);
     }
   }
 
