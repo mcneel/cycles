@@ -1248,7 +1248,10 @@ void Session::copy_to_display_buffer(int sample)
   task.x = tile_manager.state.buffer.full_x;
   task.y = tile_manager.state.buffer.full_y;
   task.w = tile_manager.state.buffer.width;
+  task.pixel_size = tile_manager.state.buffer.resolution_divider;
   task.h = task.fh = tile_manager.state.buffer.height;
+  task.full_w = tile_manager.state.buffer.original_full_width;
+  task.full_h = tile_manager.state.buffer.original_full_height;
   task.pass_type = PassType::PASS_COMBINED;
   task.rgba_float = display->rgba_float.device_pointer;
   task.buffer = buffers->buffer.device_pointer;
@@ -1260,7 +1263,10 @@ void Session::copy_to_display_buffer(int sample)
   normal_task.x = tile_manager.state.buffer.full_x;
   normal_task.y = tile_manager.state.buffer.full_y;
   normal_task.w = tile_manager.state.buffer.width;
+  normal_task.pixel_size = tile_manager.state.buffer.resolution_divider;
   normal_task.h = normal_task.fh = tile_manager.state.buffer.height;
+  normal_task.full_w = tile_manager.state.buffer.original_full_width;
+  normal_task.full_h = tile_manager.state.buffer.original_full_height;
   normal_task.pass_type = PassType::PASS_NORMAL;
   normal_task.rgba_float = normal->three_float.device_pointer;
   normal_task.buffer = buffers->buffer.device_pointer;
@@ -1272,7 +1278,10 @@ void Session::copy_to_display_buffer(int sample)
   depth_task.x = tile_manager.state.buffer.full_x;
   depth_task.y = tile_manager.state.buffer.full_y;
   depth_task.w = tile_manager.state.buffer.width;
+  depth_task.pixel_size = tile_manager.state.buffer.resolution_divider;
   depth_task.h = depth_task.fh = tile_manager.state.buffer.height;
+  depth_task.full_w = tile_manager.state.buffer.original_full_width;
+  depth_task.full_h = tile_manager.state.buffer.original_full_height;
   depth_task.pass_type = PassType::PASS_DEPTH;
   depth_task.rgba_float = depth->one_float.device_pointer;
   depth_task.buffer = buffers->buffer.device_pointer;
@@ -1284,7 +1293,10 @@ void Session::copy_to_display_buffer(int sample)
   albedo_task.x = tile_manager.state.buffer.full_x;
   albedo_task.y = tile_manager.state.buffer.full_y;
   albedo_task.w = tile_manager.state.buffer.width;
+  albedo_task.pixel_size = tile_manager.state.buffer.resolution_divider;
   albedo_task.h = albedo_task.fh = tile_manager.state.buffer.height;
+  albedo_task.full_w = tile_manager.state.buffer.original_full_width;
+  albedo_task.full_h = tile_manager.state.buffer.original_full_height;
   albedo_task.pass_type = PassType::PASS_DIFFUSE_COLOR;
   albedo_task.rgba_float = albedo->three_float.device_pointer;
   albedo_task.buffer = buffers->buffer.device_pointer;

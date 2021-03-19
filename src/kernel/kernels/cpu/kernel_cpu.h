@@ -40,7 +40,10 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
                                                       int y,
                                                       int height,
                                                       int offset,
-                                                      int stride);
+                                                      int stride,
+                                                      int fullw,
+                                                      int fullh,
+                                                      int pixelsize);
 
 void KERNEL_FUNCTION_FULL_NAME(shader)(KernelGlobals *kg,
                                        uint4 *input,

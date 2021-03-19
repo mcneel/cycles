@@ -67,7 +67,7 @@ class DeviceTask : public Task {
   typedef enum { RENDER, FILM_CONVERT, SHADER } Type;
   Type type;
 
-  int x, y, w, h, fh;
+  int x, y, w, h, fh, full_w, full_h, pixel_size;
   device_ptr rgba_float;
   device_ptr buffer;
   int sample;

@@ -138,13 +138,13 @@ kernel_cuda_convert_to_byte(uchar4 *rgba, float *buffer, float sample_scale, int
 
 extern "C" __global__ void
 CUDA_LAUNCH_BOUNDS(CUDA_THREADS_BLOCK_WIDTH, CUDA_KERNEL_MAX_REGISTERS)
-kernel_cuda_convert_to_float(float *rgba, float *buffer, float sample_scale, int pass_type, int sx, int sy, int sw, int sh, int height, int offset, int stride)
+kernel_cuda_convert_to_float(float *rgba, float *buffer, float sample_scale, int pass_type, int sx, int sy, int sw, int sh, int height, int offset, int stride, int fullw, int fullh, int pixelsize)
 {
 	int x = sx + blockDim.x*blockIdx.x + threadIdx.x;
 	int y = sy + blockDim.y*blockIdx.y + threadIdx.y;
 
 	if(x < sx + sw && y < sy + sh)
-		kernel_film_convert_to_float(NULL, rgba, buffer, sample_scale, pass_type, x, y, height, offset, stride);
+		kernel_film_convert_to_float(NULL, rgba, buffer, sample_scale, pass_type, x, y, height, offset, stride, fullw, fullh, pixelsize);
 }
 
 #endif

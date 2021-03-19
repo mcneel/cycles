@@ -1855,7 +1855,7 @@ class CUDADevice : public Device {
     CUDAContextScope scope(this);
 
     CUfunction cuFilmConvert;
-    CUdeviceptr d_rgba = rgba_float; //map_pixels(rgba_float);
+    CUdeviceptr d_rgba = /* rgba_float; */ map_pixels(rgba_float);
     CUdeviceptr d_buffer = cuda_device_ptr(buffer);
 
     /* get kernel function */
@@ -1880,7 +1880,10 @@ class CUDADevice : public Device {
                     &task.h,
                     &task.fh,
                     &task.offset,
-                    &task.stride};
+                    &task.stride,
+                    &task.full_w,
+                    &task.full_h,
+                    &task.pixel_size};
 
     /* launch kernel */
     int threads_per_block;
@@ -1906,7 +1909,7 @@ class CUDADevice : public Device {
                                args,
                                0));
 
-    //unmap_pixels(rgba_float);
+    unmap_pixels(rgba_float);
 
     cuda_assert(cuCtxSynchronize());
   }
