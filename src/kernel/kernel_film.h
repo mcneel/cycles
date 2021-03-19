@@ -171,26 +171,74 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
                                              int y,
                                              int height,
                                              int offset,
-                                             int stride)
+                                             int stride,
+                                             int full_width,
+                                             int full_height,
+                                             int pixel_size)
 {
   /* buffer offset */
-  int index = offset + x + y * stride;
-  int out_index = offset + (height - (y + 1)) * stride + x;
+  int input_index = offset + x + y * stride;
+
+  /* ADD HERE EXPANDING of pixel into target buffer. Take into account
+   * target buffer width and height. Ensure we don't write beyond the
+   * width and height of the target buffer to keep result correct
+   *
+   * NEEDED:
+   * full width (full_stride)
+   * full height
+   * pixel size (resolution)
+   *
+   */
+  /* offset into target buffer */
+  int new_y = min(full_width, y * pixel_size + pixel_size);
+  int out_index = offset + x * pixel_size + (full_height - new_y) * full_width;
+
+  int expand_x = x*pixel_size + pixel_size;
+  int expand_y = y*pixel_size + pixel_size;
+
+  if(expand_x > full_width) {
+    expand_x = full_width % pixel_size;
+  } else {
+    expand_x = pixel_size;
+  }
+  if(expand_y > full_height) {
+    expand_y = full_height % pixel_size;
+  } else {
+    expand_y = pixel_size;
+  }
 
   bool use_display_sample_scale = (kernel_data.film.display_divide_pass_stride == -1);
-  float4 rgba_in = film_get_pass_result(kg, buffer, sample_scale, index, use_display_sample_scale, pass_type);
+  float4 rgba_in = film_get_pass_result(kg, buffer, sample_scale, input_index, use_display_sample_scale, pass_type);
   float scale = use_display_sample_scale ? sample_scale : 1.0f;
   if (pass_type == PASS_COMBINED) {
     ccl_global float *out = (ccl_global float *)rgba + out_index * 4;
-    float4_store_float4(out, rgba_in, scale);
+    for (int write_x = 0; write_x < expand_x; write_x++) {
+      for (int write_y = 0; write_y < expand_y; write_y++) {
+        float *final_out = out + write_x * 4 + write_y * full_width * 4;
+        float4_store_float4(final_out, rgba_in, scale);
+      }
+    }
   }
   else if (pass_type == PASS_NORMAL || pass_type == PASS_DIFFUSE_COLOR) {
+    if(pass_type == PASS_NORMAL) {
+      scale = 1.0f;
+	}
     ccl_global float *out = (ccl_global float *)rgba + out_index * 3;
-    float4_store_float3(out, rgba_in, 1.0f);
+    for (int write_x = 0; write_x < expand_x; write_x++) {
+      for (int write_y = 0; write_y < expand_y; write_y++) {
+        float* final_out = out + write_x * 3 + write_y * full_width * 3;
+		float4_store_float3(final_out, rgba_in, scale);
+      }
+    }
   }
   else if (pass_type == PASS_DEPTH) {
     ccl_global float *out = (ccl_global float *)rgba + out_index;
-    *out = rgba_in.x;
+    for (int write_x = 0; write_x < expand_x; write_x++) {
+      for (int write_y = 0; write_y < expand_y; write_y++) {
+        float* final_out = out + write_x + write_y * full_width;
+		*final_out = rgba_in.x;
+      }
+    }
   }
 }
 

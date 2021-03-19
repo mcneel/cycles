@@ -48,6 +48,9 @@ class BufferParams {
   int full_y;
   int full_width;
   int full_height;
+  int original_full_width;
+  int original_full_height;
+  int resolution_divider;
 
   /* passes */
   vector<Pass> passes;

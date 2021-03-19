@@ -179,7 +179,7 @@ class CPUDevice : public Device {
   DeviceRequestedFeatures requested_features;
 
   KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> path_trace_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, float *, float *, float, int, int, int, int, int, int)>
+  KernelFunctions<void (*)(KernelGlobals *, float *, float *, float, int, int, int, int, int, int, int, int, int)>
       convert_to_float_kernel;
   //KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int, int)>
   //    convert_to_byte_kernel;
@@ -970,7 +970,10 @@ class CPUDevice : public Device {
                                     y,
                                     task.fh,
                                     task.offset,
-                                    task.stride);
+                                    task.stride,
+                                    task.full_w,
+                                    task.full_h,
+                                    task.pixel_size);
     /*}
     else {
       for (int y = task.y; y < task.y + task.h; y++)

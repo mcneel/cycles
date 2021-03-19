@@ -122,12 +122,15 @@ void KERNEL_FUNCTION_FULL_NAME(convert_to_float)(KernelGlobals *kg,
                                                       int y,
                                                       int height,
                                                       int offset,
-                                                      int stride)
+                                                      int stride,
+                                                      int full_w,
+                                                      int full_h,
+                                                      int pixel_size)
 {
 #  ifdef KERNEL_STUB
   STUB_ASSERT(KERNEL_ARCH, convert_to_float);
 #  else
-  kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, pass_type, x, y, height, offset, stride);
+  kernel_film_convert_to_float(kg, rgba, buffer, sample_scale, pass_type, x, y, height, offset, stride, full_w, full_h, pixel_size);
 #  endif /* KERNEL_STUB */
 }
 

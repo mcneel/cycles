@@ -1880,7 +1880,10 @@ class CUDADevice : public Device {
                     &task.h,
                     &task.fh,
                     &task.offset,
-                    &task.stride};
+                    &task.stride,
+                    &task.full_w,
+                    &task.full_h,
+                    &task.pixel_size};
 
     /* launch kernel */
     int threads_per_block;

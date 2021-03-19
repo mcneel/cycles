@@ -1388,6 +1388,9 @@ void OpenCLDevice::film_convert(DeviceTask &task,
   cl_int d_w = task.w;
   cl_int d_h = task.h;
   cl_int d_fh = task.fh;
+  cl_int d_fullw = task.full_w;
+  cl_int d_fullh = task.full_h;
+  cl_int d_pixelsize = task.pixel_size;
   cl_float d_sample_scale = 1.0f / (task.sample + 1);
   cl_int d_offset = task.offset;
   cl_int d_stride = task.stride;
@@ -1408,7 +1411,10 @@ void OpenCLDevice::film_convert(DeviceTask &task,
                                      d_h,
                                      d_fh,
                                      d_offset,
-                                     d_stride);
+                                     d_stride,
+                                     d_fullw,
+                                     d_fullh,
+                                     d_pixelsize);
 
   enqueue_kernel(ckFilmConvertKernel, d_w, d_h);
 }

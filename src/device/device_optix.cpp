@@ -1097,7 +1097,10 @@ class OptiXDevice : public Device {
                     &task.h,
                     &task.fh,
                     &task.offset,
-                    &task.stride};
+                    &task.stride,
+                    &task.full_w,
+                    &task.full_h,
+                    &task.pixel_size};
 
     int threads_per_block;
     check_result_cuda(cuFuncGetAttribute(

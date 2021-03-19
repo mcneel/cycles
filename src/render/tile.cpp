@@ -382,6 +382,9 @@ void TileManager::set_tiles()
   state.buffer.full_y = params.full_y / resolution;
   state.buffer.full_width = max(1, params.full_width / resolution);
   state.buffer.full_height = max(1, params.full_height / resolution);
+  state.buffer.original_full_width = params.full_width;
+  state.buffer.original_full_height = params.full_height;
+  state.buffer.resolution_divider = resolution;
 }
 
 int TileManager::get_neighbor_index(int index, int neighbor)
