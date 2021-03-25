@@ -178,19 +178,9 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
 {
   /* buffer offset */
   int input_index = offset + x + y * stride;
-  int out_index = offset + x + (height - (y + 1)) * stride;
 
-  /* ADD HERE EXPANDING of pixel into target buffer. Take into account
-   * target buffer width and height. Ensure we don't write beyond the
-   * width and height of the target buffer to keep result correct
-   *
-   * NEEDED:
-   * full width (full_stride)
-   * full height
-   * pixel size (resolution)
-   *
-   */
   /* offset into target buffer */
+  int out_index = offset + x + (height - (y + 1)) * full_width;
   int expand_x = 1;
   int expand_y = 1;
   if (pixel_size > 1) {
@@ -207,7 +197,7 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
     ccl_global float *out = (ccl_global float *)rgba + out_index * 4;
     for (int write_x = 0; write_x < expand_x; write_x++) {
       for (int write_y = 0; write_y < expand_y; write_y++) {
-        float *final_out = out + write_x * 4 + write_y * full_width * 4;
+        ccl_global float *final_out = out + write_x * 4 + write_y * full_width * 4;
         float4_store_float4(final_out, rgba_in, scale);
       }
     }
@@ -219,7 +209,7 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
     ccl_global float *out = (ccl_global float *)rgba + out_index * 3;
     for (int write_x = 0; write_x < expand_x; write_x++) {
       for (int write_y = 0; write_y < expand_y; write_y++) {
-        float* final_out = out + write_x * 3 + write_y * full_width * 3;
+        ccl_global float* final_out = out + write_x * 3 + write_y * full_width * 3;
 		float4_store_float3(final_out, rgba_in, scale);
       }
     }
@@ -228,7 +218,7 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
     ccl_global float *out = (ccl_global float *)rgba + out_index;
     for (int write_x = 0; write_x < expand_x; write_x++) {
       for (int write_y = 0; write_y < expand_y; write_y++) {
-        float* final_out = out + write_x + write_y * full_width;
+        ccl_global float* final_out = out + write_x + write_y * full_width;
 		*final_out = rgba_in.x;
       }
     }
