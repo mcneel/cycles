@@ -178,6 +178,7 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
 {
   /* buffer offset */
   int input_index = offset + x + y * stride;
+  int out_index = offset + x + (height - (y + 1)) * stride;
 
   /* ADD HERE EXPANDING of pixel into target buffer. Take into account
    * target buffer width and height. Ensure we don't write beyond the
@@ -190,20 +191,12 @@ ccl_device void kernel_film_convert_to_float(KernelGlobals *kg,
    *
    */
   /* offset into target buffer */
-  int new_y = min(full_width, y * pixel_size + pixel_size);
-  int out_index = offset + x * pixel_size + (full_height - new_y) * full_width;
-
-  int expand_x = x*pixel_size + pixel_size;
-  int expand_y = y*pixel_size + pixel_size;
-
-  if(expand_x > full_width) {
-    expand_x = full_width % pixel_size;
-  } else {
+  int expand_x = 1;
+  int expand_y = 1;
+  if (pixel_size > 1) {
+    int new_y = y * pixel_size;
+    out_index = offset + x * pixel_size + (full_height - (new_y + pixel_size)) * full_width;
     expand_x = pixel_size;
-  }
-  if(expand_y > full_height) {
-    expand_y = full_height % pixel_size;
-  } else {
     expand_y = pixel_size;
   }
 
