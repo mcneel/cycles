@@ -513,8 +513,8 @@ void* DisplayBuffer::prepare_pixels(Device *device, const DeviceDrawParams &draw
 
     device->prepare_pixels(rgba,
                         0,
-                        draw_width,
-                        draw_height,
+                        params.full_width, //draw_width,
+                        params.full_height, //draw_height,
                         params.full_x,
                         params.full_y,
                         params.width,
