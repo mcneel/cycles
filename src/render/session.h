@@ -133,10 +133,7 @@ class Session {
   Device *device;
   Scene *scene;
   RenderBuffers *buffers;
-  DisplayBuffer *display;
-  DisplayBuffer *normal;
-  DisplayBuffer *depth;
-  DisplayBuffer *albedo;
+  std::unordered_map<ccl::PassType, DisplayBuffer *> display_buffers = {};
   Progress progress;
   SessionParams params;
   TileManager tile_manager;

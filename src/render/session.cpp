@@ -65,17 +65,13 @@ Session::Session(const SessionParams &params_)
 
   if (params.background && !params.write_render_cb) {
     buffers = NULL;
-    display = NULL;
-    normal = NULL;
-    depth = NULL;
-    albedo = NULL;
+    display_buffers[ccl::PassType::PASS_COMBINED] = nullptr;
   }
   else {
     buffers = new RenderBuffers(device);
-    display = new DisplayBuffer(device, 4);
-    normal = new DisplayBuffer(device, 3);
-    depth = new DisplayBuffer(device, 1);
-    albedo = new DisplayBuffer(device, 3);
+    for (const auto pass : tile_manager.params.passes) {
+      display_buffers[pass.type] = new DisplayBuffer(device, pass.components);
+    }
   }
 
   session_thread = NULL;
@@ -135,10 +131,12 @@ Session::~Session()
   tile_manager.device_free();
 
   delete buffers;
-  delete display;
-  delete normal;
-  delete depth;
-  delete albedo;
+
+  for(auto& n : display_buffers) {
+    delete n.second;
+  }
+  display_buffers.clear();
+
   delete scene;
   delete device;
 
@@ -194,7 +192,7 @@ bool Session::draw_gpu(BufferParams &buffer_params, DeviceDrawParams &draw_param
   if (gpu_draw_ready) {
     /* then verify the buffers have the expected size, so we don't
      * draw previous results in a resized window */
-    if (!buffer_params.modified(display->params)) {
+    if (!buffer_params.modified(display_buffers[ccl::PassType::PASS_COMBINED]->params)) {
       /* for CUDA we need to do tone-mapping still, since we can
        * only access GL buffers from the main thread. */
       if (gpu_need_display_buffer_update) {
@@ -204,7 +202,7 @@ bool Session::draw_gpu(BufferParams &buffer_params, DeviceDrawParams &draw_param
         gpu_need_display_buffer_update_cond.notify_all();
       }
 
-      display->draw(device, draw_params);
+      display_buffers[ccl::PassType::PASS_COMBINED]->draw(device, draw_params);
 
       if (display_outdated && (time_dt() - reset_time) > params.text_timeout)
         return false;
@@ -260,7 +258,7 @@ int Session::sample_gpu()
     if (!device->error_message().empty())
       progress.set_error(device->error_message());
 
-    if (display != nullptr || !params.background) {
+    if (display_buffers[ccl::PassType::PASS_COMBINED] != nullptr || !params.background) {
       thread_scoped_lock display_lock(display_mutex);
       // tonemap(tile_manager.state.sample);
       copy_to_display_buffer(tile_manager.state.sample);
@@ -426,11 +424,11 @@ bool Session::draw_cpu(BufferParams &buffer_params, DeviceDrawParams &draw_param
   thread_scoped_lock display_lock(display_mutex);
 
   /* first check we already rendered something */
-  if (display->draw_ready()) {
+  if (display_buffers[ccl::PassType::PASS_COMBINED]->draw_ready()) {
     /* then verify the buffers have the expected size, so we don't
      * draw previous results in a resized window */
-    if (!buffer_params.modified(display->params)) {
-      display->draw(device, draw_params);
+    if (!buffer_params.modified(display_buffers[ccl::PassType::PASS_COMBINED]->params)) {
+      display_buffers[ccl::PassType::PASS_COMBINED]->draw(device, draw_params);
 
       if (display_outdated && (time_dt() - reset_time) > params.text_timeout)
         return false;
@@ -659,7 +657,7 @@ int Session::sample_cpu()
     if (!device->error_message().empty())
       progress.set_error(device->error_message());
 
-    if (display != nullptr || !params.background) {
+    if (display_buffers[ccl::PassType::PASS_COMBINED] != nullptr || !params.background) {
       thread_scoped_lock display_lock(display_mutex);
       /* TODO [NATHANLOOK] Figure out tonemap changes. */
       // tonemap(tile_manager.state.sample);
@@ -1000,17 +998,20 @@ void Session::reset_(BufferParams &buffer_params, int samples)
   if (buffers && buffer_params.modified(tile_manager.params)) {
     gpu_draw_ready = false;
     buffers->reset(buffer_params);
-    if (display) {
-      display->reset(buffer_params);
+    for (auto &n : display_buffers) {
+      if (ccl::Pass::contains(buffer_params.passes, n.first)) {
+        n.second->reset(buffer_params);
+      }
+      else {
+        delete n.second;
+      }
     }
-    if (normal) {
-      normal->reset(buffer_params);
-    }
-    if (depth) {
-      depth->reset(buffer_params);
-    }
-    if (albedo) {
-      albedo->reset(buffer_params);
+    for (auto p : buffer_params.passes) {
+      auto dbit = display_buffers.find(p.type);
+      if (dbit == display_buffers.end()) {
+        display_buffers[p.type] = new DisplayBuffer(device, p.components);
+        display_buffers[p.type]->reset(buffer_params);
+      }
     }
   }
 
@@ -1243,88 +1244,43 @@ void Session::render()
 void Session::copy_to_display_buffer(int sample)
 {
   /* add film conversion task */
-  DeviceTask task(DeviceTask::FILM_CONVERT);
+  for (auto &n : display_buffers) {
+    if (n.second != nullptr) {
+      DeviceTask task(DeviceTask::FILM_CONVERT);
 
-  task.x = tile_manager.state.buffer.full_x;
-  task.y = tile_manager.state.buffer.full_y;
-  task.w = tile_manager.state.buffer.width;
-  task.pixel_size = tile_manager.state.buffer.resolution_divider;
-  task.h = task.fh = tile_manager.state.buffer.height;
-  task.full_w = tile_manager.state.buffer.original_full_width;
-  task.full_h = tile_manager.state.buffer.original_full_height;
-  task.pass_type = PassType::PASS_COMBINED;
-  task.rgba_float = display->rgba_float.device_pointer;
-  task.buffer = buffers->buffer.device_pointer;
-  task.sample = sample;
-  tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
+      task.x = tile_manager.state.buffer.full_x;
+      task.y = tile_manager.state.buffer.full_y;
+      task.w = tile_manager.state.buffer.width;
+      task.pixel_size = tile_manager.state.buffer.resolution_divider;
+      task.h = task.fh = tile_manager.state.buffer.height;
+      task.full_w = tile_manager.state.buffer.original_full_width;
+      task.full_h = tile_manager.state.buffer.original_full_height;
+      task.pass_type = n.first;
 
-  DeviceTask normal_task(DeviceTask::FILM_CONVERT);
+	  task.rgba_float = 0;
 
-  normal_task.x = tile_manager.state.buffer.full_x;
-  normal_task.y = tile_manager.state.buffer.full_y;
-  normal_task.w = tile_manager.state.buffer.width;
-  normal_task.pixel_size = tile_manager.state.buffer.resolution_divider;
-  normal_task.h = normal_task.fh = tile_manager.state.buffer.height;
-  normal_task.full_w = tile_manager.state.buffer.original_full_width;
-  normal_task.full_h = tile_manager.state.buffer.original_full_height;
-  normal_task.pass_type = PassType::PASS_NORMAL;
-  normal_task.rgba_float = normal->three_float.device_pointer;
-  normal_task.buffer = buffers->buffer.device_pointer;
-  normal_task.sample = sample;
-  tile_manager.state.buffer.get_offset_stride(normal_task.offset, normal_task.stride);
-
-  DeviceTask depth_task(DeviceTask::FILM_CONVERT);
-
-  depth_task.x = tile_manager.state.buffer.full_x;
-  depth_task.y = tile_manager.state.buffer.full_y;
-  depth_task.w = tile_manager.state.buffer.width;
-  depth_task.pixel_size = tile_manager.state.buffer.resolution_divider;
-  depth_task.h = depth_task.fh = tile_manager.state.buffer.height;
-  depth_task.full_w = tile_manager.state.buffer.original_full_width;
-  depth_task.full_h = tile_manager.state.buffer.original_full_height;
-  depth_task.pass_type = PassType::PASS_DEPTH;
-  depth_task.rgba_float = depth->one_float.device_pointer;
-  depth_task.buffer = buffers->buffer.device_pointer;
-  depth_task.sample = sample;
-  tile_manager.state.buffer.get_offset_stride(depth_task.offset, depth_task.stride);
-
-  DeviceTask albedo_task(DeviceTask::FILM_CONVERT);
-
-  albedo_task.x = tile_manager.state.buffer.full_x;
-  albedo_task.y = tile_manager.state.buffer.full_y;
-  albedo_task.w = tile_manager.state.buffer.width;
-  albedo_task.pixel_size = tile_manager.state.buffer.resolution_divider;
-  albedo_task.h = albedo_task.fh = tile_manager.state.buffer.height;
-  albedo_task.full_w = tile_manager.state.buffer.original_full_width;
-  albedo_task.full_h = tile_manager.state.buffer.original_full_height;
-  albedo_task.pass_type = PassType::PASS_DIFFUSE_COLOR;
-  albedo_task.rgba_float = albedo->three_float.device_pointer;
-  albedo_task.buffer = buffers->buffer.device_pointer;
-  albedo_task.sample = sample;
-  tile_manager.state.buffer.get_offset_stride(albedo_task.offset, albedo_task.stride);
-
-  if (task.w > 0 && task.h > 0) {
-    if (Pass::contains(tile_manager.params.passes, PassType::PASS_COMBINED)) {
-      device->task_add(task);
-      device->task_wait();
-      display->draw_set(task.w, task.h);
-    }
-    if (sample <= 1) {
-      if (Pass::contains(tile_manager.params.passes, PassType::PASS_NORMAL)) {
-        device->task_add(normal_task);
-        device->task_wait();
-        normal->draw_set(task.w, task.h);
+      for (const ccl::Pass pass : tile_manager.params.passes) {
+        if (pass.type == n.first) {
+          if (pass.components == 4) {
+            task.rgba_float = n.second->rgba_float.device_pointer;
+          }
+          else if (pass.components == 3) {
+            task.rgba_float = n.second->three_float.device_pointer;
+          }
+          else if (pass.components == 1) {
+            task.rgba_float = n.second->one_float.device_pointer;
+		  }
+		  break;
+        }
       }
-      if (Pass::contains(tile_manager.params.passes, PassType::PASS_DEPTH)) {
-        device->task_add(depth_task);
+      task.buffer = buffers->buffer.device_pointer;
+      task.sample = sample;
+      tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
+      if (task.rgba_float != 0 && task.w > 0 && task.h > 0) {
+        device->task_add(task);
         device->task_wait();
-        depth->draw_set(task.w, task.h);
+        n.second->draw_set(task.w, task.h);
       }
-    }
-    if (Pass::contains(tile_manager.params.passes, PassType::PASS_DIFFUSE_COLOR)) {
-      device->task_add(albedo_task);
-      device->task_wait();
-      albedo->draw_set(task.w, task.h);
     }
   }
 
