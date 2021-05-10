@@ -69,7 +69,7 @@ Session::Session(const SessionParams &params_)
   }
   else {
     buffers = new RenderBuffers(device);
-    for (const auto pass : tile_manager.params.passes) {
+    for (const ccl::Pass& pass : tile_manager.params.passes) {
       display_buffers[pass.type] = new DisplayBuffer(device, pass.components);
     }
   }
@@ -1259,7 +1259,7 @@ void Session::copy_to_display_buffer(int sample)
 
 	  task.rgba_float = 0;
 
-      for (const ccl::Pass pass : tile_manager.params.passes) {
+      for (const ccl::Pass& pass : tile_manager.params.passes) {
         if (pass.type == n.first) {
           if (pass.components == 4) {
             task.rgba_float = n.second->rgba_float.device_pointer;
