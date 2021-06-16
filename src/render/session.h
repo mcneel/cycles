@@ -149,7 +149,7 @@ class Session {
   void start();
   bool draw(BufferParams &params, DeviceDrawParams &draw_params);
   void wait();
-  void prepare_run();
+  void prepare_run(BufferParams &params, int samples);
   void end_run();
   int sample();
 

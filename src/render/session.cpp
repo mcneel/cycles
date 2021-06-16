@@ -954,8 +954,10 @@ void Session::run()
     progress.set_update();
 }
 
-void Session::prepare_run()
+void Session::prepare_run(BufferParams &params, int samples)
 {
+  delayed_reset.params = params;
+  delayed_reset.samples = samples;
   /* session thread loop */
   progress.set_status("Waiting for render to start");
 
@@ -1243,23 +1245,26 @@ void Session::render()
 
 void Session::copy_to_display_buffer(int sample)
 {
+  if (sample < 0)
+    return;
   /* add film conversion task */
   for (auto &n : display_buffers) {
     if (n.second != nullptr) {
       DeviceTask task(DeviceTask::FILM_CONVERT);
 
-      task.x = tile_manager.state.buffer.full_x;
-      task.y = tile_manager.state.buffer.full_y;
-      task.w = tile_manager.state.buffer.width;
       task.pixel_size = tile_manager.state.buffer.resolution_divider;
+      bool onepixel = task.pixel_size == 1;
+      task.x = onepixel ? 0 : tile_manager.state.buffer.full_x;
+      task.y = onepixel ? 0 : tile_manager.state.buffer.full_y;
+      task.w = tile_manager.state.buffer.width;
       task.h = task.fh = tile_manager.state.buffer.height;
-      task.full_w = tile_manager.state.buffer.original_full_width;
-      task.full_h = tile_manager.state.buffer.original_full_height;
+      task.full_w = onepixel ? tile_manager.state.buffer.width : tile_manager.state.buffer.original_full_width;
+      task.full_h = onepixel ? tile_manager.state.buffer.height : tile_manager.state.buffer.original_full_height;
       task.pass_type = n.first;
 
-	  task.rgba_float = 0;
+      task.rgba_float = 0;
 
-      for (const ccl::Pass& pass : tile_manager.params.passes) {
+      for (const ccl::Pass &pass : tile_manager.params.passes) {
         if (pass.type == n.first) {
           if (pass.components == 4) {
             task.rgba_float = n.second->rgba_float.device_pointer;
@@ -1269,13 +1274,14 @@ void Session::copy_to_display_buffer(int sample)
           }
           else if (pass.components == 1) {
             task.rgba_float = n.second->one_float.device_pointer;
-		  }
-		  break;
+          }
+          break;
         }
       }
       task.buffer = buffers->buffer.device_pointer;
       task.sample = sample;
       tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
+      task.offset = 0;
       if (task.rgba_float != 0 && task.w > 0 && task.h > 0) {
         device->task_add(task);
         device->task_wait();
