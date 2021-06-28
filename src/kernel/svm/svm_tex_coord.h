@@ -555,7 +555,11 @@ ccl_device void svm_node_tex_coord(
     }
     case NODE_TEXCO_ENV_EMAP: {
       data = get_reflected_incoming_ray(kg, sd);
-      data = env_emap_act(data);
+      Transform tfm = kernel_data.cam.worldtocamera;
+      data = transform_direction(&tfm, data);
+      // rhino camera scaled 1, -1, -1, so take that into account
+      data = make_float3(data.x, -data.y, -data.z);
+      data = env_world_emap(data);
       break;
     }
     case NODE_TEXCO_ENV_BOX: {
@@ -734,9 +738,10 @@ ccl_device void svm_node_tex_coord_bump_dx(
     case NODE_TEXCO_ENV_EMAP: {
       data = get_reflected_incoming_ray(kg, sd);
       data = data + sd->dP.dx;
-      data = make_float3(-data.z, data.x, -data.y);
       Transform tfm = kernel_data.cam.worldtocamera;
       data = transform_direction(&tfm, data);
+      // rhino camera scaled 1, -1, -1, so take that into account
+      data = make_float3(data.x, -data.y, -data.z);
       data = env_world_emap(data);
       break;
     }
@@ -919,9 +924,10 @@ ccl_device void svm_node_tex_coord_bump_dy(
     case NODE_TEXCO_ENV_EMAP: {
       data = get_reflected_incoming_ray(kg, sd);
       data = data + sd->dP.dy;
-      data = make_float3(-data.z, data.x, -data.y);
       Transform tfm = kernel_data.cam.worldtocamera;
       data = transform_direction(&tfm, data);
+      // rhino camera scaled 1, -1, -1, so take that into account
+      data = make_float3(data.x, -data.y, -data.z);
       data = env_world_emap(data);
       break;
     }
