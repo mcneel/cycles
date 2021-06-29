@@ -260,7 +260,7 @@ ccl_device_forceinline bool kernel_path_shader_apply(KernelGlobals *kg,
   PROFILING_INIT(kg, PROFILING_SHADER_APPLY);
 
 #ifdef __SHADOW_TRICKS__
-  if ((sd->object_flag & SD_OBJECT_SHADOW_CATCHER)) {
+  if ((sd->object_flag & SD_OBJECT_SHADOW_CATCHER) && (sd->flag & SD_BACKFACING)!=SD_BACKFACING) {
     if (state->flag & PATH_RAY_TRANSPARENT_BACKGROUND) {
       state->flag |= (PATH_RAY_SHADOW_CATCHER | PATH_RAY_STORE_SHADOW_INFO);
 
