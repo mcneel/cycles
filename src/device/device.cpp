@@ -568,6 +568,7 @@ vector<DeviceType> Device::available_types()
   return types;
 }
 
+#ifdef _WIN32
 class CyclesDriverCrashException : std::exception
 {
 public:
@@ -595,6 +596,7 @@ public:
         : old_SE_translator{ _set_se_translator( new_SE_translator ) } {}
     ~CrashTranslatorHelper() noexcept { _set_se_translator( old_SE_translator ); }
 };
+#endif
 
 vector<DeviceInfo> Device::available_devices(uint mask)
 {
