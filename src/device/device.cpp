@@ -19,8 +19,8 @@
 
 #ifdef _WIN32
 #include <eh.h>
-#include <exception>
 #endif
+#include <exception>
 
 #include "device/device.h"
 #include "device/device_intern.h"
@@ -568,7 +568,6 @@ vector<DeviceType> Device::available_types()
   return types;
 }
 
-#ifdef _WIN32
 class CyclesDriverCrashException : std::exception
 {
 public:
@@ -580,6 +579,8 @@ public:
 private:
   unsigned int m_nVDE;
 };
+
+#ifdef _WIN32
 
 static
 void crash_translator_function(unsigned int eCode, EXCEPTION_POINTERS*)
