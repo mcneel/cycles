@@ -17,6 +17,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <eh.h>
+#include <exception>
+#endif
+
 #include "device/device.h"
 #include "device/device_intern.h"
 
@@ -563,6 +568,34 @@ vector<DeviceType> Device::available_types()
   return types;
 }
 
+class CyclesDriverCrashException : std::exception
+{
+public:
+  CyclesDriverCrashException() : m_nVDE(-1) {}
+  CyclesDriverCrashException(unsigned int n) : m_nVDE(n) {}
+
+  unsigned int VDENumber() const { return m_nVDE; }
+
+private:
+  unsigned int m_nVDE;
+};
+
+static
+void crash_translator_function(unsigned int eCode, EXCEPTION_POINTERS*)
+{
+  throw CyclesDriverCrashException(eCode);
+}
+
+class CrashTranslatorHelper
+{
+private:
+    const _se_translator_function old_SE_translator;
+public:
+    CrashTranslatorHelper( _se_translator_function new_SE_translator ) noexcept
+        : old_SE_translator{ _set_se_translator( new_SE_translator ) } {}
+    ~CrashTranslatorHelper() noexcept { _set_se_translator( old_SE_translator ); }
+};
+
 vector<DeviceInfo> Device::available_devices(uint mask)
 {
   /* Lazy initialize devices. On some platforms OpenCL or CUDA drivers can
@@ -570,6 +603,10 @@ vector<DeviceInfo> Device::available_devices(uint mask)
    * we don't want to do any initialization until the user chooses to. */
   thread_scoped_lock lock(device_mutex);
   vector<DeviceInfo> devices;
+
+#ifdef _WIN32
+  CrashTranslatorHelper se_translator(crash_translator_function);
+#endif
 
   if (mask & DEVICE_MASK_CPU) {
     if (!(devices_initialized_mask & DEVICE_MASK_CPU)) {
@@ -584,53 +621,69 @@ vector<DeviceInfo> Device::available_devices(uint mask)
 #ifdef WITH_OPENCL
   if (mask & DEVICE_MASK_OPENCL) {
     if (!(devices_initialized_mask & DEVICE_MASK_OPENCL)) {
-      if (device_opencl_init()) {
-        device_opencl_info(opencl_devices);
+      try {
+        if (device_opencl_init()) {
+          device_opencl_info(opencl_devices);
+        }
+        devices_initialized_mask |= DEVICE_MASK_OPENCL;
+        foreach (DeviceInfo &info, opencl_devices) {
+          devices.push_back(info);
+        }
       }
-      devices_initialized_mask |= DEVICE_MASK_OPENCL;
+      catch (CyclesDriverCrashException) {
+      }
     }
-    foreach (DeviceInfo &info, opencl_devices) {
-      devices.push_back(info);
-    }
-  }
+}
 #endif
 
 #ifdef WITH_CUDA
   if (mask & DEVICE_MASK_CUDA) {
-    if (!(devices_initialized_mask & DEVICE_MASK_CUDA)) {
-      if (device_cuda_init()) {
-        device_cuda_info(cuda_devices);
+    try {
+      if (!(devices_initialized_mask & DEVICE_MASK_CUDA)) {
+        if (device_cuda_init()) {
+          device_cuda_info(cuda_devices);
+        }
+        devices_initialized_mask |= DEVICE_MASK_CUDA;
       }
-      devices_initialized_mask |= DEVICE_MASK_CUDA;
+      foreach (DeviceInfo &info, cuda_devices) {
+        devices.push_back(info);
+      }
     }
-    foreach (DeviceInfo &info, cuda_devices) {
-      devices.push_back(info);
+    catch (CyclesDriverCrashException) {
     }
   }
 #endif
 
 #ifdef WITH_OPTIX
   if (mask & DEVICE_MASK_OPTIX) {
-    if (!(devices_initialized_mask & DEVICE_MASK_OPTIX)) {
-      if (device_optix_init()) {
-        device_optix_info(optix_devices);
+    try {
+      if (!(devices_initialized_mask & DEVICE_MASK_OPTIX)) {
+        if (device_optix_init()) {
+          device_optix_info(optix_devices);
+        }
+        devices_initialized_mask |= DEVICE_MASK_OPTIX;
       }
-      devices_initialized_mask |= DEVICE_MASK_OPTIX;
+      foreach (DeviceInfo &info, optix_devices) {
+        devices.push_back(info);
+      }
     }
-    foreach (DeviceInfo &info, optix_devices) {
-      devices.push_back(info);
+    catch (CyclesDriverCrashException) {
     }
   }
 #endif
 
 #ifdef WITH_NETWORK
   if (mask & DEVICE_MASK_NETWORK) {
-    if (!(devices_initialized_mask & DEVICE_MASK_NETWORK)) {
-      device_network_info(network_devices);
-      devices_initialized_mask |= DEVICE_MASK_NETWORK;
+    try {
+      if (!(devices_initialized_mask & DEVICE_MASK_NETWORK)) {
+        device_network_info(network_devices);
+        devices_initialized_mask |= DEVICE_MASK_NETWORK;
+      }
+      foreach (DeviceInfo &info, network_devices) {
+        devices.push_back(info);
+      }
     }
-    foreach (DeviceInfo &info, network_devices) {
-      devices.push_back(info);
+    catch (CyclesDriverCrashException) {
     }
   }
 #endif
