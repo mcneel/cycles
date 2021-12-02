@@ -884,7 +884,7 @@ DeviceRequestedFeatures Session::get_requested_device_features()
   requested_features.use_denoising = false;
   requested_features.use_shader_raytrace = false; // set to true if/when we add AmbientOcclusion and Bevel nodes
   requested_features.use_true_displacement = true;
-  requested_features.use_background_light = false;
+  requested_features.use_background_light = true;
 
   return requested_features;
 }
