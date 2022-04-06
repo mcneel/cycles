@@ -148,8 +148,8 @@ if(CYCLES_STANDALONE_REPOSITORY)
   # On macOS, always use zlib from system.
   if(APPLE)
     set(ZLIB_ROOT /usr)
-    find_package(ZLIB REQUIRED)
-    find_package(PNG REQUIRED)
+    #find_package(ZLIB REQUIRED)
+    #find_package(PNG REQUIRED)
   endif()
 endif()
 
@@ -224,7 +224,7 @@ if(CYCLES_STANDALONE_REPOSITORY)
     set(PUGIXML_INCLUDE_DIR "${OPENIMAGEIO_INCLUDE_DIR/OpenImageIO}")
     set(PUGIXML_LIBRARIES "")
   else()
-    find_package(PugiXML REQUIRED)
+    #find_package(PugiXML REQUIRED)
   endif()
 
   # Dependencies
@@ -233,10 +233,10 @@ if(CYCLES_STANDALONE_REPOSITORY)
     set(OPENJPEG_LIBRARY ${_cycles_lib_dir}/openjpeg/lib/openjp2${CMAKE_STATIC_LIBRARY_SUFFIX})
   endif()
 
-  find_package(JPEG REQUIRED)
-  find_package(OpenJPEG REQUIRED)
-  find_package(TIFF REQUIRED)
-  find_package(PNG REQUIRED)
+  #find_package(JPEG REQUIRED)
+  #find_package(OpenJPEG REQUIRED)
+  #find_package(TIFF REQUIRED)
+  #find_package(PNG REQUIRED)
 endif()
 
 ###########################################################################
