@@ -988,8 +988,8 @@ class CUDADevice : public Device {
 
   void mem_copy_from(device_memory &mem, int y, int w, int h, int elem)
   {
-    if (false && mem.type == MEM_PIXELS && !background) {
-      pixels_copy_from(mem, y, w, h);
+    if ((false) && mem.type == MEM_PIXELS && !background) {
+        pixels_copy_from(mem, y, w, h);
     }
     else if (mem.type == MEM_TEXTURE) {
       assert(!"mem_copy_from not supported for textures.");
