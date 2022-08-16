@@ -445,7 +445,7 @@ class OptiXDevice : public Device {
 
       if (cuda_module == NULL) {  // Avoid reloading module if it was already loaded
         string cubin_data;
-        const string cubin_filename = string_printf("lib/kernel_sm_%d%d.cubin", major, minor);
+        const string cubin_filename = string_printf("lib/kernel_compute.ptx", major, minor);
         if (!path_read_text(path_get(cubin_filename), cubin_data)) {
           set_error("Failed loading pre-compiled CUDA kernel " + cubin_filename + ".");
           return false;
@@ -456,7 +456,7 @@ class OptiXDevice : public Device {
 
       if (requested_features.use_denoising && cuda_filter_module == NULL) {
         string filter_data;
-        const string filter_filename = string_printf("lib/filter_sm_%d%d.cubin", major, minor);
+        const string filter_filename = string_printf("lib/filter_compute.ptx", major, minor);
         if (!path_read_text(path_get(filter_filename), filter_data)) {
           set_error("Failed loading pre-compiled CUDA filter kernel " + filter_filename + ".");
           return false;
