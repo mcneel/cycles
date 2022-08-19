@@ -445,7 +445,26 @@ class OptiXDevice : public Device {
 
       if (cuda_module == NULL) {  // Avoid reloading module if it was already loaded
         string cubin_data;
-        const string cubin_filename = string_printf("lib/kernel_compute.ptx", major, minor);
+        // first try SM CUBIN
+        string cubin_filename = string_printf("lib/kernel_sm_%d%d.cubin", major, minor);
+        const string smcubin = path_get(cubin_filename);
+        VLOG(1) << "Testing for pre-compiled sm kernel " << smcubin << ".";
+        if (!path_exists(smcubin)) {
+          // then try COMPUTE CUBIN
+          cubin_filename = string_printf("lib/kernel_compute_%d%d.cubin", major, major);
+          const string computecubin = path_get(cubin_filename);
+          VLOG(1) << "Testing for pre-compiled compute kernel " << computecubin << ".";
+          if (!path_exists(computecubin)) {
+            cubin_filename = string_printf("lib/kernel_compute.ptx");
+            const string computeptx = path_get(cubin_filename);
+            VLOG(1) << "Testing for pre-compiled compute kernel PTX" << computeptx << ".";
+            if (!path_exists(computeptx)) {
+              set_error("Failed to find kernel to load.");
+              return false;
+            }
+          }
+        }
+        // we have a path, load the module
         if (!path_read_text(path_get(cubin_filename), cubin_data)) {
           set_error("Failed loading pre-compiled CUDA kernel " + cubin_filename + ".");
           return false;
@@ -454,16 +473,18 @@ class OptiXDevice : public Device {
         check_result_cuda_ret(cuModuleLoadData(&cuda_module, cubin_data.data()));
       }
 
-      if (requested_features.use_denoising && cuda_filter_module == NULL) {
-        string filter_data;
-        const string filter_filename = string_printf("lib/filter_compute.ptx", major, minor);
-        if (!path_read_text(path_get(filter_filename), filter_data)) {
-          set_error("Failed loading pre-compiled CUDA filter kernel " + filter_filename + ".");
-          return false;
-        }
+      /* In Rhino we don't use OptiX denoising in Cycles
+        if (requested_features.use_denoising && cuda_filter_module == NULL) {
+          string filter_data;
+          const string filter_filename = string_printf("lib/filter_compute.ptx", major, minor);
+          if (!path_read_text(path_get(filter_filename), filter_data)) {
+            set_error("Failed loading pre-compiled CUDA filter kernel " + filter_filename + ".");
+            return false;
+          }
 
-        check_result_cuda_ret(cuModuleLoadData(&cuda_filter_module, filter_data.data()));
-      }
+          check_result_cuda_ret(cuModuleLoadData(&cuda_filter_module, filter_data.data()));
+        }
+      */
     }
 
     // Create program groups
