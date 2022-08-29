@@ -455,7 +455,7 @@ class CUDADevice : public Device {
         VLOG(1) << "Using precompiled kernel.";
         return cubin;
       }
-      const string ptx = path_get(string_printf("lib/%s_compute.ptx", name, major, minor));
+      const string ptx = path_get(string_printf("lib/%s_compute.ptx", name));
       VLOG(1) << "Testing for pre-compiled kernel " << ptx << ".";
       if (path_exists(ptx)) {
         VLOG(1) << "Using precompiled kernel.";
