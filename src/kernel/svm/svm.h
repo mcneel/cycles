@@ -208,6 +208,8 @@ CCL_NAMESPACE_END
 #include "kernel/svm/svm_white_noise.h"
 #include "kernel/svm/svm_vertex_color.h"
 
+#include "kernel/svm/svm_rhino_azimuth_altitude_transform.h"
+
 #ifdef __SHADER_RAYTRACE__
 #  include "kernel/svm/svm_ao.h"
 #  include "kernel/svm/svm_bevel.h"
@@ -294,6 +296,9 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
         break;
       case NODE_VERTEX_COLOR:
         svm_node_vertex_color(kg, sd, stack, node.y, node.z, node.w);
+        break;
+      case RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM:
+        svm_rhino_node_azimuth_altitude_transform(kg, sd, stack, node, &offset);
         break;
 #  if NODES_FEATURE(NODE_FEATURE_BUMP)
       case NODE_GEOMETRY_BUMP_DX:
