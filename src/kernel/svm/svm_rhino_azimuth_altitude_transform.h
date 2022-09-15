@@ -39,7 +39,8 @@ ccl_device float3 azimuth_altitude_transform(float3 vector, float azimuth, float
   float3 axis;
   float dummy;
   svm_vector_math(&dummy, &axis, NODE_VECTOR_MATH_CROSS_PRODUCT, azimuth_rotation, ref, 1.0f);
-  float axis_len = len(axis);
+  float axis_len;
+  axis = normalize_len(axis, &axis_len);
 
   float3 rotated_vector = rotate_around_axis(azimuth_rotation, axis_len > threshold ? axis : ref, altitude);
 
