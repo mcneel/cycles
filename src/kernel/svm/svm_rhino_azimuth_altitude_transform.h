@@ -21,18 +21,18 @@ CCL_NAMESPACE_BEGIN
 ccl_device float3 azimuth_altitude_transform(float3 vector, float azimuth, float altitude, float threshold)
 {
   float3 ref;
-  ref.x = ref.y = ref.w = 0.0f;
+  ref.x = ref.y = 0.0f;
   ref.z = 1.0f;
 
   float3 location;
-  location.x = location.y = location.z = location.w = 0.0f;
+  location.x = location.y = location.z = 0.0f;
 
   float3 rotation;
-  rotation.x = rotation.y = rotation.w = 0.0f;
+  rotation.x = rotation.y = 0.0f;
   rotation.z = azimuth;
 
   float3 scale;
-  scale.x = scale.y = scale.z = scale.w = 1.0f;
+  scale.x = scale.y = scale.z= 1.0f;
 
   float3 azimuth_rotation = svm_mapping(NODE_MAPPING_TYPE_VECTOR, vector, location, rotation, scale);
 
