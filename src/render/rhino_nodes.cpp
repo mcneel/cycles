@@ -64,6 +64,4 @@ void AzimuthAltitudeTransformNode::compile(OSLCompiler &compiler)
 {
 }
 
-
-
 CCL_NAMESPACE_END
