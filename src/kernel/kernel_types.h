@@ -54,6 +54,8 @@ CCL_NAMESPACE_BEGIN
 #define VOLUME_BOUNDS_MAX 1024
 
 #define BECKMANN_TABLE_SIZE 256
+#define RHINO_PERLIN_NOISE_PERM_SIZE 256
+#define RHINO_PERLIN_NOISE_TABLE_SIZE (2*RHINO_PERLIN_NOISE_PERM_SIZE)
 
 #define SHADER_NONE (~0)
 #define OBJECT_NONE (~0)
@@ -1438,7 +1440,13 @@ static_assert_align(KernelCurves, 16);
 
 typedef struct KernelTables {
   int beckmann_offset;
-  int pad1, pad2, pad3;
+  int rhino_perlin_noise_offset;
+  int rhino_impulse_noise_offset;
+  int rhino_vc_noise_offset;
+  int rhino_aaltonen_noise_offset;
+  int rhino_dots_tree_data_offset;
+  int rhino_dots_dot_data_offset;
+  int pad;
 } KernelTables;
 static_assert_align(KernelTables, 16);
 

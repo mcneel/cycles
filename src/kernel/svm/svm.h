@@ -209,6 +209,7 @@ CCL_NAMESPACE_END
 #include "kernel/svm/svm_vertex_color.h"
 
 #include "kernel/svm/svm_rhino_azimuth_altitude_transform.h"
+#include "kernel/svm/svm_rhino_procedurals.h"
 
 #ifdef __SHADER_RAYTRACE__
 #  include "kernel/svm/svm_ao.h"
@@ -299,6 +300,66 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
         break;
       case RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM:
         svm_rhino_node_azimuth_altitude_transform(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_CHECKER_TEXTURE:
+        svm_rhino_node_checker_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_NOISE_TEXTURE:
+        svm_rhino_node_noise_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_WAVES_TEXTURE:
+        svm_rhino_node_waves_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_WAVES_WIDTH_TEXTURE:
+        svm_rhino_node_waves_width_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_PERTURBING_PART1_TEXTURE:
+        svm_rhino_node_perturbing_part1_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_PERTURBING_PART2_TEXTURE:
+        svm_rhino_node_perturbing_part2_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_GRADIENT_TEXTURE:
+        svm_rhino_node_gradient_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_BLEND_TEXTURE:
+        svm_rhino_node_blend_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_EXPOSURE_TEXTURE:
+        svm_rhino_node_exposure_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_FBM_TEXTURE:
+        svm_rhino_node_fbm_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_GRID_TEXTURE:
+        svm_rhino_node_grid_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_PROJECTION_CHANGER_TEXTURE:
+        svm_rhino_node_projection_changer_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_MASK_TEXTURE:
+        svm_rhino_node_mask_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_PERLIN_MARBLE_TEXTURE:
+        svm_rhino_node_perlin_marble_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_PHYSICAL_SKY_TEXTURE:
+        svm_rhino_node_physical_sky_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_TEXTURE_ADJUSTMENT_TEXTURE:
+        svm_rhino_node_texture_adjustment_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_TILE_TEXTURE:
+        svm_rhino_node_tile_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_DOTS_TEXTURE:
+        svm_rhino_node_dots_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_NORMAL_PART1_TEXTURE:
+        svm_rhino_node_normal_part1_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_NORMAL_PART2_TEXTURE:
+        svm_rhino_node_normal_part2_texture(kg, sd, stack, node, &offset);
         break;
 #  if NODES_FEATURE(NODE_FEATURE_BUMP)
       case NODE_GEOMETRY_BUMP_DX:
