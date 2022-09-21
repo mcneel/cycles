@@ -155,6 +155,7 @@ typedef enum ShaderNodeType {
   NODE_AOV_VALUE,
   NODE_AOV_COLOR,
   RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM,
+  RHINO_NODE_CHECKER_TEXTURE_2D,
 } ShaderNodeType;
 
 typedef enum NodeAttributeType {

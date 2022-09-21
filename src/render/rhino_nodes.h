@@ -28,7 +28,17 @@ class AzimuthAltitudeTransformNode : public ShaderNode {
   }
 };
 
+class Rhino_CheckerTexture2dNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(Rhino_CheckerTexture2dNode)
 
+  float3 uvw, color1, color2;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
 
 
 CCL_NAMESPACE_END

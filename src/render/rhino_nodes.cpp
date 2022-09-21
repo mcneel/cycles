@@ -22,7 +22,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-/* Checker Texture */
+/* Azimuth Altitude Transform */
 
 NODE_DEFINE(AzimuthAltitudeTransformNode)
 {
@@ -61,6 +61,45 @@ void AzimuthAltitudeTransformNode::compile(SVMCompiler &compiler)
 }
 
 void AzimuthAltitudeTransformNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Checker Texture 2D */
+
+NODE_DEFINE(Rhino_CheckerTexture2dNode)
+{
+  NodeType *type = NodeType::add("rhino_checker_texture_2d", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(uvw, "UV", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_OUT_COLOR(color, "Color");
+
+  return type;
+}
+
+Rhino_CheckerTexture2dNode::Rhino_CheckerTexture2dNode() : ShaderNode(node_type)
+{
+}
+
+void Rhino_CheckerTexture2dNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UV");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_CHECKER_TEXTURE_2D,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign_if_linked(color_out))
+                   );
+}
+
+void Rhino_CheckerTexture2dNode::compile(OSLCompiler &compiler)
 {
 }
 
