@@ -66,26 +66,30 @@ void AzimuthAltitudeTransformNode::compile(OSLCompiler &compiler)
 
 /* Checker Texture 2D */
 
-NODE_DEFINE(Rhino_CheckerTexture2dNode)
+NODE_DEFINE(RhinoCheckerTexture2dNode)
 {
   NodeType *type = NodeType::add("rhino_checker_texture_2d", create, NodeType::SHADER);
 
-  SOCKET_IN_POINT(uvw, "UV", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_TRANSFORM(uvw_transform,
+                   "UvwTransform",
+                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
   SOCKET_OUT_COLOR(color, "Color");
 
   return type;
 }
 
-Rhino_CheckerTexture2dNode::Rhino_CheckerTexture2dNode() : ShaderNode(node_type)
+RhinoCheckerTexture2dNode::RhinoCheckerTexture2dNode() : ShaderNode(node_type)
 {
 }
 
-void Rhino_CheckerTexture2dNode::compile(SVMCompiler &compiler)
+void RhinoCheckerTexture2dNode::compile(SVMCompiler &compiler)
 {
-  ShaderInput *uvw_in = input("UV");
+  ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
   ShaderInput *color2_in = input("Color2");
 
@@ -97,9 +101,75 @@ void Rhino_CheckerTexture2dNode::compile(SVMCompiler &compiler)
                                            compiler.stack_assign(color2_in),
                                            compiler.stack_assign_if_linked(color_out))
                    );
+  compiler.add_node(uvw_transform.x);
+  compiler.add_node(uvw_transform.y);
+  compiler.add_node(uvw_transform.z);
 }
 
-void Rhino_CheckerTexture2dNode::compile(OSLCompiler &compiler)
+void RhinoCheckerTexture2dNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Noise */
+
+NODE_DEFINE(RhinoNoiseTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_noise_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_TRANSFORM(uvw_transform,
+                   "UvwTransform",
+                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
+  SOCKET_INT(noise_type, "NoiseType", 0);
+  SOCKET_INT(spec_synth_type, "SpecSynthType", 0);
+  SOCKET_INT(octave_count, "OctaveCount", 0);
+  SOCKET_FLOAT(frequency_multiplier, "FrequencyMultiplier", 0.0f);
+  SOCKET_FLOAT(amplitude_multiplier, "AmplitudeMultiplier", 0.0f);
+  SOCKET_FLOAT(clamp_min, "ClampMin", 0.0f);
+  SOCKET_FLOAT(clamp_max, "ClampMax", 0.0f);
+  SOCKET_BOOLEAN(scale_to_clamp, "ScaleToClamp", false);
+  SOCKET_BOOLEAN(inverse, "Inverse", false);
+  SOCKET_FLOAT(gain, "Gain", 0.0f);
+
+  SOCKET_OUT_COLOR(color, "Color");
+
+  return type;
+}
+
+RhinoNoiseTextureNode::RhinoNoiseTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoNoiseTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_NOISE_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign_if_linked(color_out)));
+  compiler.add_node(uvw_transform.x);
+  compiler.add_node(uvw_transform.y);
+  compiler.add_node(uvw_transform.z);
+
+  compiler.add_node(
+      (int)noise_type, (int)spec_synth_type, octave_count, __float_as_int(frequency_multiplier));
+  compiler.add_node(__float_as_int(amplitude_multiplier),
+                    __float_as_int(clamp_min),
+                    __float_as_int(clamp_max),
+                    (int)scale_to_clamp);
+  compiler.add_node((int)inverse, __float_as_int(gain));
+}
+
+void RhinoNoiseTextureNode::compile(OSLCompiler &compiler)
 {
 }
 

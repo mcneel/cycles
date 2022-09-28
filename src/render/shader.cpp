@@ -45,6 +45,8 @@ thread_mutex ShaderManager::lookup_table_mutex;
 vector<float> ShaderManager::beckmann_table;
 bool ShaderManager::beckmann_table_ready = false;
 
+vector<float> ShaderManager::rhino_perlin_noise_table;
+
 /* Beckmann sampling precomputed table, see bsdf_microfacet.h */
 
 /* 2D slope distribution (alpha = 1.0) */
@@ -375,6 +377,7 @@ ShaderManager::ShaderManager()
 {
   need_update = true;
   beckmann_table_offset = TABLE_OFFSET_INVALID;
+  rhino_perlin_noise_table_offset = TABLE_OFFSET_INVALID;
 
   xyz_to_r = make_float3(3.2404542f, -1.5371385f, -0.4985314f);
   xyz_to_g = make_float3(-0.9692660f, 1.8760108f, 0.0415560f);
@@ -591,6 +594,13 @@ void ShaderManager::device_update_common(Device *device,
   }
   ktables->beckmann_offset = (int)beckmann_table_offset;
 
+  /* Rhino procedural perlin noise table */
+  if (rhino_perlin_noise_table_offset == TABLE_OFFSET_INVALID) {
+    rhino_perlin_noise_table_offset = scene->lookup_tables->add_table(dscene,
+                                                                      rhino_perlin_noise_table);
+  }
+  ktables->rhino_perlin_noise_offset = (int)rhino_perlin_noise_table_offset;
+
   /* integrator */
   KernelIntegrator *kintegrator = &dscene->data.integrator;
   kintegrator->use_volumes = has_volumes;
@@ -610,6 +620,7 @@ void ShaderManager::device_update_common(Device *device,
 void ShaderManager::device_free_common(Device *, DeviceScene *dscene, Scene *scene)
 {
   scene->lookup_tables->remove_table(&beckmann_table_offset);
+  scene->lookup_tables->remove_table(&rhino_perlin_noise_table_offset);
 
   dscene->shaders.free();
 }
@@ -762,6 +773,11 @@ string ShaderManager::get_cryptomatte_materials(Scene *scene)
   }
   manifest[manifest.size() - 1] = '}';
   return manifest;
+}
+
+void ShaderManager::set_rhino_perlin_noise_table(const vector<float> &perlin_noise_table)
+{
+  rhino_perlin_noise_table = perlin_noise_table;
 }
 
 CCL_NAMESPACE_END
