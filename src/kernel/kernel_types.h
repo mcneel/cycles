@@ -1441,7 +1441,10 @@ static_assert_align(KernelCurves, 16);
 typedef struct KernelTables {
   int beckmann_offset;
   int rhino_perlin_noise_offset;
-  int pad1, pad2;
+  int rhino_impulse_noise_offset;
+  int rhino_vc_noise_offset;
+  int rhino_aaltonen_noise_offset;
+  int pad1, pad2, pad3;
 } KernelTables;
 static_assert_align(KernelTables, 16);
 

@@ -206,6 +206,9 @@ class ShaderManager {
   string get_cryptomatte_materials(Scene *scene);
 
   void set_rhino_perlin_noise_table(const vector<float>& perlin_noise_table);
+  void set_rhino_impulse_noise_table(const vector<float> &impulse_noise_table);
+  void set_rhino_vc_noise_table(const vector<float> &vc_noise_table);
+  void set_rhino_aaltonen_noise_table(const vector<float> &aaltonen_noise_table);
 
  protected:
   ShaderManager();
@@ -220,7 +223,13 @@ class ShaderManager {
   size_t beckmann_table_offset;
 
   static vector<float> rhino_perlin_noise_table;
+  static vector<float> rhino_impulse_noise_table;
+  static vector<float> rhino_vc_noise_table;
+  static vector<float> rhino_aaltonen_noise_table;
   size_t rhino_perlin_noise_table_offset;
+  size_t rhino_impulse_noise_table_offset;
+  size_t rhino_vc_noise_table_offset;
+  size_t rhino_aaltonen_noise_table_offset;
 
   void get_requested_graph_features(ShaderGraph *graph,
                                     DeviceRequestedFeatures *requested_features);

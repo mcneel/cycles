@@ -315,7 +315,41 @@ ccl_device float simplex_noise(float x, float y, float z)
 #define SCNNEXT(h) (((h) + 1) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1))
 #define SCNNIMPULSES 3
 
-ccl_device float SCNoise(KernelGlobals *kg, float x, float y, float z)
+
+#define VCNPERM(kg, x) perlin_noise((kg), (x) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1))
+#define VCNINDEX(kg, ix, iy, iz) VCNPERM((kg), (ix) + VCNPERM((kg), (iy) + VCNPERM((kg), iz)))
+
+ccl_device float4 impulse_noise(KernelGlobals *kg, int x)
+{
+  float4 noise = make_float4(0.0f);
+  noise.x = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
+  noise.y = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
+  noise.z = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
+  noise.w = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
+
+  return noise;
+}
+
+ccl_device float catrom2(float d)
+{
+#define SAMPRATE 100 /* table entries per unit distance */
+
+  float factor = (d < 4.0f ? 0.0f : 1.0f);
+  d = (1.0f - factor) * d + factor;
+
+  d = d * float(SAMPRATE) + 0.5f;
+  int i = int(floorf(d));
+
+  float x = sqrt(i / float(SAMPRATE));
+
+  factor = (x < 1.0f ? 0.0f : 1.0f);
+  x = (1.0f - factor) * (0.5f * (2.0f + x * x * (-5.0f + x * 3.0f))) +
+      factor * (0.5f * (4.0f + x * (-8.0f + x * (5.0f - x))));
+
+  return x;
+}
+
+ccl_device float sparse_convolution_noise(KernelGlobals *kg, float x, float y, float z)
 {
   int ix = int(floorf(x));
   int iy = int(floorf(y));
@@ -336,18 +370,237 @@ ccl_device float SCNoise(KernelGlobals *kg, float x, float y, float z)
 
         for (int n = SCNNIMPULSES; n > 0; n--, h = SCNNEXT(h)) {
           /* Convolve filter and impulse. */
-          //float4 fp = ImpulseValue(h);
-          //float dx = fx - (float(i) + fp.x);
-          //float dy = fy - (float(j) + fp.y);
-          //float dz = fz - (float(k) + fp.z);
-          //float distsq = dx * dx + dy * dy + dz * dz;
-          //sum += Catrom2(distsq) * fp.w;
+          float4 fp = impulse_noise(kg, h * 4);
+          float dx = fx - (float(i) + fp.x);
+          float dy = fy - (float(j) + fp.y);
+          float dz = fz - (float(k) + fp.z);
+          float distsq = dx * dx + dy * dy + dz * dz;
+          sum += catrom2(distsq) * fp.w;
         }
       }
     }
   }
 
   return sum / float(SCNNIMPULSES);
+}
+
+ccl_device float vc_noise(KernelGlobals *kg, int x)
+{
+  float noise = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_vc_noise_offset + x);
+
+  return noise;
+}
+
+ccl_device float lattice_convolution_noise(KernelGlobals *kg, float x, float y, float z)
+{
+  int ix = int(floorf(x));
+  int iy = int(floorf(y));
+  int iz = int(floorf(z));
+
+  float fx = x - float(ix);
+  float fy = y - float(iy);
+  float fz = z - float(iz);
+
+  float sum = 0.0f;
+
+  for (int k = -1; k <= 2; k++) {
+    float dz = float(k) - fz;
+    dz = dz * dz;
+
+    for (int j = -1; j <= 2; j++) {
+      float dy = float(j) - fy;
+      dy = dy * dy;
+
+      for (int i = -1; i <= 2; i++) {
+        float dx = float(i) - fx;
+        dx = dx * dx;
+
+        sum += vc_noise(kg, VCNINDEX(kg, ix + i, iy + j, iz + k)) * catrom2(dx + dy + dz);
+      }
+    }
+  }
+
+  return sum;
+}
+
+ccl_device float WHN_frand(int seed)
+{
+  seed = seed << (13 ^ seed);
+  return (1.0f - float(int(seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) /
+                     1073741824.0f);
+}
+
+ccl_device float WHN_rand3a(int x, int y, int z)
+{
+  return WHN_frand(67 * x + 59 * y + 71 * z);
+}
+ccl_device float WHN_rand3b(int x, int y, int z)
+{
+  return WHN_frand(73 * x + 79 * y + 83 * z);
+}
+ccl_device float WHN_rand3c(int x, int y, int z)
+{
+  return WHN_frand(89 * x + 97 * y + 101 * z);
+}
+ccl_device float WHN_rand3d(int x, int y, int z)
+{
+  return WHN_frand(103 * x + 107 * y + 109 * z);
+}
+
+ccl_device float WHN_hpoly1(float t)
+{
+  return ((2.0 * t - 3.0) * t * t + 1.0);
+}
+ccl_device float WHN_hpoly2(float t)
+{
+  return (-2.0 * t + 3.0) * t * t;
+}
+ccl_device float WHN_hpoly3(float t)
+{
+  return ((t - 2.0) * t + 1.0) * t;
+}
+ccl_device float WHN_hpoly4(float t)
+{
+  return (t - 1.0) * t * t;
+}
+
+ccl_device float4 WHN_rand(int i, int3 xlim[2])
+{
+  float4 f;
+
+  f[0] = WHN_rand3a(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
+  f[1] = WHN_rand3b(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
+  f[2] = WHN_rand3c(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
+  f[3] = WHN_rand3d(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
+
+  return f;
+}
+
+ccl_device float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
+{
+  float4 f;
+
+  float x = xarg[n];
+  float hp1 = WHN_hpoly1(x);
+  float hp2 = WHN_hpoly2(x);
+  f[0] = f0[0] * hp1 + f1[0] * hp2;
+  f[1] = f0[1] * hp1 + f1[1] * hp2;
+  f[2] = f0[2] * hp1 + f1[2] * hp2;
+  f[3] = f0[3] * hp1 + f1[3] * hp2 + f0[n] * WHN_hpoly3(x) + f1[n] * WHN_hpoly4(x);
+
+  return f;
+}
+
+ccl_device float4 WHN_interpolate_nonrecursive(int3 xlim[2], float3 pXarg)
+{
+  float4 f0 = WHN_rand(0, xlim);
+  float4 f1 = WHN_rand(1, xlim);
+
+  float4 f2 = WHN_rand(2, xlim);
+  float4 f3 = WHN_rand(3, xlim);
+
+  float4 f4 = WHN_rand(4, xlim);
+  float4 f5 = WHN_rand(5, xlim);
+
+  float4 f6 = WHN_rand(10, xlim);
+  float4 f7 = WHN_rand(11, xlim);
+
+  float4 ff0 = WHN_hpoly(0, pXarg, f0, f1);
+  float4 ff1 = WHN_hpoly(0, pXarg, f2, f3);
+  float4 ff2 = WHN_hpoly(0, pXarg, f4, f5);
+  float4 ff3 = WHN_hpoly(0, pXarg, f6, f7);
+
+  float4 fff0 = WHN_hpoly(1, pXarg, ff0, ff1);
+  float4 fff1 = WHN_hpoly(1, pXarg, ff2, ff3);
+
+  return WHN_hpoly(2, pXarg, fff0, fff1);
+}
+
+ccl_device float wards_hermite_noise(float x, float y, float z)
+{
+  float3 uvw = make_float3(x, y, z);
+
+  int3 xlim[2];
+  xlim[0] = make_int3(int(floorf(uvw.x)), int(floorf(uvw.y)), int(floorf(uvw.z)));
+  xlim[1] = xlim[0] + make_int3(1);
+
+  float3 xarg = uvw - make_float3(xlim[0].x, xlim[0].y, xlim[0].z);
+
+  float4 f = WHN_interpolate_nonrecursive(xlim, xarg);
+
+  return f[3];
+}
+
+ccl_device int aaltonen_value(KernelGlobals *kg, int x)
+{
+  float value = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_aaltonen_noise_offset + x);
+
+  return int(value);
+}
+
+ccl_device float aaltonen_noise(KernelGlobals *kg, float x, float y, float z)
+{
+  // clang-format off
+  float ANsquaredRadius[16] = {
+	  1.5000000f, 1.8262500f, 2.1524999f, 2.4787498f,
+      2.8049998f, 3.1312499f, 1.7175000f, 2.0437498f,
+      2.3699999f, 2.6962500f, 3.0224998f, 1.6087500f,
+      1.9349999f, 2.2612500f, 2.5874999f, 2.9137497f
+  };
+
+  float ANinverseOfSquaredRadius[16] = {
+	  0.66666669f, 0.54757017f, 0.46457610f, 0.40342918f,
+      0.35650626f, 0.31936130f, 0.58224165f, 0.48929667f,
+      0.42194095f, 0.37088549f, 0.33085197f, 0.62160063f,
+      0.51679587f, 0.44223326f, 0.38647345f, 0.34320039f
+  };
+  // clang-format on
+
+#define maxRadius 1.8f
+#define maxRadiusInt 1
+
+  int sx = int(ceilf(x - maxRadius));
+  int ex = int(floorf(x + maxRadius));
+  if (ex >= sx + 4 || sx > ex)
+    return 0.0f;
+
+  int sy = int(ceilf(y - maxRadius));
+  int ey = int(floorf(y + maxRadius));
+  if (ey >= sy + 4 || sy > ey)
+    return 0.0f;
+
+  int sz = int(ceilf(z - maxRadius));
+  int ez = int(floorf(z + maxRadius));
+  if (ez >= sz + 4 || sz > ez)
+    return 0.0f;
+
+  float result = 0.0;
+  for (int iz = sz; iz <= ez; iz++) {
+    float dz = iz - z;
+    float sqdz = dz * dz;
+    int permZ = aaltonen_value(kg, iz & 255);
+    for (int iy = sy; iy <= ey; iy++) {
+      float dy = iy - y;
+      float sqdy = dy * dy;
+      float sqdydz = sqdy + sqdz;
+      int permY = aaltonen_value(kg, permZ + (iy & 255));
+      for (int ix = sx; ix <= ex; ix++) {
+        float dx = ix - x;
+        float sqdx = dx * dx;
+        float dsq = sqdx + sqdydz;
+        int prn = aaltonen_value(kg, permY + (ix & 255));
+        if (ANsquaredRadius[prn & 15] >= dsq) {
+          float t = 1.0f - dsq * ANinverseOfSquaredRadius[prn & 15];
+          if ((prn & 128) == 128)
+            result -= t;
+          else
+            result += t;
+        }
+      }
+    }
+  }
+
+  return result / 10.333334f;
 }
 
 ccl_device float4 noise_texture(KernelGlobals *kg,
@@ -394,17 +647,17 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
         value = simplex_noise(x, y, z);
         break;
       case RhinoProceduralNoiseType::SPARSE_CONVOLUTION:
-        value = SCNoise(kg, x, y, z);
+        value = sparse_convolution_noise(kg, x, y, z);
         break;
-      //case RhinoProceduralNoiseType::LATTICE_CONVOLUTION:
-      //  value = VCNoise(x, y, z);
-      //  break;
-      //case RhinoProceduralNoiseType::WARDS_HERMITE:
-      //  value = WardsHermiteNoise(x, y, z);
-      //  break;
-      //case RhinoProceduralNoiseType::AALTONEN:
-      //  value = AaltonenNoise(x, y, z);
-      //  break;
+      case RhinoProceduralNoiseType::LATTICE_CONVOLUTION:
+        value = lattice_convolution_noise(kg, x, y, z);
+        break;
+      case RhinoProceduralNoiseType::WARDS_HERMITE:
+        value = wards_hermite_noise(x, y, z);
+        break;
+      case RhinoProceduralNoiseType::AALTONEN:
+        value = aaltonen_noise(kg, x, y, z);
+        break;
       default:
         break;
     }
@@ -500,6 +753,10 @@ ccl_device void svm_rhino_node_noise_texture(
                                    scale_to_clamp,
                                    inverse,
                                    gain);
+
+  // TODO: Fix this
+  out_color = make_float4(
+      powf(out_color.x, 2.2), powf(out_color.y, 2.2), powf(out_color.z, 2.2), out_color.w);
 
   if (stack_valid(out_color_offset))
     stack_store_float3(
