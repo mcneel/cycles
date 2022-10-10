@@ -18,6 +18,8 @@ limitations under the License.
 
 CCL_NAMESPACE_BEGIN
 
+#define PI 3.14159265358979f
+
 ccl_device bool is_odd(int x)
 {
   return (x & 1) == 1;
@@ -619,6 +621,8 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
                                 bool inverse,
                                 float gain)
 {
+  uvw = transform_point(uvw_transform, uvw);
+
   float4 color_out = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
 
   float total_value = 0.0;
@@ -753,6 +757,127 @@ ccl_device void svm_rhino_node_noise_texture(
                                    scale_to_clamp,
                                    inverse,
                                    gain);
+
+  // TODO: Fix this
+  out_color = make_float4(
+      powf(out_color.x, 2.2), powf(out_color.y, 2.2), powf(out_color.z, 2.2), out_color.w);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device float luminance(float3 color)
+{
+  return 0.299f * color.x + 0.587f * color.y + 0.114f * color.z;
+}
+
+ccl_device float4 waves_texture(float3 uvw,
+                                const Transform *uvw_transform,
+                                float4 color1,
+                                float4 color2,
+                                float4 color3,
+                                RhinoProceduralWavesType wave_type,
+                                float wave_width,
+                                bool wave_width_texture_on,
+                                float contrast1,
+                                float contrast2)
+{
+  uvw = transform_point(uvw_transform, uvw);
+
+  float parameter = ((wave_type == RhinoProceduralWavesType::LINEAR) ?
+                         uvw.y :
+                         sqrt(uvw.x * uvw.x + uvw.y * uvw.y));
+
+  float phase = parameter - floorf(parameter);
+
+  float hillParameter = min(phase, 1.0f - phase);
+
+  float waveWidth = wave_width_texture_on ? luminance(make_float3(color3.x, color3.y, color3.z)) :
+                                            wave_width;
+
+  float hillLength = min(1.0f - waveWidth, waveWidth);
+  float hillMiddle = 0.5f * (1.0f - waveWidth);
+
+  float value = 0.0f;
+  if (hillParameter > hillMiddle - 0.5f * hillLength) {
+    if (hillParameter < hillMiddle + 0.5f * hillLength) {
+      value = 0.5f + 0.5f * sin((hillParameter - hillMiddle) / (hillLength)*PI);
+    }
+    else
+      value = 1.0f;
+  }
+
+  float contrast = contrast1;
+  if (phase > 0.5f)
+    contrast = contrast2;
+
+  if (contrast < 1.0f) {
+    value = 0.5f + 0.5f * (2.0f * value - 1.0f) / (1.0f - contrast);
+    if (value < 0.0f)
+      value = 0.0f;
+    if (value > 1.0f)
+      value = 1.0f;
+  }
+  else {
+    if (value >= 0.5f)
+      value = 1.0f;
+    if (value < 0.5f)
+      value = 0.0f;
+  }
+
+  if (value <= 0.0f)
+    return color1;
+
+  if (value >= 1.0f)
+    return color2;
+
+  float4 output_color = mix(color1, color2, value);
+  output_color.w = clamp(output_color.w, 0.0f, 1.0f);
+
+  return output_color;
+}
+
+ccl_device void svm_rhino_node_waves_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, in_color3_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &in_color3_offset);
+  svm_unpack_node_uchar4(
+      node.z, &out_color_offset, &dummy, &dummy, &dummy);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float3 color3 = stack_load_float3(stack, in_color3_offset);
+
+  Transform uvw_transform;
+  uvw_transform.x = read_node_float(kg, offset);
+  uvw_transform.y = read_node_float(kg, offset);
+  uvw_transform.z = read_node_float(kg, offset);
+
+  uint4 data0 = read_node(kg, offset);
+  uint4 data1 = read_node(kg, offset);
+
+  RhinoProceduralWavesType wave_type = (RhinoProceduralWavesType)data0.x;
+  float wave_width = __uint_as_float(data0.y);
+  bool wave_width_texture_on = (bool)data0.z;
+  float contrast1 = __uint_as_float(data0.w);
+  float contrast2 = __uint_as_float(data1.x);
+
+  float4 out_color = waves_texture(uvw,
+                                   &uvw_transform,
+                                   make_float4(color1.x, color1.y, color1.z, 1.0f),
+                                   make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                   make_float4(color3.x, color3.y, color3.z, 1.0f),
+                                   wave_type,
+                                   wave_width,
+                                   wave_width_texture_on,
+                                   contrast1,
+                                   contrast2);
 
   // TODO: Fix this
   out_color = make_float4(

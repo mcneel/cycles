@@ -65,6 +65,24 @@ class RhinoNoiseTextureNode : public ShaderNode {
   }
 };
 
+class RhinoWavesTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoWavesTextureNode)
+
+  float3 uvw, color1, color2, color3;
+  Transform uvw_transform;
+  RhinoProceduralWavesType wave_type;
+  float wave_width;
+  bool wave_width_texture_on;
+  float contrast1;
+  float contrast2;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

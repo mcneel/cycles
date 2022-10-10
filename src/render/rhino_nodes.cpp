@@ -173,4 +173,64 @@ void RhinoNoiseTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Waves */
+
+NODE_DEFINE(RhinoWavesTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_waves_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color3, "Color3", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_TRANSFORM(uvw_transform,
+                   "UvwTransform",
+                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
+  SOCKET_INT(wave_type, "WaveType", 0);
+  SOCKET_FLOAT(wave_width, "WaveWidth", 0);
+  SOCKET_BOOLEAN(wave_width_texture_on, "WaveWidthTextureOn", 0);
+  SOCKET_FLOAT(contrast1, "Contrast1", 0.0f);
+  SOCKET_FLOAT(contrast2, "Contrast2", 0.0f);
+
+  SOCKET_OUT_COLOR(color, "Color");
+
+  return type;
+}
+
+RhinoWavesTextureNode::RhinoWavesTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoWavesTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+  ShaderInput *color3_in = input("Color3");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_WAVES_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color3_in)),
+                    compiler.encode_uchar4(compiler.stack_assign_if_linked(color_out)));
+
+  compiler.add_node(uvw_transform.x);
+  compiler.add_node(uvw_transform.y);
+  compiler.add_node(uvw_transform.z);
+
+  compiler.add_node((int)wave_type,
+                    __float_as_int(wave_width),
+                    (int)wave_width_texture_on,
+                    __float_as_int(contrast1));
+  compiler.add_node(__float_as_int(contrast2));
+}
+
+void RhinoWavesTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END

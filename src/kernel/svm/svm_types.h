@@ -157,6 +157,7 @@ typedef enum ShaderNodeType {
   RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM,
   RHINO_NODE_CHECKER_TEXTURE_2D,
   RHINO_NODE_NOISE_TEXTURE,
+  RHINO_NODE_WAVES_TEXTURE,
 } ShaderNodeType;
 
 typedef enum NodeAttributeType {

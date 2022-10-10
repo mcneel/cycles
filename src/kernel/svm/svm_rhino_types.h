@@ -35,6 +35,11 @@ typedef enum RhinoProceduralSpecSynthType {
   TURBULENCE,
 } RhinoProceduralSpecSynthType;
 
+typedef enum RhinoProceduralWavesType {
+  LINEAR,
+  RADIAL,
+} RhinoProceduralWavesType;
+
 CCL_NAMESPACE_END
 
 #endif /*  __SVM_RHINO_TYPES_H__ */
