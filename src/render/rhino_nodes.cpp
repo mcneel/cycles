@@ -233,4 +233,138 @@ void RhinoWavesTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Waves Width */
+
+NODE_DEFINE(RhinoWavesWidthTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_waves_width_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+
+  SOCKET_TRANSFORM(uvw_transform,
+                   "UvwTransform",
+                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
+  SOCKET_INT(wave_type, "WaveType", 0);
+
+  SOCKET_OUT_POINT(out_uvw, "UVW");
+
+  return type;
+}
+
+RhinoWavesWidthTextureNode::RhinoWavesWidthTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoWavesWidthTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+
+  ShaderOutput *uvw_out = output("UVW");
+
+  compiler.add_node(RHINO_NODE_WAVES_WIDTH_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign_if_linked(uvw_out)));
+
+  compiler.add_node(uvw_transform.x);
+  compiler.add_node(uvw_transform.y);
+  compiler.add_node(uvw_transform.z);
+
+  compiler.add_node((int)wave_type);
+}
+
+void RhinoWavesWidthTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Perturbing Part 1 */
+
+NODE_DEFINE(RhinoPerturbingPart1TextureNode)
+{
+  NodeType *type = NodeType::add("rhino_perturbing_part1_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+
+  SOCKET_TRANSFORM(uvw_transform,
+                   "UvwTransform",
+                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
+
+  SOCKET_OUT_POINT(out_uvw0, "UVW0");
+  SOCKET_OUT_POINT(out_uvw1, "UVW1");
+  SOCKET_OUT_POINT(out_uvw2, "UVW2");
+
+  return type;
+}
+
+RhinoPerturbingPart1TextureNode::RhinoPerturbingPart1TextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoPerturbingPart1TextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+
+  ShaderOutput *uvw0_out = output("UVW0");
+  ShaderOutput *uvw1_out = output("UVW1");
+  ShaderOutput *uvw2_out = output("UVW2");
+
+  compiler.add_node(RHINO_NODE_PERTURBING_PART1_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign_if_linked(uvw0_out),
+                                           compiler.stack_assign_if_linked(uvw1_out),
+                                           compiler.stack_assign_if_linked(uvw2_out)));
+
+  compiler.add_node(uvw_transform.x);
+  compiler.add_node(uvw_transform.y);
+  compiler.add_node(uvw_transform.z);
+}
+
+void RhinoPerturbingPart1TextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Perturbing Part 2 */
+
+NODE_DEFINE(RhinoPerturbingPart2TextureNode)
+{
+  NodeType *type = NodeType::add("rhino_perturbing_part2_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(
+      uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_COLOR(
+      color0, "Color0", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_COLOR(
+      color1, "Color1", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_COLOR(
+      color2, "Color2", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+
+  SOCKET_OUT_POINT(out_uvw, "Perturbed UVW");
+
+  return type;
+}
+
+RhinoPerturbingPart2TextureNode::RhinoPerturbingPart2TextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoPerturbingPart2TextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *color0_in = input("Color0");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_PERTURBING_PART2_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(color0_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign_if_linked(color_out)));
+
+  compiler.add_node(__float_as_int(amount));
+}
+
+void RhinoPerturbingPart2TextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END

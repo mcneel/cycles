@@ -83,6 +83,49 @@ class RhinoWavesTextureNode : public ShaderNode {
   }
 };
 
+class RhinoWavesWidthTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoWavesWidthTextureNode)
+
+  float3 uvw;
+  Transform uvw_transform;
+  RhinoProceduralWavesType wave_type;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoPerturbingPart1TextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoPerturbingPart1TextureNode)
+
+  float3 uvw;
+  Transform uvw_transform;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoPerturbingPart2TextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoPerturbingPart2TextureNode)
+
+  float3 uvw;
+  float3 color0;
+  float3 color1;
+  float3 color2;
+  float amount;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

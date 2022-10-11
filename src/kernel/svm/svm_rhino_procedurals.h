@@ -758,10 +758,6 @@ ccl_device void svm_rhino_node_noise_texture(
                                    inverse,
                                    gain);
 
-  // TODO: Fix this
-  out_color = make_float4(
-      powf(out_color.x, 2.2), powf(out_color.y, 2.2), powf(out_color.z, 2.2), out_color.w);
-
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
@@ -770,6 +766,52 @@ ccl_device void svm_rhino_node_noise_texture(
 ccl_device float luminance(float3 color)
 {
   return 0.299f * color.x + 0.587f * color.y + 0.114f * color.z;
+}
+
+ccl_device float4 waves_width_texture(float3 uvw,
+                                      const Transform *uvw_transform,
+                                      RhinoProceduralWavesType wave_type)
+{
+  uvw = transform_point(uvw_transform, uvw);
+
+  float3 uvw_perturbed = make_float3(uvw.x, 0.5 + floorf(uvw.y), 0.0);
+
+  if (wave_type == RhinoProceduralWavesType::RADIAL) {
+    float uvw_length = len(uvw);
+    if (uvw_length == 0.0)
+      uvw_perturbed = make_float3(0.0f);
+    else
+      uvw_perturbed = (uvw / uvw_length) * (0.5 + floorf(uvw_length));
+  }
+
+  return make_float4(uvw_perturbed.x, uvw_perturbed.y, uvw_perturbed.z, 1.0);
+}
+
+ccl_device void svm_rhino_node_waves_width_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, out_uvw_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(node.y, &in_uvw_offset, &out_uvw_offset, &dummy, &dummy);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+
+  Transform uvw_transform;
+  uvw_transform.x = read_node_float(kg, offset);
+  uvw_transform.y = read_node_float(kg, offset);
+  uvw_transform.z = read_node_float(kg, offset);
+
+  uint4 data0 = read_node(kg, offset);
+
+  RhinoProceduralWavesType wave_type = (RhinoProceduralWavesType)data0.x;
+
+  float4 out_uvw = waves_width_texture(uvw,
+                                   &uvw_transform,
+                                   wave_type);
+
+  if (stack_valid(out_uvw_offset))
+    stack_store_float3(stack, out_uvw_offset, make_float3(out_uvw.x, out_uvw.y, out_uvw.z));
 }
 
 ccl_device float4 waves_texture(float3 uvw,
@@ -879,13 +921,80 @@ ccl_device void svm_rhino_node_waves_texture(
                                    contrast1,
                                    contrast2);
 
-  // TODO: Fix this
-  out_color = make_float4(
-      powf(out_color.x, 2.2), powf(out_color.y, 2.2), powf(out_color.z, 2.2), out_color.w);
-
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device void perturbing_part1_texture(float3 uvw, const Transform *uvw_transform, float3* out_uvw0, float3* out_uvw1, float3* out_uvw2)
+{
+  uvw = transform_point(uvw_transform, uvw);
+
+  *out_uvw0 = uvw;
+  *out_uvw1 = make_float3(1.0f, 0.0f, 0.0f) - uvw;
+  *out_uvw2 = make_float3(0.0f, 1.0f, 0.0f) - uvw;
+}
+
+ccl_device void svm_rhino_node_perturbing_part1_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, out_uvw0_offset, out_uvw1_offset, out_uvw2_offset;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &out_uvw0_offset, &out_uvw1_offset, &out_uvw2_offset);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+
+  Transform uvw_transform;
+  uvw_transform.x = read_node_float(kg, offset);
+  uvw_transform.y = read_node_float(kg, offset);
+  uvw_transform.z = read_node_float(kg, offset);
+
+  float3 out_uvw0, out_uvw1, out_uvw2;
+  perturbing_part1_texture(uvw, &uvw_transform, &out_uvw0, &out_uvw1, &out_uvw2);
+
+  if (stack_valid(out_uvw0_offset))
+    stack_store_float3(stack, out_uvw0_offset, out_uvw0);
+
+  if (stack_valid(out_uvw1_offset))
+    stack_store_float3(stack, out_uvw1_offset, out_uvw1);
+
+  if (stack_valid(out_uvw2_offset))
+    stack_store_float3(stack, out_uvw2_offset, out_uvw2);
+}
+
+ccl_device float3 perturbing_part2_texture(
+    float3 uvw, float3 perturb_color1, float3 perturb_color2, float3 perturb_color3, float amount)
+{
+  float x = reduce_add(perturb_color1) / 1.5f * amount - amount;
+  float y = reduce_add(perturb_color2) / 1.5f * amount - amount;
+  float z = reduce_add(perturb_color3) / 1.5f * amount - amount;
+
+  float3 perturbed_uvw = uvw + make_float3(x, y, z);
+
+  return perturbed_uvw;
+}
+
+ccl_device void svm_rhino_node_perturbing_part2_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color0_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color0_offset, &in_color1_offset, &in_color2_offset);
+  svm_unpack_node_uchar4(node.z, &out_color_offset, &dummy, &dummy, &dummy);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color0 = stack_load_float3(stack, in_color0_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float amount = read_node_float(kg, offset).x;
+
+  float3 out_color = perturbing_part2_texture(uvw, color0, color1, color2, amount);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(stack, out_color_offset, out_color);
 }
 
 CCL_NAMESPACE_END

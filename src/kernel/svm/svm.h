@@ -310,6 +310,15 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
       case RHINO_NODE_WAVES_TEXTURE:
         svm_rhino_node_waves_texture(kg, sd, stack, node, &offset);
         break;
+      case RHINO_NODE_WAVES_WIDTH_TEXTURE:
+        svm_rhino_node_waves_width_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_PERTURBING_PART1_TEXTURE:
+        svm_rhino_node_perturbing_part1_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_PERTURBING_PART2_TEXTURE:
+        svm_rhino_node_perturbing_part2_texture(kg, sd, stack, node, &offset);
+        break;
 #  if NODES_FEATURE(NODE_FEATURE_BUMP)
       case NODE_GEOMETRY_BUMP_DX:
         svm_node_geometry_bump_dx(kg, sd, stack, node.y, node.z);
