@@ -348,19 +348,20 @@ RhinoPerturbingPart2TextureNode::RhinoPerturbingPart2TextureNode() : ShaderNode(
 
 void RhinoPerturbingPart2TextureNode::compile(SVMCompiler &compiler)
 {
+  ShaderInput *uvw_in = input("UVW");
   ShaderInput *color0_in = input("Color0");
   ShaderInput *color1_in = input("Color1");
   ShaderInput *color2_in = input("Color2");
 
-  ShaderOutput *color_out = output("Color");
+  ShaderOutput *uvw_out = output("Perturbed UVW");
 
   compiler.add_node(RHINO_NODE_PERTURBING_PART2_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(color0_in),
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color0_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign_if_linked(color_out)));
-
-  compiler.add_node(__float_as_int(amount));
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign_if_linked(uvw_out)),
+                    __float_as_int(amount));
 }
 
 void RhinoPerturbingPart2TextureNode::compile(OSLCompiler &compiler)

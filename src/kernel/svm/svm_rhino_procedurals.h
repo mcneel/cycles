@@ -978,23 +978,23 @@ ccl_device float3 perturbing_part2_texture(
 ccl_device void svm_rhino_node_perturbing_part2_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color0_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color0_offset, in_color1_offset, in_color2_offset, out_uvw_offset;
   uint dummy;
 
   svm_unpack_node_uchar4(
       node.y, &in_uvw_offset, &in_color0_offset, &in_color1_offset, &in_color2_offset);
-  svm_unpack_node_uchar4(node.z, &out_color_offset, &dummy, &dummy, &dummy);
+  svm_unpack_node_uchar4(node.z, &out_uvw_offset, &dummy, &dummy, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color0 = stack_load_float3(stack, in_color0_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
-  float amount = read_node_float(kg, offset).x;
+  float amount = __uint_as_float(node.w);
 
-  float3 out_color = perturbing_part2_texture(uvw, color0, color1, color2, amount);
+  float3 out_uvw = perturbing_part2_texture(uvw, color0, color1, color2, amount);
 
-  if (stack_valid(out_color_offset))
-    stack_store_float3(stack, out_color_offset, out_color);
+  if (stack_valid(out_uvw_offset))
+    stack_store_float3(stack, out_uvw_offset, out_uvw);
 }
 
 CCL_NAMESPACE_END
