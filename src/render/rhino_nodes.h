@@ -16,6 +16,16 @@ class LightManager;
 class Scene;
 class Shader;
 
+class MatrixMathNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(MatrixMathNode)
+
+  Transform tfm;
+  float3 vector;
+
+  NodeMatrixMath type;
+};
+
 class AzimuthAltitudeTransformNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(AzimuthAltitudeTransformNode)

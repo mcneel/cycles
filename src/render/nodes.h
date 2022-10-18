@@ -1416,16 +1416,6 @@ class NormalNode : public ShaderNode {
   float3 normal;
 };
 
-class MatrixMathNode : public ShaderNode {
-public:
-  SHADER_NODE_CLASS(MatrixMathNode)
-
-  Transform tfm;
-  float3 vector;
-
-  NodeMatrixMath type;
-};
-
 class VectorMathNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(VectorMathNode)
