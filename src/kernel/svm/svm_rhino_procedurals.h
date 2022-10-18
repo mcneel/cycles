@@ -638,35 +638,35 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
     float z = uvw.z * freq - fo;
 
     switch (noise_type) {
-      case RhinoProceduralNoiseType::PERLIN:
+      case RhinoProceduralNoiseType::RHINO_PERLIN:
         value = noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::VALUE_NOISE:
+      case RhinoProceduralNoiseType::RHINO_VALUE_NOISE:
         value = value_noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::PERLIN_PLUS_VALUE:
+      case RhinoProceduralNoiseType::RHINO_PERLIN_PLUS_VALUE:
         value = 0.5f * value_noise(kg, x, y, z) + 0.5f * noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::SIMPLEX:
+      case RhinoProceduralNoiseType::RHINO_SIMPLEX:
         value = simplex_noise(x, y, z);
         break;
-      case RhinoProceduralNoiseType::SPARSE_CONVOLUTION:
+      case RhinoProceduralNoiseType::RHINO_SPARSE_CONVOLUTION:
         value = sparse_convolution_noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::LATTICE_CONVOLUTION:
+      case RhinoProceduralNoiseType::RHINO_LATTICE_CONVOLUTION:
         value = lattice_convolution_noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::WARDS_HERMITE:
+      case RhinoProceduralNoiseType::RHINO_WARDS_HERMITE:
         value = wards_hermite_noise(x, y, z);
         break;
-      case RhinoProceduralNoiseType::AALTONEN:
+      case RhinoProceduralNoiseType::RHINO_AALTONEN:
         value = aaltonen_noise(kg, x, y, z);
         break;
       default:
         break;
     }
 
-    if (spec_synth_type == RhinoProceduralSpecSynthType::TURBULENCE && (value < 0.0f))
+    if (spec_synth_type == RhinoProceduralSpecSynthType::RHINO_TURBULENCE && (value < 0.0f))
       value = -value;
     total_value += weight * value;
 
@@ -679,7 +679,7 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
   if (total_weight > 0.0f)
     total_value /= total_weight;
 
-  if (spec_synth_type == RhinoProceduralSpecSynthType::TURBULENCE)
+  if (spec_synth_type == RhinoProceduralSpecSynthType::RHINO_TURBULENCE)
     total_value = 2.0f * total_value - 1.0f;
 
   if (total_value >= clamp_max)
@@ -776,7 +776,7 @@ ccl_device float4 waves_width_texture(float3 uvw,
 
   float3 uvw_perturbed = make_float3(uvw.x, 0.5 + floorf(uvw.y), 0.0);
 
-  if (wave_type == RhinoProceduralWavesType::RADIAL) {
+  if (wave_type == RhinoProceduralWavesType::RHINO_RADIAL) {
     float uvw_length = len(uvw);
     if (uvw_length == 0.0)
       uvw_perturbed = make_float3(0.0f);
@@ -827,7 +827,7 @@ ccl_device float4 waves_texture(float3 uvw,
 {
   uvw = transform_point(uvw_transform, uvw);
 
-  float parameter = ((wave_type == RhinoProceduralWavesType::LINEAR) ?
+  float parameter = ((wave_type == RhinoProceduralWavesType::RHINO_LINEAR) ?
                          uvw.y :
                          sqrt(uvw.x * uvw.x + uvw.y * uvw.y));
 

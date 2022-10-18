@@ -20,24 +20,24 @@ limitations under the License.
 CCL_NAMESPACE_BEGIN
 
 typedef enum RhinoProceduralNoiseType {
-  PERLIN,
-  VALUE_NOISE,
-  PERLIN_PLUS_VALUE,
-  SIMPLEX,
-  SPARSE_CONVOLUTION,
-  LATTICE_CONVOLUTION,
-  WARDS_HERMITE,
-  AALTONEN,
+  RHINO_PERLIN,
+  RHINO_VALUE_NOISE,
+  RHINO_PERLIN_PLUS_VALUE,
+  RHINO_SIMPLEX,
+  RHINO_SPARSE_CONVOLUTION,
+  RHINO_LATTICE_CONVOLUTION,
+  RHINO_WARDS_HERMITE,
+  RHINO_AALTONEN,
 } RhinoProceduralNoiseType;
 
 typedef enum RhinoProceduralSpecSynthType {
-  FRACTAL_SUM,
-  TURBULENCE,
+  RHINO_FRACTAL_SUM,
+  RHINO_TURBULENCE,
 } RhinoProceduralSpecSynthType;
 
 typedef enum RhinoProceduralWavesType {
-  LINEAR,
-  RADIAL,
+  RHINO_LINEAR,
+  RHINO_RADIAL,
 } RhinoProceduralWavesType;
 
 CCL_NAMESPACE_END

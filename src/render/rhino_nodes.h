@@ -4,7 +4,7 @@
 #include "render/graph.h"
 #include "graph/node.h"
 #include "render/nodes.h"
-#include "svm_rhino_types.h"
+#include "kernel/svm/svm_rhino_types.h"
 
 #include "util/util_array.h"
 #include "util/util_string.h"

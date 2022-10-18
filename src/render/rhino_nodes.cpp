@@ -123,8 +123,23 @@ NODE_DEFINE(RhinoNoiseTextureNode)
   SOCKET_TRANSFORM(uvw_transform,
                    "UvwTransform",
                    make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
-  SOCKET_INT(noise_type, "NoiseType", 0);
-  SOCKET_INT(spec_synth_type, "SpecSynthType", 0);
+
+  static NodeEnum noise_type_enum;
+  noise_type_enum.insert("perlin", RHINO_PERLIN);
+  noise_type_enum.insert("value noise", RHINO_VALUE_NOISE);
+  noise_type_enum.insert("perlin plus value", RHINO_PERLIN_PLUS_VALUE);
+  noise_type_enum.insert("simplex", RHINO_SIMPLEX);
+  noise_type_enum.insert("sparse convolution", RHINO_SPARSE_CONVOLUTION);
+  noise_type_enum.insert("lattice convolution", RHINO_LATTICE_CONVOLUTION);
+  noise_type_enum.insert("wards hermite", RHINO_WARDS_HERMITE);
+  noise_type_enum.insert("aaltonen", RHINO_AALTONEN);
+  SOCKET_ENUM(noise_type, "NoiseType", noise_type_enum, RHINO_PERLIN);
+
+  static NodeEnum spec_synth_type_enum;
+  spec_synth_type_enum.insert("fractal sum", RHINO_FRACTAL_SUM);
+  spec_synth_type_enum.insert("turbulence", RHINO_TURBULENCE);
+
+  SOCKET_ENUM(spec_synth_type, "SpecSynthType", spec_synth_type_enum, RHINO_FRACTAL_SUM);
   SOCKET_INT(octave_count, "OctaveCount", 0);
   SOCKET_FLOAT(frequency_multiplier, "FrequencyMultiplier", 0.0f);
   SOCKET_FLOAT(amplitude_multiplier, "AmplitudeMultiplier", 0.0f);
@@ -187,7 +202,10 @@ NODE_DEFINE(RhinoWavesTextureNode)
   SOCKET_TRANSFORM(uvw_transform,
                    "UvwTransform",
                    make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
-  SOCKET_INT(wave_type, "WaveType", 0);
+  static NodeEnum wave_type_enum;
+  wave_type_enum.insert("linear", RHINO_LINEAR);
+  wave_type_enum.insert("radial", RHINO_RADIAL);
+  SOCKET_ENUM(wave_type, "WaveType", wave_type_enum, RHINO_LINEAR);
   SOCKET_FLOAT(wave_width, "WaveWidth", 0);
   SOCKET_BOOLEAN(wave_width_texture_on, "WaveWidthTextureOn", 0);
   SOCKET_FLOAT(contrast1, "Contrast1", 0.0f);
@@ -244,7 +262,11 @@ NODE_DEFINE(RhinoWavesWidthTextureNode)
   SOCKET_TRANSFORM(uvw_transform,
                    "UvwTransform",
                    make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
-  SOCKET_INT(wave_type, "WaveType", 0);
+
+  static NodeEnum wave_type_enum;
+  wave_type_enum.insert("linear", RHINO_LINEAR);
+  wave_type_enum.insert("radial", RHINO_RADIAL);
+  SOCKET_ENUM(wave_type, "WaveType", wave_type_enum, RHINO_LINEAR);
 
   SOCKET_OUT_POINT(out_uvw, "UVW");
 
