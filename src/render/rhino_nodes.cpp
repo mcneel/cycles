@@ -34,6 +34,7 @@ NODE_DEFINE(MatrixMathNode)
   type_enum.insert("Perspective", NODE_MATRIX_MATH_PERSPECTIVE);
   type_enum.insert("Direction Transposed", NODE_MATRIX_MATH_DIR_TRANSPOSED);
   SOCKET_ENUM(type, "Type", type_enum, NODE_MATRIX_MATH_POINT);
+  SOCKET_TRANSFORM(tfm, "Transform", transform_identity());
 
   SOCKET_IN_VECTOR(vector, "Vector", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_OUT_VECTOR(vector, "Vector");
