@@ -83,7 +83,7 @@ NODE_DEFINE(AzimuthAltitudeTransformNode)
   NodeType *type = NodeType::add("azimuth_altitude_transform", create, NodeType::SHADER);
 
   SOCKET_IN_POINT(
-      vector, "Vector", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+      vector, "Vector", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_FLOAT(azimuth, "Azimuth", 0.0f);
   SOCKET_IN_FLOAT(altitude, "Altitude", 0.0f);
   SOCKET_IN_FLOAT(threshold, "Threshold", 0.001f);
@@ -100,9 +100,7 @@ AzimuthAltitudeTransformNode::AzimuthAltitudeTransformNode() : ShaderNode(node_t
 void AzimuthAltitudeTransformNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *vector_in = input("Vector");
-
   ShaderOutput *vector_out = output("Vector");
-
 
   compiler.add_node(RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM,
                     compiler.stack_assign(vector_in),
@@ -124,7 +122,7 @@ NODE_DEFINE(RhinoCheckerTexture2dNode)
 {
   NodeType *type = NodeType::add("rhino_checker_texture_2d", create, NodeType::SHADER);
 
-  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
 
@@ -153,7 +151,7 @@ void RhinoCheckerTexture2dNode::compile(SVMCompiler &compiler)
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
                                            compiler.stack_assign(color2_in),
-                                           compiler.stack_assign_if_linked(color_out))
+                                           compiler.stack_assign(color_out))
                    );
   compiler.add_node(uvw_transform.x);
   compiler.add_node(uvw_transform.y);
@@ -170,7 +168,7 @@ NODE_DEFINE(RhinoNoiseTextureNode)
 {
   NodeType *type = NodeType::add("rhino_noise_texture", create, NodeType::SHADER);
 
-  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
 
@@ -179,21 +177,22 @@ NODE_DEFINE(RhinoNoiseTextureNode)
                    make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
   static NodeEnum noise_type_enum;
-  noise_type_enum.insert("perlin", RHINO_PERLIN);
-  noise_type_enum.insert("value noise", RHINO_VALUE_NOISE);
-  noise_type_enum.insert("perlin plus value", RHINO_PERLIN_PLUS_VALUE);
-  noise_type_enum.insert("simplex", RHINO_SIMPLEX);
-  noise_type_enum.insert("sparse convolution", RHINO_SPARSE_CONVOLUTION);
-  noise_type_enum.insert("lattice convolution", RHINO_LATTICE_CONVOLUTION);
-  noise_type_enum.insert("wards hermite", RHINO_WARDS_HERMITE);
-  noise_type_enum.insert("aaltonen", RHINO_AALTONEN);
-  SOCKET_ENUM(noise_type, "NoiseType", noise_type_enum, RHINO_PERLIN);
+  noise_type_enum.insert("perlin", RHINO_NOISE_PERLIN);
+  noise_type_enum.insert("value noise", RHINO_NOISE_VALUE_NOISE);
+  noise_type_enum.insert("perlin plus value", RHINO_NOISE_PERLIN_PLUS_VALUE);
+  noise_type_enum.insert("simplex", RHINO_NOISE_SIMPLEX);
+  noise_type_enum.insert("sparse convolution", RHINO_NOISE_SPARSE_CONVOLUTION);
+  noise_type_enum.insert("lattice convolution", RHINO_NOISE_LATTICE_CONVOLUTION);
+  noise_type_enum.insert("wards hermite", RHINO_NOISE_WARDS_HERMITE);
+  noise_type_enum.insert("aaltonen", RHINO_NOISE_AALTONEN);
+  SOCKET_ENUM(noise_type, "NoiseType", noise_type_enum, RHINO_NOISE_PERLIN);
 
   static NodeEnum spec_synth_type_enum;
-  spec_synth_type_enum.insert("fractal sum", RHINO_FRACTAL_SUM);
-  spec_synth_type_enum.insert("turbulence", RHINO_TURBULENCE);
+  spec_synth_type_enum.insert("fractal sum", RHINO_SPEC_SYNTH_FRACTAL_SUM);
+  spec_synth_type_enum.insert("turbulence", RHINO_SPEC_SYNTH_TURBULENCE);
 
-  SOCKET_ENUM(spec_synth_type, "SpecSynthType", spec_synth_type_enum, RHINO_FRACTAL_SUM);
+  SOCKET_ENUM(
+      spec_synth_type, "SpecSynthType", spec_synth_type_enum, RHINO_SPEC_SYNTH_FRACTAL_SUM);
   SOCKET_INT(octave_count, "OctaveCount", 0);
   SOCKET_FLOAT(frequency_multiplier, "FrequencyMultiplier", 0.0f);
   SOCKET_FLOAT(amplitude_multiplier, "AmplitudeMultiplier", 0.0f);
@@ -224,7 +223,7 @@ void RhinoNoiseTextureNode::compile(SVMCompiler &compiler)
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
                                            compiler.stack_assign(color2_in),
-                                           compiler.stack_assign_if_linked(color_out)));
+                                           compiler.stack_assign(color_out)));
   compiler.add_node(uvw_transform.x);
   compiler.add_node(uvw_transform.y);
   compiler.add_node(uvw_transform.z);
@@ -248,7 +247,7 @@ NODE_DEFINE(RhinoWavesTextureNode)
 {
   NodeType *type = NodeType::add("rhino_waves_texture", create, NodeType::SHADER);
 
-  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color3, "Color3", make_float3(0.0f, 0.0f, 0.0f));
@@ -257,9 +256,9 @@ NODE_DEFINE(RhinoWavesTextureNode)
                    "UvwTransform",
                    make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
   static NodeEnum wave_type_enum;
-  wave_type_enum.insert("linear", RHINO_LINEAR);
-  wave_type_enum.insert("radial", RHINO_RADIAL);
-  SOCKET_ENUM(wave_type, "WaveType", wave_type_enum, RHINO_LINEAR);
+  wave_type_enum.insert("linear", RHINO_WAVES_LINEAR);
+  wave_type_enum.insert("radial", RHINO_WAVES_RADIAL);
+  SOCKET_ENUM(wave_type, "WaveType", wave_type_enum, RHINO_WAVES_LINEAR);
   SOCKET_FLOAT(wave_width, "WaveWidth", 0);
   SOCKET_BOOLEAN(wave_width_texture_on, "WaveWidthTextureOn", 0);
   SOCKET_FLOAT(contrast1, "Contrast1", 0.0f);
@@ -288,7 +287,7 @@ void RhinoWavesTextureNode::compile(SVMCompiler &compiler)
                                            compiler.stack_assign(color1_in),
                                            compiler.stack_assign(color2_in),
                                            compiler.stack_assign(color3_in)),
-                    compiler.encode_uchar4(compiler.stack_assign_if_linked(color_out)));
+                    compiler.encode_uchar4(compiler.stack_assign(color_out)));
 
   compiler.add_node(uvw_transform.x);
   compiler.add_node(uvw_transform.y);
@@ -311,16 +310,16 @@ NODE_DEFINE(RhinoWavesWidthTextureNode)
 {
   NodeType *type = NodeType::add("rhino_waves_width_texture", create, NodeType::SHADER);
 
-  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
 
   SOCKET_TRANSFORM(uvw_transform,
                    "UvwTransform",
                    make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
   static NodeEnum wave_type_enum;
-  wave_type_enum.insert("linear", RHINO_LINEAR);
-  wave_type_enum.insert("radial", RHINO_RADIAL);
-  SOCKET_ENUM(wave_type, "WaveType", wave_type_enum, RHINO_LINEAR);
+  wave_type_enum.insert("linear", RHINO_WAVES_LINEAR);
+  wave_type_enum.insert("radial", RHINO_WAVES_RADIAL);
+  SOCKET_ENUM(wave_type, "WaveType", wave_type_enum, RHINO_WAVES_LINEAR);
 
   SOCKET_OUT_POINT(out_uvw, "UVW");
 
@@ -339,7 +338,7 @@ void RhinoWavesWidthTextureNode::compile(SVMCompiler &compiler)
 
   compiler.add_node(RHINO_NODE_WAVES_WIDTH_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign_if_linked(uvw_out)));
+                                           compiler.stack_assign(uvw_out)));
 
   compiler.add_node(uvw_transform.x);
   compiler.add_node(uvw_transform.y);
@@ -358,15 +357,15 @@ NODE_DEFINE(RhinoPerturbingPart1TextureNode)
 {
   NodeType *type = NodeType::add("rhino_perturbing_part1_texture", create, NodeType::SHADER);
 
-  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
 
   SOCKET_TRANSFORM(uvw_transform,
                    "UvwTransform",
                    make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
-  SOCKET_OUT_POINT(out_uvw0, "UVW0");
   SOCKET_OUT_POINT(out_uvw1, "UVW1");
   SOCKET_OUT_POINT(out_uvw2, "UVW2");
+  SOCKET_OUT_POINT(out_uvw3, "UVW3");
 
   return type;
 }
@@ -379,15 +378,15 @@ void RhinoPerturbingPart1TextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
 
-  ShaderOutput *uvw0_out = output("UVW0");
   ShaderOutput *uvw1_out = output("UVW1");
   ShaderOutput *uvw2_out = output("UVW2");
+  ShaderOutput *uvw3_out = output("UVW3");
 
   compiler.add_node(RHINO_NODE_PERTURBING_PART1_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign_if_linked(uvw0_out),
-                                           compiler.stack_assign_if_linked(uvw1_out),
-                                           compiler.stack_assign_if_linked(uvw2_out)));
+                                           compiler.stack_assign(uvw1_out),
+                                           compiler.stack_assign(uvw2_out),
+                                           compiler.stack_assign(uvw3_out)));
 
   compiler.add_node(uvw_transform.x);
   compiler.add_node(uvw_transform.y);
@@ -405,13 +404,14 @@ NODE_DEFINE(RhinoPerturbingPart2TextureNode)
   NodeType *type = NodeType::add("rhino_perturbing_part2_texture", create, NodeType::SHADER);
 
   SOCKET_IN_POINT(
-      uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+      uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(
-      color0, "Color0", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+      color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(
-      color1, "Color1", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+      color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(
-      color2, "Color2", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_GENERATED);
+      color3, "Color3", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_FLOAT(amount, "Amount", 0.5f);
 
   SOCKET_OUT_POINT(out_uvw, "Perturbed UVW");
 
@@ -425,22 +425,87 @@ RhinoPerturbingPart2TextureNode::RhinoPerturbingPart2TextureNode() : ShaderNode(
 void RhinoPerturbingPart2TextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
-  ShaderInput *color0_in = input("Color0");
   ShaderInput *color1_in = input("Color1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *color3_in = input("Color3");
 
   ShaderOutput *uvw_out = output("Perturbed UVW");
 
   compiler.add_node(RHINO_NODE_PERTURBING_PART2_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color0_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign_if_linked(uvw_out)),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color3_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_out)),
                     __float_as_int(amount));
 }
 
 void RhinoPerturbingPart2TextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Gradient */
+
+NODE_DEFINE(RhinoGradientTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_gradient_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(
+      color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(
+      color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_TRANSFORM(uvw_transform,
+                   "UvwTransform",
+                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
+
+  static NodeEnum gradient_type_enum;
+  gradient_type_enum.insert("linear", RHINO_GRADIENT_LINEAR);
+  gradient_type_enum.insert("box", RHINO_GRADIENT_BOX);
+  gradient_type_enum.insert("radial", RHINO_GRADIENT_RADIAL);
+  gradient_type_enum.insert("tartan", RHINO_GRADIENT_TARTAN);
+  gradient_type_enum.insert("sweep", RHINO_GRADIENT_SWEEP);
+  gradient_type_enum.insert("pong", RHINO_GRADIENT_PONG);
+  gradient_type_enum.insert("spiral", RHINO_GRADIENT_SPIRAL);
+  SOCKET_ENUM(gradient_type, "GradientType", gradient_type_enum, RHINO_GRADIENT_LINEAR);
+  SOCKET_BOOLEAN(flip_alternate, "FlipAlternate", false);
+  SOCKET_BOOLEAN(use_custom_curve, "UseCustomCurve", false);
+  SOCKET_INT(point_width, "PointWidth", 1.0f);
+  SOCKET_INT(point_height, "PointHeight", 1.0f);
+
+  SOCKET_OUT_COLOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoGradientTextureNode::RhinoGradientTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoGradientTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_GRADIENT_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node(uvw_transform.x);
+  compiler.add_node(uvw_transform.y);
+  compiler.add_node(uvw_transform.z);
+
+  compiler.add_node((int)gradient_type, (int)flip_alternate, (int)use_custom_curve, point_width);
+  compiler.add_node(point_height);
+}
+
+void RhinoGradientTextureNode::compile(OSLCompiler &compiler)
 {
 }
 

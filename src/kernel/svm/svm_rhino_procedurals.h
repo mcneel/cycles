@@ -638,35 +638,35 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
     float z = uvw.z * freq - fo;
 
     switch (noise_type) {
-      case RhinoProceduralNoiseType::RHINO_PERLIN:
+      case RHINO_NOISE_PERLIN:
         value = noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::RHINO_VALUE_NOISE:
+      case RHINO_NOISE_VALUE_NOISE:
         value = value_noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::RHINO_PERLIN_PLUS_VALUE:
+      case RHINO_NOISE_PERLIN_PLUS_VALUE:
         value = 0.5f * value_noise(kg, x, y, z) + 0.5f * noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::RHINO_SIMPLEX:
+      case RHINO_NOISE_SIMPLEX:
         value = simplex_noise(x, y, z);
         break;
-      case RhinoProceduralNoiseType::RHINO_SPARSE_CONVOLUTION:
+      case RHINO_NOISE_SPARSE_CONVOLUTION:
         value = sparse_convolution_noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::RHINO_LATTICE_CONVOLUTION:
+      case RHINO_NOISE_LATTICE_CONVOLUTION:
         value = lattice_convolution_noise(kg, x, y, z);
         break;
-      case RhinoProceduralNoiseType::RHINO_WARDS_HERMITE:
+      case RHINO_NOISE_WARDS_HERMITE:
         value = wards_hermite_noise(x, y, z);
         break;
-      case RhinoProceduralNoiseType::RHINO_AALTONEN:
+      case RHINO_NOISE_AALTONEN:
         value = aaltonen_noise(kg, x, y, z);
         break;
       default:
         break;
     }
 
-    if (spec_synth_type == RhinoProceduralSpecSynthType::RHINO_TURBULENCE && (value < 0.0f))
+    if (spec_synth_type == RHINO_SPEC_SYNTH_TURBULENCE && (value < 0.0f))
       value = -value;
     total_value += weight * value;
 
@@ -679,7 +679,7 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
   if (total_weight > 0.0f)
     total_value /= total_weight;
 
-  if (spec_synth_type == RhinoProceduralSpecSynthType::RHINO_TURBULENCE)
+  if (spec_synth_type == RHINO_SPEC_SYNTH_TURBULENCE)
     total_value = 2.0f * total_value - 1.0f;
 
   if (total_value >= clamp_max)
@@ -776,7 +776,7 @@ ccl_device float4 waves_width_texture(float3 uvw,
 
   float3 uvw_perturbed = make_float3(uvw.x, 0.5 + floorf(uvw.y), 0.0);
 
-  if (wave_type == RhinoProceduralWavesType::RHINO_RADIAL) {
+  if (wave_type == RHINO_WAVES_RADIAL) {
     float uvw_length = len(uvw);
     if (uvw_length == 0.0)
       uvw_perturbed = make_float3(0.0f);
@@ -827,7 +827,7 @@ ccl_device float4 waves_texture(float3 uvw,
 {
   uvw = transform_point(uvw_transform, uvw);
 
-  float parameter = ((wave_type == RhinoProceduralWavesType::RHINO_LINEAR) ?
+  float parameter = ((wave_type == RHINO_WAVES_LINEAR) ?
                          uvw.y :
                          sqrt(uvw.x * uvw.x + uvw.y * uvw.y));
 
@@ -995,6 +995,132 @@ ccl_device void svm_rhino_node_perturbing_part2_texture(
 
   if (stack_valid(out_uvw_offset))
     stack_store_float3(stack, out_uvw_offset, out_uvw);
+}
+
+ccl_device float4 gradient_texture(float3 uvw,
+                                   const Transform *uvw_transform,
+                                   float4 color1,
+                                   float4 color2,
+                                   RhinoProceduralGradientType type,
+                                   bool flip_alternate,
+                                   bool use_custom_curve,
+                                   int point_width,
+                                   int point_height)
+{
+  uvw = transform_point(uvw_transform, uvw);
+
+  float4 color_out = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
+
+  int u_cell = int(floorf(uvw.x));
+  int v_cell = int(floorf(uvw.y));
+
+  float u = fractf(uvw.x);
+  float v = fractf(uvw.y);
+
+  int cell_parity = 0;
+  float t = 0;
+
+  switch (type) {
+    case RHINO_GRADIENT_LINEAR:
+      t = v;
+      cell_parity = v_cell;
+      break;
+
+    case RHINO_GRADIENT_BOX:
+      t = 2.0f * min(min(v, 1.0f - v), min(u, 1.0f - u));
+      cell_parity = v_cell + u_cell;
+      break;
+
+    case RHINO_GRADIENT_RADIAL: {
+      float dist = sqrt(uvw.x * uvw.x + uvw.y * uvw.y);
+      t = fractf(dist);
+      cell_parity = int(floorf(dist));
+    } break;
+
+    case RHINO_GRADIENT_TARTAN:
+      t = 1.0f - min(fabsf(0.5f - u), fabsf(0.5f - v)) * 2.0f;
+      cell_parity = v_cell + u_cell;
+      break;
+
+    case RHINO_GRADIENT_SWEEP:
+      t = atan2f(uvw.x, uvw.y) / (2.0f * PI / 4.0f);
+      cell_parity = int(floorf(t));
+      t = fmodf(t + 40.0f, 1.0f);
+      break;
+
+    case RHINO_GRADIENT_PONG:
+      t = atan2f(uvw.x, uvw.y) / (2.0f * PI / 8.0f);
+      cell_parity = int(floorf(0.5 * t));
+      t = fmodf(t + 80.0f, 2.0f);
+      if (t > 1.0f)
+        t = 2.0f - t;
+      break;
+
+    case RHINO_GRADIENT_SPIRAL:
+      t = atan2f(0.5f - uvw.x, uvw.y - 0.5f) / (2.0f * PI / 1.0f);
+      t = fmodf(t + 10.0f, 1.0f);
+      cell_parity = 0;
+      break;
+  }
+
+  if (flip_alternate && is_odd(cell_parity)) {
+    t = 1.0 - t;
+  }
+
+  if (use_custom_curve) {
+    // for (int i = 0; i < point_height; ++i) {
+    //   float newV = GetCurveY(i, t, point_width, point_height, sampler_index);
+    //   color1[i] *= newV;
+    //   color2[i] *= newV;
+    // }
+
+    color_out = clamp(color1 + color2, make_float4(0.0f), make_float4(1.0f));
+  }
+  else {
+    color_out = mix(color2, color1, t);
+  }
+
+  return color_out;
+}
+
+ccl_device void svm_rhino_node_gradient_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+
+  Transform uvw_transform;
+  uvw_transform.x = read_node_float(kg, offset);
+  uvw_transform.y = read_node_float(kg, offset);
+  uvw_transform.z = read_node_float(kg, offset);
+
+  uint4 data0 = read_node(kg, offset);
+  uint4 data1 = read_node(kg, offset);
+
+  RhinoProceduralGradientType gradient_type = (RhinoProceduralGradientType)data0.x;
+  bool flip_alternate = (bool)data0.y;
+  bool use_custom_curve = (bool)data0.z;
+  int point_width = (int)data0.w;
+  int point_height = (int)data1.x;
+
+  float4 out_color = gradient_texture(uvw,
+                                      &uvw_transform,
+                                      make_float4(color1.x, color1.y, color1.z, 1.0f),
+                                      make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                      gradient_type,
+                                      flip_alternate,
+                                      use_custom_curve,
+                                      point_width,
+                                      point_height);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
 CCL_NAMESPACE_END

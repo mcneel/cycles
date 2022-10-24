@@ -125,10 +125,30 @@ class RhinoPerturbingPart2TextureNode : public ShaderNode {
   SHADER_NODE_CLASS(RhinoPerturbingPart2TextureNode)
 
   float3 uvw;
-  float3 color0;
   float3 color1;
   float3 color2;
+  float3 color3;
   float amount;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoGradientTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoGradientTextureNode)
+
+  float3 uvw;
+  Transform uvw_transform;
+  float3 color1;
+  float3 color2;
+  RhinoProceduralGradientType gradient_type;
+  bool flip_alternate;
+  bool use_custom_curve;
+  int point_width;
+  int point_height;
 
   virtual int get_group()
   {
