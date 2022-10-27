@@ -509,4 +509,50 @@ void RhinoGradientTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Blend */
+
+NODE_DEFINE(RhinoBlendTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_blend_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(blend_color, "BlendColor", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_BOOLEAN(use_blend_color, "UseBlendColor", false);
+  SOCKET_FLOAT(blend_factor, "BlendFactor", 0.5f);
+
+  SOCKET_OUT_COLOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoBlendTextureNode::RhinoBlendTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoBlendTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+  ShaderInput *blend_color_in = input("BlendColor");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_BLEND_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(blend_color_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(color_out)));
+
+  compiler.add_node((int)use_blend_color, __float_as_int(blend_factor));
+}
+
+void RhinoBlendTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END

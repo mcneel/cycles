@@ -1123,4 +1123,58 @@ ccl_device void svm_rhino_node_gradient_texture(
     stack_store_float3(stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
+ccl_device float Luminance(float3 color)
+{
+  return 0.299f * color.x + 0.587f * color.y + 0.114f * color.z;
+}
+
+ccl_device float4 blend_texture(float3 uvw,
+                                float4 color1,
+                                float4 color2,
+                                float4 blend_color,
+                                bool use_blend_color,
+                                float blend_factor)
+{
+  if (use_blend_color) {
+    blend_factor = Luminance(make_float3(blend_color.x, blend_color.y, blend_color.z));
+  }
+
+  float4 color_out = mix(color1, color2, blend_factor);
+  color_out.w = clamp(color_out.w, 0.0f, 1.0f);
+
+  return color_out;
+}
+
+ccl_device void svm_rhino_node_blend_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, in_blend_color_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &in_blend_color_offset);
+  svm_unpack_node_uchar4(node.z, &out_color_offset, &dummy, &dummy, &dummy);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float3 blend_color = stack_load_float3(stack, in_blend_color_offset);
+
+  uint4 data = read_node(kg, offset);
+
+  bool use_blend_color = (bool)data.x;
+  float blend_factor = __uint_as_float(data.y);
+
+  float4 out_color = blend_texture(uvw,
+                                   make_float4(color1.x, color1.y, color1.z, 1.0f),
+                                   make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                   make_float4(blend_color.x, blend_color.y, blend_color.z, 1.0f),
+                                   use_blend_color,
+                                   blend_factor);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
 CCL_NAMESPACE_END

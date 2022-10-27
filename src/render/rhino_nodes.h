@@ -156,6 +156,23 @@ class RhinoGradientTextureNode : public ShaderNode {
   }
 };
 
+class RhinoBlendTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoBlendTextureNode)
+
+  float3 uvw;
+  float3 color1;
+  float3 color2;
+  float3 blend_color;
+  bool use_blend_color;
+  float blend_factor;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */
