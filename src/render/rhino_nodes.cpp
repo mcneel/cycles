@@ -555,4 +555,43 @@ void RhinoBlendTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Exposure */
+
+NODE_DEFINE(RhinoExposureTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_exposure_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_COLOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_FLOAT(exposure, "Exposure", 1.0f);
+  SOCKET_FLOAT(multiplier, "Multiplier", 0.5f);
+  SOCKET_FLOAT(world_luminance, "WorldLuminance", 0.5f);
+  SOCKET_FLOAT(max_luminance, "MaxLuminance", 0.5f);
+
+  SOCKET_OUT_COLOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoExposureTextureNode::RhinoExposureTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoExposureTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *color_in = input("Color");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(
+      RHINO_NODE_EXPOSURE_TEXTURE,
+      compiler.encode_uchar4(compiler.stack_assign(color_in), compiler.stack_assign(color_out)));
+
+  compiler.add_node(__float_as_int(exposure), __float_as_int(multiplier), __float_as_int(world_luminance), __float_as_int(max_luminance));
+}
+
+void RhinoExposureTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END

@@ -173,6 +173,22 @@ class RhinoBlendTextureNode : public ShaderNode {
   }
 };
 
+class RhinoExposureTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoExposureTextureNode)
+
+  float3 color;
+  float exposure;
+  float multiplier;
+  float world_luminance;
+  float max_luminance;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

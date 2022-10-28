@@ -163,6 +163,7 @@ typedef enum ShaderNodeType {
   RHINO_NODE_PERTURBING_PART2_TEXTURE,
   RHINO_NODE_GRADIENT_TEXTURE,
   RHINO_NODE_BLEND_TEXTURE,
+  RHINO_NODE_EXPOSURE_TEXTURE,
 } ShaderNodeType;
 
 typedef enum NodeAttributeType {

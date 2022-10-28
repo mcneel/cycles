@@ -1177,4 +1177,141 @@ ccl_device void svm_rhino_node_blend_texture(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
+ccl_device float3 RgbToYxy(float3 rgb)
+{
+  float Y = 0.0f;
+  float x = 0.0f;
+  float y = 0.0f;
+
+  float r = rgb.x;
+  float g = rgb.y;
+  float b = rgb.z;
+
+  float res0 = (0.5141364f * r) + (0.32387860f * g) + (0.16036376f * b);
+  float res1 = (0.2650680f * r) + (0.67023428f * g) + (0.06409157f * b);
+  float res2 = (0.0241188f * r) + (0.12281780f * g) + (0.84442666f * b);
+
+  float fW = res0 + res1 + res2;
+  if (fW > 0.0f) {
+    Y = res1;
+    x = res0 / fW;
+    y = res1 / fW;
+  }
+
+  return make_float3(Y, x, y);
+}
+
+ccl_device float3 LogMapYxy(float3 Yxy, float exposure, float world_luminance, float max_luminance)
+{
+  float Y = Yxy[0];
+  float x = Yxy[1];
+  float y = Yxy[2];
+
+  float fExposure = pow(2.0f, exposure);  // default exposure is 1, 2^0
+
+  // Arbitrary Bias Parameter
+  float fBias = 0.85f;
+  float fCont = 0.0f;
+
+  float exp_adapt = 1.0f;
+
+  float fAvLum = exp(world_luminance) / exp_adapt;
+  float fBiasP = (log(fBias) / log(0.5));
+  float fContP = (0.0f != fCont) ? 1.0f / fCont : 1e22f;
+  float fLmax = max_luminance / fAvLum;
+  float fDivider = log10(fLmax + 1.0f);
+
+  float fValue = Y;
+
+  // Inverse gamma function to enhance contrast. Not in paper.
+  if (0.0f != fCont) {
+    fValue = pow(fValue, fContP);
+  }
+
+  fValue = (fValue / fAvLum) * fExposure;
+
+  float fLog;
+
+  if (fValue < 1.0f) {
+    // Approximation of log(x+1) = x(6 + x) / (6 + 4x) when x < 1.
+    fLog = fValue * (6.0f + fValue) / (6.0f + (4.0f * fValue));
+  }
+  else if (fValue < 2.0f) {
+    // Approximation of log(x+1) = x(6 + 0.7662x) / (5.9897 + 3.7658x) when 1 < x < 2.
+    fLog = fValue * (6.0f + 0.7662f * fValue) / (5.9897f + 3.7658f * fValue);
+  }
+  else {
+    // Normal log(x+1).
+    fLog = log(fValue + 1.0f);
+  }
+
+  float fInterpol = log(2.0f + pow(fValue / fLmax, fBiasP) * 8.0f);
+
+  Y = (fLog / fInterpol) / fDivider;
+
+  return make_float3(Y, x, y);
+}
+
+ccl_device float3 YxyToRgb(float3 Yxy)
+{
+  float Y = Yxy[0];
+  float x = Yxy[1];
+  float y = Yxy[2];
+
+  float X = 0.0;
+  float Z = 0.0;
+
+  if ((x > 0.0) && (y > 0.0)) {
+    X = (x * Y) / y;
+    Z = (X / x) - X - Y;
+  }
+
+  float r = (2.5651f * X) + (-1.1665f * Y) + (-0.3986f * Z);
+  float g = (-1.0217f * X) + (1.9777f * Y) + (0.0439f * Z);
+  float b = (0.0753f * X) + (-0.2543f * Y) + (1.1892f * Z);
+
+  return make_float3(r, g, b);
+}
+
+ccl_device float4 exposure_texture(
+    float4 color, float exposure, float multiplier, float world_luminance, float max_luminance)
+{
+  float3 Yxy = RgbToYxy(make_float3(color.x, color.y, color.z));
+
+  Yxy = LogMapYxy(Yxy, exposure, world_luminance, max_luminance);
+
+  float3 rgb = YxyToRgb(Yxy);
+  rgb *= multiplier;
+
+  return make_float4(rgb.x, rgb.y, rgb.z, 1.0);
+}
+
+ccl_device void svm_rhino_node_exposure_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_color_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(node.y, &in_color_offset, &out_color_offset, &dummy, &dummy);
+
+  float3 color = stack_load_float3(stack, in_color_offset);
+
+  uint4 data = read_node(kg, offset);
+
+  float exposure = __uint_as_float(data.x);
+  float multiplier = __uint_as_float(data.y);
+  float world_luminance = __uint_as_float(data.z);
+  float max_luminance = __uint_as_float(data.w);
+
+  float4 out_color = exposure_texture(make_float4(color.x, color.y, color.z, 1.0f),
+                                      exposure,
+                                      multiplier,
+                                      world_luminance,
+                                      max_luminance);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
 CCL_NAMESPACE_END
