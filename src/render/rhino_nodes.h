@@ -189,6 +189,56 @@ class RhinoExposureTextureNode : public ShaderNode {
   }
 };
 
+class RhinoFbmTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoFbmTextureNode)
+
+  float3 uvw;
+  float3 color1;
+  float3 color2;
+  bool is_turbulent;
+  float max_octaves;
+  float gain;
+  float roughness;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoGridTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoGridTextureNode)
+
+  float3 uvw;
+  float3 color1;
+  float3 color2;
+  int cells;
+  float font_thickness;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoProjectionChangerTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoProjectionChangerTextureNode)
+
+  float3 uvw;
+  RhinoProceduralProjectionType input_projection_type;
+  RhinoProceduralProjectionType output_projection_type;
+  float azimuth;
+  float altitude;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

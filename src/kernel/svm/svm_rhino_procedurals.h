@@ -19,6 +19,10 @@ limitations under the License.
 CCL_NAMESPACE_BEGIN
 
 #define PI 3.14159265358979f
+#define TWO_PI 6.28318530717959f
+#define INV_PI 0.31830988618379f
+#define INV_TWO_PI 0.15915494309190f
+#define SQRT_PI 1.77245385090552f
 
 ccl_device bool is_odd(int x)
 {
@@ -1312,6 +1316,906 @@ ccl_device void svm_rhino_node_exposure_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device float fbm(KernelGlobals *kg, float3 P, bool is_turbulent, float omega, int maxOctaves)
+{
+  float sum = 0.0, lambda = 1.0, o = 1.0;
+  for (int i = 0; i < maxOctaves; ++i) {
+    float3 lambda_p = lambda * P;
+    float noise_value = noise(kg, lambda_p.x, lambda_p.y, lambda_p.z);
+
+    if (is_turbulent)
+      noise_value = fabsf(noise_value);
+
+    sum += o * noise_value;
+    lambda *= 1.99;
+    o *= omega;
+  }
+
+  return sum;
+}
+
+ccl_device float4 fbm_texture(KernelGlobals *kg,
+                              float3 uvw,
+                              float4 color1,
+                              float4 color2,
+                              bool is_turbulent,
+                              int max_octaves,
+                              float gain,
+                              float roughness)
+{
+  float t = fabsf(fbm(kg, uvw, is_turbulent, roughness, max_octaves) * gain);
+
+  float4 color_out = mix(color1, color2, t);
+  color_out = clamp(color_out, make_float4(0.0f), make_float4(1.0f));
+
+  return color_out;
+}
+
+ccl_device void svm_rhino_node_fbm_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+
+  uint4 data = read_node(kg, offset);
+
+  bool is_turbulent = (bool)data.x;
+  int max_octaves = data.y;
+  float gain = __uint_as_float(data.z);
+  float roughness = __uint_as_float(data.w);
+
+  float4 out_color = fbm_texture(kg,
+                                 uvw,
+                                 make_float4(color1.x, color1.y, color1.z, 1.0),
+                                 make_float4(color2.x, color2.y, color2.z, 1.0),
+                                 is_turbulent,
+                                 max_octaves,
+                                 gain,
+                                 roughness);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device int get_segment(float u, float v, float thickness, float margin)
+{
+  if (u < 2.0 * margin || 1.0 - 2.0 * margin < u || v < margin) {
+    return 0;
+  }
+
+  if (u > 2.0 * (margin + thickness) && u < 1.0 - 2.0 * (margin + thickness) &&
+      v > margin + thickness && v < 0.5 - 0.5 * thickness) {
+    return 0;
+  }
+
+  if (u - 2.0 * v > 0.0 && u + 2.0 * v < 1.0) {
+    return 1;
+  }
+
+  if (0.25 * u + v > 0.5 * margin + 0.5 && 0.25 * u - v < -0.5 * margin - 0.25) {
+    return 4;
+  }
+
+  if (u < 0.5) {
+    return 2;
+  }
+
+  return 3;
+}
+
+ccl_device int test_digit(int n, float u, float v, float thickness, float margin)
+{
+  /* clang-format off */
+
+  int segLU[80] = {
+    0, 2, 2, 2, 1, 2, 2, 2 , // 0
+    0, 1, 1, 2, 1, 2, 1, 1 , // 1
+    0, 2, 1, 2, 2, 1, 2, 2 , // 2
+    0, 2, 1, 2, 2, 2, 1, 2 , // 3
+    0, 1, 2, 2, 2, 2, 1, 1 , // 4
+    0, 2, 2, 1, 2, 2, 1, 2 , // 5
+    0, 2, 2, 1, 2, 2, 2, 2 , // 6
+    0, 2, 1, 2, 1, 2, 1, 1 , // 7
+    0, 2, 2, 2, 2, 2, 2, 2 , // 8
+    0, 2, 2, 2, 2, 2, 1, 2   // 9
+  };
+
+  /* clang-format on */
+
+  if (n < 0 || 9 < n)
+    return 0;
+
+  bool mirror = v > 0.5;
+  if (mirror) {
+    v = 1.0 - v;
+  }
+
+  int s = get_segment(u, v, thickness, margin);
+
+  if (s < 0)
+    return 0;
+
+  if (mirror) {
+    s = (8 - s) % 8;
+  }
+
+  return segLU[8 * n + s];
+}
+
+ccl_device int TestNumber(int digits, int number, float thickness, float margin, float u, float v)
+{
+  float digitIndexDbl = 0.0;
+  float digitU = modff(u * digits, &digitIndexDbl);
+  float digitV = v;
+  int digitIndex = int(digitIndexDbl);
+
+  if (0 <= digitIndex && digitIndex < digits) {
+    int nU = number;
+    int digit = 0;
+    for (int i = 0; i < digits - digitIndex; i++) {
+      digit = nU % 10;
+      nU -= digit;
+      nU /= 10;
+    }
+    return test_digit(digit, digitU, digitV, thickness, margin);
+  }
+
+  return 0;
+}
+
+ccl_device float4
+grid_texture(float3 uvw, float4 color1, float4 color2, int cells, float font_thickness)
+{
+  float u = fractf(uvw.x);
+  float v = fractf(uvw.y);
+
+  float gridU = 0.0;
+  float gridV = 0.0;
+  float cellU = 0.0;
+  float cellV = 0.0;
+
+  cellU = modff(cells * u, &gridU);
+  cellV = modff(cells * v, &gridV);
+
+  int cellParity = (int(gridU) + int(gridV)) % 2;
+
+  float3 white = make_float3(1.0f, 1.0f, 1.0f);
+  float3 black = make_float3(0.0f, 0.0f, 0.0f);
+  float4 colBackground = (cellParity == 0) ? color1 : color2;
+  float3 colNumber = Luminance(make_float3(colBackground.x, colBackground.y, colBackground.z)) <
+                             0.5f ?
+                         white :
+                         black;
+
+  int cellNumber = int(gridU) + cells * (cells - 1 - int(gridV));
+
+  int maxCellNumber = cells * cells - 1;
+
+  int digitCount = maxCellNumber < 10   ? 1 :
+                   maxCellNumber < 100  ? 2 :
+                   maxCellNumber < 1000 ? 3 :
+                   maxCellNumber < 1000 ? 4 :
+                                          5;
+  float numberStartU = (5 - digitCount) * 0.1;
+  float numberEndU = 1.0 - numberStartU;
+  float numberStartV = 0.3;
+  float numberEndV = 0.7;
+  float numberU = (cellU - numberStartU) / (numberEndU - numberStartU);
+  float numberV = (cellV - numberStartV) / (numberEndV - numberStartV);
+
+  int hitResult = TestNumber(
+      digitCount, cellNumber, 0.12 * font_thickness, 0.1, numberU, 1.0 - numberV);
+
+  if (2 == hitResult)
+    return make_float4(colNumber.x, colNumber.y, colNumber.z, 1);
+
+  return colBackground;
+}
+
+ccl_device void svm_rhino_node_grid_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+
+  uint4 data = read_node(kg, offset);
+
+  int cells = data.x;
+  float font_thickness = __uint_as_float(data.y);
+
+  float4 out_color = grid_texture(uvw,
+                                  make_float4(color1.x, color1.y, color1.z, 1.0),
+                                  make_float4(color2.x, color2.y, color2.z, 1.0),
+                                  cells,
+                                  font_thickness);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device float3 light_probe_to_world(float2 uv)
+{
+  float u = uv.x;
+  float v = uv.y;
+
+  float d = sqrt((0.5f - u) * (0.5f - u) + (0.5f - v) * (0.5f - v)) * 2.0f;
+  float cosine = cos(PI * d);
+  float factor = 2.0f * sqrt(1.0f - cosine * cosine);
+
+  float3 vec;
+  vec.x = (u - 0.5f) * factor / d;
+  vec.y = (0.5f - v) * factor / d;
+  vec.z = cosine;
+
+  return vec;
+}
+
+ccl_device float2 world_to_lightprobe(float3 n)
+{
+  float x = n.x;
+  float y = n.y;
+  float z = n.z;
+
+  float fDivisor = sqrt(x * x + y * y);
+
+  float f = (acos(z) / PI) / fDivisor;
+
+  float px = x * f;
+  float py = y * f;
+
+  float u = (px + 1.0f) * 0.5f;
+  float v = (-py + 1.0f) * 0.5f;
+
+  return make_float2(u, v);
+}
+
+ccl_device float3 equirect_to_world(float2 uv)
+{
+  float theta = (uv.x - 0.5f) * TWO_PI;
+  float phi = -(uv.y - 0.5f) * PI;
+
+  float cosphi = cos(phi);
+
+  float3 vec;
+  vec.x = sin(theta) * cosphi;
+  vec.y = sin(phi);
+  vec.z = cos(theta) * cosphi;
+
+  return vec;
+}
+
+ccl_device float2 world_to_equirect(float3 n)
+{
+  float x = -n.z;
+  float y = -n.x;
+  float z = n.y;
+
+  float theta, phi;
+
+  if (x == 0.0 && y == 0.0) {
+    theta = 0.0;
+    phi = (z >= 0.0 ? 0.5 * PI : -0.5 * PI);
+  }
+  else {
+    theta = atan2(y, x);
+    if (theta < 0.0)
+      theta += 2.0 * PI;
+
+    float r;
+    if (fabsf(x) >= fabsf(y)) {
+      r = y / x;
+      r = fabsf(x) * sqrt(1.0 + r * r);
+    }
+    else {
+      r = x / y;
+      r = fabsf(y) * sqrt(1.0 + r * r);
+    }
+
+    phi = atan(z / r);
+  }
+
+  float u = theta / (2.0 * PI);
+  float v = (-phi + 0.5 * PI) / PI;
+
+  return make_float2(u, v);
+}
+
+ccl_device float3 cubemap_to_world(float2 uv)
+{
+  float u = uv.x;
+  float v = uv.y;
+
+  float uCube = u - floorf(u);
+  float vCube = v - floorf(v);
+  int subTextureIndex = int(floorf(uCube * 6.0f));
+  float subTextureOffset = float(subTextureIndex / 6.0f);
+  float uSubTex = (uCube - subTextureOffset) * 6.0f;
+  float vSubTex = vCube;
+  float sc = 2.0f * uSubTex - 1.0f;
+  float tc = 2.0f * vSubTex - 1.0f;
+
+  float3 vec = make_float3(0.0f, 0.0f, 0.0f);
+
+  switch (subTextureIndex) {
+    case 0:
+      vec.z = -sc;
+      vec.y = -tc;
+      vec.x = 1.0f;
+      break;
+    case 1:
+      vec.z = sc;
+      vec.y = -tc;
+      vec.x = -1.0f;
+      break;
+    case 2:
+      vec.x = sc;
+      vec.z = -tc;
+      vec.y = -1.0f;
+      break;
+    case 3:
+      vec.x = sc;
+      vec.z = tc;
+      vec.y = 1.0f;
+      break;
+    case 4:
+      vec.x = sc;
+      vec.y = -tc;
+      vec.z = 1.0f;
+      break;
+    case 5:
+      vec.x = -sc;
+      vec.y = -tc;
+      vec.z = -1.0f;
+      break;
+  }
+
+  return normalize(vec);
+}
+
+ccl_device int get_main_axis_index(float3 v)
+{
+  v.x = fabsf(v.x);
+  v.y = fabsf(v.y);
+  v.z = fabsf(v.z);
+
+  if (v.x > v.y && v.x > v.z) {
+    return 0;
+  }
+  else if (v.y > v.z) {
+    return 1;
+  }
+  else {
+    return 2;
+  }
+}
+
+ccl_device float2 world_to_cubemap(float3 n)
+{
+  int mainAxis = get_main_axis_index(n);
+  float mainAxisDir = n[mainAxis];
+
+  int subTextureIndex;
+
+  switch (mainAxis) {
+    case 0:
+      subTextureIndex = (mainAxisDir >= 0.0f ? 0 : 1);
+      break;
+    case 1:
+      subTextureIndex = (mainAxisDir >= 0.0f ? 3 : 2);
+      break;
+    case 2:
+      subTextureIndex = (mainAxisDir >= 0.0f ? 4 : 5);
+      break;
+  }
+
+  float subTextureOffset = float(subTextureIndex) / 6.0f;
+  float ma = fabsf(mainAxisDir);
+
+  float sc = 0.0f;
+  float tc = 0.0f;
+
+  switch (subTextureIndex) {
+    case 0:
+      sc = -n.z;
+      tc = -n.y;
+      break;
+    case 1:
+      sc = n.z;
+      tc = -n.y;
+      break;
+    case 2:
+      sc = n.x;
+      tc = -n.z;
+      break;
+    case 3:
+      sc = n.x;
+      tc = n.z;
+      break;
+    case 4:
+      sc = n.x;
+      tc = -n.y;
+      break;
+    case 5:
+      sc = -n.x;
+      tc = -n.y;
+      break;
+  }
+
+  float u = (sc / ma + 1.0f) / 12.0f + subTextureOffset;
+  float v = (tc / ma + 1.0f) / 2.0f;
+
+  return make_float2(u, v);
+}
+
+ccl_device float3 vertical_cross_cubemap_to_world(float2 uv)
+{
+  float u = uv.x;
+  float v = uv.y;
+
+  float uCube = u - floorf(u);
+  float vCube = v - floorf(v);
+
+  const float minU = 1.0f / 3.0f;
+  const float maxU = 2.0f / 3.0f;
+  const float minV = 2.0f / 4.0f;
+  const float maxV = 3.0f / 4.0f;
+  const float borderU = 1.0f / 360.0f;
+  const float borderV = 1.0f / 360.0f;
+
+  float uLtd = (uCube < minU ? minU : (maxU < uCube ? maxU : uCube));
+  float vLtd = (vCube < minV ? minV : (maxV < vCube ? maxV : vCube));
+  float uAdj = fabsf(uLtd - uCube);
+  float vAdj = fabsf(vLtd - vCube);
+
+  if (uAdj != 0.0 && vAdj != 0.0) {
+    if (uAdj <= vAdj && uAdj < borderU) {
+      uCube = uLtd;
+    }
+    else if (vAdj <= uAdj && vAdj < borderV) {
+      vCube = vLtd;
+    }
+  }
+
+  int subTexU = int(floorf(3.0f * uCube));
+  int subTexV = int(floorf(4.0f * vCube));
+  float subTextureStartU = float(subTexU / 3.0f);
+  float subTextureStartV = float(subTexV / 4.0f);
+  float uSubTex = 3.0f * (uCube - subTextureStartU);
+  float vSubTex = 4.0f * (vCube - subTextureStartV);
+  float sc = 2.0f * uSubTex - 1.0f;
+  float tc = 2.0f * vSubTex - 1.0f;
+
+  int subTextureIndex = -1;
+  if (subTexU == 0) {
+    if (subTexV == 2)
+      subTextureIndex = 1;
+  }
+  else {
+    if (subTexU == 1) {
+      if (subTexV == 0)
+        subTextureIndex = 5;
+      else if (subTexV == 1)
+        subTextureIndex = 2;
+      else if (subTexV == 2)
+        subTextureIndex = 4;
+      else if (subTexV == 3)
+        subTextureIndex = 3;
+    }
+    else {
+      if (subTexU == 2) {
+        if (subTexV == 2)
+          subTextureIndex = 0;
+      }
+    }
+  }
+
+  if (subTextureIndex == -1)
+    return make_float3(0.0f);
+
+  float3 vec = make_float3(0.0f);
+
+  switch (subTextureIndex) {
+    case 0:
+      vec.z = -sc;
+      vec.y = -tc;
+      vec.x = 1.0f;
+      break;
+    case 1:
+      vec.z = sc;
+      vec.y = -tc;
+      vec.x = -1.0f;
+      break;
+    case 2:
+      vec.x = sc;
+      vec.z = tc;
+      vec.y = 1.0f;
+      break;
+    case 3:
+      vec.x = sc;
+      vec.z = -tc;
+      vec.y = -1.0f;
+      break;
+    case 4:
+      vec.x = sc;
+      vec.y = -tc;
+      vec.z = 1.0f;
+      break;
+    case 5:
+      vec.x = sc;
+      vec.y = tc;
+      vec.z = -1.0f;
+      break;
+  }
+
+  return normalize(vec);
+}
+
+ccl_device float2 world_to_vertical_cross_cubemap(float3 n)
+{
+  float2 st = make_float2(0.0f, 0.0f);
+
+  const float uI[6] = {2.0 / 3.0, 0.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0};
+  const float vI[6] = {2.0 / 4.0, 2.0 / 4.0, 1.0 / 4.0, 3.0 / 4.0, 2.0 / 4.0, 0.0};
+
+  float2 uva[6] = {make_float2(-n.z, -n.y),
+                   make_float2(n.z, -n.y),
+                   make_float2(n.x, n.z),
+                   make_float2(n.x, -n.z),
+                   make_float2(n.x, -n.y),
+                   make_float2(n.x, n.y)};
+
+  int mainAxis = get_main_axis_index(n);
+  float mainAxisDir = n[mainAxis];
+  int subTextureIndex = (2 * mainAxis) + (mainAxisDir >= 0.0f ? 0 : 1);
+
+  float2 SubTexStart = make_float2(uI[subTextureIndex], vI[subTextureIndex]);
+  st = (uva[subTextureIndex] / fabsf(mainAxisDir) + 1.0) / make_float2(6.0, 8.0) + SubTexStart;
+
+  return st;
+}
+
+ccl_device float3 horizontal_cross_cubemap_to_world(float2 uv)
+{
+  float u = uv.x;
+  float v = uv.y;
+
+  float uCube = u - floorf(u);
+  float vCube = v - floorf(v);
+
+  const float minU = 1.0f / 4.0f;
+  const float maxU = 2.0f / 4.0f;
+  const float minV = 1.0f / 3.0f;
+  const float maxV = 2.0f / 3.0f;
+  const float borderU = 1.0f / 360.0f;
+  const float borderV = 1.0f / 360.0f;
+
+  float uLtd = (uCube < minU ? minU : (maxU < uCube ? maxU : uCube));
+  float vLtd = (vCube < minV ? minV : (maxV < vCube ? maxV : vCube));
+  float uAdj = fabsf(uLtd - uCube);
+  float vAdj = fabsf(vLtd - vCube);
+
+  if (uAdj != 0.0 && vAdj != 0.0) {
+    if (uAdj <= vAdj && uAdj < borderU) {
+      uCube = uLtd;
+    }
+    else if (vAdj <= uAdj && vAdj < borderV) {
+      vCube = vLtd;
+    }
+  }
+
+  int subTexU = int(floorf(4.0f * uCube));
+  int subTexV = int(floorf(3.0f * vCube));
+  float subTextureStartU = float(subTexU / 4.0f);
+  float subTextureStartV = float(subTexV / 3.0f);
+  float uSubTex = 4.0f * (uCube - subTextureStartU);
+  float vSubTex = 3.0f * (vCube - subTextureStartV);
+  float sc = 2.0f * uSubTex - 1.0f;
+  float tc = 2.0f * vSubTex - 1.0f;
+
+  int subTextureIndex = -1;
+  if (subTexV == 0) {
+    if (subTexU == 1)
+      subTextureIndex = 2;
+  }
+  else {
+    if (subTexV == 1) {
+      if (subTexU == 0)
+        subTextureIndex = 1;
+      else if (subTexU == 1)
+        subTextureIndex = 4;
+      else if (subTexU == 2)
+        subTextureIndex = 0;
+      else if (subTexU == 3)
+        subTextureIndex = 5;
+    }
+    else {
+      if (subTexV == 2) {
+        if (subTexU == 1)
+          subTextureIndex = 3;
+      }
+    }
+  }
+
+  if (subTextureIndex == -1)
+    return make_float3(0.0f);
+
+  float3 vec = make_float3(0.0f);
+
+  switch (subTextureIndex) {
+    case 0:
+      vec.z = -sc;
+      vec.y = -tc;
+      vec.x = 1.0f;
+      break;
+    case 1:
+      vec.z = sc;
+      vec.y = -tc;
+      vec.x = -1.0f;
+      break;
+    case 2:
+      vec.x = sc;
+      vec.z = tc;
+      vec.y = 1.0f;
+      break;
+    case 3:
+      vec.x = sc;
+      vec.z = -tc;
+      vec.y = -1.0f;
+      break;
+    case 4:
+      vec.x = sc;
+      vec.y = -tc;
+      vec.z = 1.0f;
+      break;
+    case 5:
+      vec.x = -sc;
+      vec.y = -tc;
+      vec.z = -1.0f;
+      break;
+  }
+
+  return normalize(vec);
+}
+
+ccl_device float2 world_to_horizontal_cross_cubemap(float3 n)
+{
+  float2 st = make_float2(0.0f, 0.0f);
+
+  const float uI[6] = {2.0 / 4.0, 0.0, 1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0, 3.0 / 4.0};
+  const float vI[6] = {1.0 / 3.0, 1.0 / 3.0, 0.0, 2.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0};
+
+  float2 uva[6] = {make_float2(-n.z, -n.y),
+                   make_float2(n.z, -n.y),
+                   make_float2(n.x, n.z),
+                   make_float2(n.x, -n.z),
+                   make_float2(n.x, -n.y),
+                   make_float2(-n.x, -n.y)};
+
+  int mainAxis = get_main_axis_index(n);
+  float mainAxisDir = n[mainAxis];
+  int subTextureIndex = (2 * mainAxis) + (mainAxisDir >= 0.0f ? 0 : 1);
+
+  float2 SubTexStart = make_float2(uI[subTextureIndex], vI[subTextureIndex]);
+  st = (uva[subTextureIndex] / fabsf(mainAxisDir) + 1.0) / make_float2(8.0, 6.0) + SubTexStart;
+
+  return st;
+}
+
+ccl_device float3 emap_to_world(float2 uv)
+{
+  float x = 2.0f * uv.x - 1.0f;
+  float y = -(2.0f * uv.y - 1.0f);
+
+  float r = sqrt(x * x + y * y);
+  r = min(r, 1.0f);
+
+  float t = 2.0f * asin(r);
+  float s = sin(t) / r;
+
+  float3 vec;
+  vec.x = -s * x;
+  vec.y = s * y;
+  vec.z = cos(t);
+
+  return vec;
+}
+
+ccl_device float2 world_to_emap(float3 n)
+{
+  float x = n.x;
+  float y = n.y;
+  float z = n.z;
+
+  float m = 2.0 * sqrt((x * x) + (y * y) + (z + 1.0) * (z + 1.0));
+
+  float u = x / m + 0.5;
+  float v = y / m + 0.5;
+
+  return make_float2(u, v);
+}
+
+ccl_device float3 hemispherical_to_world(float2 uv)
+{
+  return equirect_to_world(make_float2(uv.x, 0.5f + 0.5f * uv.y));
+}
+
+ccl_device float2 world_to_hemispherical(float3 n)
+{
+  float3 hemi = make_float3(n.x, min(n.y, 0.0f), n.z);
+
+  float2 uv = world_to_equirect(normalize(hemi));
+
+  uv.y = 2.0f * uv.y - 1.0f;
+
+  return uv;
+}
+
+ccl_device Transform rotation_matrix(float3 axis, float angle)
+{
+  float s = -sin(angle);
+  float c = cos(angle);
+  float oc = 1.0 - c;
+
+  Transform tf;
+  tf.x.x = oc * axis.x * axis.x + c;
+  tf.x.y = oc * axis.x * axis.y - axis.z * s;
+  tf.x.z = oc * axis.z * axis.x + axis.y * s;
+  tf.x.w = 0.0f;
+
+  tf.y.x = oc * axis.x * axis.y + axis.z * s;
+  tf.y.y = oc * axis.y * axis.y + c;
+  tf.y.z = oc * axis.y * axis.z - axis.x * s;
+  tf.y.w = 0.0f;
+
+  tf.z.x = oc * axis.z * axis.x - axis.y * s;
+  tf.z.y = oc * axis.y * axis.z + axis.x * s;
+  tf.z.z = oc * axis.z * axis.z + c;
+  tf.z.w = 0.0f;
+
+  return tf;
+}
+
+ccl_device bool is_parallel_to(float3 a, float3 b)
+{
+  return len(cross(a, b)) < 1e-6;
+}
+
+ccl_device float4 projection_changer_texture(float3 uvw,
+                                             RhinoProceduralProjectionType input_projection_type,
+                                             RhinoProceduralProjectionType output_projection_type,
+                                             float azimuth,
+                                             float altitude)
+{
+  output_projection_type = (output_projection_type == RHINO_PROJECTION_SAME_AS_INPUT) ?
+                               input_projection_type :
+                               output_projection_type;
+
+  uvw = make_float3(fractf(uvw.x), fractf(uvw.y), fractf(uvw.z));
+
+  bool bQuick = false;
+
+  if (input_projection_type == RHINO_PROJECTION_PLANAR)
+    bQuick = true;
+  else if ((output_projection_type == input_projection_type) && (azimuth == 0.0f) &&
+           (altitude == 0.0f))
+    bQuick = true;
+
+  if (!bQuick) {
+    float3 vec = make_float3(0);
+
+    switch (output_projection_type) {
+      case RHINO_PROJECTION_LIGHTPROBE:
+        vec = light_probe_to_world(make_float2(uvw.x, uvw.y));
+        break;
+      case RHINO_PROJECTION_EQUIRECT:
+        vec = equirect_to_world(make_float2(uvw.x, uvw.y));
+        break;
+      case RHINO_PROJECTION_CUBEMAP:
+        vec = cubemap_to_world(make_float2(uvw.x, uvw.y));
+        break;
+      case RHINO_PROJECTION_VERTICAL_CROSS_CUBEMAP:
+        vec = vertical_cross_cubemap_to_world(make_float2(uvw.x, uvw.y));
+        break;
+      case RHINO_PROJECTION_HORIZONTAL_CROSS_CUBEMAP:
+        vec = horizontal_cross_cubemap_to_world(make_float2(uvw.x, uvw.y));
+        break;
+      case RHINO_PROJECTION_EMAP:
+        vec = emap_to_world(make_float2(uvw.x, uvw.y));
+        break;
+      case RHINO_PROJECTION_HEMISPHERICAL:
+        vec = hemispherical_to_world(make_float2(uvw.x, uvw.y));
+        break;
+      default:
+        vec = uvw;
+        break;
+    }
+
+    float3 rotate_axis = make_float3(0, 1, 0);
+
+    Transform transform = rotation_matrix(rotate_axis, azimuth);
+    vec = transform_direction(&transform, vec);
+
+    if (!is_parallel_to(vec, rotate_axis)) {
+      float3 cross_axis = normalize(cross(vec, rotate_axis));
+      transform = rotation_matrix(cross_axis, altitude);
+      vec = transform_direction(&transform, vec);
+    }
+
+    float2 uv = make_float2(0.0f, 0.0f);
+
+    switch (input_projection_type) {
+      case RHINO_PROJECTION_LIGHTPROBE:
+        uv = world_to_lightprobe(vec);
+        break;
+      case RHINO_PROJECTION_EQUIRECT:
+        uv = world_to_equirect(vec);
+        break;
+      case RHINO_PROJECTION_CUBEMAP:
+        uv = world_to_cubemap(vec);
+        break;
+      case RHINO_PROJECTION_VERTICAL_CROSS_CUBEMAP:
+        uv = world_to_vertical_cross_cubemap(vec);
+        break;
+      case RHINO_PROJECTION_HORIZONTAL_CROSS_CUBEMAP:
+        uv = world_to_horizontal_cross_cubemap(vec);
+        break;
+      case RHINO_PROJECTION_EMAP:
+        uv = world_to_emap(vec);
+        break;
+      case RHINO_PROJECTION_HEMISPHERICAL:
+        uv = world_to_hemispherical(vec);
+        break;
+      default:
+        uv = make_float2(vec.x, vec.y);
+        break;
+    }
+
+    uvw.x = uv.x;
+    uvw.y = uv.y;
+  }
+
+  return make_float4(uvw.x, uvw.y, uvw.z, 1.0);
+}
+
+ccl_device void svm_rhino_node_projection_changer_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, out_uvw_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &out_uvw_offset, &dummy, &dummy);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+
+  uint4 data = read_node(kg, offset);
+
+  RhinoProceduralProjectionType input_projection_type = (RhinoProceduralProjectionType)data.x;
+  RhinoProceduralProjectionType output_projection_type = (RhinoProceduralProjectionType)data.y;
+  float azimuth = __uint_as_float(data.z);
+  float altitude = __uint_as_float(data.w);
+
+  //float4 out_uvw = make_float4(uvw.x, uvw.y, uvw.z, 1.0);
+  float4 out_uvw = projection_changer_texture(uvw, input_projection_type, output_projection_type, azimuth, altitude);
+
+  if (stack_valid(out_uvw_offset))
+    stack_store_float3(stack, out_uvw_offset, make_float3(out_uvw.x, out_uvw.y, out_uvw.z));
 }
 
 CCL_NAMESPACE_END

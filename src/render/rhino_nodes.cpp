@@ -594,4 +594,151 @@ void RhinoExposureTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* FBm */
+
+NODE_DEFINE(RhinoFbmTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_fbm_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_BOOLEAN(is_turbulent, "IsTurbulent", false);
+  SOCKET_INT(max_octaves, "MaxOctaves", 3);
+  SOCKET_FLOAT(gain, "Gain", 0.5f);
+  SOCKET_FLOAT(roughness, "Roughness", 0.5f);
+
+  SOCKET_OUT_COLOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoFbmTextureNode::RhinoFbmTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoFbmTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(
+      RHINO_NODE_FBM_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node((int)is_turbulent,
+                    max_octaves, __float_as_int(gain), __float_as_int(roughness));
+}
+
+void RhinoFbmTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Grid */
+
+NODE_DEFINE(RhinoGridTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_grid_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_INT(cells, "Cells", 0);
+  SOCKET_FLOAT(font_thickness, "FontThickness", 1.0f);
+
+  SOCKET_OUT_COLOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoGridTextureNode::RhinoGridTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoGridTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_GRID_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node(cells, __float_as_int(font_thickness));
+}
+
+void RhinoGridTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Projection Changer */
+
+NODE_DEFINE(RhinoProjectionChangerTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_projection_changer_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+
+  static NodeEnum projection_changer_type_enum;
+  projection_changer_type_enum.insert("none", RHINO_PROJECTION_NONE);
+  projection_changer_type_enum.insert("planar", RHINO_PROJECTION_PLANAR);
+  projection_changer_type_enum.insert("lightprobe", RHINO_PROJECTION_LIGHTPROBE);
+  projection_changer_type_enum.insert("equirect", RHINO_PROJECTION_EQUIRECT);
+  projection_changer_type_enum.insert("cubemap", RHINO_PROJECTION_CUBEMAP);
+  projection_changer_type_enum.insert("vertical_cross_cubemap", RHINO_PROJECTION_VERTICAL_CROSS_CUBEMAP);
+  projection_changer_type_enum.insert("horizontal_cross_cubemap", RHINO_PROJECTION_HORIZONTAL_CROSS_CUBEMAP);
+  projection_changer_type_enum.insert("emap", RHINO_PROJECTION_EMAP);
+  projection_changer_type_enum.insert("same_as_input", RHINO_PROJECTION_SAME_AS_INPUT);
+  projection_changer_type_enum.insert("hemispherical", RHINO_PROJECTION_HEMISPHERICAL);
+
+  SOCKET_ENUM(input_projection_type,
+              "InputProjectionType",
+              projection_changer_type_enum,
+              RHINO_PROJECTION_NONE);
+  SOCKET_ENUM(output_projection_type,
+              "OutputProjectionType",
+              projection_changer_type_enum,
+              RHINO_PROJECTION_NONE);
+  SOCKET_FLOAT(azimuth, "Azimuth", 1.0f);
+  SOCKET_FLOAT(altitude, "Altitude", 1.0f);
+
+  SOCKET_OUT_VECTOR(out_uvw, "Output UVW");
+
+  return type;
+}
+
+RhinoProjectionChangerTextureNode::RhinoProjectionChangerTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoProjectionChangerTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+
+  ShaderOutput *uvw_out = output("Output UVW");
+
+  compiler.add_node(
+      RHINO_NODE_PROJECTION_CHANGER_TEXTURE,
+      compiler.encode_uchar4(compiler.stack_assign(uvw_in), compiler.stack_assign(uvw_out)));
+
+  compiler.add_node((int)input_projection_type, (int)output_projection_type, __float_as_int(azimuth), __float_as_int(altitude));
+}
+
+void RhinoProjectionChangerTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END
