@@ -2211,7 +2211,6 @@ ccl_device void svm_rhino_node_projection_changer_texture(
   float azimuth = __uint_as_float(data.z);
   float altitude = __uint_as_float(data.w);
 
-  //float4 out_uvw = make_float4(uvw.x, uvw.y, uvw.z, 1.0);
   float4 out_uvw = projection_changer_texture(uvw, input_projection_type, output_projection_type, azimuth, altitude);
 
   if (stack_valid(out_uvw_offset))
