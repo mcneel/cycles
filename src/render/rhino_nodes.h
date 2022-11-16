@@ -239,6 +239,41 @@ class RhinoProjectionChangerTextureNode : public ShaderNode {
   }
 };
 
+class RhinoMaskTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoMaskTextureNode)
+
+  float3 color;
+  float alpha;
+  RhinoProceduralMaskType mask_type;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoPerlinMarbleTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoPerlinMarbleTextureNode)
+
+  float3 uvw;
+  float3 color1;
+  float3 color2;
+  
+  int levels;
+  float noise_amount;
+  float blur;
+  float size;
+  float color1_sat;
+  float color2_sat;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

@@ -741,4 +741,99 @@ void RhinoProjectionChangerTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Mask */
+
+NODE_DEFINE(RhinoMaskTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_mask_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha, "Alpha", 1.0f);
+
+  static NodeEnum mask_type_enum;
+  mask_type_enum.insert("luminance", RHINO_MASK_LUMINANCE);
+  mask_type_enum.insert("red", RHINO_MASK_RED);
+  mask_type_enum.insert("green", RHINO_MASK_GREEN);
+  mask_type_enum.insert("blue", RHINO_MASK_BLUE);
+  mask_type_enum.insert("alpha", RHINO_MASK_ALPHA);
+
+  SOCKET_ENUM(mask_type, "MaskType", mask_type_enum, RHINO_MASK_LUMINANCE);
+
+  SOCKET_OUT_VECTOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoMaskTextureNode::RhinoMaskTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoMaskTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *color_in = input("Color");
+  ShaderInput *alpha_in = input("Alpha");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_MASK_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(color_in),
+                                           compiler.stack_assign(alpha_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node((int)mask_type);
+}
+
+void RhinoMaskTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Perlin Marble */
+
+NODE_DEFINE(RhinoPerlinMarbleTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_perlin_marble_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_INT(levels, "Levels", 0);
+  SOCKET_FLOAT(noise_amount, "Noise", 0.0f);
+  SOCKET_FLOAT(blur, "Blur", 0.0f);
+  SOCKET_FLOAT(size, "Size", 0.0f);
+  SOCKET_FLOAT(color1_sat, "Color1Saturation", 0.0f);
+  SOCKET_FLOAT(color2_sat, "Color2Saturation", 0.0f);
+
+  SOCKET_OUT_VECTOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoPerlinMarbleTextureNode::RhinoPerlinMarbleTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoPerlinMarbleTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_PERLIN_MARBLE_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node(
+      levels, __float_as_int(noise_amount), __float_as_int(blur), __float_as_int(size));
+  compiler.add_node(__float_as_int(color1_sat), __float_as_int(color2_sat));
+}
+
+void RhinoPerlinMarbleTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END

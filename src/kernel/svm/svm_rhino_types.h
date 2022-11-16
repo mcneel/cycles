@@ -63,6 +63,14 @@ typedef enum RhinoProceduralProjectionType {
   RHINO_PROJECTION_HEMISPHERICAL,
 } RhinoProceduralProjectionType;
 
+typedef enum RhinoProceduralMaskType {
+  RHINO_MASK_LUMINANCE,
+  RHINO_MASK_RED,
+  RHINO_MASK_GREEN,
+  RHINO_MASK_BLUE,
+  RHINO_MASK_ALPHA,
+} RhinoProceduralMaskType;
+
 CCL_NAMESPACE_END
 
 #endif /*  __SVM_RHINO_TYPES_H__ */

@@ -2217,4 +2217,155 @@ ccl_device void svm_rhino_node_projection_changer_texture(
     stack_store_float3(stack, out_uvw_offset, make_float3(out_uvw.x, out_uvw.y, out_uvw.z));
 }
 
+ccl_device float4 mask_texture(float4 color, RhinoProceduralMaskType mask_type)
+{
+  float alphaValue = 0.5;
+
+  switch (mask_type) {
+    case RHINO_MASK_LUMINANCE:
+      alphaValue = Luminance(make_float3(color.x, color.y, color.z));
+      break;
+    case RHINO_MASK_RED:
+      alphaValue = color.x;
+      break;
+    case RHINO_MASK_GREEN:
+      alphaValue = color.y;
+      break;
+    case RHINO_MASK_BLUE:
+      alphaValue = color.z;
+      break;
+    case RHINO_MASK_ALPHA:
+      alphaValue = color.w;
+      break;
+  }
+
+  return make_float4(alphaValue, alphaValue, alphaValue, 1.0f);
+}
+
+ccl_device void svm_rhino_node_mask_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_color_offset, in_alpha_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_color_offset, &in_alpha_offset, &out_color_offset, &dummy);
+
+  float3 color = stack_load_float3(stack, in_color_offset);
+  float alpha = stack_load_float(stack, in_alpha_offset);
+
+  uint4 data = read_node(kg, offset);
+
+  RhinoProceduralMaskType mask_type = (RhinoProceduralMaskType)data.x;
+
+  float4 out_color = mask_texture(make_float4(color.x, color.y, color.z, alpha), mask_type);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device float4 perlin_marble_texture(KernelGlobals *kg,
+                                        float3 uvw,
+                                        float3 color1,
+                                        float3 color2,
+                                        int levels,
+                                        float noise_amount,
+                                        float blur,
+                                        float size,
+                                        float color1_sat,
+                                        float color2_sat)
+{
+  float totalValue = 0.0;
+  float freq = 1.0;
+  float weight = noise_amount;
+  for (int o = 0; o < levels; o++) {
+    float x = uvw.x * freq + float(o);
+    float y = uvw.y * freq + float(o) * 2.0;
+    float z = uvw.z * freq - float(o);
+    float value = noise(kg, x * size, y * size, z * size);
+    totalValue += weight * value;
+    freq *= 2.17;
+    weight *= 0.5;
+  }
+
+  float phase = totalValue - floorf(totalValue);
+
+  float3 startColor;
+  float3 endColor;
+  float tweenValue = 0.0;
+
+  if (0.0 <= phase && phase < 0.1) {
+    tweenValue = phase * 10.0;
+
+    startColor = color1;
+    endColor = startColor * color1_sat;
+  }
+  if (0.1 <= phase && phase < 0.5) {
+    tweenValue = (phase - 0.1) * 2.5;
+
+    startColor = color1;
+    startColor *= color1_sat;
+
+    endColor = color2;
+  }
+  if (0.5 <= phase && phase < 0.6) {
+    tweenValue = (phase - 0.5) * 10.0;
+
+    startColor = color2;
+    endColor = startColor * color2_sat;
+  }
+  if (0.6 <= phase && phase <= 1.0) {
+    tweenValue = (phase - 0.6) * 2.5;
+
+    startColor = color2;
+    startColor *= color2_sat;
+
+    endColor = color1;
+  }
+
+  if (blur > 0.0) {
+    tweenValue = 0.5 + (2.0 * tweenValue - 1.0) / blur * 0.5;
+    if (tweenValue < 0.0)
+      tweenValue = 0.0;
+    if (tweenValue > 1.0)
+      tweenValue = 1.0;
+  }
+  else
+    tweenValue = tweenValue > 0.5 ? 1.0 : 0.0;
+
+  float3 colOut = startColor * (1.0 - tweenValue) + endColor * tweenValue;
+
+  return make_float4(colOut.x, colOut.y, colOut.z, 1);
+}
+
+ccl_device void svm_rhino_node_perlin_marble_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+
+  uint4 data0 = read_node(kg, offset);
+  uint4 data1 = read_node(kg, offset);
+
+  int levels = (int)data0.x;
+  float noise_amount = __uint_as_float(data0.y);
+  float blur = __uint_as_float(data0.z);
+  float size = __uint_as_float(data0.w);
+  float color1_sat = __uint_as_float(data1.x);
+  float color2_sat = __uint_as_float(data1.y);
+
+  float4 out_color = perlin_marble_texture(kg, uvw, color1, color2, levels, noise_amount, blur, size, color1_sat, color2_sat);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
 CCL_NAMESPACE_END
