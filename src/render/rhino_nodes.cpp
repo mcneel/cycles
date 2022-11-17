@@ -836,4 +836,56 @@ void RhinoPerlinMarbleTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Physical Sky */
+
+NODE_DEFINE(RhinoPhysicalSkyTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_physical_sky_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_VECTOR(sun_dir, "SunDirection", make_float3(0.0f));
+  SOCKET_FLOAT(atmospheric_density, "AtmosphericDensity", 0.0f);
+  SOCKET_FLOAT(rayleigh_scattering, "RayleighScattering", 0.0f);
+  SOCKET_FLOAT(mie_scattering, "MieScattering", 0.0f);
+  SOCKET_BOOLEAN(show_sun, "ShowSun", false);
+  SOCKET_FLOAT(sun_brightness, "SunBrightness", 0.0f);
+  SOCKET_FLOAT(sun_size, "SunSize", 0.0f);
+  SOCKET_VECTOR(sun_color, "SunColor", make_float3(0.0f));
+  SOCKET_VECTOR(inv_wavelengths, "InverseWavelengths", make_float3(0.0f));
+  SOCKET_FLOAT(exposure, "Exposure", 0.0f);
+
+  SOCKET_OUT_VECTOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoPhysicalSkyTextureNode::RhinoPhysicalSkyTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoPhysicalSkyTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_PHYSICAL_SKY_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node(make_float4(sun_dir.x, sun_dir.y, sun_dir.z, atmospheric_density));
+  compiler.add_node(__float_as_int(rayleigh_scattering),
+                    __float_as_int(mie_scattering),
+                    (int)show_sun,
+                    __float_as_int(sun_brightness));
+  compiler.add_node(make_float4(sun_size, sun_color.x, sun_color.y, sun_color.z));
+  compiler.add_node(
+      make_float4(inv_wavelengths.x, inv_wavelengths.y, inv_wavelengths.z, exposure));
+}
+
+void RhinoPhysicalSkyTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END

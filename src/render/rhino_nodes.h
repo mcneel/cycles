@@ -274,6 +274,29 @@ class RhinoPerlinMarbleTextureNode : public ShaderNode {
   }
 };
 
+class RhinoPhysicalSkyTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoPhysicalSkyTextureNode)
+
+  float3 uvw;
+
+  float3 sun_dir;
+  float atmospheric_density;
+  float rayleigh_scattering;
+  float mie_scattering;
+  bool show_sun;
+  float sun_brightness;
+  float sun_size;
+  float3 sun_color;
+  float3 inv_wavelengths;
+  float exposure;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

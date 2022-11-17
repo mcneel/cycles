@@ -2368,4 +2368,187 @@ ccl_device void svm_rhino_node_perlin_marble_texture(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
+ccl_device float scale(float fCos)
+{
+  float x = 1.0f - fCos;
+  return 0.25f * exp(-0.00287f + x * (0.459f + x * (3.83f + x * (-6.80f + x * 5.25f))));
+}
+
+ccl_device float3 hdr(float3 LDR, float exposure)
+{
+  float fExposure = -exposure;
+
+  return make_float3(1.0f) -
+         make_float3(exp(fExposure * LDR.x), exp(fExposure * LDR.y), exp(fExposure * LDR.z));
+}
+
+ccl_device float4 physical_sky_texture(float3 uvw,
+                                       float3 sun_dir,
+                                       float atmospheric_density,
+                                       float rayleigh_scattering,
+                                       float mie_scattering,
+                                       bool show_sun,
+                                       float sun_brightness,
+                                       float sun_size,
+                                       float3 sun_color,
+                                       float3 inv_wavelengths,
+                                       float exposure)
+{
+  float3 vLightDir = -sun_dir;
+
+  // This gives you the view direction into space.
+  float3 vSkyDir = equirect_to_world(make_float2(uvw.x, uvw.y));
+
+  // Need to swap and flip y and z so that projection matches OpenGL's...this is so that
+  // the same code in the shader can be used here pretty much interchangeably.
+  float tmp = vSkyDir.y;
+  vSkyDir.y = vSkyDir.z;
+  vSkyDir.z = -tmp;
+
+  float4 color_out = make_float4(0, 0, 0, 1);
+
+  //////////////////////////////////////
+  // BEGIN: Physical Sky algorithm...
+  if (vSkyDir.z < -0.15f)
+    return color_out;
+
+  const int nSamples = 3;
+  const float fSamples = float(nSamples);
+
+  float g = atmospheric_density / 10000.0f - 1.0f;
+  float g2 = g * g;
+
+  const float fInnerRadius = 1.0f;
+  const float fOuterRadius = fInnerRadius + 0.025f;
+  const float OR2 = fOuterRadius * fOuterRadius;
+  float fKrESun = rayleigh_scattering * sun_brightness;
+  float fKmESun = mie_scattering * sun_brightness;
+  float fKr4PI = float(rayleigh_scattering * 4.0f * PI);
+  float fKm4PI = float(mie_scattering * 4.0f * PI);
+  const float fScale = 1.0f / (fOuterRadius - fInnerRadius);
+  const float fScaleDepth = 0.25f;
+  const float fScaleOverScaleDepth = fScale / fScaleDepth;
+  float3 vGroundPos = make_float3(0.0, 0.0, fInnerRadius + 1.0e-6f);
+  float IR2 = vGroundPos.z * vGroundPos.z;
+
+  // Precomputed Mie constants...
+  float M1 = 1.5f * ((1.0f - g2) / (2.0f + g2));
+  float M2 = 1.0f + g2;
+  float M3 = 2.0f * g;
+  float M4 = sun_size / 10.0f;
+  float3 M5 = fKmESun * sun_color;
+  float3 RScatter = (inv_wavelengths * fKrESun);
+  float3 MScatter = (inv_wavelengths * fKr4PI) + make_float3(fKm4PI);
+
+  // Calculate the distance 't' from the ground to the outer atmosphere... basically
+  // do a quick ray:sphere intersection (with shortcuts) to get 't'...
+  float B = -vGroundPos.z * vSkyDir.z;  // dot( -vGroundPos, vSkyDir );
+  float D = IR2 - B * B;
+  float q = sqrt(OR2 - D);
+  float t = B + q;
+
+  // Get the ray from the ground to the vertex (position on the "virtual" sky dome)
+  float3 vSkyPos = vGroundPos + vSkyDir * t;
+  float3 vRay = normalize(vSkyPos - vGroundPos);
+
+  // Calculate the ray's starting position, then calculate its scattering offset
+  float Depth = exp(-fScaleOverScaleDepth * 1.0e-6f);
+  float StartAngle = dot(vRay, normalize(vGroundPos));
+  float StartOffset = Depth * scale(StartAngle);
+
+  // Initialize the scattering variables
+  float SampleLength = t / fSamples;
+  float ScaledLength = SampleLength * fScale;
+  float3 vSampleRay = vRay * SampleLength;
+  float3 vSamplePoint = vGroundPos + vSampleRay * 0.5f;
+
+  // Now iterate along the sample ray and accumulate scattering mie and rayleigh values...
+  float3 Color = make_float3(0.0);
+  float Height = len(vSamplePoint);
+
+  for (int i = 0; i < nSamples; i++) {
+    float3 vPoint = vSamplePoint;
+
+    vPoint = normalize(vPoint);
+
+    float Depth2 = exp(fScaleOverScaleDepth * (fInnerRadius - Height));
+    float LightAngle = dot(vLightDir, vPoint);
+    float CameraAngle = dot(vRay, vPoint);
+    float Scatter = StartOffset + Depth2 * (scale(LightAngle) - scale(CameraAngle));
+    float3 vAttenuate = make_float3(
+        exp(-Scatter * MScatter.x), exp(-Scatter * MScatter.y), exp(-Scatter * MScatter.z));
+
+    Color += vAttenuate * (Depth2 * ScaledLength);
+    Height += SampleLength;
+    vSamplePoint += vSampleRay;
+  }
+
+  // Finally, compute sun and sky colors based on mie and rayleigh values...
+  float fCos = dot(vLightDir, -vRay);
+  float fMie = M1 * (1.0f + fCos * fCos) / pow(M2 - M3 * fCos, M4);
+  // vec3  Sun  = __HDR( vec3( Color.x * M5.x, Color.y * M5.y, Color.z * M5.z ) * fMie );
+  float3 Sky = hdr(make_float3(Color.x * RScatter.x, Color.y * RScatter.y, Color.z * RScatter.z),
+                   exposure);
+
+  float3 SkyColor = Sky;
+
+  if (show_sun)
+    SkyColor += hdr(make_float3(Color.x * M5.x, Color.y * M5.y, Color.z * M5.z) * fMie, exposure);
+
+  // END: Physical Sky algorithm...
+  //////////////////////////////////////
+
+  color_out.x = SkyColor.x;
+  color_out.y = SkyColor.y;
+  color_out.z = SkyColor.z;
+
+  return color_out;
+}
+
+ccl_device void svm_rhino_node_physical_sky_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(node.y, &in_uvw_offset, &out_color_offset, &dummy, &dummy);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+
+  uint4 data0 = read_node(kg, offset);
+  uint4 data1 = read_node(kg, offset);
+  uint4 data2 = read_node(kg, offset);
+  uint4 data3 = read_node(kg, offset);
+
+  float3 sun_dir = make_float3(
+      __uint_as_float(data0.x), __uint_as_float(data0.y), __uint_as_float(data0.z));
+  float atmospheric_density = __uint_as_float(data0.w);
+  float rayleigh_scattering = __uint_as_float(data1.x);
+  float mie_scattering = __uint_as_float(data1.y);
+  bool show_sun = (bool)data1.z;
+  float sun_brightness = __uint_as_float(data1.w);
+  float sun_size = __uint_as_float(data2.x);
+  float3 sun_color = make_float3(
+      __uint_as_float(data2.y), __uint_as_float(data2.z), __uint_as_float(data2.w));
+  float3 inv_wavelengths = make_float3(
+      __uint_as_float(data3.x), __uint_as_float(data3.y), __uint_as_float(data3.z));
+  float exposure = __uint_as_float(data3.w);
+
+  float4 out_color = physical_sky_texture(uvw,
+                                          sun_dir,
+                                          atmospheric_density,
+                                          rayleigh_scattering,
+                                          mie_scattering,
+                                          show_sun,
+                                          sun_brightness,
+                                          sun_size,
+                                          sun_color,
+                                          inv_wavelengths,
+                                          exposure);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
 CCL_NAMESPACE_END
