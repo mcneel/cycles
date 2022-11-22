@@ -297,6 +297,31 @@ class RhinoPhysicalSkyTextureNode : public ShaderNode {
   }
 };
 
+class RhinoTextureAdjustmentTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoTextureAdjustmentTextureNode)
+
+  float3 color;
+
+  bool grayscale;
+  bool invert;
+  bool clamp;
+  bool scale_to_clamp;
+  float multiplier;
+  float clamp_min;
+  float clamp_max;
+  float gain;
+  float gamma;
+  float saturation;
+  float hue_shift;
+  bool is_hdr;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

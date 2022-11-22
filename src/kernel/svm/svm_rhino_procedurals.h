@@ -1181,7 +1181,7 @@ ccl_device void svm_rhino_node_blend_texture(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
-ccl_device float3 RgbToYxy(float3 rgb)
+ccl_device float3 rgb_to_yxy(float3 rgb)
 {
   float Y = 0.0f;
   float x = 0.0f;
@@ -1256,7 +1256,7 @@ ccl_device float3 LogMapYxy(float3 Yxy, float exposure, float world_luminance, f
   return make_float3(Y, x, y);
 }
 
-ccl_device float3 YxyToRgb(float3 Yxy)
+ccl_device float3 yxy_to_rgb(float3 Yxy)
 {
   float Y = Yxy[0];
   float x = Yxy[1];
@@ -1280,11 +1280,11 @@ ccl_device float3 YxyToRgb(float3 Yxy)
 ccl_device float4 exposure_texture(
     float4 color, float exposure, float multiplier, float world_luminance, float max_luminance)
 {
-  float3 Yxy = RgbToYxy(make_float3(color.x, color.y, color.z));
+  float3 Yxy = rgb_to_yxy(make_float3(color.x, color.y, color.z));
 
   Yxy = LogMapYxy(Yxy, exposure, world_luminance, max_luminance);
 
-  float3 rgb = YxyToRgb(Yxy);
+  float3 rgb = yxy_to_rgb(Yxy);
   rgb *= multiplier;
 
   return make_float4(rgb.x, rgb.y, rgb.z, 1.0);
@@ -2545,6 +2545,242 @@ ccl_device void svm_rhino_node_physical_sky_texture(
                                           sun_color,
                                           inv_wavelengths,
                                           exposure);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device float3 rgb_to_hsb(float3 color)
+{
+  float r = color.x;
+  float g = color.y;
+  float b = color.z;
+
+  float maximum = max(r, max(g, b));
+  float minimum = min(r, min(g, b));
+
+  float hue = 0.0f;
+  float saturation = 0.0f;
+  float brightness = maximum;
+
+  float delta = maximum - minimum;
+
+  if (maximum != 0.0f) {
+    saturation = delta / maximum;
+  }
+
+  if (saturation != 0.0f) {
+    if (r == maximum) {
+      hue = (g - b) / delta;
+    }
+    else if (g == maximum) {
+      hue = 2.0f + ((b - r) / delta);
+    }
+    else {
+      hue = 4.0f + ((r - g) / delta);
+    }
+
+    hue *= 60.0f;
+
+    if (hue < 0.0f) {
+      hue += 360.0f;
+    }
+  }
+  else {
+    hue = 0.0f;
+  }
+
+  hue = max(0.0f, min(359.9999f, hue));
+
+  return make_float3(hue, saturation, brightness);
+}
+
+ccl_device float3 hsb_to_rgb(float3 hsb)
+{
+  float hue = hsb.x;
+  float saturation = hsb.y;
+  float brightness = hsb.z;
+
+  while (hue < 0.0f) {
+    hue += 360.0f;
+  }
+
+  while (hue > 360.0f) {
+    hue -= 360.0f;
+  }
+
+  if (saturation == 0.0f) {
+    return make_float3(brightness);
+  }
+
+  saturation = min(1.0f, saturation);
+
+  float h = hue * 0.01666666666666f;
+  int iH = int(floorf(h));
+
+  float f = h - float(iH);
+  float p = brightness * (1.0f - saturation);
+  float q = brightness * (1.0f - (saturation * f));
+  float t = brightness * (1.0f - (saturation * (1.0f - f)));
+
+  switch (iH) {
+    case 0:
+      return make_float3(brightness, t, p);
+    case 1:
+      return make_float3(q, brightness, p);
+    case 2:
+      return make_float3(p, brightness, t);
+    case 3:
+      return make_float3(p, q, brightness);
+    case 4:
+      return make_float3(t, p, brightness);
+    case 5:
+      return make_float3(brightness, p, q);
+    default:
+      return make_float3(0);
+  }
+}
+
+ccl_device float3 gamma_adjust(float3 color, float gamma)
+{
+  return make_float3(powf(color.x, gamma), powf(color.y, gamma), powf(color.z, gamma));
+}
+
+ccl_device float4 texture_adjustment_texture(float4 color,
+                 bool grayscale,
+                 bool invert,
+                 bool clamp,
+                 bool scale_to_clamp,
+                 float multiplier,
+                 float clamp_min,
+                 float clamp_max,
+                 float gain,
+                 float gamma,
+                 float saturation,
+                 float hue_shift,
+                 bool is_hdr)
+{
+  float3 hsb = rgb_to_hsb(make_float3(color.x, color.y, color.z));
+
+  float h = hsb.x;
+  float s = hsb.y;
+  float b = hsb.z;
+
+  if (is_hdr) {
+    // Gain does not work on HDR images.
+  }
+  else {
+    b = gain_func(b, gain);
+  }
+
+  if (clamp) {
+    if (b > clamp_max)
+      b = clamp_max;
+    if (b < clamp_min)
+      b = clamp_min;
+
+    if (scale_to_clamp)
+      b = (b - clamp_min) / (clamp_max - clamp_min);
+  }
+
+  float hue_in = h + (hue_shift * 360.0f / (2.0f * PI));
+  while (hue_in >= 360.0f) {
+    hue_in -= 360.0f;
+  }
+  while (hue_in < 0.0f) {
+    hue_in += 360.0f;
+  }
+  if (hue_in < 0.0f || hue_in >= 360.0f)
+    hue_in = 0.0f;
+
+  float3 rgb = hsb_to_rgb(make_float3(hue_in, s * saturation, b));
+  color.x = rgb.x;
+  color.y = rgb.y;
+  color.z = rgb.z;
+
+  if (gamma != 1.0f) {
+    gamma = max(0.2f, min(5.0f, gamma));
+    rgb = gamma_adjust(make_float3(color.x, color.y, color.z), 1.0f / gamma);
+    color.x = rgb.x;
+    color.y = rgb.y;
+    color.z = rgb.z;
+  }
+
+  if (invert) {
+    if (is_hdr) {
+      // For HDR colors we apply multiplicative inversion
+      color.x = max(color.x, 1.192092896e-07f);
+      color.y = max(color.y, 1.192092896e-07f);
+      color.z = max(color.z, 1.192092896e-07f);
+
+      color.x = 1.0f / color.x;
+      color.y = 1.0f / color.y;
+      color.z = 1.0f / color.z;
+    }
+    else {
+      // For normal colors we apply additive inversion
+      color.x = max(0.0f, 1.0f - color.x);
+      color.y = max(0.0f, 1.0f - color.y);
+      color.z = max(0.0f, 1.0f - color.z);
+    }
+  }
+
+  if (grayscale) {
+    float luminance = Luminance(make_float3(color.x, color.y, color.z));
+    rgb = make_float3(luminance);
+    color.x = rgb.x;
+    color.y = rgb.y;
+    color.z = rgb.z;
+  }
+
+  color.x *= multiplier;
+  color.y *= multiplier;
+  color.z *= multiplier;
+
+  return color;
+}
+
+ccl_device void svm_rhino_node_texture_adjustment_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_color_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(node.y, &in_color_offset, &out_color_offset, &dummy, &dummy);
+
+  float3 color = stack_load_float3(stack, in_color_offset);
+
+  uint4 data0 = read_node(kg, offset);
+  uint4 data1 = read_node(kg, offset);
+  uint4 data2 = read_node(kg, offset);
+
+  bool grayscale = (bool)data0.x;
+  bool invert = (bool)data0.y;
+  bool clamp = (bool)data0.z;
+  bool scale_to_clamp = (bool)data0.w;
+  float multiplier = __uint_as_float(data1.x);
+  float clamp_min = __uint_as_float(data1.y);
+  float clamp_max = __uint_as_float(data1.z);
+  float gain = __uint_as_float(data1.w);
+  float gamma = __uint_as_float(data2.x);
+  float saturation = __uint_as_float(data2.y);
+  float hue_shift = __uint_as_float(data2.z);
+  bool is_hdr = (bool)data2.w;
+
+  float4 out_color = texture_adjustment_texture(make_float4(color.x, color.y, color.z, 1.0f),
+                                                grayscale,
+                                                invert,
+                                                clamp,
+                                                scale_to_clamp,
+                                                multiplier,
+                                                clamp_min,
+                                                clamp_max,
+                                                gain,
+                                                gamma,
+                                                saturation,
+                                                hue_shift,
+                                                is_hdr);
 
   if (stack_valid(out_color_offset))
     stack_store_float3(

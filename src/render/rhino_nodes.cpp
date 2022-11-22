@@ -888,4 +888,61 @@ void RhinoPhysicalSkyTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Texture Adjustment */
+
+NODE_DEFINE(RhinoTextureAdjustmentTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_texture_adjustment_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_COLOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_BOOLEAN(grayscale, "Grayscale", false);
+  SOCKET_BOOLEAN(invert, "Invert", false);
+  SOCKET_BOOLEAN(clamp, "Clamp", false);
+  SOCKET_BOOLEAN(scale_to_clamp, "ScaleToClamp", false);
+
+  SOCKET_FLOAT(multiplier, "Multiplier", 0.0f);
+  SOCKET_FLOAT(clamp_min, "ClampMin", 0.0f);
+  SOCKET_FLOAT(clamp_max, "ClampMax", 0.0f);
+  SOCKET_FLOAT(gain, "Gain", 0.0f);
+  SOCKET_FLOAT(gamma, "Gamma", 0.0f);
+  SOCKET_FLOAT(saturation, "Saturation", 0.0f);
+  SOCKET_FLOAT(hue_shift, "HueShift", 0.0f);
+
+  SOCKET_BOOLEAN(is_hdr, "IsHdr", false);
+
+  SOCKET_OUT_VECTOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoTextureAdjustmentTextureNode::RhinoTextureAdjustmentTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoTextureAdjustmentTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *color_in = input("Color");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(
+      RHINO_NODE_TEXTURE_ADJUSTMENT_TEXTURE,
+      compiler.encode_uchar4(compiler.stack_assign(color_in), compiler.stack_assign(color_out)));
+
+  compiler.add_node((int)grayscale, (int)invert, (int)clamp, (int)scale_to_clamp);
+  compiler.add_node(__float_as_int(multiplier),
+                    __float_as_int(clamp_min),
+                    __float_as_int(clamp_max),
+                    __float_as_int(gain));
+  compiler.add_node(__float_as_int(gamma),
+                    __float_as_int(saturation),
+                    __float_as_int(hue_shift),
+                    (int)is_hdr);
+}
+
+void RhinoTextureAdjustmentTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END
