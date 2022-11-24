@@ -71,6 +71,14 @@ typedef enum RhinoProceduralMaskType {
   RHINO_MASK_ALPHA,
 } RhinoProceduralMaskType;
 
+typedef enum RhinoProceduralTileType {
+  RHINO_TILE_3D_RECTANGULAR,
+  RHINO_TILE_2D_RECTANGULAR,
+  RHINO_TILE_2D_HEXAGONAL,
+  RHINO_TILE_2D_TRIANGULAR,
+  RHINO_TILE_2D_OCTAGONAL,
+} RhinoProceduralTileType;
+
 CCL_NAMESPACE_END
 
 #endif /*  __SVM_RHINO_TYPES_H__ */

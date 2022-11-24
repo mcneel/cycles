@@ -39,12 +39,11 @@ class AzimuthAltitudeTransformNode : public ShaderNode {
   }
 };
 
-class RhinoCheckerTexture2dNode : public ShaderNode {
+class RhinoCheckerTextureNode : public ShaderNode {
  public:
-  SHADER_NODE_CLASS(RhinoCheckerTexture2dNode)
+  SHADER_NODE_CLASS(RhinoCheckerTextureNode)
 
   float3 uvw, color1, color2;
-  Transform uvw_transform;
 
   virtual int get_group()
   {
@@ -57,7 +56,6 @@ class RhinoNoiseTextureNode : public ShaderNode {
   SHADER_NODE_CLASS(RhinoNoiseTextureNode)
 
   float3 uvw, color1, color2;
-  Transform uvw_transform;
   RhinoProceduralNoiseType noise_type;
   RhinoProceduralSpecSynthType spec_synth_type;
   int octave_count;
@@ -80,7 +78,6 @@ class RhinoWavesTextureNode : public ShaderNode {
   SHADER_NODE_CLASS(RhinoWavesTextureNode)
 
   float3 uvw, color1, color2, color3;
-  Transform uvw_transform;
   RhinoProceduralWavesType wave_type;
   float wave_width;
   bool wave_width_texture_on;
@@ -98,7 +95,6 @@ class RhinoWavesWidthTextureNode : public ShaderNode {
   SHADER_NODE_CLASS(RhinoWavesWidthTextureNode)
 
   float3 uvw;
-  Transform uvw_transform;
   RhinoProceduralWavesType wave_type;
 
   virtual int get_group()
@@ -112,7 +108,6 @@ class RhinoPerturbingPart1TextureNode : public ShaderNode {
   SHADER_NODE_CLASS(RhinoPerturbingPart1TextureNode)
 
   float3 uvw;
-  Transform uvw_transform;
 
   virtual int get_group()
   {
@@ -141,7 +136,6 @@ class RhinoGradientTextureNode : public ShaderNode {
   SHADER_NODE_CLASS(RhinoGradientTextureNode)
 
   float3 uvw;
-  Transform uvw_transform;
   float3 color1;
   float3 color2;
   RhinoProceduralGradientType gradient_type;
@@ -315,6 +309,24 @@ class RhinoTextureAdjustmentTextureNode : public ShaderNode {
   float saturation;
   float hue_shift;
   bool is_hdr;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoTileTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoTileTextureNode)
+
+  float3 uvw;
+  float3 color1;
+  float3 color2;
+
+  RhinoProceduralTileType tile_type;
+  float3 phase;
+  float3 join_width;
 
   virtual int get_group()
   {

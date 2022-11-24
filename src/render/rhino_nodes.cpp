@@ -118,28 +118,24 @@ void AzimuthAltitudeTransformNode::compile(OSLCompiler &compiler)
 
 /* Checker Texture 2D */
 
-NODE_DEFINE(RhinoCheckerTexture2dNode)
+NODE_DEFINE(RhinoCheckerTextureNode)
 {
-  NodeType *type = NodeType::add("rhino_checker_texture_2d", create, NodeType::SHADER);
+  NodeType *type = NodeType::add("rhino_checker_texture", create, NodeType::SHADER);
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
-
-  SOCKET_TRANSFORM(uvw_transform,
-                   "UvwTransform",
-                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
   SOCKET_OUT_COLOR(color, "Color");
 
   return type;
 }
 
-RhinoCheckerTexture2dNode::RhinoCheckerTexture2dNode() : ShaderNode(node_type)
+RhinoCheckerTextureNode::RhinoCheckerTextureNode() : ShaderNode(node_type)
 {
 }
 
-void RhinoCheckerTexture2dNode::compile(SVMCompiler &compiler)
+void RhinoCheckerTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
@@ -147,18 +143,15 @@ void RhinoCheckerTexture2dNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *color_out = output("Color");
 
-  compiler.add_node(RHINO_NODE_CHECKER_TEXTURE_2D,
+  compiler.add_node(RHINO_NODE_CHECKER_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
                                            compiler.stack_assign(color2_in),
                                            compiler.stack_assign(color_out))
                    );
-  compiler.add_node(uvw_transform.x);
-  compiler.add_node(uvw_transform.y);
-  compiler.add_node(uvw_transform.z);
 }
 
-void RhinoCheckerTexture2dNode::compile(OSLCompiler &compiler)
+void RhinoCheckerTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
@@ -171,10 +164,6 @@ NODE_DEFINE(RhinoNoiseTextureNode)
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
-
-  SOCKET_TRANSFORM(uvw_transform,
-                   "UvwTransform",
-                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
   static NodeEnum noise_type_enum;
   noise_type_enum.insert("perlin", RHINO_NOISE_PERLIN);
@@ -224,9 +213,6 @@ void RhinoNoiseTextureNode::compile(SVMCompiler &compiler)
                                            compiler.stack_assign(color1_in),
                                            compiler.stack_assign(color2_in),
                                            compiler.stack_assign(color_out)));
-  compiler.add_node(uvw_transform.x);
-  compiler.add_node(uvw_transform.y);
-  compiler.add_node(uvw_transform.z);
 
   compiler.add_node(
       (int)noise_type, (int)spec_synth_type, octave_count, __float_as_int(frequency_multiplier));
@@ -252,9 +238,6 @@ NODE_DEFINE(RhinoWavesTextureNode)
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color3, "Color3", make_float3(0.0f, 0.0f, 0.0f));
 
-  SOCKET_TRANSFORM(uvw_transform,
-                   "UvwTransform",
-                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
   static NodeEnum wave_type_enum;
   wave_type_enum.insert("linear", RHINO_WAVES_LINEAR);
   wave_type_enum.insert("radial", RHINO_WAVES_RADIAL);
@@ -289,10 +272,6 @@ void RhinoWavesTextureNode::compile(SVMCompiler &compiler)
                                            compiler.stack_assign(color3_in)),
                     compiler.encode_uchar4(compiler.stack_assign(color_out)));
 
-  compiler.add_node(uvw_transform.x);
-  compiler.add_node(uvw_transform.y);
-  compiler.add_node(uvw_transform.z);
-
   compiler.add_node((int)wave_type,
                     __float_as_int(wave_width),
                     (int)wave_width_texture_on,
@@ -311,10 +290,6 @@ NODE_DEFINE(RhinoWavesWidthTextureNode)
   NodeType *type = NodeType::add("rhino_waves_width_texture", create, NodeType::SHADER);
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
-
-  SOCKET_TRANSFORM(uvw_transform,
-                   "UvwTransform",
-                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
   static NodeEnum wave_type_enum;
   wave_type_enum.insert("linear", RHINO_WAVES_LINEAR);
@@ -340,10 +315,6 @@ void RhinoWavesWidthTextureNode::compile(SVMCompiler &compiler)
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(uvw_out)));
 
-  compiler.add_node(uvw_transform.x);
-  compiler.add_node(uvw_transform.y);
-  compiler.add_node(uvw_transform.z);
-
   compiler.add_node((int)wave_type);
 }
 
@@ -358,10 +329,6 @@ NODE_DEFINE(RhinoPerturbingPart1TextureNode)
   NodeType *type = NodeType::add("rhino_perturbing_part1_texture", create, NodeType::SHADER);
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
-
-  SOCKET_TRANSFORM(uvw_transform,
-                   "UvwTransform",
-                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
 
   SOCKET_OUT_POINT(out_uvw1, "UVW1");
   SOCKET_OUT_POINT(out_uvw2, "UVW2");
@@ -387,10 +354,6 @@ void RhinoPerturbingPart1TextureNode::compile(SVMCompiler &compiler)
                                            compiler.stack_assign(uvw1_out),
                                            compiler.stack_assign(uvw2_out),
                                            compiler.stack_assign(uvw3_out)));
-
-  compiler.add_node(uvw_transform.x);
-  compiler.add_node(uvw_transform.y);
-  compiler.add_node(uvw_transform.z);
 }
 
 void RhinoPerturbingPart1TextureNode::compile(OSLCompiler &compiler)
@@ -456,10 +419,6 @@ NODE_DEFINE(RhinoGradientTextureNode)
   SOCKET_IN_COLOR(
       color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
 
-  SOCKET_TRANSFORM(uvw_transform,
-                   "UvwTransform",
-                   make_transform(1.0f, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0));
-
   static NodeEnum gradient_type_enum;
   gradient_type_enum.insert("linear", RHINO_GRADIENT_LINEAR);
   gradient_type_enum.insert("box", RHINO_GRADIENT_BOX);
@@ -496,10 +455,6 @@ void RhinoGradientTextureNode::compile(SVMCompiler &compiler)
                                            compiler.stack_assign(color1_in),
                                            compiler.stack_assign(color2_in),
                                            compiler.stack_assign(color_out)));
-
-  compiler.add_node(uvw_transform.x);
-  compiler.add_node(uvw_transform.y);
-  compiler.add_node(uvw_transform.z);
 
   compiler.add_node((int)gradient_type, (int)flip_alternate, (int)use_custom_curve, point_width);
   compiler.add_node(point_height);
@@ -942,6 +897,59 @@ void RhinoTextureAdjustmentTextureNode::compile(SVMCompiler &compiler)
 }
 
 void RhinoTextureAdjustmentTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Tile */
+
+NODE_DEFINE(RhinoTileTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_tile_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  static NodeEnum type_enum;
+  type_enum.insert("3dRectangular", RHINO_TILE_3D_RECTANGULAR);
+  type_enum.insert("2dRectangular", RHINO_TILE_2D_RECTANGULAR);
+  type_enum.insert("2dHexagonal", RHINO_TILE_2D_HEXAGONAL);
+  type_enum.insert("2dTriangular", RHINO_TILE_2D_TRIANGULAR);
+  SOCKET_ENUM(tile_type, "Type", type_enum, RHINO_TILE_3D_RECTANGULAR);
+  SOCKET_VECTOR(phase, "Phase", make_float3(0.0f));
+  SOCKET_VECTOR(join_width, "JoinWidth", make_float3(0.0f));
+
+  SOCKET_OUT_COLOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoTileTextureNode::RhinoTileTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoTileTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(
+      RHINO_NODE_TILE_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node(
+      (int)tile_type, __float_as_int(phase.x), __float_as_int(phase.y), __float_as_int(phase.z));
+  compiler.add_node(
+      __float_as_int(join_width.x), __float_as_int(join_width.y), __float_as_int(join_width.z));
+}
+
+void RhinoTileTextureNode::compile(OSLCompiler &compiler)
 {
 }
 

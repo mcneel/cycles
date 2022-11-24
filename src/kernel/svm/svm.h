@@ -301,8 +301,8 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
       case RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM:
         svm_rhino_node_azimuth_altitude_transform(kg, sd, stack, node, &offset);
         break;
-      case RHINO_NODE_CHECKER_TEXTURE_2D:
-        svm_rhino_node_checker_texture_2d(kg, sd, stack, node, &offset);
+      case RHINO_NODE_CHECKER_TEXTURE:
+        svm_rhino_node_checker_texture(kg, sd, stack, node, &offset);
         break;
       case RHINO_NODE_NOISE_TEXTURE:
         svm_rhino_node_noise_texture(kg, sd, stack, node, &offset);
@@ -348,6 +348,9 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
         break;
       case RHINO_NODE_TEXTURE_ADJUSTMENT_TEXTURE:
         svm_rhino_node_texture_adjustment_texture(kg, sd, stack, node, &offset);
+        break;
+      case RHINO_NODE_TILE_TEXTURE:
+        svm_rhino_node_tile_texture(kg, sd, stack, node, &offset);
         break;
 #  if NODES_FEATURE(NODE_FEATURE_BUMP)
       case NODE_GEOMETRY_BUMP_DX:

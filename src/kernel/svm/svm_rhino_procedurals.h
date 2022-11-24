@@ -29,21 +29,19 @@ ccl_device bool is_odd(int x)
   return (x & 1) == 1;
 }
 
-/* Checker Texture 2D */
+/* Checker Texture */
 
-ccl_device float4 checker_texture_2d(float3 uvw,
-                                     const Transform *mapping,
+ccl_device float4 checker_texture(float3 uvw,
                                      float4 color1,
                                      float4 color2)
 {
   float4 color_out = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
 
-  uvw = transform_point(mapping, uvw);
-
   int u_cell = int(floorf(uvw.x));
   int v_cell = int(floorf(uvw.y));
+  int w_cell = int(floorf(uvw.z));
 
-  if (is_odd(u_cell + v_cell)) {
+  if (is_odd(u_cell + v_cell + w_cell)) {
     color_out = color1;
   }
   else {
@@ -53,7 +51,7 @@ ccl_device float4 checker_texture_2d(float3 uvw,
   return color_out;
 }
 
-ccl_device void svm_rhino_node_checker_texture_2d(
+ccl_device void svm_rhino_node_checker_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
@@ -65,13 +63,7 @@ ccl_device void svm_rhino_node_checker_texture_2d(
   float3 color1 = stack_load_float3(stack, in_color1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
 
-  Transform uvw_transform;
-  uvw_transform.x = read_node_float(kg, offset);
-  uvw_transform.y = read_node_float(kg, offset);
-  uvw_transform.z = read_node_float(kg, offset);
-
-  float4 out_color = checker_texture_2d(uvw,
-                                        &uvw_transform,
+  float4 out_color = checker_texture(uvw,
                                         make_float4(color1.x, color1.y, color1.z, 1.0f),
                                         make_float4(color2.x, color2.y, color2.z, 1.0f));
 
@@ -611,7 +603,6 @@ ccl_device float aaltonen_noise(KernelGlobals *kg, float x, float y, float z)
 
 ccl_device float4 noise_texture(KernelGlobals *kg,
                                 float3 uvw,
-                                const Transform* uvw_transform,
                                 float4 color1,
                                 float4 color2,
                                 RhinoProceduralNoiseType noise_type,
@@ -625,8 +616,6 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
                                 bool inverse,
                                 float gain)
 {
-  uvw = transform_point(uvw_transform, uvw);
-
   float4 color_out = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
 
   float total_value = 0.0;
@@ -726,11 +715,6 @@ ccl_device void svm_rhino_node_noise_texture(
   float3 color1 = stack_load_float3(stack, in_color1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
 
-  Transform uvw_transform;
-  uvw_transform.x = read_node_float(kg, offset);
-  uvw_transform.y = read_node_float(kg, offset);
-  uvw_transform.z = read_node_float(kg, offset);
-
   uint4 data0 = read_node(kg, offset);
   uint4 data1 = read_node(kg, offset);
   uint4 data2 = read_node(kg, offset);
@@ -748,7 +732,6 @@ ccl_device void svm_rhino_node_noise_texture(
 
   float4 out_color = noise_texture(kg,
                                    uvw,
-                                   &uvw_transform,
                                    make_float4(color1.x, color1.y, color1.z, 1.0f),
                                    make_float4(color2.x, color2.y, color2.z, 1.0f),
                                    noise_type,
@@ -773,11 +756,8 @@ ccl_device float luminance(float3 color)
 }
 
 ccl_device float4 waves_width_texture(float3 uvw,
-                                      const Transform *uvw_transform,
                                       RhinoProceduralWavesType wave_type)
 {
-  uvw = transform_point(uvw_transform, uvw);
-
   float3 uvw_perturbed = make_float3(uvw.x, 0.5 + floorf(uvw.y), 0.0);
 
   if (wave_type == RHINO_WAVES_RADIAL) {
@@ -801,25 +781,17 @@ ccl_device void svm_rhino_node_waves_width_texture(
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
 
-  Transform uvw_transform;
-  uvw_transform.x = read_node_float(kg, offset);
-  uvw_transform.y = read_node_float(kg, offset);
-  uvw_transform.z = read_node_float(kg, offset);
-
   uint4 data0 = read_node(kg, offset);
 
   RhinoProceduralWavesType wave_type = (RhinoProceduralWavesType)data0.x;
 
-  float4 out_uvw = waves_width_texture(uvw,
-                                   &uvw_transform,
-                                   wave_type);
+  float4 out_uvw = waves_width_texture(uvw, wave_type);
 
   if (stack_valid(out_uvw_offset))
     stack_store_float3(stack, out_uvw_offset, make_float3(out_uvw.x, out_uvw.y, out_uvw.z));
 }
 
 ccl_device float4 waves_texture(float3 uvw,
-                                const Transform *uvw_transform,
                                 float4 color1,
                                 float4 color2,
                                 float4 color3,
@@ -829,8 +801,6 @@ ccl_device float4 waves_texture(float3 uvw,
                                 float contrast1,
                                 float contrast2)
 {
-  uvw = transform_point(uvw_transform, uvw);
-
   float parameter = ((wave_type == RHINO_WAVES_LINEAR) ?
                          uvw.y :
                          sqrt(uvw.x * uvw.x + uvw.y * uvw.y));
@@ -900,11 +870,6 @@ ccl_device void svm_rhino_node_waves_texture(
   float3 color2 = stack_load_float3(stack, in_color2_offset);
   float3 color3 = stack_load_float3(stack, in_color3_offset);
 
-  Transform uvw_transform;
-  uvw_transform.x = read_node_float(kg, offset);
-  uvw_transform.y = read_node_float(kg, offset);
-  uvw_transform.z = read_node_float(kg, offset);
-
   uint4 data0 = read_node(kg, offset);
   uint4 data1 = read_node(kg, offset);
 
@@ -915,7 +880,6 @@ ccl_device void svm_rhino_node_waves_texture(
   float contrast2 = __uint_as_float(data1.x);
 
   float4 out_color = waves_texture(uvw,
-                                   &uvw_transform,
                                    make_float4(color1.x, color1.y, color1.z, 1.0f),
                                    make_float4(color2.x, color2.y, color2.z, 1.0f),
                                    make_float4(color3.x, color3.y, color3.z, 1.0f),
@@ -930,10 +894,8 @@ ccl_device void svm_rhino_node_waves_texture(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
-ccl_device void perturbing_part1_texture(float3 uvw, const Transform *uvw_transform, float3* out_uvw0, float3* out_uvw1, float3* out_uvw2)
+ccl_device void perturbing_part1_texture(float3 uvw, float3* out_uvw0, float3* out_uvw1, float3* out_uvw2)
 {
-  uvw = transform_point(uvw_transform, uvw);
-
   *out_uvw0 = uvw;
   *out_uvw1 = make_float3(1.0f, 0.0f, 0.0f) - uvw;
   *out_uvw2 = make_float3(0.0f, 1.0f, 0.0f) - uvw;
@@ -949,13 +911,8 @@ ccl_device void svm_rhino_node_perturbing_part1_texture(
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
 
-  Transform uvw_transform;
-  uvw_transform.x = read_node_float(kg, offset);
-  uvw_transform.y = read_node_float(kg, offset);
-  uvw_transform.z = read_node_float(kg, offset);
-
   float3 out_uvw0, out_uvw1, out_uvw2;
-  perturbing_part1_texture(uvw, &uvw_transform, &out_uvw0, &out_uvw1, &out_uvw2);
+  perturbing_part1_texture(uvw, &out_uvw0, &out_uvw1, &out_uvw2);
 
   if (stack_valid(out_uvw0_offset))
     stack_store_float3(stack, out_uvw0_offset, out_uvw0);
@@ -1002,7 +959,6 @@ ccl_device void svm_rhino_node_perturbing_part2_texture(
 }
 
 ccl_device float4 gradient_texture(float3 uvw,
-                                   const Transform *uvw_transform,
                                    float4 color1,
                                    float4 color2,
                                    RhinoProceduralGradientType type,
@@ -1011,8 +967,6 @@ ccl_device float4 gradient_texture(float3 uvw,
                                    int point_width,
                                    int point_height)
 {
-  uvw = transform_point(uvw_transform, uvw);
-
   float4 color_out = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
 
   int u_cell = int(floorf(uvw.x));
@@ -1099,11 +1053,6 @@ ccl_device void svm_rhino_node_gradient_texture(
   float3 color1 = stack_load_float3(stack, in_color1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
 
-  Transform uvw_transform;
-  uvw_transform.x = read_node_float(kg, offset);
-  uvw_transform.y = read_node_float(kg, offset);
-  uvw_transform.z = read_node_float(kg, offset);
-
   uint4 data0 = read_node(kg, offset);
   uint4 data1 = read_node(kg, offset);
 
@@ -1114,7 +1063,6 @@ ccl_device void svm_rhino_node_gradient_texture(
   int point_height = (int)data1.x;
 
   float4 out_color = gradient_texture(uvw,
-                                      &uvw_transform,
                                       make_float4(color1.x, color1.y, color1.z, 1.0f),
                                       make_float4(color2.x, color2.y, color2.z, 1.0f),
                                       gradient_type,
@@ -2781,6 +2729,212 @@ ccl_device void svm_rhino_node_texture_adjustment_texture(
                                                 saturation,
                                                 hue_shift,
                                                 is_hdr);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
+ccl_device bool tile_texture_rectangular_test_3d(float3 uvw, float3 join_width)
+{
+  for (int i = 0; i < 3; i++) {
+    float dHalfWidth = join_width[i] * 0.5;
+
+    if (uvw[i] < dHalfWidth || uvw[i] > 1.0 - dHalfWidth) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+ccl_device bool tile_texture_rectangular_test_2d(float3 uvw, float3 join_width)
+{
+  for (int i = 0; i < 2; i++) {
+    float dHalfWidth = join_width[i] * 0.5;
+
+    if (uvw[i] < dHalfWidth || uvw[i] > 1.0 - dHalfWidth) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+ccl_device bool is_point_near_half_line_starting_from_origin(
+    float pointU, float pointV, float tangentU, float tangentV, float distance)
+{
+  float dotP = pointU * tangentU + pointV * tangentV;
+
+  if (0.0 > dotP)
+    return false;
+
+  float pointDistance = pointU * tangentV - pointV * tangentU;
+
+  if (pointDistance > distance)
+    return false;
+
+  if (-pointDistance > distance)
+    return false;
+
+  return true;
+}
+
+ccl_device bool tile_texture_hexagonal_test(float3 uvw, float3 join_width)
+{
+  const float sqrtOfThree = sqrt(3.0);
+  float u = (uvw.x <= 0.5 ? uvw.x : 1.0 - uvw.x);
+  float v = (uvw.y <= 0.5 ? uvw.y : 1.0 - uvw.y);
+
+  float knot_u = (u < v ? 0.0 : 0.5);
+  float knot_v = (u < v ? 2.0 / 6.0 : 1.0 / 6.0);
+  float dJunctionVScale = (u < v ? 1.0 : -1.0);
+
+  float trim_u = (u - knot_u);
+  float trim_v = (v - knot_v) * sqrtOfThree * dJunctionVScale;
+
+  float maxJointWidth = max(join_width[0], join_width[1]);
+  float maxJointWidthSquared = maxJointWidth * maxJointWidth;
+
+  float trimLengthSquared = trim_u * trim_u + trim_v * trim_v;
+
+  if (4.0 * trimLengthSquared < maxJointWidthSquared)
+    return true;
+
+  if (is_point_near_half_line_starting_from_origin(trim_u, trim_v, 0.0, 1.0, join_width[0] / 2.0))
+    return true;
+
+  if (is_point_near_half_line_starting_from_origin(
+          trim_u, trim_v, 0.5 * sqrtOfThree, -0.5, join_width[1] / 2.0))
+    return true;
+
+  if (is_point_near_half_line_starting_from_origin(
+          trim_u, trim_v, -0.5 * sqrtOfThree, -0.5, join_width[1] / 2.0))
+    return true;
+
+  return false;
+}
+
+ccl_device bool tile_texture_triangular_test(float3 uvw, float3 join_width)
+{
+  const float vFactor = sqrt(3.0) / 2.0;
+  float u = uvw.x > 0.5 ? 1.0 - uvw.x : uvw.x;
+  float v = (uvw.y > 0.5 ? 1.0 - uvw.y : uvw.y) * 2.0 * vFactor;
+
+  float dHalfWidth = join_width[0] * 0.5;
+
+  if (v < dHalfWidth || v > vFactor - dHalfWidth)
+    return true;
+
+  float v2 = v / vFactor;
+  u -= (1.0 - v2) * 0.5;
+
+  dHalfWidth = join_width[1] * 0.5 * vFactor;
+
+  return abs(u) < dHalfWidth;
+}
+
+ccl_device bool tile_texture_octagonal_test(float3 uvw, float3 join_width)
+{
+  const float sqrtOfTwo = sqrt(2.0);
+  const float b = 1.0 / (2.0 + sqrtOfTwo);
+
+  float u = uvw.x > 0.5 ? 1.0 - uvw.x : uvw.x;
+  float v = uvw.y > 0.5 ? 1.0 - uvw.y : uvw.y;
+
+  if (u + v < b - sqrtOfTwo * 0.5 * join_width[0]) {
+    if (v > b - 0.5 * join_width[1])
+      return true;
+
+    if (u > b - 0.5 * join_width[1])
+      return true;
+
+    return false;
+  }
+
+  if (u < 0.5 * join_width[1])
+    return true;
+
+  if (v < 0.5 * join_width[1])
+    return true;
+
+  if (u + v < b + sqrtOfTwo * 0.5 * join_width[0])
+    return true;
+
+  return false;
+}
+
+ccl_device float4
+tile_texture(float3 uvw, float4 color1, float4 color2, int type, float3 phase, float3 join_width)
+{
+  int uCell = int(floorf(uvw.x));
+  int vCell = int(floorf(uvw.y));
+
+  float3 phaseShift = make_float3(0);
+
+  if (is_odd(vCell))
+    phaseShift.x += phase[0];
+  if (is_odd(uCell))
+    phaseShift.y += phase[1];
+  if (is_odd(uCell))
+    phaseShift.x += phase[2];
+
+  uvw.x = fractf(uvw.x + phaseShift.x);
+  uvw.y = fractf(uvw.y + phaseShift.y);
+  uvw.z = fractf(uvw.z + phaseShift.z);
+
+  bool bLineHit = false;
+
+  switch (type) {
+    case RHINO_TILE_3D_RECTANGULAR:
+      bLineHit = tile_texture_rectangular_test_3d(uvw, join_width);
+      break;
+    case RHINO_TILE_2D_RECTANGULAR:
+      bLineHit = tile_texture_rectangular_test_2d(uvw, join_width);
+      break;
+    case RHINO_TILE_2D_HEXAGONAL:
+      bLineHit = tile_texture_hexagonal_test(uvw, join_width);
+      break;
+    case RHINO_TILE_2D_TRIANGULAR:
+      bLineHit = tile_texture_triangular_test(uvw, join_width);
+      break;
+    case RHINO_TILE_2D_OCTAGONAL:
+      bLineHit = tile_texture_octagonal_test(uvw, join_width);
+      break;
+  }
+
+  float4 color_out = bLineHit ? color1 : color2;
+
+  return color_out;
+}
+
+ccl_device void svm_rhino_node_tile_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+
+  uint4 data0 = read_node(kg, offset);
+  uint4 data1 = read_node(kg, offset);
+
+  int type = (int)data0.x;
+  float3 phase = make_float3(
+      __uint_as_float(data0.y), __uint_as_float(data0.z), __uint_as_float(data0.w));
+  float3 join_width = make_float3(
+      __uint_as_float(data1.x), __uint_as_float(data1.y), __uint_as_float(data1.z));
+
+  float4 out_color = tile_texture(uvw,
+                                  make_float4(color1.x, color1.y, color1.z, 1.0f),
+                                  make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                  type,
+                                  phase,
+                                  join_width);
 
   if (stack_valid(out_color_offset))
     stack_store_float3(
