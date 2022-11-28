@@ -172,6 +172,7 @@ typedef enum ShaderNodeType {
   RHINO_NODE_PHYSICAL_SKY_TEXTURE,
   RHINO_NODE_TEXTURE_ADJUSTMENT_TEXTURE,
   RHINO_NODE_TILE_TEXTURE,
+  RHINO_NODE_DOTS_TEXTURE,
 } ShaderNodeType;
 
 typedef enum NodeAttributeType {

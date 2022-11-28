@@ -1444,7 +1444,9 @@ typedef struct KernelTables {
   int rhino_impulse_noise_offset;
   int rhino_vc_noise_offset;
   int rhino_aaltonen_noise_offset;
-  int pad1, pad2, pad3;
+  int rhino_dots_tree_data_offset;
+  int rhino_dots_dot_data_offset;
+  int pad;
 } KernelTables;
 static_assert_align(KernelTables, 16);
 

@@ -2941,4 +2941,493 @@ ccl_device void svm_rhino_node_tile_texture(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
+const int STACK_STATE_BEGIN = 0;
+const int STACK_STATE_FIRST_CHILD = 1;
+const int STACK_STATE_SECOND_CHILD = 2;
+const int STACK_STATE_END = 3;
+
+ccl_device void RecurseTree(
+    int *dots_tree_stack, int *depth, int *index, int child_offset, int state)
+{
+  dots_tree_stack[*depth] = state;
+  *depth += 1;
+  *index = 2 * (*index) + child_offset;
+}
+
+ccl_device bool RecurseTreeChild1(int *dots_tree_stack,
+                                  float3 uvw,
+                                  float2 center,
+                                  int axis,
+                                  float radius,
+                                  int *depth,
+                                  int *index)
+{
+  if (uvw[axis] <= center[axis] + radius) {
+    RecurseTree(dots_tree_stack, depth, index, 1, STACK_STATE_SECOND_CHILD);
+    return true;
+  }
+
+  return false;
+}
+
+ccl_device bool RecurseTreeChild2(int *dots_tree_stack,
+                                  float3 uvw,
+                                  float2 center,
+                                  int axis,
+                                  float radius,
+                                  int *depth,
+                                  int *index)
+{
+  if (uvw[axis] > center[axis] - radius) {
+    RecurseTree(dots_tree_stack, depth, index, 2, STACK_STATE_END);
+    return true;
+  }
+
+  return false;
+}
+
+ccl_device void Return(int *dots_tree_stack, int *depth, int *index)
+{
+  dots_tree_stack[*depth] = STACK_STATE_BEGIN;
+  *depth -= 1;
+  *index = ((*index) - 2 + ((*index) % 2)) / 2;
+}
+
+ccl_device float4 dots_tree_data_fetch(KernelGlobals *kg, int x)
+{
+  // TODO: We might have many dots textures that need their own data in memory,
+  // so we can't just use one rhino_dots_tree_data_offset.
+
+  float4 tree_data;
+  tree_data.x = kernel_tex_fetch(__lookup_table,
+                                 kernel_data.tables.rhino_dots_tree_data_offset + x);
+  tree_data.y = kernel_tex_fetch(__lookup_table,
+                                 kernel_data.tables.rhino_dots_tree_data_offset + x + 1);
+  tree_data.z = kernel_tex_fetch(__lookup_table,
+                                 kernel_data.tables.rhino_dots_tree_data_offset + x + 2);
+  tree_data.w = kernel_tex_fetch(__lookup_table,
+                                 kernel_data.tables.rhino_dots_tree_data_offset + x + 3);
+
+  return tree_data;
+}
+
+ccl_device void GetDotTreeData(KernelGlobals *kg,
+                               int tree_index,
+                               float2 *center,
+                               float *radius,
+                               int *dot_index)
+{
+  float4 dot_tree_node = dots_tree_data_fetch(kg, tree_index);
+
+  *center = make_float2(dot_tree_node.x, dot_tree_node.y);
+  *radius = dot_tree_node.z;
+  *dot_index = int(dot_tree_node.w);
+}
+
+ccl_device void FindIntersectingDot(KernelGlobals *kg,
+                                    float3 uvw,
+                                    int dots_tree_node_count,
+                                    int *depth,
+                                    int *tree_index,
+                                    int *dot_index_output,
+                                    float *squared_distance_output)
+{
+  // Will support around 100 000 dots
+  // UI is limited to 100 000 dots.
+  const int dots_tree_stack_size = 17;
+  int dots_tree_stack[dots_tree_stack_size] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+  *dot_index_output = -1;
+  *squared_distance_output = 0.0f;
+
+  uvw.x = fractf(uvw.x);
+  uvw.y = fractf(uvw.y);
+  uvw.z = fractf(uvw.z);
+
+  int counter = 0;
+
+  for (;; counter++) {
+    if (depth < 0) {
+      *dot_index_output = -1;
+      return;
+    }
+
+    if (counter > 5 * dots_tree_node_count) {
+      *dot_index_output = -2;
+      return;
+    }
+
+    int axis = (*depth) % 2;
+
+    int state = dots_tree_stack[(*depth)];
+
+    if (state == STACK_STATE_BEGIN) {
+      if ((*tree_index) >= dots_tree_node_count) {
+        Return(dots_tree_stack, depth, tree_index);
+        continue;
+      }
+
+      float2 center;
+      float radius;
+      int dot_index;
+      GetDotTreeData(kg,
+                     *tree_index,
+                     &center,
+                     &radius,
+                     &dot_index);
+
+      if (radius == 0.0f)  // Means this node is null
+      {
+        Return(dots_tree_stack, depth, tree_index);
+        continue;
+      }
+      float length_squared = len_squared(make_float3(center.x - uvw.x, center.y - uvw.y, 0.0f));
+      if (length_squared <= radius * radius) {
+        dots_tree_stack[*depth] = STACK_STATE_FIRST_CHILD;
+        *dot_index_output = dot_index;
+        *squared_distance_output = length_squared;
+        return;
+      }
+
+      if (RecurseTreeChild1(dots_tree_stack, uvw, center, axis, radius, depth, tree_index))
+        continue;
+
+      if (RecurseTreeChild2(dots_tree_stack, uvw, center, axis, radius, depth, tree_index))
+        continue;
+
+      Return(dots_tree_stack, depth, tree_index);
+      continue;
+    }
+    else if (state == STACK_STATE_FIRST_CHILD) {
+      float2 center;
+      float radius;
+      int dot_index;
+      GetDotTreeData(kg,
+                     *tree_index,
+                     &center,
+                     &radius,
+                     &dot_index);
+
+      if (RecurseTreeChild1(dots_tree_stack, uvw, center, axis, radius, depth, tree_index))
+        continue;
+
+      if (RecurseTreeChild2(dots_tree_stack, uvw, center, axis, radius, depth, tree_index))
+        continue;
+
+      Return(dots_tree_stack, depth, tree_index);
+      continue;
+    }
+    else if (state == STACK_STATE_SECOND_CHILD) {
+      float2 center;
+      float radius;
+      int dot_index;
+      GetDotTreeData(kg,
+                     *tree_index,
+                     &center,
+                     &radius,
+                     &dot_index);
+
+      if (RecurseTreeChild2(dots_tree_stack, uvw, center, axis, radius, depth, tree_index))
+        continue;
+
+      Return(dots_tree_stack, depth, tree_index);
+      continue;
+    }
+    else if (state == STACK_STATE_END) {
+      Return(dots_tree_stack, depth, tree_index);
+      continue;
+    }
+  }
+}
+
+ccl_device float4 GetDotData(KernelGlobals *kg, int index)
+{
+  // TODO: We might have many dots textures that need their own data in memory,
+  // so we can't just use one rhino_dots_tree_data_offset.
+
+  float4 dot_data;
+  dot_data.x = kernel_tex_fetch(__lookup_table,
+                                kernel_data.tables.rhino_dots_dot_data_offset + index);
+  dot_data.y = kernel_tex_fetch(__lookup_table,
+                                kernel_data.tables.rhino_dots_dot_data_offset + index + 1);
+  dot_data.z = kernel_tex_fetch(__lookup_table,
+                                kernel_data.tables.rhino_dots_dot_data_offset + index + 2);
+  dot_data.w = kernel_tex_fetch(__lookup_table,
+                                kernel_data.tables.rhino_dots_dot_data_offset + index + 3);
+
+  return dot_data;
+}
+
+ccl_device float GetDotRadius(KernelGlobals *kg, int index)
+{
+  return GetDotData(kg, index).x;
+}
+
+ccl_device float GetDotRingRadius(KernelGlobals *kg, int index)
+{
+  return GetDotData(kg, index).y;
+}
+
+ccl_device float GetDotAmplitude(KernelGlobals *kg, int index)
+{
+  return GetDotData(kg, index).z;
+}
+
+ccl_device float GetDotHueAdjust(KernelGlobals *kg, int index)
+{
+  return GetDotData(kg, index).w;
+}
+
+ccl_device float GetDotSaturationFactor(KernelGlobals *kg, int index)
+{
+  return GetDotData(kg, index + 1).x;
+}
+
+ccl_device void ProcessDotColor(KernelGlobals *kg,
+                                float4 originalBackgroundColor,
+                                float4 originalDotColor,
+                                bool rings,
+                                RhinoProceduralDotsFalloffType falloff_type,
+                                RhinoProceduralDotsCompositionType composition_type,
+                                int dot_index,
+                                float squared_distance,
+                                float *standard_composition_value,
+                                float4 *color,
+                                int *colors_added)
+{
+  dot_index *= 2;
+
+  float radius = GetDotRadius(kg, dot_index);
+  float ring_radius = GetDotRingRadius(kg, dot_index);
+
+  // Calculate virtual radius and virtual distance
+  float virtualRadius = radius;
+  float virtualSquaredDistance = squared_distance;
+  float virtualDistance = sqrt(virtualSquaredDistance);
+
+  if (rings && ring_radius != 1.0f) {
+    float ringRadius = ring_radius;
+    virtualRadius = radius * ringRadius;
+    float actualRingRadius = radius * (1.0 - ringRadius);
+    virtualDistance = abs(actualRingRadius - virtualDistance);
+    virtualSquaredDistance = virtualDistance * virtualDistance;
+  }
+
+  if (virtualSquaredDistance < virtualRadius * virtualRadius) {
+    float amplitude = GetDotAmplitude(kg, dot_index);
+    float hueAdjust = GetDotHueAdjust(kg, dot_index);
+    float saturationFactor = GetDotSaturationFactor(kg, dot_index);
+
+    float value = 0.0f;
+    switch (falloff_type) {
+      case RHINO_DOTS_FALLOFF_FLAT:
+        value = amplitude;
+        break;
+
+      case RHINO_DOTS_FALLOFF_LINEAR:
+        value = amplitude * (1.0 - sqrt(virtualSquaredDistance) / virtualRadius);
+        break;
+
+      case RHINO_DOTS_FALLOFF_CUBIC: {
+        float param = sqrt(virtualSquaredDistance) / virtualRadius;
+        float alpha = 1.0;
+        float a = 2.0 * alpha;
+        float b = -3.0 * alpha;
+        float c = 0.0;
+        float d = alpha;
+        value = amplitude * (((a * param + b) * param + c) * param + d);
+      } break;
+
+      case RHINO_DOTS_FALLOFF_ELLIPTIC: {
+        float xSquared = virtualSquaredDistance / (virtualRadius * virtualRadius);
+        value = amplitude * sqrt(1.0 - xSquared);
+      } break;
+      default:
+        value = amplitude;
+        break;
+    }
+
+    float h = 0.0;
+    float s = 0.0;
+    float b = 0.0;
+
+    float4 dotColor = originalDotColor;
+
+    // Jussi, 12-1-2011: Hue variance was broken due to invalid use of hsb2rgb.
+    // Hue value passed into hsb2rgb must in degrees and in the range of [0,360).
+
+    float3 hsb = rgb_to_hsb(
+        make_float3(originalDotColor.x, originalDotColor.y, originalDotColor.z));
+    h = hsb.x;
+    s = hsb.y;
+    b = hsb.z;
+
+    float shiftedHue = mod(h + hueAdjust, 360.0f);
+
+    if (shiftedHue < 0)
+      shiftedHue += 360.0f;
+
+    float3 color3 = hsb_to_rgb(make_float3(shiftedHue, s * saturationFactor, b));
+    dotColor.x = color3.x;
+    dotColor.y = color3.y;
+    dotColor.z = color3.z;
+
+    switch (composition_type) {
+      case RHINO_DOTS_COMPOSITION_MAXIMUM: {
+        float4 startColor = originalBackgroundColor;
+        float4 endColor = dotColor;
+        startColor *= 1.0f - value;
+        endColor *= value;
+        startColor += endColor;
+        *color = make_float4(max(color->x, startColor.x),
+                             max(color->y, startColor.y),
+                             max(color->z, startColor.z),
+                             max(color->w, startColor.w));
+      } break;
+
+      case RHINO_DOTS_COMPOSITION_ADDITION:
+        dotColor *= value;
+        *color += dotColor;
+        break;
+
+      case RHINO_DOTS_COMPOSITION_SUBTRACTION:
+        dotColor *= value;
+        *color -= dotColor;
+        break;
+
+      case RHINO_DOTS_COMPOSITION_MULTIPLICATION: {
+        float4 startColor = originalBackgroundColor;
+        float4 endColor = dotColor;
+        startColor *= 1.0f - value;
+        endColor *= value;
+        endColor += startColor;
+        *color *= endColor;
+      } break;
+
+      case RHINO_DOTS_COMPOSITION_AVERAGE: {
+        float4 startColor = originalBackgroundColor;
+        float4 endColor = dotColor;
+        startColor *= 1.0f - value;
+        endColor *= value;
+        *color += startColor;
+        *color += endColor;
+      } break;
+
+      case RHINO_DOTS_COMPOSITION_STANDARD:
+        *standard_composition_value += value;
+        *color = dotColor;
+        break;
+
+      default:
+        break;
+    }
+
+    colors_added++;
+  }
+}
+
+ccl_device float4 dots_texture(KernelGlobals *kg,
+                               float3 uvw,
+                               float4 color1,
+                               float4 color2,
+                               int dots_data_count,
+                               int dots_tree_node_count,
+                               float sample_area_size,
+                               bool rings,
+                               float ring_radius,
+                               RhinoProceduralDotsFalloffType falloff_type,
+                               RhinoProceduralDotsCompositionType composition_type)
+{
+  uvw = uvw / sample_area_size;
+
+  float4 original_background_color = color1;
+  float4 original_dot_color = color2;
+
+  float4 color = original_background_color;
+  int colors_added = 0;
+
+  float standard_composition_value = 0.0f;
+
+  int depth = 0;
+  int tree_index = 0;
+
+  while (colors_added < 100) {
+    int dot_index = -1;
+    float squared_distance = 0.0f;
+    FindIntersectingDot(
+        kg, uvw, dots_tree_node_count, &depth, &tree_index, &dot_index, &squared_distance);
+
+    if (dot_index < 0 || dot_index >= dots_data_count)
+      break;
+
+    ProcessDotColor(kg,
+                    original_background_color,
+                    original_dot_color,
+                    rings,
+                    falloff_type,
+                    composition_type,
+                    dot_index,
+                    squared_distance,
+                    &standard_composition_value,
+                    &color,
+                    &colors_added);
+  }
+
+  if (composition_type == RHINO_DOTS_COMPOSITION_AVERAGE) {
+    color /= (colors_added == 0 ? 1 : colors_added);
+  }
+  else if (composition_type == RHINO_DOTS_COMPOSITION_STANDARD) {
+    color = (1.f - standard_composition_value) * original_background_color +
+            standard_composition_value * color;
+  }
+
+  float4 col_out = make_float4(clamp(color.x, 0.0f, 1.0f),
+                               clamp(color.y, 0.0f, 1.0f),
+                               clamp(color.z, 0.0f, 1.0f),
+                               clamp(color.w, 0.0f, 1.0f));
+
+  return col_out;
+}
+
+ccl_device void svm_rhino_node_dots_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+
+  uint4 data0 = read_node(kg, offset);
+  uint4 data1 = read_node(kg, offset);
+
+  int dots_data_count = (int)data0.x;
+  int dots_tree_node_count = (int)data0.y;
+  float sample_area_size = __uint_as_float(data0.z);
+  bool rings = (bool)data0.w;
+  float ring_radius = __uint_as_float(data1.x);
+  RhinoProceduralDotsFalloffType falloff_type = (RhinoProceduralDotsFalloffType)data1.y;
+  RhinoProceduralDotsCompositionType composition_type = (RhinoProceduralDotsCompositionType)
+                                                            data1.z;
+
+  float4 out_color = dots_texture(kg,
+                                  uvw,
+                                  make_float4(color1.x, color1.y, color1.z, 1.0f),
+                                  make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                  dots_data_count,
+                                  dots_tree_node_count,
+                                  sample_area_size,
+                                  rings,
+                                  ring_radius,
+                                  falloff_type,
+                                  composition_type);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(
+        stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+}
+
 CCL_NAMESPACE_END

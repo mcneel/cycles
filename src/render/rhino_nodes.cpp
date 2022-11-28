@@ -953,4 +953,69 @@ void RhinoTileTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Dots */
+
+NODE_DEFINE(RhinoDotsTextureNode)
+{
+  NodeType *type = NodeType::add("rhino_dots_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_INT(dots_data_count, "DataCount", 0);
+  SOCKET_INT(dots_tree_node_count, "TreeNodeCount", 0);
+  SOCKET_FLOAT(sample_area_size, "SampleAreaSize", 0.0f);
+  SOCKET_BOOLEAN(rings, "Rings", false);
+  SOCKET_FLOAT(ring_radius, "RingRadius", 0.0f);
+
+  static NodeEnum falloff_enum;
+  falloff_enum.insert("Flat", RHINO_DOTS_FALLOFF_FLAT);
+  falloff_enum.insert("Linear", RHINO_DOTS_FALLOFF_LINEAR);
+  falloff_enum.insert("Cubic", RHINO_DOTS_FALLOFF_CUBIC);
+  falloff_enum.insert("Elliptic", RHINO_DOTS_FALLOFF_ELLIPTIC);
+  SOCKET_ENUM(falloff_type, "FalloffType", falloff_enum, RHINO_DOTS_FALLOFF_FLAT);
+  static NodeEnum composition_enum;
+  composition_enum.insert("Maximum", RHINO_DOTS_COMPOSITION_MAXIMUM);
+  composition_enum.insert("Addition", RHINO_DOTS_COMPOSITION_ADDITION);
+  composition_enum.insert("Subtraction", RHINO_DOTS_COMPOSITION_SUBTRACTION);
+  composition_enum.insert("Multiplication", RHINO_DOTS_COMPOSITION_MULTIPLICATION);
+  composition_enum.insert("Average", RHINO_DOTS_COMPOSITION_AVERAGE);
+  composition_enum.insert("Standard", RHINO_DOTS_COMPOSITION_STANDARD);
+  SOCKET_ENUM(
+      composition_type, "CompositionType", composition_enum, RHINO_DOTS_COMPOSITION_MAXIMUM);
+
+  SOCKET_OUT_COLOR(out_color, "Color");
+
+  return type;
+}
+
+RhinoDotsTextureNode::RhinoDotsTextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoDotsTextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_DOTS_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color_out)));
+
+  compiler.add_node(dots_data_count,
+                    dots_tree_node_count,
+                    __float_as_int(sample_area_size), (int)rings);
+  compiler.add_node(__float_as_int(ring_radius), (int)falloff_type, (int)composition_type);
+}
+
+void RhinoDotsTextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END

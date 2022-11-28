@@ -79,6 +79,22 @@ typedef enum RhinoProceduralTileType {
   RHINO_TILE_2D_OCTAGONAL,
 } RhinoProceduralTileType;
 
+typedef enum RhinoProceduralDotsFalloffType {
+  RHINO_DOTS_FALLOFF_FLAT,
+  RHINO_DOTS_FALLOFF_LINEAR,
+  RHINO_DOTS_FALLOFF_CUBIC,
+  RHINO_DOTS_FALLOFF_ELLIPTIC,
+} RhinoProceduralDotsFalloffType;
+
+typedef enum RhinoProceduralDotsCompositionType {
+  RHINO_DOTS_COMPOSITION_MAXIMUM,
+  RHINO_DOTS_COMPOSITION_ADDITION,
+  RHINO_DOTS_COMPOSITION_SUBTRACTION,
+  RHINO_DOTS_COMPOSITION_MULTIPLICATION,
+  RHINO_DOTS_COMPOSITION_AVERAGE,
+  RHINO_DOTS_COMPOSITION_STANDARD,
+} RhinoProceduralDotsCompositionType;
+
 CCL_NAMESPACE_END
 
 #endif /*  __SVM_RHINO_TYPES_H__ */

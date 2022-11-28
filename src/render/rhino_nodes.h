@@ -334,6 +334,28 @@ class RhinoTileTextureNode : public ShaderNode {
   }
 };
 
+class RhinoDotsTextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoDotsTextureNode)
+
+  float3 uvw;
+  float3 color1;
+  float3 color2;
+
+  int dots_data_count;
+  int dots_tree_node_count;
+  float sample_area_size;
+  bool rings;
+  float ring_radius;
+  RhinoProceduralDotsFalloffType falloff_type;
+  RhinoProceduralDotsCompositionType composition_type;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */
