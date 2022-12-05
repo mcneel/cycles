@@ -54,22 +54,30 @@ ccl_device float4 checker_texture(float3 uvw,
 ccl_device void svm_rhino_node_checker_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
+  uint dummy;
 
   svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+      node.y, &in_uvw_offset, &in_color1_offset, &in_alpha1_offset, &in_color2_offset);
+
+  svm_unpack_node_uchar4(node.z, &in_alpha2_offset, &out_color_offset, &out_alpha_offset, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
 
   float4 out_color = checker_texture(uvw,
-                                        make_float4(color1.x, color1.y, color1.z, 1.0f),
-                                        make_float4(color2.x, color2.y, color2.z, 1.0f));
+                                     make_float4(color1.x, color1.y, color1.z, alpha1),
+                                     make_float4(color2.x, color2.y, color2.z, alpha2));
 
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 /* Noise */
@@ -706,14 +714,18 @@ ccl_device float4 noise_texture(KernelGlobals *kg,
 ccl_device void svm_rhino_node_noise_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
+  uint dummy;
 
   svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+      node.y, &in_uvw_offset, &in_color1_offset, &in_alpha1_offset, &in_color2_offset);
+  svm_unpack_node_uchar4(node.z, &in_alpha2_offset, &out_color_offset, &out_alpha_offset, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
 
   uint4 data0 = read_node(kg, offset);
   uint4 data1 = read_node(kg, offset);
@@ -732,8 +744,8 @@ ccl_device void svm_rhino_node_noise_texture(
 
   float4 out_color = noise_texture(kg,
                                    uvw,
-                                   make_float4(color1.x, color1.y, color1.z, 1.0f),
-                                   make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                   make_float4(color1.x, color1.y, color1.z, alpha1),
+                                   make_float4(color2.x, color2.y, color2.z, alpha2),
                                    noise_type,
                                    spec_synth_type,
                                    octave_count,
@@ -748,6 +760,9 @@ ccl_device void svm_rhino_node_noise_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device float luminance(float3 color)
@@ -857,17 +872,18 @@ ccl_device float4 waves_texture(float3 uvw,
 ccl_device void svm_rhino_node_waves_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, in_color3_offset, out_color_offset;
-  uint dummy;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, in_color3_offset, out_color_offset, out_alpha_offset;
 
   svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &in_color3_offset);
+      node.y, &in_uvw_offset, &in_color1_offset, &in_alpha1_offset, &in_color2_offset);
   svm_unpack_node_uchar4(
-      node.z, &out_color_offset, &dummy, &dummy, &dummy);
+      node.z, &in_alpha2_offset, &in_color3_offset, &out_color_offset, &out_alpha_offset);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
   float3 color3 = stack_load_float3(stack, in_color3_offset);
 
   uint4 data0 = read_node(kg, offset);
@@ -880,8 +896,8 @@ ccl_device void svm_rhino_node_waves_texture(
   float contrast2 = __uint_as_float(data1.x);
 
   float4 out_color = waves_texture(uvw,
-                                   make_float4(color1.x, color1.y, color1.z, 1.0f),
-                                   make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                   make_float4(color1.x, color1.y, color1.z, alpha1),
+                                   make_float4(color2.x, color2.y, color2.z, alpha2),
                                    make_float4(color3.x, color3.y, color3.z, 1.0f),
                                    wave_type,
                                    wave_width,
@@ -892,6 +908,9 @@ ccl_device void svm_rhino_node_waves_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device void perturbing_part1_texture(float3 uvw, float3* out_uvw0, float3* out_uvw1, float3* out_uvw2)
@@ -1044,14 +1063,23 @@ ccl_device float4 gradient_texture(float3 uvw,
 ccl_device void svm_rhino_node_gradient_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset,
+      out_color_offset, out_alpha_offset;
+  uint dummy;
 
-  svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+  svm_unpack_node_uchar4(node.y,
+                         &in_uvw_offset,
+                         &in_color1_offset,
+                         &in_alpha1_offset,
+                         &in_color2_offset);
+
+  svm_unpack_node_uchar4(node.z, &in_alpha2_offset, &out_color_offset, &out_alpha_offset, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
 
   uint4 data0 = read_node(kg, offset);
   uint4 data1 = read_node(kg, offset);
@@ -1063,8 +1091,8 @@ ccl_device void svm_rhino_node_gradient_texture(
   int point_height = (int)data1.x;
 
   float4 out_color = gradient_texture(uvw,
-                                      make_float4(color1.x, color1.y, color1.z, 1.0f),
-                                      make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                      make_float4(color1.x, color1.y, color1.z, alpha1),
+                                      make_float4(color2.x, color2.y, color2.z, alpha2),
                                       gradient_type,
                                       flip_alternate,
                                       use_custom_curve,
@@ -1073,6 +1101,9 @@ ccl_device void svm_rhino_node_gradient_texture(
 
   if (stack_valid(out_color_offset))
     stack_store_float3(stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device float Luminance(float3 color)
@@ -1100,16 +1131,19 @@ ccl_device float4 blend_texture(float3 uvw,
 ccl_device void svm_rhino_node_blend_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, in_blend_color_offset, out_color_offset;
-  uint dummy;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset,
+      in_blend_color_offset, out_color_offset, out_alpha_offset;
 
   svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &in_blend_color_offset);
-  svm_unpack_node_uchar4(node.z, &out_color_offset, &dummy, &dummy, &dummy);
+      node.y, &in_uvw_offset, &in_color1_offset, &in_alpha1_offset, &in_color2_offset);
+  svm_unpack_node_uchar4(
+      node.z, &in_alpha2_offset, &in_blend_color_offset, &out_color_offset, &out_alpha_offset);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
   float3 blend_color = stack_load_float3(stack, in_blend_color_offset);
 
   uint4 data = read_node(kg, offset);
@@ -1118,8 +1152,8 @@ ccl_device void svm_rhino_node_blend_texture(
   float blend_factor = __uint_as_float(data.y);
 
   float4 out_color = blend_texture(uvw,
-                                   make_float4(color1.x, color1.y, color1.z, 1.0f),
-                                   make_float4(color2.x, color2.y, color2.z, 1.0f),
+                                   make_float4(color1.x, color1.y, color1.z, alpha1),
+                                   make_float4(color2.x, color2.y, color2.z, alpha2),
                                    make_float4(blend_color.x, blend_color.y, blend_color.z, 1.0f),
                                    use_blend_color,
                                    blend_factor);
@@ -1127,6 +1161,9 @@ ccl_device void svm_rhino_node_blend_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device float3 rgb_to_yxy(float3 rgb)
@@ -1241,10 +1278,10 @@ ccl_device float4 exposure_texture(
 ccl_device void svm_rhino_node_exposure_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_color_offset, out_color_offset;
+  uint in_color_offset, out_color_offset, out_alpha_offset;
   uint dummy;
 
-  svm_unpack_node_uchar4(node.y, &in_color_offset, &out_color_offset, &dummy, &dummy);
+  svm_unpack_node_uchar4(node.y, &in_color_offset, &out_color_offset, &out_alpha_offset, &dummy);
 
   float3 color = stack_load_float3(stack, in_color_offset);
 
@@ -1264,6 +1301,10 @@ ccl_device void svm_rhino_node_exposure_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(
+        stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device float fbm(KernelGlobals *kg, float3 P, bool is_turbulent, float omega, int maxOctaves)
@@ -1304,14 +1345,19 @@ ccl_device float4 fbm_texture(KernelGlobals *kg,
 ccl_device void svm_rhino_node_fbm_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
+  uint dummy;
 
   svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+      node.y, &in_uvw_offset, &in_color1_offset, &in_alpha1_offset, &in_color2_offset);
+  svm_unpack_node_uchar4(
+      node.z, &in_alpha2_offset, &out_color_offset, &out_alpha_offset, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
 
   uint4 data = read_node(kg, offset);
 
@@ -1322,8 +1368,8 @@ ccl_device void svm_rhino_node_fbm_texture(
 
   float4 out_color = fbm_texture(kg,
                                  uvw,
-                                 make_float4(color1.x, color1.y, color1.z, 1.0),
-                                 make_float4(color2.x, color2.y, color2.z, 1.0),
+                                 make_float4(color1.x, color1.y, color1.z, alpha1),
+                                 make_float4(color2.x, color2.y, color2.z, alpha2),
                                  is_turbulent,
                                  max_octaves,
                                  gain,
@@ -1332,6 +1378,9 @@ ccl_device void svm_rhino_node_fbm_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device int get_segment(float u, float v, float thickness, float margin)
@@ -1472,14 +1521,19 @@ grid_texture(float3 uvw, float4 color1, float4 color2, int cells, float font_thi
 ccl_device void svm_rhino_node_grid_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset,
+      out_color_offset, out_alpha_offset;
+  uint dummy;
 
   svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+      node.y, &in_uvw_offset, &in_color1_offset, &in_alpha1_offset, &in_color2_offset);
+  svm_unpack_node_uchar4(node.z, &in_alpha2_offset, &out_color_offset, &out_alpha_offset, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
 
   uint4 data = read_node(kg, offset);
 
@@ -1487,14 +1541,17 @@ ccl_device void svm_rhino_node_grid_texture(
   float font_thickness = __uint_as_float(data.y);
 
   float4 out_color = grid_texture(uvw,
-                                  make_float4(color1.x, color1.y, color1.z, 1.0),
-                                  make_float4(color2.x, color2.y, color2.z, 1.0),
+                                  make_float4(color1.x, color1.y, color1.z, alpha1),
+                                  make_float4(color2.x, color2.y, color2.z, alpha2),
                                   cells,
                                   font_thickness);
 
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device float3 light_probe_to_world(float2 uv)
@@ -2193,11 +2250,10 @@ ccl_device float4 mask_texture(float4 color, RhinoProceduralMaskType mask_type)
 ccl_device void svm_rhino_node_mask_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_color_offset, in_alpha_offset, out_color_offset;
-  uint dummy;
+  uint in_color_offset, in_alpha_offset, out_color_offset, out_alpha_offset;
 
   svm_unpack_node_uchar4(
-      node.y, &in_color_offset, &in_alpha_offset, &out_color_offset, &dummy);
+      node.y, &in_color_offset, &in_alpha_offset, &out_color_offset, &out_alpha_offset);
 
   float3 color = stack_load_float3(stack, in_color_offset);
   float alpha = stack_load_float(stack, in_alpha_offset);
@@ -2211,6 +2267,9 @@ ccl_device void svm_rhino_node_mask_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device float4 perlin_marble_texture(KernelGlobals *kg,
@@ -2290,10 +2349,12 @@ ccl_device float4 perlin_marble_texture(KernelGlobals *kg,
 ccl_device void svm_rhino_node_perlin_marble_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset, out_alpha_offset;
+  uint dummy;
 
   svm_unpack_node_uchar4(
       node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+  svm_unpack_node_uchar4(node.z, &out_alpha_offset, &dummy, &dummy, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
@@ -2314,6 +2375,9 @@ ccl_device void svm_rhino_node_perlin_marble_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+  if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 ccl_device float scale(float fCos)
@@ -2911,14 +2975,19 @@ tile_texture(float3 uvw, float4 color1, float4 color2, int type, float3 phase, f
 ccl_device void svm_rhino_node_tile_texture(
     KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
 {
-  uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
+  uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
+  uint dummy;
 
   svm_unpack_node_uchar4(
-      node.y, &in_uvw_offset, &in_color1_offset, &in_color2_offset, &out_color_offset);
+      node.y, &in_uvw_offset, &in_color1_offset, &in_alpha1_offset, &in_color2_offset);
+  svm_unpack_node_uchar4(
+      node.z, &in_alpha2_offset, &out_color_offset, &out_alpha_offset, &dummy);
 
   float3 uvw = stack_load_float3(stack, in_uvw_offset);
   float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float alpha1 = stack_load_float(stack, in_alpha1_offset);
   float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float alpha2 = stack_load_float(stack, in_alpha2_offset);
 
   uint4 data0 = read_node(kg, offset);
   uint4 data1 = read_node(kg, offset);
@@ -2939,6 +3008,9 @@ ccl_device void svm_rhino_node_tile_texture(
   if (stack_valid(out_color_offset))
     stack_store_float3(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
+
+   if (stack_valid(out_alpha_offset))
+    stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
 const int STACK_STATE_BEGIN = 0;

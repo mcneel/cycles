@@ -43,7 +43,11 @@ class RhinoCheckerTextureNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(RhinoCheckerTextureNode)
 
-  float3 uvw, color1, color2;
+  float3 uvw;
+  float3 color1;
+  float alpha1;
+  float3 color2;
+  float alpha2;
 
   virtual int get_group()
   {
@@ -55,7 +59,12 @@ class RhinoNoiseTextureNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(RhinoNoiseTextureNode)
 
-  float3 uvw, color1, color2;
+  float3 uvw;
+  float3 color1;
+  float alpha1;
+  float3 color2;
+  float alpha2;
+
   RhinoProceduralNoiseType noise_type;
   RhinoProceduralSpecSynthType spec_synth_type;
   int octave_count;
@@ -77,7 +86,13 @@ class RhinoWavesTextureNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(RhinoWavesTextureNode)
 
-  float3 uvw, color1, color2, color3;
+  float3 uvw;
+  float3 color1;
+  float alpha1;
+  float3 color2;
+  float alpha2;
+  float3 color3;
+
   RhinoProceduralWavesType wave_type;
   float wave_width;
   bool wave_width_texture_on;
@@ -137,7 +152,10 @@ class RhinoGradientTextureNode : public ShaderNode {
 
   float3 uvw;
   float3 color1;
+  float alpha1;
   float3 color2;
+  float alpha2;
+
   RhinoProceduralGradientType gradient_type;
   bool flip_alternate;
   bool use_custom_curve;
@@ -156,8 +174,11 @@ class RhinoBlendTextureNode : public ShaderNode {
 
   float3 uvw;
   float3 color1;
+  float alpha1;
   float3 color2;
+  float alpha2;
   float3 blend_color;
+
   bool use_blend_color;
   float blend_factor;
 
@@ -189,7 +210,10 @@ class RhinoFbmTextureNode : public ShaderNode {
 
   float3 uvw;
   float3 color1;
+  float alpha1;
   float3 color2;
+  float alpha2;
+
   bool is_turbulent;
   float max_octaves;
   float gain;
@@ -207,7 +231,10 @@ class RhinoGridTextureNode : public ShaderNode {
 
   float3 uvw;
   float3 color1;
+  float alpha1;
   float3 color2;
+  float alpha2;
+
   int cells;
   float font_thickness;
 
@@ -322,7 +349,9 @@ class RhinoTileTextureNode : public ShaderNode {
 
   float3 uvw;
   float3 color1;
+  float alpha1;
   float3 color2;
+  float alpha2;
 
   RhinoProceduralTileType tile_type;
   float3 phase;

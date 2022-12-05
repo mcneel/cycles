@@ -124,9 +124,12 @@ NODE_DEFINE(RhinoCheckerTextureNode)
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
 
   SOCKET_OUT_COLOR(color, "Color");
+  SOCKET_OUT_FLOAT(alpha, "Alpha");
 
   return type;
 }
@@ -139,16 +142,21 @@ void RhinoCheckerTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_CHECKER_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out))
-                   );
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 }
 
 void RhinoCheckerTextureNode::compile(OSLCompiler &compiler)
@@ -163,7 +171,9 @@ NODE_DEFINE(RhinoNoiseTextureNode)
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
 
   static NodeEnum noise_type_enum;
   noise_type_enum.insert("perlin", RHINO_NOISE_PERLIN);
@@ -192,6 +202,7 @@ NODE_DEFINE(RhinoNoiseTextureNode)
   SOCKET_FLOAT(gain, "Gain", 0.0f);
 
   SOCKET_OUT_COLOR(color, "Color");
+  SOCKET_OUT_FLOAT(alpha, "Alpha");
 
   return type;
 }
@@ -204,15 +215,21 @@ void RhinoNoiseTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_NOISE_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node(
       (int)noise_type, (int)spec_synth_type, octave_count, __float_as_int(frequency_multiplier));
@@ -235,7 +252,9 @@ NODE_DEFINE(RhinoWavesTextureNode)
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
   SOCKET_IN_COLOR(color3, "Color3", make_float3(0.0f, 0.0f, 0.0f));
 
   static NodeEnum wave_type_enum;
@@ -248,6 +267,7 @@ NODE_DEFINE(RhinoWavesTextureNode)
   SOCKET_FLOAT(contrast2, "Contrast2", 0.0f);
 
   SOCKET_OUT_COLOR(color, "Color");
+  SOCKET_OUT_FLOAT(alpha, "Alpha");
 
   return type;
 }
@@ -260,17 +280,23 @@ void RhinoWavesTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
   ShaderInput *color3_in = input("Color3");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_WAVES_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color3_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(color3_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node((int)wave_type,
                     __float_as_int(wave_width),
@@ -414,10 +440,10 @@ NODE_DEFINE(RhinoGradientTextureNode)
   NodeType *type = NodeType::add("rhino_gradient_texture", create, NodeType::SHADER);
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
-  SOCKET_IN_COLOR(
-      color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
-  SOCKET_IN_COLOR(
-      color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
 
   static NodeEnum gradient_type_enum;
   gradient_type_enum.insert("linear", RHINO_GRADIENT_LINEAR);
@@ -434,6 +460,7 @@ NODE_DEFINE(RhinoGradientTextureNode)
   SOCKET_INT(point_height, "PointHeight", 1.0f);
 
   SOCKET_OUT_COLOR(out_color, "Color");
+  SOCKET_OUT_FLOAT(out_alpha, "Alpha");
 
   return type;
 }
@@ -446,15 +473,21 @@ void RhinoGradientTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_GRADIENT_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node((int)gradient_type, (int)flip_alternate, (int)use_custom_curve, point_width);
   compiler.add_node(point_height);
@@ -472,13 +505,16 @@ NODE_DEFINE(RhinoBlendTextureNode)
 
   SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
   SOCKET_IN_COLOR(blend_color, "BlendColor", make_float3(0.0f, 0.0f, 0.0f));
 
   SOCKET_BOOLEAN(use_blend_color, "UseBlendColor", false);
   SOCKET_FLOAT(blend_factor, "BlendFactor", 0.5f);
 
   SOCKET_OUT_COLOR(out_color, "Color");
+  SOCKET_OUT_FLOAT(out_alpha, "Alpha");
 
   return type;
 }
@@ -491,17 +527,23 @@ void RhinoBlendTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
   ShaderInput *blend_color_in = input("BlendColor");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_BLEND_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(blend_color_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(blend_color_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node((int)use_blend_color, __float_as_int(blend_factor));
 }
@@ -524,6 +566,7 @@ NODE_DEFINE(RhinoExposureTextureNode)
   SOCKET_FLOAT(max_luminance, "MaxLuminance", 0.5f);
 
   SOCKET_OUT_COLOR(out_color, "Color");
+  SOCKET_OUT_COLOR(out_alpha, "Alpha");
 
   return type;
 }
@@ -537,10 +580,13 @@ void RhinoExposureTextureNode::compile(SVMCompiler &compiler)
   ShaderInput *color_in = input("Color");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(
       RHINO_NODE_EXPOSURE_TEXTURE,
-      compiler.encode_uchar4(compiler.stack_assign(color_in), compiler.stack_assign(color_out)));
+                    compiler.encode_uchar4(compiler.stack_assign(color_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node(__float_as_int(exposure), __float_as_int(multiplier), __float_as_int(world_luminance), __float_as_int(max_luminance));
 }
@@ -557,7 +603,9 @@ NODE_DEFINE(RhinoFbmTextureNode)
 
   SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
 
   SOCKET_BOOLEAN(is_turbulent, "IsTurbulent", false);
   SOCKET_INT(max_octaves, "MaxOctaves", 3);
@@ -565,6 +613,7 @@ NODE_DEFINE(RhinoFbmTextureNode)
   SOCKET_FLOAT(roughness, "Roughness", 0.5f);
 
   SOCKET_OUT_COLOR(out_color, "Color");
+  SOCKET_OUT_FLOAT(out_alpha, "Alpha");
 
   return type;
 }
@@ -577,16 +626,22 @@ void RhinoFbmTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(
       RHINO_NODE_FBM_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node((int)is_turbulent,
                     max_octaves, __float_as_int(gain), __float_as_int(roughness));
@@ -604,12 +659,15 @@ NODE_DEFINE(RhinoGridTextureNode)
 
   SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
 
   SOCKET_INT(cells, "Cells", 0);
   SOCKET_FLOAT(font_thickness, "FontThickness", 1.0f);
 
   SOCKET_OUT_COLOR(out_color, "Color");
+  SOCKET_OUT_FLOAT(out_alpha, "Alpha");
 
   return type;
 }
@@ -622,15 +680,21 @@ void RhinoGridTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_GRID_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node(cells, __float_as_int(font_thickness));
 }
@@ -715,6 +779,7 @@ NODE_DEFINE(RhinoMaskTextureNode)
   SOCKET_ENUM(mask_type, "MaskType", mask_type_enum, RHINO_MASK_LUMINANCE);
 
   SOCKET_OUT_VECTOR(out_color, "Color");
+  SOCKET_OUT_FLOAT(out_alpha, "Alpha");
 
   return type;
 }
@@ -729,11 +794,13 @@ void RhinoMaskTextureNode::compile(SVMCompiler &compiler)
   ShaderInput *alpha_in = input("Alpha");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_MASK_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(color_in),
                                            compiler.stack_assign(alpha_in),
-                                           compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node((int)mask_type);
 }
@@ -759,7 +826,8 @@ NODE_DEFINE(RhinoPerlinMarbleTextureNode)
   SOCKET_FLOAT(color1_sat, "Color1Saturation", 0.0f);
   SOCKET_FLOAT(color2_sat, "Color2Saturation", 0.0f);
 
-  SOCKET_OUT_VECTOR(out_color, "Color");
+  SOCKET_OUT_COLOR(out_color, "Color");
+  SOCKET_OUT_FLOAT(out_alpha, "Alpha");
 
   return type;
 }
@@ -775,12 +843,14 @@ void RhinoPerlinMarbleTextureNode::compile(SVMCompiler &compiler)
   ShaderInput *color2_in = input("Color2");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(RHINO_NODE_PERLIN_MARBLE_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
                                            compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(color_out)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha_out)));
 
   compiler.add_node(
       levels, __float_as_int(noise_amount), __float_as_int(blur), __float_as_int(size));
@@ -908,7 +978,9 @@ NODE_DEFINE(RhinoTileTextureNode)
 
   SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
   SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha1, "Alpha1", 1.0f);
   SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_FLOAT(alpha2, "Alpha2", 1.0f);
 
   static NodeEnum type_enum;
   type_enum.insert("3dRectangular", RHINO_TILE_3D_RECTANGULAR);
@@ -920,6 +992,7 @@ NODE_DEFINE(RhinoTileTextureNode)
   SOCKET_VECTOR(join_width, "JoinWidth", make_float3(0.0f));
 
   SOCKET_OUT_COLOR(out_color, "Color");
+  SOCKET_OUT_COLOR(out_alpha, "Alpha");
 
   return type;
 }
@@ -932,16 +1005,22 @@ void RhinoTileTextureNode::compile(SVMCompiler &compiler)
 {
   ShaderInput *uvw_in = input("UVW");
   ShaderInput *color1_in = input("Color1");
+  ShaderInput *alpha1_in = input("Alpha1");
   ShaderInput *color2_in = input("Color2");
+  ShaderInput *alpha2_in = input("Alpha2");
 
   ShaderOutput *color_out = output("Color");
+  ShaderOutput *alpha_out = output("Alpha");
 
   compiler.add_node(
       RHINO_NODE_TILE_TEXTURE,
                     compiler.encode_uchar4(compiler.stack_assign(uvw_in),
                                            compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)));
+                                           compiler.stack_assign(alpha1_in),
+                                           compiler.stack_assign(color2_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
+                                           compiler.stack_assign(color_out),
+                                           compiler.stack_assign(alpha_out)));
 
   compiler.add_node(
       (int)tile_type, __float_as_int(phase.x), __float_as_int(phase.y), __float_as_int(phase.z));
