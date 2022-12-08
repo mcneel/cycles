@@ -3502,4 +3502,141 @@ ccl_device void svm_rhino_node_dots_texture(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
+ccl_device void normal_part1_texture(ShaderData *sd,
+                                       float3 uvw,
+                                       float3 *uvw1,
+                                       float3 *uvw2,
+                                       float3 *uvw3,
+                                       float3 *uvw4,
+                                       float3 *uvw5,
+                                       float3 *uvw6,
+                                       float3 *uvw7,
+                                       float3 *uvw8)
+{
+  float2 uv_in = make_float2(uvw.x, uvw.y);
+
+  differential duvdx = sd->du;
+  differential duvdy = sd->dv;
+
+  float2 uv_x = make_float2(len(make_float2(duvdx.dx, duvdy.dx)), 0);
+  float2 uv_y = make_float2(0, len(make_float2(duvdx.dy, duvdy.dy)));
+
+  float2 uv1 = uv_in - uv_x - uv_y;
+  float2 uv2 = uv_in        - uv_y;
+  float2 uv3 = uv_in + uv_x - uv_y;
+  float2 uv4 = uv_in - uv_x + uv_y;
+  float2 uv5 = uv_in        + uv_y;
+  float2 uv6 = uv_in + uv_x + uv_y;
+  float2 uv7 = uv_in - uv_x;
+  float2 uv8 = uv_in + uv_x;
+
+  *uvw1 = make_float3(uv1.x, uv1.y, 0.0f);
+  *uvw2 = make_float3(uv2.x, uv2.y, 0.0f);
+  *uvw3 = make_float3(uv3.x, uv3.y, 0.0f);
+  *uvw4 = make_float3(uv4.x, uv4.y, 0.0f);
+  *uvw5 = make_float3(uv5.x, uv5.y, 0.0f);
+  *uvw6 = make_float3(uv6.x, uv6.y, 0.0f);
+  *uvw7 = make_float3(uv7.x, uv7.y, 0.0f);
+  *uvw8 = make_float3(uv8.x, uv8.y, 0.0f);
+}
+
+ccl_device void svm_rhino_node_normal_part1_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_uvw_offset, out_uvw1_offset, out_uvw2_offset, out_uvw3_offset, out_uvw4_offset,
+      out_uvw5_offset, out_uvw6_offset, out_uvw7_offset, out_uvw8_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_uvw_offset, &out_uvw1_offset, &out_uvw2_offset, &out_uvw3_offset);
+  svm_unpack_node_uchar4(
+      node.z, &out_uvw4_offset, &out_uvw5_offset, &out_uvw6_offset, &out_uvw7_offset);
+  svm_unpack_node_uchar4(node.w, &out_uvw8_offset, &dummy, &dummy, &dummy);
+
+  float3 uvw = stack_load_float3(stack, in_uvw_offset);
+
+  float3 uvw1, uvw2, uvw3, uvw4, uvw5, uvw6, uvw7, uvw8;
+  normal_part1_texture(sd, uvw, &uvw1, &uvw2, &uvw3, &uvw4, &uvw5, &uvw6, &uvw7, &uvw8);
+
+  if (stack_valid(out_uvw1_offset))
+    stack_store_float3(stack, out_uvw1_offset, uvw1);
+  if (stack_valid(out_uvw2_offset))
+    stack_store_float3(stack, out_uvw2_offset, uvw2);
+  if (stack_valid(out_uvw3_offset))
+    stack_store_float3(stack, out_uvw3_offset, uvw3);
+  if (stack_valid(out_uvw4_offset))
+    stack_store_float3(stack, out_uvw4_offset, uvw4);
+  if (stack_valid(out_uvw5_offset))
+    stack_store_float3(stack, out_uvw5_offset, uvw5);
+  if (stack_valid(out_uvw6_offset))
+    stack_store_float3(stack, out_uvw6_offset, uvw6);
+  if (stack_valid(out_uvw7_offset))
+    stack_store_float3(stack, out_uvw7_offset, uvw7);
+  if (stack_valid(out_uvw8_offset))
+    stack_store_float3(stack, out_uvw8_offset, uvw8);
+}
+
+ccl_device float4 normal_part2_texture(float3 color1,
+                                       float3 color2,
+                                       float3 color3,
+                                       float3 color4,
+                                       float3 color5,
+                                       float3 color6,
+                                       float3 color7,
+                                       float3 color8)
+{
+  float a = Luminance(color1);
+  float b = Luminance(color2);
+  float c = Luminance(color3);
+  float d = Luminance(color4);
+  float e = Luminance(color5);
+  float f = Luminance(color6);
+  float g = Luminance(color7);
+  float k = Luminance(color8);
+
+  float3 normal;
+  normal.x = (a - c + 2.0f * g - 2.0f * k + d - f);
+  normal.y = (a + 2.0f * b + c - d - 2.0f * e - f);
+  normal.z = 1.0f;
+
+  normal = normalize(normal);
+
+  float4 color;
+  color.x = 0.5f * normal.x + 0.5f;
+  color.y = 0.5f * normal.y + 0.5f;
+  color.z = 0.5f * normal.z + 0.5f;
+  color.w = 1.0f;
+
+  return color;
+}
+
+ccl_device void svm_rhino_node_normal_part2_texture(
+    KernelGlobals *kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+{
+  uint in_color1_offset, in_color2_offset, in_color3_offset, in_color4_offset, in_color5_offset,
+      in_color6_offset, in_color7_offset, in_color8_offset, out_color_offset;
+  uint dummy;
+
+  svm_unpack_node_uchar4(
+      node.y, &in_color1_offset, &in_color2_offset, &in_color3_offset, &in_color4_offset);
+  svm_unpack_node_uchar4(
+      node.z, &in_color5_offset, &in_color6_offset, &in_color7_offset, &in_color8_offset);
+  svm_unpack_node_uchar4(node.w, &out_color_offset, &dummy, &dummy, &dummy);
+
+  float3 color1 = stack_load_float3(stack, in_color1_offset);
+  float3 color2 = stack_load_float3(stack, in_color2_offset);
+  float3 color3 = stack_load_float3(stack, in_color3_offset);
+  float3 color4 = stack_load_float3(stack, in_color4_offset);
+  float3 color5 = stack_load_float3(stack, in_color5_offset);
+  float3 color6 = stack_load_float3(stack, in_color6_offset);
+  float3 color7 = stack_load_float3(stack, in_color7_offset);
+  float3 color8 = stack_load_float3(stack, in_color8_offset);
+
+  float4 color = normal_part2_texture(
+      color1, color2, color3, color4, color5, color6, color7, color8);
+
+  if (stack_valid(out_color_offset))
+    stack_store_float3(stack, out_color_offset, make_float3(color.x, color.y, color.z));
+}
+
 CCL_NAMESPACE_END

@@ -385,6 +385,37 @@ class RhinoDotsTextureNode : public ShaderNode {
   }
 };
 
+class RhinoNormalPart1TextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoNormalPart1TextureNode)
+
+  float3 uvw;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
+class RhinoNormalPart2TextureNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoNormalPart2TextureNode)
+
+  float3 color1;
+  float3 color2;
+  float3 color3;
+  float3 color4;
+  float3 color5;
+  float3 color6;
+  float3 color7;
+  float3 color8;
+
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

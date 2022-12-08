@@ -1097,4 +1097,111 @@ void RhinoDotsTextureNode::compile(OSLCompiler &compiler)
 {
 }
 
+/* Normal Part 1 */
+
+NODE_DEFINE(RhinoNormalPart1TextureNode)
+{
+  NodeType *type = NodeType::add("rhino_normal_part1_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_VECTOR(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_OUT_VECTOR(uvw1_out, "UVW1");
+  SOCKET_OUT_VECTOR(uvw2_out, "UVW2");
+  SOCKET_OUT_VECTOR(uvw3_out, "UVW3");
+  SOCKET_OUT_VECTOR(uvw4_out, "UVW4");
+  SOCKET_OUT_VECTOR(uvw5_out, "UVW5");
+  SOCKET_OUT_VECTOR(uvw6_out, "UVW6");
+  SOCKET_OUT_VECTOR(uvw7_out, "UVW7");
+  SOCKET_OUT_VECTOR(uvw8_out, "UVW8");
+
+  return type;
+}
+
+RhinoNormalPart1TextureNode::RhinoNormalPart1TextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoNormalPart1TextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *uvw_in = input("UVW");
+
+  ShaderOutput *uvw1_out = output("UVW1");
+  ShaderOutput *uvw2_out = output("UVW2");
+  ShaderOutput *uvw3_out = output("UVW3");
+  ShaderOutput *uvw4_out = output("UVW4");
+  ShaderOutput *uvw5_out = output("UVW5");
+  ShaderOutput *uvw6_out = output("UVW6");
+  ShaderOutput *uvw7_out = output("UVW7");
+  ShaderOutput *uvw8_out = output("UVW8");
+
+  compiler.add_node(RHINO_NODE_NORMAL_PART1_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
+                                           compiler.stack_assign(uvw1_out),
+                                           compiler.stack_assign(uvw2_out),
+                                           compiler.stack_assign(uvw3_out)),
+                    compiler.encode_uchar4(compiler.stack_assign(uvw4_out),
+                                           compiler.stack_assign(uvw5_out),
+                                           compiler.stack_assign(uvw6_out),
+                                           compiler.stack_assign(uvw7_out)),
+                    compiler.encode_uchar4(compiler.stack_assign(uvw8_out)));
+}
+
+void RhinoNormalPart1TextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Normal Part 2 */
+
+NODE_DEFINE(RhinoNormalPart2TextureNode)
+{
+  NodeType *type = NodeType::add("rhino_normal_part2_texture", create, NodeType::SHADER);
+
+  SOCKET_IN_COLOR(color1, "Color1", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color2, "Color2", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color3, "Color3", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color4, "Color4", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color5, "Color5", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color6, "Color6", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color7, "Color7", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_COLOR(color8, "Color8", make_float3(0.0f, 0.0f, 0.0f));
+
+
+  SOCKET_OUT_COLOR(color_out, "Color");
+
+  return type;
+}
+
+RhinoNormalPart2TextureNode::RhinoNormalPart2TextureNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoNormalPart2TextureNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *color1_in = input("Color1");
+  ShaderInput *color2_in = input("Color2");
+  ShaderInput *color3_in = input("Color3");
+  ShaderInput *color4_in = input("Color4");
+  ShaderInput *color5_in = input("Color5");
+  ShaderInput *color6_in = input("Color6");
+  ShaderInput *color7_in = input("Color7");
+  ShaderInput *color8_in = input("Color8");
+
+  ShaderOutput *color_out = output("Color");
+
+  compiler.add_node(RHINO_NODE_NORMAL_PART2_TEXTURE,
+                    compiler.encode_uchar4(compiler.stack_assign(color1_in),
+                                           compiler.stack_assign(color2_in),
+                                           compiler.stack_assign(color3_in),
+                                           compiler.stack_assign(color4_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(color5_in),
+                                           compiler.stack_assign(color6_in),
+                                           compiler.stack_assign(color7_in),
+                                           compiler.stack_assign(color8_in)),
+                    compiler.encode_uchar4(compiler.stack_assign(color_out)));
+}
+
+void RhinoNormalPart2TextureNode::compile(OSLCompiler &compiler)
+{
+}
+
 CCL_NAMESPACE_END
