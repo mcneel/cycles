@@ -215,7 +215,7 @@ class RhinoFbmTextureNode : public ShaderNode {
   float alpha2;
 
   bool is_turbulent;
-  float max_octaves;
+  int max_octaves;
   float gain;
   float roughness;
 
