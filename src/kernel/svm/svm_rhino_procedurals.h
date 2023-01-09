@@ -3119,7 +3119,7 @@ ccl_device void FindIntersectingDot(KernelGlobals *kg,
   int counter = 0;
 
   for (;; counter++) {
-    if (depth < 0) {
+    if (*depth < 0) {
       *dot_index_output = -1;
       return;
     }
