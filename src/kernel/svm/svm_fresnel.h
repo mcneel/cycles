@@ -28,7 +28,10 @@ ccl_device void svm_node_fresnel(
   float3 normal_in = stack_valid(normal_offset) ? stack_load_float3(stack, normal_offset) : sd->N;
 
   eta = fmaxf(eta, 1e-5f);
-  eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
+  //eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
+  if (sd->flag & SD_BACKFACING) {
+	normal_in = -normal_in;
+  }
 
   float f = fresnel_dielectric_cos(dot(sd->I, normal_in), eta);
 
