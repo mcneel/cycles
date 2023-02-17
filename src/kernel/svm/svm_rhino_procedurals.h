@@ -24,7 +24,49 @@ CCL_NAMESPACE_BEGIN
 #define INV_TWO_PI 0.15915494309190f
 #define SQRT_PI 1.77245385090552f
 
-ccl_device bool is_odd(int x)
+ccl_device_inline float get_float_from_f2(float2 f2, int index)
+{
+  if(index == 1)
+    return f2.y;
+
+  return f2.x;
+}
+
+ccl_device_inline float get_float_from_f3(float3 f3, int index)
+{
+  if(index == 1)
+    return f3.y;
+  if(index == 2)
+    return f3.z;
+
+  return f3.x;
+}
+
+ccl_device_inline float get_float_from_f4(float4 f4, int index)
+{
+  if(index == 1)
+    return f4.y;
+  if(index == 2)
+    return f4.z;
+  if(index == 3)
+    return f4.w;
+
+  return f4.x;
+}
+
+ccl_device_inline float3 set_float_in_f3(float3 f3, int index, float v)
+{
+  if(index == 0)
+    f3.x = v;
+  if(index == 1)
+    f3.y = v;
+  if(index == 2)
+    f3.z = v;
+
+  return f3;
+}
+
+ccl_device_inline bool is_odd(int x)
 {
   return (x & 1) == 1;
 }
@@ -270,15 +312,14 @@ ccl_device int shuffle(int i, int j, int k)
          B(k, i, j, 5) + B(i, j, k, 6) + B(j, k, i, 7);
 }
 
-ccl_device float K(int a, float u, float v, float w, int i, int j, int k, int3* a_vec)
+ccl_device float K(int a, float u, float v, float w, int i, int j, int k, int3 a_vec)
 {
-  float s = float((*a_vec)[0] + (*a_vec)[1] + (*a_vec)[2]) / 6.0f;
-  float x = u - float((*a_vec)[0]) + s;
-  float y = v - float((*a_vec)[1]) + s;
-  float z = w - float((*a_vec)[2]) + s;
+  float s = float(a_vec.x + a_vec.y+ a_vec.z) / 6.0f;
+  float x = u - float(a_vec.x) + s;
+  float y = v - float(a_vec.y) + s;
+  float z = w - float(a_vec.z) + s;
   float t = 0.6f - x * x - y * y - z * z;
-  int h = shuffle(i + (*a_vec)[0], j + (*a_vec)[1], k + (*a_vec)[2]);
-  (*a_vec)[a]++;
+  int h = shuffle(i + a_vec.x, j + a_vec.y, k + a_vec.z);
   t = max(t, 0.0f);
   int b5 = (h >> 5) & 1;
   int b4 = (h >> 4) & 1;
@@ -295,7 +336,18 @@ ccl_device float K(int a, float u, float v, float w, int i, int j, int k, int3* 
   return 8.0f * t * t * (p + (b == 0 ? q + r : (b2 == 0 ? q : r)));
 }
 
-ccl_device float simplex_noise(float x, float y, float z)
+ccl_device_inline int3 roll_int3(int3 a, int idx)
+{
+  if(idx == 0)
+    a.x++;
+  if(idx == 1)
+    a.y++;
+  if(idx == 2)
+    a.z++;
+  return a;
+}
+
+ccl_device_inline float simplex_noise(float x, float y, float z)
 {
   float s = (x + y + z) / 3.0f;
   int i = int(floorf(x + s));
@@ -305,13 +357,17 @@ ccl_device float simplex_noise(float x, float y, float z)
   float u = x - float(i) + s;
   float v = y - float(j) + s;
   float w = z - float(k) + s;
-  int3 a = make_int3(0);
+  int3 a = make_int3(0, 0, 0);
   int hi = (u >= w ? (u >= v ? 0 : 1) : (v >= w ? 1 : 2));
   int lo = (u < w ? (u < v ? 0 : 1) : (v < w ? 1 : 2));
-  float k1 = K(hi, u, v, w, i, j, k, &a);
-  float k2 = K(3 - hi - lo, u, v, w, i, j, k, &a);
-  float k3 = K(lo, u, v, w, i, j, k, &a);
-  float k4 = K(0, u, v, w, i, j, k, &a);
+  int mid = 3 - hi - lo;
+  float k1 = K(hi, u, v, w, i, j, k, a);
+  a = roll_int3(a, hi);
+  float k2 = K(mid, u, v, w, i, j, k, a);
+  a = roll_int3(a, mid);
+  float k3 = K(lo, u, v, w, i, j, k, a);
+  a = roll_int3(a, lo);
+  float k4 = K(0, u, v, w, i, j, k, a);
   return k1 + k2 + k3 + k4;
 }
 
@@ -325,9 +381,9 @@ ccl_device float simplex_noise(float x, float y, float z)
 #define VCNPERM(kg, x) perlin_noise((kg), (x) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1))
 #define VCNINDEX(kg, ix, iy, iz) VCNPERM((kg), (ix) + VCNPERM((kg), (iy) + VCNPERM((kg), iz)))
 
-ccl_device float4 impulse_noise(KernelGlobals *kg, int x)
+ccl_device_inline float4 impulse_noise(KernelGlobals *kg, int x)
 {
-  float4 noise = make_float4(0.0f);
+  float4 noise = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
   noise.x = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
   noise.y = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
   noise.z = kernel_tex_fetch(__lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
@@ -336,7 +392,7 @@ ccl_device float4 impulse_noise(KernelGlobals *kg, int x)
   return noise;
 }
 
-ccl_device float catrom2(float d)
+ccl_device_inline float catrom2(float d)
 {
 #define SAMPRATE 100 /* table entries per unit distance */
 
@@ -429,70 +485,75 @@ ccl_device float lattice_convolution_noise(KernelGlobals *kg, float x, float y, 
   return sum;
 }
 
-ccl_device float WHN_frand(int seed)
+ccl_device_inline float WHN_frand(int seed)
 {
   seed = seed << (13 ^ seed);
   return (1.0f - float(int(seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) /
                      1073741824.0f);
 }
 
-ccl_device float WHN_rand3a(int x, int y, int z)
+ccl_device_inline float WHN_rand3a(int x, int y, int z)
 {
   return WHN_frand(67 * x + 59 * y + 71 * z);
 }
-ccl_device float WHN_rand3b(int x, int y, int z)
+ccl_device_inline float WHN_rand3b(int x, int y, int z)
 {
   return WHN_frand(73 * x + 79 * y + 83 * z);
 }
-ccl_device float WHN_rand3c(int x, int y, int z)
+ccl_device_inline float WHN_rand3c(int x, int y, int z)
 {
   return WHN_frand(89 * x + 97 * y + 101 * z);
 }
-ccl_device float WHN_rand3d(int x, int y, int z)
+ccl_device_inline float WHN_rand3d(int x, int y, int z)
 {
   return WHN_frand(103 * x + 107 * y + 109 * z);
 }
 
-ccl_device float WHN_hpoly1(float t)
+ccl_device_inline float WHN_hpoly1(float t)
 {
   return ((2.0 * t - 3.0) * t * t + 1.0);
 }
-ccl_device float WHN_hpoly2(float t)
+ccl_device_inline float WHN_hpoly2(float t)
 {
   return (-2.0 * t + 3.0) * t * t;
 }
-ccl_device float WHN_hpoly3(float t)
+ccl_device_inline float WHN_hpoly3(float t)
 {
   return ((t - 2.0) * t + 1.0) * t;
 }
-ccl_device float WHN_hpoly4(float t)
+ccl_device_inline float WHN_hpoly4(float t)
 {
   return (t - 1.0) * t * t;
 }
 
-ccl_device float4 WHN_rand(int i, int3 xlim[2])
+ccl_device_inline float4 WHN_rand(int i, int3 xlim[2])
 {
   float4 f;
 
-  f[0] = WHN_rand3a(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
-  f[1] = WHN_rand3b(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
-  f[2] = WHN_rand3c(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
-  f[3] = WHN_rand3d(xlim[i & 1][0], xlim[(i >> 1) & 1][1], xlim[(i >> 2) & 1][2]);
+  f.x = WHN_rand3a(xlim[i & 1].x, xlim[(i >> 1) & 1].y, xlim[(i >> 2) & 1].z);
+  f.y = WHN_rand3b(xlim[i & 1].x, xlim[(i >> 1) & 1].y, xlim[(i >> 2) & 1].z);
+  f.z = WHN_rand3c(xlim[i & 1].x, xlim[(i >> 1) & 1].y, xlim[(i >> 2) & 1].z);
+  f.w = WHN_rand3d(xlim[i & 1].x, xlim[(i >> 1) & 1].y, xlim[(i >> 2) & 1].z);
 
   return f;
 }
 
-ccl_device float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
+ccl_device_inline float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
 {
   float4 f;
 
-  float x = xarg[n];
+  float x = get_float_from_f3(xarg, n);
+
+  float f0x = get_float_from_f4(f0, n);
+
+  float f1x = get_float_from_f4(f1, n);
+
   float hp1 = WHN_hpoly1(x);
   float hp2 = WHN_hpoly2(x);
-  f[0] = f0[0] * hp1 + f1[0] * hp2;
-  f[1] = f0[1] * hp1 + f1[1] * hp2;
-  f[2] = f0[2] * hp1 + f1[2] * hp2;
-  f[3] = f0[3] * hp1 + f1[3] * hp2 + f0[n] * WHN_hpoly3(x) + f1[n] * WHN_hpoly4(x);
+  f.x = f0.x * hp1 + f1.x * hp2;
+  f.y = f0.y * hp1 + f1.y * hp2;
+  f.z = f0.z * hp1 + f1.z * hp2;
+  f.w = f0.w * hp1 + f1.w * hp2 + f0x * WHN_hpoly3(x) + f1x * WHN_hpoly4(x);
 
   return f;
 }
@@ -528,13 +589,13 @@ ccl_device float wards_hermite_noise(float x, float y, float z)
 
   int3 xlim[2];
   xlim[0] = make_int3(int(floorf(uvw.x)), int(floorf(uvw.y)), int(floorf(uvw.z)));
-  xlim[1] = xlim[0] + make_int3(1);
+  xlim[1] = xlim[0] + make_int3(1, 1, 1);
 
   float3 xarg = uvw - make_float3(xlim[0].x, xlim[0].y, xlim[0].z);
 
   float4 f = WHN_interpolate_nonrecursive(xlim, xarg);
 
-  return f[3];
+  return f.w;
 }
 
 ccl_device int aaltonen_value(KernelGlobals *kg, int x)
@@ -778,7 +839,7 @@ ccl_device float4 waves_width_texture(float3 uvw,
   if (wave_type == RHINO_WAVES_RADIAL) {
     float uvw_length = len(uvw);
     if (uvw_length == 0.0)
-      uvw_perturbed = make_float3(0.0f);
+      uvw_perturbed = make_float3(0.0f, 0.0f, 0.0f);
     else
       uvw_perturbed = (uvw / uvw_length) * (0.5 + floorf(uvw_length));
   }
@@ -1051,7 +1112,7 @@ ccl_device float4 gradient_texture(float3 uvw,
     //   color2[i] *= newV;
     // }
 
-    color_out = clamp(color1 + color2, make_float4(0.0f), make_float4(1.0f));
+    color_out = clamp(color1 + color2, make_float4(0.0f, 0.0f, 0.0f, 0.0f), make_float4(1.0f, 1.0f, 1.0f, 1.0f));
   }
   else {
     color_out = mix(color2, color1, t);
@@ -1192,9 +1253,9 @@ ccl_device float3 rgb_to_yxy(float3 rgb)
 
 ccl_device float3 LogMapYxy(float3 Yxy, float exposure, float world_luminance, float max_luminance)
 {
-  float Y = Yxy[0];
-  float x = Yxy[1];
-  float y = Yxy[2];
+  float Y = Yxy.x;
+  float x = Yxy.y;
+  float y = Yxy.z;
 
   float fExposure = pow(2.0f, exposure);  // default exposure is 1, 2^0
 
@@ -1243,9 +1304,9 @@ ccl_device float3 LogMapYxy(float3 Yxy, float exposure, float world_luminance, f
 
 ccl_device float3 yxy_to_rgb(float3 Yxy)
 {
-  float Y = Yxy[0];
-  float x = Yxy[1];
-  float y = Yxy[2];
+  float Y = Yxy.x;
+  float x = Yxy.y;
+  float y = Yxy.z;
 
   float X = 0.0;
   float Z = 0.0;
@@ -1337,7 +1398,7 @@ ccl_device float4 fbm_texture(KernelGlobals *kg,
   float t = fabsf(fbm(kg, uvw, is_turbulent, roughness, max_octaves) * gain);
 
   float4 color_out = mix(color1, color2, t);
-  color_out = clamp(color_out, make_float4(0.0f), make_float4(1.0f));
+  color_out = clamp(color_out, make_float4(0.0f, 0.0f, 0.0f, 0.0f), make_float4(1.0f, 1.0f, 1.0f, 1.0f));
 
   return color_out;
 }
@@ -1713,7 +1774,7 @@ ccl_device int get_main_axis_index(float3 v)
 ccl_device float2 world_to_cubemap(float3 n)
 {
   int mainAxis = get_main_axis_index(n);
-  float mainAxisDir = n[mainAxis];
+  float mainAxisDir = get_float_from_f3(n, mainAxis);
 
   int subTextureIndex;
 
@@ -1831,9 +1892,9 @@ ccl_device float3 vertical_cross_cubemap_to_world(float2 uv)
   }
 
   if (subTextureIndex == -1)
-    return make_float3(0.0f);
+    return make_float3(0.0f, 0.0f, 0.0f);
 
-  float3 vec = make_float3(0.0f);
+  float3 vec = make_float3(0.0f, 0.0f, 0.0f);
 
   switch (subTextureIndex) {
     case 0:
@@ -1886,7 +1947,7 @@ ccl_device float2 world_to_vertical_cross_cubemap(float3 n)
                    make_float2(n.x, n.y)};
 
   int mainAxis = get_main_axis_index(n);
-  float mainAxisDir = n[mainAxis];
+  float mainAxisDir = get_float_from_f3(n, mainAxis);
   int subTextureIndex = (2 * mainAxis) + (mainAxisDir >= 0.0f ? 0 : 1);
 
   float2 SubTexStart = make_float2(uI[subTextureIndex], vI[subTextureIndex]);
@@ -1958,9 +2019,9 @@ ccl_device float3 horizontal_cross_cubemap_to_world(float2 uv)
   }
 
   if (subTextureIndex == -1)
-    return make_float3(0.0f);
+    return make_float3(0.0f, 0.0f, 0.0f);
 
-  float3 vec = make_float3(0.0f);
+  float3 vec = make_float3(0.0f, 0.0f, 0.0f);
 
   switch (subTextureIndex) {
     case 0:
@@ -2013,7 +2074,7 @@ ccl_device float2 world_to_horizontal_cross_cubemap(float3 n)
                    make_float2(-n.x, -n.y)};
 
   int mainAxis = get_main_axis_index(n);
-  float mainAxisDir = n[mainAxis];
+  float mainAxisDir = get_float_from_f3(n, mainAxis);
   int subTextureIndex = (2 * mainAxis) + (mainAxisDir >= 0.0f ? 0 : 1);
 
   float2 SubTexStart = make_float2(uI[subTextureIndex], vI[subTextureIndex]);
@@ -2122,7 +2183,7 @@ ccl_device float4 projection_changer_texture(float3 uvw,
     bQuick = true;
 
   if (!bQuick) {
-    float3 vec = make_float3(0);
+    float3 vec = make_float3(0.0f, 0.0f, 0.0f);
 
     switch (output_projection_type) {
       case RHINO_PROJECTION_LIGHTPROBE:
@@ -2390,7 +2451,7 @@ ccl_device float3 hdr(float3 LDR, float exposure)
 {
   float fExposure = -exposure;
 
-  return make_float3(1.0f) -
+  return make_float3(1.0f, 1.0f, 1.0f) -
          make_float3(exp(fExposure * LDR.x), exp(fExposure * LDR.y), exp(fExposure * LDR.z));
 }
 
@@ -2450,7 +2511,7 @@ ccl_device float4 physical_sky_texture(float3 uvw,
   float M4 = sun_size / 10.0f;
   float3 M5 = fKmESun * sun_color;
   float3 RScatter = (inv_wavelengths * fKrESun);
-  float3 MScatter = (inv_wavelengths * fKr4PI) + make_float3(fKm4PI);
+  float3 MScatter = (inv_wavelengths * fKr4PI) + make_float3(fKm4PI, fKm4PI, fKm4PI);
 
   // Calculate the distance 't' from the ground to the outer atmosphere... basically
   // do a quick ray:sphere intersection (with shortcuts) to get 't'...
@@ -2475,7 +2536,7 @@ ccl_device float4 physical_sky_texture(float3 uvw,
   float3 vSamplePoint = vGroundPos + vSampleRay * 0.5f;
 
   // Now iterate along the sample ray and accumulate scattering mie and rayleigh values...
-  float3 Color = make_float3(0.0);
+  float3 Color = make_float3(0.0f, 0.0f, 0.0f);
   float Height = len(vSamplePoint);
 
   for (int i = 0; i < nSamples; i++) {
@@ -2623,7 +2684,7 @@ ccl_device float3 hsb_to_rgb(float3 hsb)
   }
 
   if (saturation == 0.0f) {
-    return make_float3(brightness);
+    return make_float3(brightness, brightness, brightness);
   }
 
   saturation = min(1.0f, saturation);
@@ -2650,7 +2711,7 @@ ccl_device float3 hsb_to_rgb(float3 hsb)
     case 5:
       return make_float3(brightness, p, q);
     default:
-      return make_float3(0);
+      return make_float3(0.0f, 0.0f, 0.0f);
   }
 }
 
@@ -2740,7 +2801,7 @@ ccl_device float4 texture_adjustment_texture(float4 color,
 
   if (grayscale) {
     float luminance = Luminance(make_float3(color.x, color.y, color.z));
-    rgb = make_float3(luminance);
+    rgb = make_float3(luminance, luminance, luminance);
     color.x = rgb.x;
     color.y = rgb.y;
     color.z = rgb.z;
@@ -2802,9 +2863,9 @@ ccl_device void svm_rhino_node_texture_adjustment_texture(
 ccl_device bool tile_texture_rectangular_test_3d(float3 uvw, float3 join_width)
 {
   for (int i = 0; i < 3; i++) {
-    float dHalfWidth = join_width[i] * 0.5;
+    float dHalfWidth = get_float_from_f3(join_width, i) * 0.5;
 
-    if (uvw[i] < dHalfWidth || uvw[i] > 1.0 - dHalfWidth) {
+    if (get_float_from_f3(uvw, i) < dHalfWidth || get_float_from_f3(uvw, i) > 1.0 - dHalfWidth) {
       return true;
     }
   }
@@ -2815,9 +2876,9 @@ ccl_device bool tile_texture_rectangular_test_3d(float3 uvw, float3 join_width)
 ccl_device bool tile_texture_rectangular_test_2d(float3 uvw, float3 join_width)
 {
   for (int i = 0; i < 2; i++) {
-    float dHalfWidth = join_width[i] * 0.5;
+    float dHalfWidth = get_float_from_f3(join_width, i) * 0.5;
 
-    if (uvw[i] < dHalfWidth || uvw[i] > 1.0 - dHalfWidth) {
+    if (get_float_from_f3(uvw, i) < dHalfWidth || get_float_from_f3(uvw, i) > 1.0 - dHalfWidth) {
       return true;
     }
   }
@@ -2857,7 +2918,7 @@ ccl_device bool tile_texture_hexagonal_test(float3 uvw, float3 join_width)
   float trim_u = (u - knot_u);
   float trim_v = (v - knot_v) * sqrtOfThree * dJunctionVScale;
 
-  float maxJointWidth = max(join_width[0], join_width[1]);
+  float maxJointWidth = max(join_width.x, join_width.y);
   float maxJointWidthSquared = maxJointWidth * maxJointWidth;
 
   float trimLengthSquared = trim_u * trim_u + trim_v * trim_v;
@@ -2865,15 +2926,15 @@ ccl_device bool tile_texture_hexagonal_test(float3 uvw, float3 join_width)
   if (4.0 * trimLengthSquared < maxJointWidthSquared)
     return true;
 
-  if (is_point_near_half_line_starting_from_origin(trim_u, trim_v, 0.0, 1.0, join_width[0] / 2.0))
+  if (is_point_near_half_line_starting_from_origin(trim_u, trim_v, 0.0, 1.0, join_width.x / 2.0))
     return true;
 
   if (is_point_near_half_line_starting_from_origin(
-          trim_u, trim_v, 0.5 * sqrtOfThree, -0.5, join_width[1] / 2.0))
+          trim_u, trim_v, 0.5 * sqrtOfThree, -0.5, join_width.y / 2.0))
     return true;
 
   if (is_point_near_half_line_starting_from_origin(
-          trim_u, trim_v, -0.5 * sqrtOfThree, -0.5, join_width[1] / 2.0))
+          trim_u, trim_v, -0.5 * sqrtOfThree, -0.5, join_width.y / 2.0))
     return true;
 
   return false;
@@ -2885,7 +2946,7 @@ ccl_device bool tile_texture_triangular_test(float3 uvw, float3 join_width)
   float u = uvw.x > 0.5 ? 1.0 - uvw.x : uvw.x;
   float v = (uvw.y > 0.5 ? 1.0 - uvw.y : uvw.y) * 2.0 * vFactor;
 
-  float dHalfWidth = join_width[0] * 0.5;
+  float dHalfWidth = join_width.x * 0.5;
 
   if (v < dHalfWidth || v > vFactor - dHalfWidth)
     return true;
@@ -2893,7 +2954,7 @@ ccl_device bool tile_texture_triangular_test(float3 uvw, float3 join_width)
   float v2 = v / vFactor;
   u -= (1.0 - v2) * 0.5;
 
-  dHalfWidth = join_width[1] * 0.5 * vFactor;
+  dHalfWidth = join_width.y * 0.5 * vFactor;
 
   return abs(u) < dHalfWidth;
 }
@@ -2906,23 +2967,23 @@ ccl_device bool tile_texture_octagonal_test(float3 uvw, float3 join_width)
   float u = uvw.x > 0.5 ? 1.0 - uvw.x : uvw.x;
   float v = uvw.y > 0.5 ? 1.0 - uvw.y : uvw.y;
 
-  if (u + v < b - sqrtOfTwo * 0.5 * join_width[0]) {
-    if (v > b - 0.5 * join_width[1])
+  if (u + v < b - sqrtOfTwo * 0.5 * join_width.x) {
+    if (v > b - 0.5 * join_width.y)
       return true;
 
-    if (u > b - 0.5 * join_width[1])
+    if (u > b - 0.5 * join_width.y)
       return true;
 
     return false;
   }
 
-  if (u < 0.5 * join_width[1])
+  if (u < 0.5 * join_width.y)
     return true;
 
-  if (v < 0.5 * join_width[1])
+  if (v < 0.5 * join_width.y)
     return true;
 
-  if (u + v < b + sqrtOfTwo * 0.5 * join_width[0])
+  if (u + v < b + sqrtOfTwo * 0.5 * join_width.x)
     return true;
 
   return false;
@@ -2934,14 +2995,14 @@ tile_texture(float3 uvw, float4 color1, float4 color2, int type, float3 phase, f
   int uCell = int(floorf(uvw.x));
   int vCell = int(floorf(uvw.y));
 
-  float3 phaseShift = make_float3(0);
+  float3 phaseShift = make_float3(0.0f, 0.0f, 0.0f);
 
   if (is_odd(vCell))
-    phaseShift.x += phase[0];
+    phaseShift.x += phase.x;
   if (is_odd(uCell))
-    phaseShift.y += phase[1];
+    phaseShift.y += phase.y;
   if (is_odd(uCell))
-    phaseShift.x += phase[2];
+    phaseShift.x += phase.z;
 
   uvw.x = fractf(uvw.x + phaseShift.x);
   uvw.y = fractf(uvw.y + phaseShift.y);
@@ -3034,7 +3095,7 @@ ccl_device bool RecurseTreeChild1(int *dots_tree_stack,
                                   int *depth,
                                   int *index)
 {
-  if (uvw[axis] <= center[axis] + radius) {
+  if (get_float_from_f3(uvw, axis) <= get_float_from_f2(center, axis) + radius) {
     RecurseTree(dots_tree_stack, depth, index, 1, STACK_STATE_SECOND_CHILD);
     return true;
   }
@@ -3050,7 +3111,7 @@ ccl_device bool RecurseTreeChild2(int *dots_tree_stack,
                                   int *depth,
                                   int *index)
 {
-  if (uvw[axis] > center[axis] - radius) {
+  if (get_float_from_f3(uvw, axis) > get_float_from_f2(center, axis) - radius) {
     RecurseTree(dots_tree_stack, depth, index, 2, STACK_STATE_END);
     return true;
   }
