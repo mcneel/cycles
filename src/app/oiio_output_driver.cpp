@@ -10,6 +10,8 @@
 
 CCL_NAMESPACE_BEGIN
 
+#if defined(BLABLA)
+
 OIIOOutputDriver::OIIOOutputDriver(const string_view filepath,
                                    const string_view pass,
                                    LogFunction log)
@@ -71,5 +73,6 @@ void OIIOOutputDriver::write_render_tile(const Tile &tile)
   image_buffer.write(image_output.get());
   image_output->close();
 }
+#endif
 
 CCL_NAMESPACE_END

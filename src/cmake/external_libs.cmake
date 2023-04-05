@@ -187,37 +187,37 @@ if(CYCLES_STANDALONE_REPOSITORY)
       debug ${OPENIMAGEIO_ROOT_DIR}/lib/OpenImageIO_Util_d.lib
     )
 
-    set(PUGIXML_INCLUDE_DIR ${PUGIXML_ROOT_DIR}/include)
-    set(PUGIXML_LIBRARIES
-      optimized ${PUGIXML_ROOT_DIR}/lib/pugixml.lib
-      debug ${PUGIXML_ROOT_DIR}/lib/pugixml_d.lib
-    )
+    #set(PUGIXML_INCLUDE_DIR ${PUGIXML_ROOT_DIR}/include)
+    #set(PUGIXML_LIBRARIES
+    #  optimized ${PUGIXML_ROOT_DIR}/lib/pugixml.lib
+    #  debug ${PUGIXML_ROOT_DIR}/lib/pugixml_d.lib
+    #)
   else()
     find_package(OpenImageIO REQUIRED)
-    if(OPENIMAGEIO_PUGIXML_FOUND)
-      set(PUGIXML_INCLUDE_DIR "${OPENIMAGEIO_INCLUDE_DIR}/OpenImageIO")
-      set(PUGIXML_LIBRARIES "")
-    else()
-      find_package(PugiXML REQUIRED)
-    endif()
+    #if(OPENIMAGEIO_PUGIXML_FOUND)
+    #  set(PUGIXML_INCLUDE_DIR "${OPENIMAGEIO_INCLUDE_DIR}/OpenImageIO")
+    #  set(PUGIXML_LIBRARIES "")
+    #else()
+    #  find_package(PugiXML REQUIRED)
+    #endif()
   endif()
 
   # Dependencies
-  if(MSVC AND EXISTS ${_cycles_lib_dir})
-    set(OPENJPEG_INCLUDE_DIR ${OPENJPEG}/include/openjpeg-2.3)
-    set(OPENJPEG_LIBRARIES ${_cycles_lib_dir}/openjpeg/lib/openjp2${CMAKE_STATIC_LIBRARY_SUFFIX})
-  else()
-    find_package(OpenJPEG REQUIRED)
-  endif()
+  #if(MSVC AND EXISTS ${_cycles_lib_dir})
+  #  set(OPENJPEG_INCLUDE_DIR ${OPENJPEG}/include/openjpeg-2.3)
+  #  set(OPENJPEG_LIBRARIES ${_cycles_lib_dir}/openjpeg/lib/openjp2${CMAKE_STATIC_LIBRARY_SUFFIX})
+  #else()
+  #  find_package(OpenJPEG REQUIRED)
+  #endif()
 
-  find_package(JPEG REQUIRED)
-  find_package(TIFF REQUIRED)
-  find_package(WebP)
+  #find_package(JPEG REQUIRED)
+  #find_package(TIFF REQUIRED)
+  #find_package(WebP)
 
-  if(EXISTS ${_cycles_lib_dir})
-    set(PNG_NAMES png16 libpng16 png libpng)
-  endif()
-  find_package(PNG REQUIRED)
+  #if(EXISTS ${_cycles_lib_dir})
+  #  set(PNG_NAMES png16 libpng16 png libpng)
+  #endif()
+  #find_package(PNG REQUIRED)
 endif()
 
 ###########################################################################
@@ -414,7 +414,8 @@ if(CYCLES_STANDALONE_REPOSITORY)
         debug ${BOOST_ROOT}/lib/libboost_wave-${BOOST_DEBUG_POSTFIX})
     endif()
   else()
-    set(__boost_packages iostreams filesystem regex system thread date_time)
+    # set(__boost_packages iostreams filesystem regex system thread date_time)
+    set(__boost_packages filesystem regex system thread date_time)
     if(WITH_CYCLES_OSL)
       list(APPEND __boost_packages wave)
     endif()

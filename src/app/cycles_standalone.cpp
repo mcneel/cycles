@@ -134,11 +134,12 @@ static void session_init()
         window_opengl_context_enable, window_opengl_context_disable));
   }
 #endif
-
+#if defined(BLABLA)
   if (!options.output_filepath.empty()) {
     options.session->set_output_driver(make_unique<OIIOOutputDriver>(
         options.output_filepath, options.output_pass, session_print));
   }
+#endif
 
   if (options.session_params.background && !options.quiet)
     options.session->progress.set_update_callback(function_bind(&session_print_status));

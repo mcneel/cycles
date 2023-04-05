@@ -11,6 +11,8 @@
 
 CCL_NAMESPACE_BEGIN
 
+#if defined(BLABLA)
+
 class OIIOOutputDriver : public OutputDriver {
  public:
   typedef function<void(const string &)> LogFunction;
@@ -25,5 +27,7 @@ class OIIOOutputDriver : public OutputDriver {
   string pass_;
   LogFunction log_;
 };
+
+#endif
 
 CCL_NAMESPACE_END
