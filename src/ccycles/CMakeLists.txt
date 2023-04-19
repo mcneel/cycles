@@ -85,7 +85,7 @@ include_directories(SYSTEM ${INC_SYS})
 if(WITH_CYCLES_STANDALONE)
   file( GLOB SRC *.cpp *.h)
 
-  add_library(ccycles ${SRC} ${INC} ${INC_SYS})
+  add_library(ccycles SHARED ${SRC} ${INC} ${INC_SYS})
   unset(SRC)
 
   target_link_libraries(ccycles PRIVATE ${LIB})
