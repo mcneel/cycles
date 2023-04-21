@@ -45,6 +45,9 @@ CCL_NAMESPACE_BEGIN
 #define INTEGRATOR_SHADOW_ISECT_SIZE_CPU 1024U
 #define INTEGRATOR_SHADOW_ISECT_SIZE_GPU 4U
 
+#define RHINO_PERLIN_NOISE_PERM_SIZE 256
+#define RHINO_PERLIN_NOISE_TABLE_SIZE (2 * RHINO_PERLIN_NOISE_PERM_SIZE)
+
 #ifdef __KERNEL_GPU__
 #  define INTEGRATOR_SHADOW_ISECT_SIZE INTEGRATOR_SHADOW_ISECT_SIZE_GPU
 #else
@@ -1187,7 +1190,13 @@ typedef enum KernelBVHLayout {
 
 typedef struct KernelTables {
   int filter_table_offset;
-  int pad1, pad2, pad3;
+  int rhino_perlin_noise_offset;
+  int rhino_impulse_noise_offset;
+  int rhino_vc_noise_offset;
+  int rhino_aaltonen_noise_offset;
+  int rhino_dots_tree_data_offset;
+  int rhino_dots_dot_data_offset;
+  int pad;
 } KernelTables;
 static_assert_align(KernelTables, 16);
 
