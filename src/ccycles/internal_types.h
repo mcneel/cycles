@@ -23,6 +23,7 @@ limitations under the License.
 #include <thread>
 //#include <mutex>
 #include <string>
+#include <functional>
 
 #pragma warning ( push )
 
@@ -42,6 +43,7 @@ limitations under the License.
 #include "scene/object.h"
 #include "scene/scene.h"
 #include "session/session.h"
+#include "session/output_driver.h"
 #include "scene/shader.h"
 
 #include "util/color.h"
@@ -148,12 +150,24 @@ struct CCImage {
 		bool is_float;
 };
 
+class CCyclesDebugDriver : public ccl::OutputDriver {
+public:
+	typedef std::function<void(const std::string &)> LogFunction;
+
+	CCyclesDebugDriver(LogFunction log);
+	virtual ~CCyclesDebugDriver();
+
+	void write_render_tile(const Tile &tile) override;
+protected:
+	LogFunction log_;
+};
 
 class CCSession final {
 public:
 	unsigned int id{ 0 };
 	ccl::SessionParams params;
-	ccl::Session* session = nullptr;
+		ccl::SceneParams scene_params;
+		ccl::Session* session = nullptr;
 
 	/* The status update handler for ccl::Session update callback.
 	 */
@@ -164,10 +178,10 @@ public:
 	/* The update render tile handler for ccl::Session rendertile update callback.
 	 */
 	// TODO: XXXX Rework render result updating via output driver
-    //void update_render_tile(ccl::RenderTile &tile, bool highlight);
+	//void update_render_tile(ccl::RenderTile &tile, bool highlight);
 	/* The write render tile handler for ccl::Session rendertile write callback.
 	 */
-    // TODO: XXXX Rework render result updating via output driver
+	// TODO: XXXX Rework render result updating via output driver
 	//void write_render_tile(ccl::RenderTile &tile);
 	/* The display update handler for ccl::Session.
 	 *
@@ -196,7 +210,7 @@ private:
 protected:
 	/* Protected constructor, use CCSession::create to create a new CCSession. */
 	CCSession()
-	{  }
+	{	}
 };
 
 class CCShader {
@@ -266,7 +280,7 @@ extern ccl::vector<float> ccycles_rhino_aaltonen_noise_table;
 
 
 /********************************/
-/* Some utility functions       */
+/* Some utility functions		 */
 /********************************/
 
 extern ccl::Shader* find_shader_in_scene(ccl::Scene* sce, unsigned int shader_id);
@@ -281,7 +295,7 @@ extern void _cleanup_sessions();
 extern void _init_shaders(unsigned int client_id, unsigned int scene_id);
 
 /********************************/
-/* Some useful defines          */
+/* Some useful defines			*/
 /********************************/
 
 
