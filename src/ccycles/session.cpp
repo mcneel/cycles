@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+#include <iostream>
+
 #ifdef _WIN32
 #include <eh.h>
 #include <exception>
@@ -22,8 +24,10 @@ limitations under the License.
 #endif
 
 #include "internal_types.h"
+#include "device/device.h"
 #include "util/thread.h"
 
+using namespace ccl;
 
 /* Hold all created sessions. */
 std::vector<CCSession*> sessions;
@@ -192,6 +196,22 @@ bool CCSession::size_has_changed() {
 	return rc;
 }
 
+CCyclesDebugDriver::CCyclesDebugDriver(CCyclesDebugDriver::LogFunction log) : log_(log) {}
+
+CCyclesDebugDriver::~CCyclesDebugDriver() {}
+
+void CCyclesDebugDriver::write_render_tile(const Tile &tile)
+{
+	log_(string_printf("Handling tile layer %d, size %d %d", tile.layer, tile.size.x, tile.size.y));
+}
+
+static void log_print(const std::string& msg)
+{
+	std::cout << msg << std::endl;
+	OutputDebugString(msg.c_str());
+	OutputDebugString("\n");
+}
+
 unsigned int cycles_session_create(unsigned int client_id, unsigned int session_params_id)
 {
 	ccl::thread_scoped_lock lock(session_mutex);
@@ -203,11 +223,28 @@ unsigned int cycles_session_create(unsigned int client_id, unsigned int session_
 	int csesid{ -1 };
 	int hid{ 0 };
 
-	CCSession* session = CCSession::create(10, 10, 4);
-    // TODO: XXXX session creation
-	//session->session = new ccl::Session(*params);
+	CCSession* session = CCSession::create(512, 512, 4);
 
-	for(CCSession* csess : sessions) {
+	// TODO: XXXX these are hardcoded params/sceneparams
+	session->params.background = true;
+	session->params.tile_size = 64;
+	session->params.use_auto_tile = true;
+
+	ccl::DeviceType device_type = ccl::Device::type_from_string("CPU");
+	ccl::vector<ccl::DeviceInfo> devices = ccl::Device::available_devices(
+			DEVICE_MASK(device_type));
+	session->params.device = devices.front();
+
+	session->scene_params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
+
+	session->session = new ccl::Session(session->params, session->scene_params);
+
+	session->session->scene->camera->set_full_height(512);
+	session->session->scene->camera->set_full_width(512);
+	session->session->scene->camera->compute_auto_viewplane();
+	session->session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
+
+  for(CCSession* csess : sessions) {
 		if(csess==nullptr) {
 			csesid = hid;
 			break;
@@ -244,7 +281,8 @@ unsigned int cycles_session_create(unsigned int client_id, unsigned int session_
 
 void cycles_session_set_scene(unsigned int client_id, unsigned int session_id, unsigned int scene_id)
 {
-	CCSession* ccsess = nullptr;
+	// TODO: XXXX Session creation now handles scene creation etc
+	/*CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		CCScene* csce = nullptr;
@@ -252,7 +290,7 @@ void cycles_session_set_scene(unsigned int client_id, unsigned int session_id, u
 		if (scene_find(scene_id, &csce, &sce)) {
 			session->scene = sce;
 		}
-	}
+	}*/
 }
 
 void cycles_session_destroy(unsigned int client_id, unsigned int session_id, unsigned int scene_id)
@@ -294,8 +332,8 @@ void cycles_session_add_pass(unsigned int client_id, unsigned int session_id, in
 {
 	ccl::PassType passtype = (ccl::PassType)pass_id;
 	ccl::vector<ccl::Pass>& passes = get_passes(session_id);
-    // TODO: XXXX Passes rework
-    /*
+		// TODO: XXXX Passes rework
+		/*
 	switch (passtype) {
 		case ccl::PASS_COMBINED:
 			ccl::Pass::add(passtype, passes, "Combined");
@@ -321,7 +359,7 @@ void cycles_session_add_pass(unsigned int client_id, unsigned int session_id, in
 		default:
 			break;
 	}
-    */
+		*/
 }
 
 
@@ -346,8 +384,8 @@ int cycles_session_reset(unsigned int client_id, unsigned int session_id, unsign
 
 			ccl::vector<ccl::Pass>& passes = get_passes(session_id);
 
-            // TODO: XXXX Passes rework
-            /*
+						// TODO: XXXX Passes rework
+						/*
 			session->scene->film->tag_passes_update(session->scene, passes);
 			session->scene->film->display_pass = ccl::PassType::PASS_COMBINED;
 			session->scene->film->tag_update(session->scene);
@@ -356,7 +394,7 @@ int cycles_session_reset(unsigned int client_id, unsigned int session_id, unsign
 
 
 			session->reset(ccsess->buffer_params, (int)samples);
-            */
+						*/
 		}
 		catch (CyclesRenderCrashException)
 		{
@@ -479,35 +517,35 @@ void cycles_session_start(unsigned int client_id, unsigned int session_id)
 
 void cycles_session_prepare_run(unsigned int client_id, unsigned int session_id)
 {
-    // TODO: XXXX revisit session running
-    /*
+		// TODO: XXXX revisit session running
+		/*
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		logger.logit(client_id, "Preparing run for session ", session_id);
 		session->prepare_run(ccsess->buffer_params, ccsess->params.samples);
 	}
-    */
+		*/
 }
 
 void cycles_session_end_run(unsigned int client_id, unsigned int session_id)
 {
-    // TODO: XXXX revisit session running
-    /*
+		// TODO: XXXX revisit session running
+		/*
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		logger.logit(client_id, "Ending run for session ", session_id);
 		session->end_run();
 	}
-    */
+		*/
 }
 
 
 int cycles_session_sample(unsigned int client_id, unsigned int session_id)
 {
-    // TODO: XXXX revisit rendering. check output driver
-    /*
+		// TODO: XXXX revisit rendering. check output driver
+		/*
 	RenderCrashTranslatorHelper render_crash_helper(render_crash_translator);
 
 	try {
@@ -528,8 +566,8 @@ int cycles_session_sample(unsigned int client_id, unsigned int session_id)
 	{
 		return -13;
 	}
-    */
-  return -1;
+		*/
+	return -1;
 }
 
 void cycles_session_wait(unsigned int client_id, unsigned int session_id)
@@ -589,8 +627,8 @@ void cycles_session_copy_buffer(unsigned int client_id, unsigned int session_id,
 
 void cycles_session_get_float_buffer(unsigned int client_id, unsigned int session_id, int passtype, float** pixels)
 {
-    // TODO: XXXX use output driver instead
-    /*
+		// TODO: XXXX use output driver instead
+		/*
 	ccl::DeviceDrawParams draw_params = ccl::DeviceDrawParams();
 	draw_params.bind_display_space_shader_cb = nullptr;
 	draw_params.unbind_display_space_shader_cb = nullptr;
@@ -602,7 +640,7 @@ void cycles_session_get_float_buffer(unsigned int client_id, unsigned int sessio
 			*pixels = (float*)session->display_buffers[(ccl::PassType)passtype]->prepare_pixels(session->device, draw_params);
 		}
 	}
-    */
+		*/
 }
 
 void cycles_progress_reset(unsigned int client_id, unsigned int session_id)
@@ -616,15 +654,15 @@ void cycles_progress_reset(unsigned int client_id, unsigned int session_id)
 
 int cycles_progress_get_sample(unsigned int client_id, unsigned int session_id)
 {
-    // TODO: revisit result acquisition
-    /*
+		// TODO: revisit result acquisition
+		/*
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		ccl::TileManager &tm = session->tile_manager;
 		return tm.state.sample;
 	}
-    */
+		*/
 	return INT_MIN;
 }
 
@@ -639,15 +677,15 @@ void cycles_progress_get_time(unsigned int client_id, unsigned int session_id, d
 
 void cycles_tilemanager_get_sample_info(unsigned int client_id, unsigned int session_id, unsigned int* samples, unsigned int* total_samples)
 {
-    // TODO: XXXX revisit rendering and sampling
-    /*
+		// TODO: XXXX revisit rendering and sampling
+		/*
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		*samples = session->tile_manager.state.sample + 1;
 		*total_samples = session->tile_manager.num_samples;
 	}
-    */
+		*/
 }
 
 /* Get cycles render progress. Note that progress will be clamped to 1.0f. */
