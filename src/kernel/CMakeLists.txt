@@ -141,6 +141,9 @@ set(SRC_KERNEL_CLOSURE_HEADERS
 
 set(SRC_KERNEL_SVM_HEADERS
   svm/svm.h
+  svm/svm_rhino_azimuth_altitude_transform.h
+  svm/svm_rhino_procedurals.h
+  svm/svm_rhino_types.h
   svm/ao.h
   svm/aov.h
   svm/attribute.h
