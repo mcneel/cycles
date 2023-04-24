@@ -3855,12 +3855,14 @@ TextureCoordinateNode::TextureCoordinateNode() : ShaderNode(get_node_type()) {}
 
 void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
-  if (shader->has_surface_link()) {
+  if (shader->has_surface) {
     if (!from_dupli) {
       if (!output("Generated")->links.empty())
         attributes->add(ATTR_STD_GENERATED);
       if (!output("UV")->links.empty())
-        attributes->add(ATTR_STD_UV);
+        attributes->add(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
+      if (!output("DecalUv")->links.empty())
+        attributes->add(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
     }
   }
 
@@ -3875,6 +3877,44 @@ void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attr
   ShaderNode::attributes(shader, attributes);
 }
 
+void TextureCoordinateNode::decal_setup(ShaderOutput *out,
+                                        ShaderNodeType texco_node,
+                                        NodeTexCoord texcoord,
+                                        SVMCompiler &compiler)
+{
+  ShaderOutput *decalforward_out = output("DecalForward");
+  ShaderOutput *decalusage_out = output("DecalUsage");
+  uint encoded = compiler.encode_uchar4(compiler.stack_assign_if_linked(decalforward_out),
+                                        compiler.stack_assign_if_linked(decalusage_out));
+  compiler.add_node(texco_node, texcoord, compiler.stack_assign(out), encoded);
+  Transform ob_itfm = transform_inverse(ob_tfm);
+  compiler.add_node(ob_tfm.x);
+  compiler.add_node(ob_tfm.y);
+  compiler.add_node(ob_tfm.z);
+  compiler.add_node(ob_itfm.x);
+  compiler.add_node(ob_itfm.y);
+  compiler.add_node(ob_itfm.z);
+  compiler.add_node(pxyz.x);
+  compiler.add_node(pxyz.y);
+  compiler.add_node(pxyz.z);
+  compiler.add_node(nxyz.x);
+  compiler.add_node(nxyz.y);
+  compiler.add_node(nxyz.z);
+  compiler.add_node(uvw.x);
+  compiler.add_node(uvw.y);
+  compiler.add_node(uvw.z);
+  // add information about alternate tiles. In Rhino box projection isn't used.
+  // so add support only here
+  uint encode = compiler.encode_uchar4(0, decal_projection);
+  compiler.add_node(encode, __float_as_int(radius), __float_as_int(height));
+  // further add decal sweeps
+  compiler.add_node(make_float4(
+      horizontal_sweep_start, horizontal_sweep_end, vertical_sweep_start, vertical_sweep_end));
+  compiler.add_node(make_float4(decal_origin.x, decal_origin.y, decal_origin.z, 0.0f));
+  compiler.add_node(make_float4(decal_across.x, decal_across.y, decal_across.z, 0.0f));
+  compiler.add_node(make_float4(decal_up.x, decal_up.y, decal_up.z, 0.0f));
+}
+
 void TextureCoordinateNode::compile(SVMCompiler &compiler)
 {
   ShaderOutput *out;
@@ -3882,6 +3922,7 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
   ShaderNodeType attr_node = NODE_ATTR;
   ShaderNodeType geom_node = NODE_GEOMETRY;
 
+  // temporarily disable
   if (bump == SHADER_BUMP_DX) {
     texco_node = NODE_TEX_COORD_BUMP_DX;
     attr_node = NODE_ATTR_BUMP_DX;
@@ -3907,7 +3948,7 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
       }
       else {
         int attr = compiler.attribute(ATTR_STD_GENERATED);
-        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
+        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
       }
     }
   }
@@ -3923,8 +3964,8 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
       compiler.add_node(texco_node, NODE_TEXCO_DUPLI_UV, compiler.stack_assign(out));
     }
     else {
-      int attr = compiler.attribute(ATTR_STD_UV);
-      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
+      int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
+      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
     }
   }
 
@@ -3932,10 +3973,9 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
   if (!out->links.empty()) {
     compiler.add_node(texco_node, NODE_TEXCO_OBJECT, compiler.stack_assign(out), use_transform);
     if (use_transform) {
-      Transform ob_itfm = transform_inverse(ob_tfm);
-      compiler.add_node(ob_itfm.x);
-      compiler.add_node(ob_itfm.y);
-      compiler.add_node(ob_itfm.z);
+      compiler.add_node(ob_tfm.x);
+      compiler.add_node(ob_tfm.y);
+      compiler.add_node(ob_tfm.z);
     }
   }
 
@@ -3957,6 +3997,82 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
     else {
       compiler.add_node(texco_node, NODE_TEXCO_REFLECTION, compiler.stack_assign(out));
     }
+  }
+
+  out = output("WcsBox");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_WCS_BOX, compiler.stack_assign(out), use_transform);
+    if (use_transform) {
+      Transform ob_itfm = transform_inverse(ob_tfm);
+      compiler.add_node(ob_itfm.x);
+      compiler.add_node(ob_itfm.y);
+      compiler.add_node(ob_itfm.z);
+    }
+  }
+
+  out = output("EnvSpherical");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_SPHERICAL, compiler.stack_assign(out));
+  }
+
+  out = output("EnvEmap");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_EMAP, compiler.stack_assign(out));
+  }
+
+  out = output("EnvBox");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_BOX, compiler.stack_assign(out));
+  }
+
+  out = output("EnvLightProbe");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_LIGHTPROBE, compiler.stack_assign(out));
+  }
+
+  out = output("EnvCubemap");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP, compiler.stack_assign(out));
+  }
+
+  out = output("EnvCubemapVerticalCross");
+  if (!out->links.empty()) {
+    compiler.add_node(
+        texco_node, NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS, compiler.stack_assign(out));
+  }
+
+  out = output("EnvCubemapHorizontalCross");
+  if (!out->links.empty()) {
+    compiler.add_node(
+        texco_node, NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS, compiler.stack_assign(out));
+  }
+
+  out = output("EnvHemi");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_ENV_HEMI, compiler.stack_assign(out));
+  }
+
+  out = output("DecalUv");
+
+  if (!out->links.empty()) {
+    int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
+    compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_UV, compiler);
+  }
+
+  out = output("DecalPlanar");
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_PLANAR, compiler);
+  }
+
+  out = output("DecalSpherical");
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_SPHERICAL, compiler);
+  }
+
+  out = output("DecalCylindrical");
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_CYLINDRICAL, compiler);
   }
 }
 
