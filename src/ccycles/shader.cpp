@@ -346,10 +346,6 @@ unsigned int cycles_add_shader_node(unsigned int client_id, unsigned int scene_i
 		case shadernode_type::VECT_MATH:
 			node = new ccl::VectorMathNode();
 			break;
-		case shadernode_type::MATRIX_MATH:
-			// TODO: XXXX port Rhino matrix node from old Cycles integration
-			//node = new ccl::MatrixMathNode();
-			break;
 		case shadernode_type::PRINCIPLED_BSDF:
 			node = new ccl::PrincipledBsdfNode();
 			break;
@@ -378,8 +374,9 @@ unsigned int cycles_add_shader_node(unsigned int client_id, unsigned int scene_i
 			node = new ccl::DisplacementNode();
 			dynamic_cast<ccl::DisplacementNode*>(node)->set_space(ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_OBJECT);
 			break;
-		// TODO: XXXX port over Rhino procedural nodes
-		/*
+		case shadernode_type::RHINO_MATRIX_MATH:
+			node = new ccl::MatrixMathNode();
+			break;
 		case shadernode_type::RHINO_AZIMUTH_ALTITUDE_TRANSFORM:
 			node = new ccl::AzimuthAltitudeTransformNode();
 			break;
@@ -440,7 +437,6 @@ unsigned int cycles_add_shader_node(unsigned int client_id, unsigned int scene_i
 		case shadernode_type::RHINO_NORMAL_PART2_TEXTURE:
 			node = new ccl::RhinoNormalPart2TextureNode();
 			break;
-		*/
 		}
 
 		assert(node);
@@ -759,15 +755,12 @@ void cycles_shadernode_set_enum(unsigned int client_id, unsigned int scene_id, u
 			node->set_math_type((ccl::NodeVectorMathType)value);
 		}
 		break;
-		// TODO: XXXX Port over matrix math node from old cycles integration
-		/*
-		case shadernode_type::MATRIX_MATH:
+		case shadernode_type::RHINO_MATRIX_MATH:
 		{
 			ccl::MatrixMathNode* node = dynamic_cast<ccl::MatrixMathNode*>(shnode);
 			node->type = (ccl::NodeMatrixMath)value;
 		}
 		break;
-		*/
 		case shadernode_type::MIX:
 		{
 			ccl::MixNode* node = dynamic_cast<ccl::MixNode*>(shnode);
@@ -881,12 +874,9 @@ void cycles_shadernode_set_enum(unsigned int client_id, unsigned int scene_id, u
 		case shadernode_type::TEXTURE_COORDINATE:
 		{
 			ccl::TextureCoordinateNode* node = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
-			// TODO: XXXX port over decal support from old Cycles integration
-			/*
 			if (ename == "decal_projection") {
-				node->decal_projection = (ccl::NodeImageDecalProjection)value;
+				node->set_decal_projection((ccl::NodeImageDecalProjection)value);
 			}
-			*/
 			break;
 		}
 		case shadernode_type::GRADIENT_TEXTURE:
@@ -1147,8 +1137,6 @@ void cycles_shadernode_set_member_bool(unsigned int client_id, unsigned int scen
 			}
 		}
 		break;
-		// TODO: XXXX port over Rhino procedural textures
-		/*
 		case shadernode_type::RHINO_NOISE_TEXTURE:
 		{
 			ccl::RhinoNoiseTextureNode* node = dynamic_cast<ccl::RhinoNoiseTextureNode*>(shnode);
@@ -1212,7 +1200,6 @@ void cycles_shadernode_set_member_bool(unsigned int client_id, unsigned int scen
 				node->is_hdr = value;
 		}
 		break;
-		*/
 		default:
 			break;
 		}
@@ -1253,8 +1240,6 @@ void cycles_shadernode_set_member_int(unsigned int client_id, unsigned int scene
 			}
 		}
 		break;
-		// TODO: XXXX Port Rhino procedural textures
-		/*
 		case shadernode_type::RHINO_NOISE_TEXTURE:
 		{
 			ccl::RhinoNoiseTextureNode* node = dynamic_cast<ccl::RhinoNoiseTextureNode*>(shnode);
@@ -1333,7 +1318,6 @@ void cycles_shadernode_set_member_int(unsigned int client_id, unsigned int scene
 				node->tile_type = (ccl::RhinoProceduralTileType)value;
 		}
 		break;
-		*/
 		default:
 			break;
 		}
@@ -1365,27 +1349,24 @@ void cycles_shadernode_set_member_float(unsigned int client_id, unsigned int sce
 		case shadernode_type::TEXTURE_COORDINATE:
 		{
 			ccl::TextureCoordinateNode* texconode = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
-			// TODO: XXXX port decal support from old Cycles integration
-			/*
 			if (mname == "decal_height") {
-				texconode->height = value;
+				texconode->set_height(value);
 			}
 			else if (mname == "decal_radius") {
-				texconode->radius = value;
+				texconode->set_radius(value);
 			}
 			else if (mname == "decal_hor_start") {
-				texconode->horizontal_sweep_start = value;
+				texconode->set_horizontal_sweep_start(value);
 			}
 			else if (mname == "decal_hor_end") {
-				texconode->horizontal_sweep_end = value;
+				texconode->set_horizontal_sweep_end(value);
 			}
 			else if (mname == "decal_ver_start") {
-				texconode->vertical_sweep_start = value;
+				texconode->set_vertical_sweep_start(value);
 			}
 			else if (mname == "decal_ver_end") {
-				texconode->vertical_sweep_end = value;
+				texconode->set_vertical_sweep_end(value);
 			}
-			*/
 		}
 		break;
 		case shadernode_type::BRICK_TEXTURE:
@@ -1406,8 +1387,6 @@ void cycles_shadernode_set_member_float(unsigned int client_id, unsigned int sce
 				skynode->set_ground_albedo(value);
 		}
 		break;
-		// TODO: port over Rhino procedurals
-		/*
 		case shadernode_type::RHINO_AZIMUTH_ALTITUDE_TRANSFORM:
 		{
 			ccl::AzimuthAltitudeTransformNode* azimuth_altitude_node = dynamic_cast<ccl::AzimuthAltitudeTransformNode*>(shnode);
@@ -1548,7 +1527,6 @@ void cycles_shadernode_set_member_float(unsigned int client_id, unsigned int sce
 				node->hue_shift = value;
 		}
 		break;
-		*/
 		default:
 			break;
 		}
@@ -1600,35 +1578,30 @@ void cycles_shadernode_set_member_vec4_at_index(unsigned int client_id, unsigned
 		case shadernode_type::TEXTURE_COORDINATE:
 		{
 			ccl::TextureCoordinateNode* texco = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
-			// TODO: XXXX verify const casting works
 			if(mname == "object_transform") {
-				auto obxform = const_cast<ccl::Transform&>(texco->get_ob_tfm());
-				_set_transform(obxform, x, y, z, w, index);
+				ccl::Transform &tf = const_cast<ccl::Transform &>(texco->get_ob_tfm());
+				_set_transform(tf, x, y, z, w, index);
 			}
-			// TODO: XXXX determine how pxyz/nxyz/uvw are used - decals related. Port
-			/*
 			else if(mname == "pxyz") {
-				auto pxyz = const_cast<ccl::Transform&>(texco->get_)
-				_set_transform(texco->pxyz, x, y, z, w, index);
+				ccl::Transform &tf = const_cast<ccl::Transform &>(texco->get_pxyz());
+				_set_transform(tf, x, y, z, w, index);
 			}
 			else if(mname == "nxyz") {
-				_set_transform(texco->nxyz, x, y, z, w, index);
+				ccl::Transform &tf = const_cast<ccl::Transform &>(texco->get_nxyz());
+				_set_transform(tf, x, y, z, w, index);
 			}
 			else if(mname == "uvw") {
-				_set_transform(texco->uvw, x, y, z, w, index);
+				ccl::Transform &tf = const_cast<ccl::Transform &>(texco->get_uvw());
+				_set_transform(tf, x, y, z, w, index);
 			}
-			*/
 		}
 		break;
-		// TODO: XXXX port over matrix math node from old Cycles integration
-		/*
-		case shadernode_type::MATRIX_MATH:
+		case shadernode_type::RHINO_MATRIX_MATH:
 		{
 			ccl::MatrixMathNode* matmath = dynamic_cast<ccl::MatrixMathNode*>(shnode);
-			set_transform(matmath->tfm, x, y, z, w, index);
+			_set_transform(matmath->tfm, x, y, z, w, index);
 		}
 		break;
-		*/
 		default:
 			break;
 		}
@@ -1672,28 +1645,17 @@ void cycles_shadernode_set_member_vec(unsigned int client_id, unsigned int scene
 		case shadernode_type::TEXTURE_COORDINATE:
 		{
 			ccl::TextureCoordinateNode* texco = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
-			// TODO: XXXX port over decal support
-			/*
 			if (mname == "origin") {
-				texco->decal_origin.x = x;
-				texco->decal_origin.y = y;
-				texco->decal_origin.z = z;
+				texco->set_decal_origin(ccl::make_float3(x, y, z));
 			}
 			else if (mname == "across") {
-				texco->decal_across.x = x;
-				texco->decal_across.y = y;
-				texco->decal_across.z = z;
+				texco->set_decal_across(ccl::make_float3(x, y, z));
 			}
 			else if (mname == "up") {
-				texco->decal_up.x = x;
-				texco->decal_up.y = y;
-				texco->decal_up.z = z;
+				texco->set_decal_up(ccl::make_float3(x, y, z));
 			}
-			*/
 		}
 		break;
-		// TODO: XXXX port rhino procedural textures
-		/*
 		case shadernode_type::RHINO_PHYSICAL_SKY_TEXTURE:
 		{
 			ccl::RhinoPhysicalSkyTextureNode* node = dynamic_cast<ccl::RhinoPhysicalSkyTextureNode*>(shnode);
@@ -1734,7 +1696,6 @@ void cycles_shadernode_set_member_vec(unsigned int client_id, unsigned int scene
 			}
 		}
 		break;
-		*/
 		default:
 			break;
 		}
@@ -1758,15 +1719,12 @@ void cycles_shadernode_set_member_string(unsigned int client_id, unsigned int sc
 			attrn->set_attribute(umval);
 		}
 		break;
-		// TODO: XXXX port decal support, uvmap used for that in texco node
-		/*
 		case shadernode_type::TEXTURE_COORDINATE:
 		{
 			ccl::TextureCoordinateNode* texco = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
-			texco->set_uvmap(mval);
+			texco->set_uvmap(umval);
 		}
 		break;
-		*/
 		case shadernode_type::NORMALMAP:
 		{
 			ccl::NormalMapNode* normalmap = dynamic_cast<ccl::NormalMapNode*>(shnode);

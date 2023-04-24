@@ -925,10 +925,58 @@ class TextureCoordinateNode : public ShaderNode {
   {
     return true;
   }
+  bool has_object_dependency()
+  {
+    return use_transform;
+  }
 
-  NODE_SOCKET_API(bool, from_dupli)
-  NODE_SOCKET_API(bool, use_transform)
-  NODE_SOCKET_API(Transform, ob_tfm)
+  virtual bool equals(const ShaderNode &other)
+  {
+    const TextureCoordinateNode &texco_node = (const TextureCoordinateNode &)other;
+    return ShaderNode::equals(other) && uvmap == texco_node.uvmap &&
+           decal_origin == texco_node.decal_origin && decal_across == texco_node.decal_across &&
+           decal_up == texco_node.decal_up && pxyz == texco_node.pxyz && nxyz == texco_node.nxyz &&
+           uvw == texco_node.uvw && horizontal_sweep_start == texco_node.horizontal_sweep_start &&
+           horizontal_sweep_end == texco_node.horizontal_sweep_end &&
+           vertical_sweep_start == texco_node.vertical_sweep_start &&
+           vertical_sweep_end == texco_node.vertical_sweep_end && height == texco_node.height &&
+           radius == texco_node.radius && decal_projection && texco_node.decal_projection;
+  }
+
+  void decal_setup(ShaderOutput *out,
+                   ShaderNodeType texco_node,
+                   NodeTexCoord texcoord,
+                   SVMCompiler &compiler);
+
+  NODE_SOCKET_API(float3, normal_osl);
+  NODE_SOCKET_API(bool, from_dupli);
+  NODE_SOCKET_API(bool, use_transform);
+  NODE_SOCKET_API(Transform, ob_tfm);
+
+  /* decal origin */
+  NODE_SOCKET_API(float3, decal_origin);
+  /* decal across vector */
+  NODE_SOCKET_API(float3, decal_across);
+  /* decal up vector */
+  NODE_SOCKET_API(float3, decal_up);
+  /* Pxyz transform to map ShaderData->P to normalized mapping primitive */
+  NODE_SOCKET_API(Transform, pxyz);
+  /* Nxyz transform to map ShaderData->N to normalized mapping primitive */
+  NODE_SOCKET_API(Transform, nxyz);
+  /* UVW transform to map point to UV(W) space*/
+  NODE_SOCKET_API(Transform, uvw);
+  /* Sweep used in spherical and tubular projections t. */
+  NODE_SOCKET_API(float, horizontal_sweep_start);
+  NODE_SOCKET_API(float, horizontal_sweep_end);
+  NODE_SOCKET_API(float, vertical_sweep_start);
+  NODE_SOCKET_API(float, vertical_sweep_end);
+  /* Height used in tubular, radius in spherical and tubular projections. */
+  NODE_SOCKET_API(float, height);
+  NODE_SOCKET_API(float, radius);
+  /* Projection used by decal: both, forward or backward */
+  NODE_SOCKET_API(NodeImageDecalProjection, decal_projection);
+  /* UV Map to use, used for Decals */
+  NODE_SOCKET_API(ustring, uvmap);
 };
 
 class UVMapNode : public ShaderNode {

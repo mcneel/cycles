@@ -39,7 +39,7 @@ limitations under the License.
 #include "scene/light.h"
 #include "scene/mesh.h"
 #include "scene/shader_nodes.h"
-//#include "rhino_nodes.h"
+#include "scene/rhino_shader_nodes.h"
 #include "scene/object.h"
 #include "scene/scene.h"
 #include "session/session.h"
