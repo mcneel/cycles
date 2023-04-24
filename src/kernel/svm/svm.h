@@ -198,6 +198,7 @@ CCL_NAMESPACE_END
 #include "kernel/svm/white_noise.h"
 #include "kernel/svm/wireframe.h"
 
+#include "kernel/svm/svm_rhino_matrix_math.h"
 #include "kernel/svm/svm_rhino_azimuth_altitude_transform.h"
 #include "kernel/svm/svm_rhino_procedurals.h"
 
@@ -338,6 +339,9 @@ ccl_device void svm_eval_nodes(KernelGlobals kg,
       break;
       SVM_CASE(NODE_SET_BUMP)
       svm_node_set_bump<node_feature_mask>(kg, sd, stack, node);
+      break;
+      SVM_CASE(RHINO_NODE_MATRIX_MATH)
+      svm_rhino_node_matrix_math(kg, sd, stack, node.y, node.z, node.w, &offset);
       break;
       SVM_CASE(RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM)
       svm_rhino_node_azimuth_altitude_transform(kg, sd, stack, node, &offset);
