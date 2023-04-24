@@ -44,6 +44,7 @@ set(SRC
   tables.cpp
   tabulated_sobol.cpp
   volume.cpp
+  rhino_shader_nodes.cpp
 )
 
 set(SRC_HEADERS
@@ -82,6 +83,7 @@ set(SRC_HEADERS
   tables.h
   tabulated_sobol.h
   volume.h
+  rhino_shader_nodes.h
 )
 
 set(LIB

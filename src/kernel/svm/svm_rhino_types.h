@@ -19,6 +19,13 @@ limitations under the License.
 
 CCL_NAMESPACE_BEGIN
 
+typedef enum NodeMatrixMath {
+  NODE_MATRIX_MATH_POINT,
+  NODE_MATRIX_MATH_DIRECTION,
+  NODE_MATRIX_MATH_PERSPECTIVE,
+  NODE_MATRIX_MATH_DIR_TRANSPOSED,
+} NodeMatrixMath;
+
 typedef enum RhinoProceduralNoiseType {
   RHINO_NOISE_PERLIN,
   RHINO_NOISE_VALUE_NOISE,
