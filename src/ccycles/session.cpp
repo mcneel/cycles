@@ -27,6 +27,9 @@ limitations under the License.
 #include "device/device.h"
 #include "util/thread.h"
 
+#include <OpenImageIO/imagebuf.h>
+#include <OpenImageIO/imagebufalgo.h>
+
 using namespace ccl;
 
 /* Hold all created sessions. */
@@ -202,7 +205,52 @@ CCyclesDebugDriver::~CCyclesDebugDriver() {}
 
 void CCyclesDebugDriver::write_render_tile(const Tile &tile)
 {
-	log_(string_printf("Handling tile layer %d, size %d %d", tile.layer, tile.size.x, tile.size.y));
+  log_(string_printf(
+      "Handling tile layer %s, size %d %d", tile.layer.c_str(), tile.size.x, tile.size.y));
+
+
+	const int width = tile.size.x;
+	const int height = tile.size.y;
+	vector<float> pixels(width * height * 4);
+
+	if (!tile.get_pass_pixels("combined", 4, pixels.data())) {
+		log_("Failed to read render pass pixels");
+		return;
+	}
+
+	unique_ptr<ImageOutput> image_output(ImageOutput::create("C:\\testrender.png"));
+	if (image_output == nullptr) {
+		log_("Failed to create image file. 1");
+		return;
+	}
+
+	ImageSpec spec(width, height, 4, TypeDesc::FLOAT);
+	if (!image_output->open("C:\\testrender.png", spec)) {
+		log_("Failed to create image file.2");
+		return;
+	}
+
+	/* Manipulate offset and stride to convert from bottom-up to top-down convention. */
+	ImageBuf image_buffer(spec,
+												pixels.data() + (height - 1) * width * 4,
+												AutoStride,
+												-width * 4 * sizeof(float),
+												AutoStride);
+
+#if defined(DOCOLORSPACE)
+	/* Apply gamma correction for (some) non-linear file formats.
+	 * TODO: use OpenColorIO view transform if available. */
+	if (ColorSpaceManager::detect_known_colorspace(
+					u_colorspace_auto, "", image_output->format_name(), true) == u_colorspace_srgb) {
+		const float g = 1.0f / 2.2f;
+		ImageBufAlgo::pow(image_buffer, image_buffer, {g, g, g, 1.0f});
+	}
+#endif
+
+	/* Write to disk and close */
+	image_buffer.set_write_format(TypeDesc::FLOAT);
+	image_buffer.write(image_output.get());
+	image_output->close();
 }
 
 static void log_print(const std::string& msg)
