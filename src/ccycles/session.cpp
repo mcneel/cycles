@@ -212,6 +212,30 @@ static void log_print(const std::string& msg)
 	OutputDebugString("\n");
 }
 
+static void prep_session(ccl::Session *session)
+{
+	ccl::Camera *cam = session->scene->camera;
+	cam->set_full_height(512);
+	cam->set_full_width(512);
+	cam->compute_auto_viewplane();
+	cam->need_flags_update = true;
+	cam->update(session->scene);
+
+
+	session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
+
+	/* add pass for output. */
+	ccl::Pass *pass = session->scene->create_node<ccl::Pass>();
+	pass->set_name(ustring("combined"));
+	pass->set_type(PASS_COMBINED);
+
+	ccl::Integrator *integrator = session->scene->integrator;
+
+	integrator->set_use_adaptive_sampling(false);
+	integrator->set_denoiser_type(ccl::DENOISER_NONE);
+	integrator->set_guiding_distribution_type(ccl::GUIDING_TYPE_DIRECTIONAL_QUAD_TREE);
+}
+
 unsigned int cycles_session_create(unsigned int client_id, unsigned int session_params_id)
 {
 	ccl::thread_scoped_lock lock(session_mutex);
@@ -227,8 +251,13 @@ unsigned int cycles_session_create(unsigned int client_id, unsigned int session_
 
 	// TODO: XXXX these are hardcoded params/sceneparams
 	session->params.background = true;
-	session->params.tile_size = 64;
+	session->params.tile_size = 2048;
 	session->params.use_auto_tile = true;
+	session->params.experimental = true;
+	session->params.samples = 50;
+	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
+	session->params.time_limit = 10.0f;
+	session->params.use_resolution_divider = false;
 
 	ccl::DeviceType device_type = ccl::Device::type_from_string("CPU");
 	ccl::vector<ccl::DeviceInfo> devices = ccl::Device::available_devices(
@@ -239,12 +268,17 @@ unsigned int cycles_session_create(unsigned int client_id, unsigned int session_
 
 	session->session = new ccl::Session(session->params, session->scene_params);
 
-	session->session->scene->camera->set_full_height(512);
-	session->session->scene->camera->set_full_width(512);
-	session->session->scene->camera->compute_auto_viewplane();
-	session->session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
+	prep_session(session->session);
 
-  for(CCSession* csess : sessions) {
+	ccl::BufferParams bparam;
+	bparam.width = 512;
+	bparam.height = 512;
+	bparam.full_width = 512;
+	bparam.full_height = 512;
+
+	session->session->reset(*params, bparam);
+
+	for(CCSession* csess : sessions) {
 		if(csess==nullptr) {
 			csesid = hid;
 			break;
@@ -298,7 +332,7 @@ void cycles_session_destroy(unsigned int client_id, unsigned int session_id, uns
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
-		CCScene* csce = nullptr;
+		/* CCScene *csce = nullptr;
 		ccl::Scene* sce = nullptr;
 		if (scene_find(scene_id, &csce, &sce))
 		{
@@ -309,8 +343,10 @@ void cycles_session_destroy(unsigned int client_id, unsigned int session_id, uns
 				set_ccscene_null(scene_id);
 			}
 		}
+		*/
 
 		delete ccsess;
+
 
 		sessions[session_id] = nullptr;
 	}
@@ -332,8 +368,7 @@ void cycles_session_add_pass(unsigned int client_id, unsigned int session_id, in
 {
 	ccl::PassType passtype = (ccl::PassType)pass_id;
 	ccl::vector<ccl::Pass>& passes = get_passes(session_id);
-		// TODO: XXXX Passes rework
-		/*
+  /*
 	switch (passtype) {
 		case ccl::PASS_COMBINED:
 			ccl::Pass::add(passtype, passes, "Combined");
