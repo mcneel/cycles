@@ -129,69 +129,6 @@ void _cleanup_scenes()
 
 unsigned int cycles_scene_create(unsigned int client_id, unsigned int scene_params_id, unsigned int session_id)
 {
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-
-		ccl::SceneParams* params = nullptr;
-		bool found_params{ false };
-
-		if (scene_params_id < scene_params.size()) {
-			params = scene_params[scene_params_id];
-			found_params = true;
-		}
-
-		if (found_params && params!=nullptr) {
-			int cscid{ -1 };
-			if (scenes.size() > 0) {
-				int hid{ 0 };
-
-				// look for first CCScene that has no ccl::Scene set.
-				// if we find one, use it. Otherwise we'll just create a new one.
-				for (CCScene* sce : scenes) {
-					if (sce == nullptr) {
-						// we found a cleaned out case, create new CCScene and use it
-						CCScene* scene = new CCScene();
-						scenes[hid] = scene;
-						cscid = hid;
-						break;
-					}
-					++hid;
-				}
-			}
-			if (cscid == -1) {
-				CCScene* scene = new CCScene();
-				scenes.push_back(scene);
-				cscid = (unsigned int)(scenes.size() - 1);
-			}
-
-			_init_shaders(client_id, cscid);
-
-			scenes[cscid]->scene = new ccl::Scene(*params, session->device);
-			scenes[cscid]->params_id = scene_params_id;
-            // TODO: XXXX revisit image handling. preference: use OIIO
-            /*
-			scenes[cscid]->scene->image_manager->builtin_image_info_cb = function_bind(&CCScene::builtin_image_info, scenes[cscid], std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-			scenes[cscid]->scene->image_manager->builtin_image_pixels_cb = function_bind(&CCScene::builtin_image_pixels, scenes[cscid], std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6, std::placeholders::_7);
-			scenes[cscid]->scene->image_manager->builtin_image_float_pixels_cb = function_bind(&CCScene::builtin_image_float_pixels, scenes[cscid], std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6, std::placeholders::_7);
-             */
-			
-			// TODO: Is this the right spot?
-            // TODO: XXXX port rhino procedurals from old integration
-            /*
-			scenes[cscid]->scene->shader_manager->set_rhino_perlin_noise_table(ccycles_rhino_perlin_noise_table);
-			scenes[cscid]->scene->shader_manager->set_rhino_impulse_noise_table(ccycles_rhino_impulse_noise_table);
-			scenes[cscid]->scene->shader_manager->set_rhino_vc_noise_table(ccycles_rhino_vc_noise_table);
-			scenes[cscid]->scene->shader_manager->set_rhino_aaltonen_noise_table(ccycles_rhino_aaltonen_noise_table);
-            */
-
-			logger.logit(client_id, "Created scene ", cscid, " with scene_params ", scene_params_id, " and device ", session->device->info.id);
-			return cscid;
-		}
-		else {
-			return UINT_MAX;
-		}
-	}
 	return UINT_MAX;
 }
 
