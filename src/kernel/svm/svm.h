@@ -339,6 +339,9 @@ ccl_device void svm_eval_nodes(KernelGlobals kg,
       SVM_CASE(NODE_SET_BUMP)
       svm_node_set_bump<node_feature_mask>(kg, sd, stack, node);
       break;
+      SVM_CASE(RHINO_NODE_TEX_COORD)
+      offset = svm_rhino_node_tex_coord(kg, sd, path_flag, stack, node, offset);
+      break;
       SVM_CASE(RHINO_NODE_MATRIX_MATH)
       svm_rhino_node_matrix_math(kg, sd, stack, node.y, node.z, node.w, &offset);
       break;

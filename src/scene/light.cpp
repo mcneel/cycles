@@ -742,7 +742,7 @@ void LightManager::device_update_background(Device *device,
         const ShaderInput *vec_in = sky->input("Vector");
         if (vec_in && vec_in->link && vec_in->link->parent) {
           ShaderNode *vec_src = vec_in->link->parent;
-          if ((vec_src->type != TextureCoordinateNode::get_node_type()) ||
+          if ((vec_src->type != RhinoTextureCoordinateNode::get_node_type()) ||
               (vec_in->link != vec_src->output("Generated"))) {
             environment_res.x = max(environment_res.x, 4096);
             environment_res.y = max(environment_res.y, 2048);

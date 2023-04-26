@@ -925,6 +925,24 @@ class TextureCoordinateNode : public ShaderNode {
   {
     return true;
   }
+
+  NODE_SOCKET_API(bool, from_dupli)
+  NODE_SOCKET_API(bool, use_transform)
+  NODE_SOCKET_API(Transform, ob_tfm)
+};
+
+class RhinoTextureCoordinateNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoTextureCoordinateNode)
+  void attributes(Shader *shader, AttributeRequestSet *attributes);
+  bool has_attribute_dependency()
+  {
+    return true;
+  }
+  bool has_spatial_varying()
+  {
+    return true;
+  }
   bool has_object_dependency()
   {
     return use_transform;
@@ -932,7 +950,7 @@ class TextureCoordinateNode : public ShaderNode {
 
   virtual bool equals(const ShaderNode &other)
   {
-    const TextureCoordinateNode &texco_node = (const TextureCoordinateNode &)other;
+    const RhinoTextureCoordinateNode &texco_node = (const RhinoTextureCoordinateNode &)other;
     return ShaderNode::equals(other) && uvmap == texco_node.uvmap &&
            decal_origin == texco_node.decal_origin && decal_across == texco_node.decal_across &&
            decal_up == texco_node.decal_up && pxyz == texco_node.pxyz && nxyz == texco_node.nxyz &&

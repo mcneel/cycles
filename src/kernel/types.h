@@ -1282,6 +1282,12 @@ typedef struct KernelObject {
 
   /* Volume velocity scale. */
   float velocity_scale;
+
+  /* Rhino properties */
+  bool use_ocs_frame;
+  Transform ocs_frame; /* OCS frame for controlling WCS and WCS Box. */
+  /* Rhino properties end */
+
 } KernelObject;
 static_assert_align(KernelObject, 16);
 

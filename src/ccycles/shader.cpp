@@ -374,6 +374,9 @@ unsigned int cycles_add_shader_node(unsigned int client_id, unsigned int scene_i
 			node = new ccl::DisplacementNode();
 			dynamic_cast<ccl::DisplacementNode*>(node)->set_space(ccl::NodeNormalMapSpace::NODE_NORMAL_MAP_OBJECT);
 			break;
+		case shadernode_type::RHINO_TEXTURE_COORDINATE:
+			node = new ccl::RhinoTextureCoordinateNode();
+			break;
 		case shadernode_type::RHINO_MATRIX_MATH:
 			node = new ccl::MatrixMathNode();
 			break;
@@ -871,9 +874,9 @@ void cycles_shadernode_set_enum(unsigned int client_id, unsigned int scene_id, u
 			}
 			break;
 		}
-		case shadernode_type::TEXTURE_COORDINATE:
-		{
-			ccl::TextureCoordinateNode* node = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
+		case shadernode_type::RHINO_TEXTURE_COORDINATE: {
+			ccl::RhinoTextureCoordinateNode *node =
+				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			if (ename == "decal_projection") {
 				node->set_decal_projection((ccl::NodeImageDecalProjection)value);
 			}
@@ -1121,9 +1124,10 @@ void cycles_shadernode_set_member_bool(unsigned int client_id, unsigned int scen
 			}*/
 		}
 		break;
-		case shadernode_type::TEXTURE_COORDINATE:
+		case shadernode_type::RHINO_TEXTURE_COORDINATE:
 		{
-			ccl::TextureCoordinateNode* texco = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
+			ccl::RhinoTextureCoordinateNode *texco =
+				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			if (mname == "use_transform") {
 				texco->set_use_transform(value);
 			}
@@ -1346,9 +1350,10 @@ void cycles_shadernode_set_member_float(unsigned int client_id, unsigned int sce
 			}
 		}
 		break;
-		case shadernode_type::TEXTURE_COORDINATE:
+		case shadernode_type::RHINO_TEXTURE_COORDINATE:
 		{
-			ccl::TextureCoordinateNode* texconode = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
+			ccl::RhinoTextureCoordinateNode *texconode =
+				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			if (mname == "decal_height") {
 				texconode->set_height(value);
 			}
@@ -1575,9 +1580,10 @@ void cycles_shadernode_set_member_vec4_at_index(unsigned int client_id, unsigned
 			ramp_alpha[index] = w;
 		}
 		break;
-		case shadernode_type::TEXTURE_COORDINATE:
+		case shadernode_type::RHINO_TEXTURE_COORDINATE :
 		{
-			ccl::TextureCoordinateNode* texco = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
+			ccl::RhinoTextureCoordinateNode *texco =
+				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			if(mname == "object_transform") {
 				ccl::Transform &tf = const_cast<ccl::Transform &>(texco->get_ob_tfm());
 				_set_transform(tf, x, y, z, w, index);
@@ -1642,9 +1648,10 @@ void cycles_shadernode_set_member_vec(unsigned int client_id, unsigned int scene
 			}*/
 		}
 		break;
-		case shadernode_type::TEXTURE_COORDINATE:
+		case shadernode_type::RHINO_TEXTURE_COORDINATE:
 		{
-			ccl::TextureCoordinateNode* texco = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
+			ccl::RhinoTextureCoordinateNode *texco =
+				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			if (mname == "origin") {
 				texco->set_decal_origin(ccl::make_float3(x, y, z));
 			}
@@ -1719,9 +1726,10 @@ void cycles_shadernode_set_member_string(unsigned int client_id, unsigned int sc
 			attrn->set_attribute(umval);
 		}
 		break;
-		case shadernode_type::TEXTURE_COORDINATE:
+		case shadernode_type::RHINO_TEXTURE_COORDINATE:
 		{
-			ccl::TextureCoordinateNode* texco = dynamic_cast<ccl::TextureCoordinateNode*>(shnode);
+			ccl::RhinoTextureCoordinateNode *texco =
+				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			texco->set_uvmap(umval);
 		}
 		break;
