@@ -303,7 +303,7 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
       UVMapNode *uvmap = (UVMapNode *)node;
       attribute = uvmap->get_attribute();
     }
-    else if (node->type == TextureCoordinateNode::get_node_type()) {
+    else if (node->type == RhinoTextureCoordinateNode::get_node_type()) {
       if (vector_in->link != node->output("UV")) {
         return;
       }
@@ -3855,6 +3855,160 @@ TextureCoordinateNode::TextureCoordinateNode() : ShaderNode(get_node_type()) {}
 
 void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attributes)
 {
+  if (shader->has_surface_link()) {
+    if (!from_dupli) {
+      if (!output("Generated")->links.empty())
+        attributes->add(ATTR_STD_GENERATED);
+      if (!output("UV")->links.empty())
+        attributes->add(ATTR_STD_UV);
+    }
+  }
+
+  if (shader->has_volume) {
+    if (!from_dupli) {
+      if (!output("Generated")->links.empty()) {
+        attributes->add(ATTR_STD_GENERATED_TRANSFORM);
+      }
+    }
+  }
+
+  ShaderNode::attributes(shader, attributes);
+}
+
+void TextureCoordinateNode::compile(SVMCompiler &compiler)
+{
+  ShaderOutput *out;
+  ShaderNodeType texco_node = NODE_TEX_COORD;
+  ShaderNodeType attr_node = NODE_ATTR;
+  ShaderNodeType geom_node = NODE_GEOMETRY;
+
+  if (bump == SHADER_BUMP_DX) {
+    texco_node = NODE_TEX_COORD_BUMP_DX;
+    attr_node = NODE_ATTR_BUMP_DX;
+    geom_node = NODE_GEOMETRY_BUMP_DX;
+  }
+  else if (bump == SHADER_BUMP_DY) {
+    texco_node = NODE_TEX_COORD_BUMP_DY;
+    attr_node = NODE_ATTR_BUMP_DY;
+    geom_node = NODE_GEOMETRY_BUMP_DY;
+  }
+
+  out = output("Generated");
+  if (!out->links.empty()) {
+    if (compiler.background) {
+      compiler.add_node(geom_node, NODE_GEOM_P, compiler.stack_assign(out));
+    }
+    else {
+      if (from_dupli) {
+        compiler.add_node(texco_node, NODE_TEXCO_DUPLI_GENERATED, compiler.stack_assign(out));
+      }
+      else if (compiler.output_type() == SHADER_TYPE_VOLUME) {
+        compiler.add_node(texco_node, NODE_TEXCO_VOLUME_GENERATED, compiler.stack_assign(out));
+      }
+      else {
+        int attr = compiler.attribute(ATTR_STD_GENERATED);
+        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
+      }
+    }
+  }
+
+  out = output("Normal");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_NORMAL, compiler.stack_assign(out));
+  }
+
+  out = output("UV");
+  if (!out->links.empty()) {
+    if (from_dupli) {
+      compiler.add_node(texco_node, NODE_TEXCO_DUPLI_UV, compiler.stack_assign(out));
+    }
+    else {
+      int attr = compiler.attribute(ATTR_STD_UV);
+      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
+    }
+  }
+
+  out = output("Object");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_OBJECT, compiler.stack_assign(out), use_transform);
+    if (use_transform) {
+      Transform ob_itfm = transform_inverse(ob_tfm);
+      compiler.add_node(ob_itfm.x);
+      compiler.add_node(ob_itfm.y);
+      compiler.add_node(ob_itfm.z);
+    }
+  }
+
+  out = output("Camera");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_CAMERA, compiler.stack_assign(out));
+  }
+
+  out = output("Window");
+  if (!out->links.empty()) {
+    compiler.add_node(texco_node, NODE_TEXCO_WINDOW, compiler.stack_assign(out));
+  }
+
+  out = output("Reflection");
+  if (!out->links.empty()) {
+    if (compiler.background) {
+      compiler.add_node(geom_node, NODE_GEOM_I, compiler.stack_assign(out));
+    }
+    else {
+      compiler.add_node(texco_node, NODE_TEXCO_REFLECTION, compiler.stack_assign(out));
+    }
+  }
+}
+
+void TextureCoordinateNode::compile(OSLCompiler &compiler)
+{
+  if (bump == SHADER_BUMP_DX)
+    compiler.parameter("bump_offset", "dx");
+  else if (bump == SHADER_BUMP_DY)
+    compiler.parameter("bump_offset", "dy");
+  else
+    compiler.parameter("bump_offset", "center");
+
+  if (compiler.background)
+    compiler.parameter("is_background", true);
+  if (compiler.output_type() == SHADER_TYPE_VOLUME)
+    compiler.parameter("is_volume", true);
+  compiler.parameter(this, "use_transform");
+  Transform ob_itfm = transform_inverse(ob_tfm);
+  compiler.parameter("object_itfm", ob_itfm);
+
+  compiler.parameter(this, "from_dupli");
+
+  compiler.add(this, "node_texture_coordinate");
+}
+
+/* RhinoTextureCoordinate */
+
+NODE_DEFINE(RhinoTextureCoordinateNode)
+{
+  NodeType *type = NodeType::add("rhino_texture_coordinate", create, NodeType::SHADER);
+
+  SOCKET_BOOLEAN(from_dupli, "From Dupli", false);
+  SOCKET_BOOLEAN(use_transform, "Use Transform", false);
+  SOCKET_TRANSFORM(ob_tfm, "Object Transform", transform_identity());
+
+  SOCKET_OUT_POINT(generated, "Generated");
+  SOCKET_OUT_NORMAL(normal, "Normal");
+  SOCKET_OUT_POINT(UV, "UV");
+  SOCKET_OUT_POINT(object, "Object");
+  SOCKET_OUT_POINT(camera, "Camera");
+  SOCKET_OUT_POINT(window, "Window");
+  SOCKET_OUT_NORMAL(reflection, "Reflection");
+
+  return type;
+}
+
+RhinoTextureCoordinateNode::RhinoTextureCoordinateNode() : ShaderNode(get_node_type())
+{
+}
+
+void RhinoTextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attributes)
+{
   if (shader->has_surface) {
     if (!from_dupli) {
       if (!output("Generated")->links.empty())
@@ -3877,7 +4031,7 @@ void TextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attr
   ShaderNode::attributes(shader, attributes);
 }
 
-void TextureCoordinateNode::decal_setup(ShaderOutput *out,
+void RhinoTextureCoordinateNode::decal_setup(ShaderOutput *out,
                                         ShaderNodeType texco_node,
                                         NodeTexCoord texcoord,
                                         SVMCompiler &compiler)
@@ -3915,10 +4069,10 @@ void TextureCoordinateNode::decal_setup(ShaderOutput *out,
   compiler.add_node(make_float4(decal_up.x, decal_up.y, decal_up.z, 0.0f));
 }
 
-void TextureCoordinateNode::compile(SVMCompiler &compiler)
+void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
 {
   ShaderOutput *out;
-  ShaderNodeType texco_node = NODE_TEX_COORD;
+  ShaderNodeType texco_node = RHINO_NODE_TEX_COORD;
   ShaderNodeType attr_node = NODE_ATTR;
   ShaderNodeType geom_node = NODE_GEOMETRY;
 
@@ -4076,7 +4230,7 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
   }
 }
 
-void TextureCoordinateNode::compile(OSLCompiler &compiler)
+void RhinoTextureCoordinateNode::compile(OSLCompiler &compiler)
 {
   if (bump == SHADER_BUMP_DX)
     compiler.parameter("bump_offset", "dx");

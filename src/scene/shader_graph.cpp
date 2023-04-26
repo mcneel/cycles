@@ -838,19 +838,19 @@ void ShaderGraph::default_inputs(bool do_osl)
       if (!input->link && (!(input->flags() & SocketType::OSL_INTERNAL) || do_osl)) {
         if (input->flags() & SocketType::LINK_TEXTURE_GENERATED) {
           if (!texco)
-            texco = create_node<TextureCoordinateNode>();
+            texco = create_node<RhinoTextureCoordinateNode>();
 
           connect(texco->output("Generated"), input);
         }
         if (input->flags() & SocketType::LINK_TEXTURE_NORMAL) {
           if (!texco)
-            texco = create_node<TextureCoordinateNode>();
+            texco = create_node<RhinoTextureCoordinateNode>();
 
           connect(texco->output("Normal"), input);
         }
         else if (input->flags() & SocketType::LINK_TEXTURE_UV) {
           if (!texco)
-            texco = create_node<TextureCoordinateNode>();
+            texco = create_node<RhinoTextureCoordinateNode>();
 
           connect(texco->output("UV"), input);
         }

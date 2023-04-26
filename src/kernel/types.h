@@ -1341,6 +1341,11 @@ typedef struct KernelObject {
   uint receiver_light_set;
   uint64_t shadow_set_membership;
   uint blocker_shadow_set;
+  /* Rhino properties */
+  bool use_ocs_frame;
+  Transform ocs_frame; /* OCS frame for controlling WCS and WCS Box. */
+  /* Rhino properties end */
+
 } KernelObject;
 static_assert_align(KernelObject, 16);
 
