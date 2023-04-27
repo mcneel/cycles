@@ -15,6 +15,10 @@ limitations under the License.
 **/
 
 #include <iostream>
+#include <filesystem>
+#include <cstdlib>
+
+namespace fs = std::filesystem;
 
 #ifdef _WIN32
 #include <eh.h>
@@ -208,6 +212,8 @@ void CCyclesDebugDriver::write_render_tile(const Tile &tile)
   log_(string_printf(
       "Handling tile layer %s, size %d %d", tile.layer.c_str(), tile.size.x, tile.size.y));
 
+	fs::path userprofile(std::getenv("USERPROFILE"));
+	fs::path save_path = userprofile / "integration_testrender.png";
 
 	const int width = tile.size.x;
 	const int height = tile.size.y;
@@ -218,14 +224,15 @@ void CCyclesDebugDriver::write_render_tile(const Tile &tile)
 		return;
 	}
 
-	unique_ptr<ImageOutput> image_output(ImageOutput::create("C:\\testrender.png"));
+	unique_ptr<ImageOutput> image_output(ImageOutput::create("png"));
 	if (image_output == nullptr) {
 		log_("Failed to create image file. 1");
 		return;
 	}
 
 	ImageSpec spec(width, height, 4, TypeDesc::FLOAT);
-	if (!image_output->open("C:\\testrender.png", spec)) {
+  if (!image_output->open(save_path.string(), spec)) {
+		log_(image_output->geterror());
 		log_("Failed to create image file.2");
 		return;
 	}
@@ -237,7 +244,8 @@ void CCyclesDebugDriver::write_render_tile(const Tile &tile)
 												-width * 4 * sizeof(float),
 												AutoStride);
 
-#if defined(DOCOLORSPACE)
+#define DCOLORSPACE
+#if defined(DCOLORSPACE)
 	/* Apply gamma correction for (some) non-linear file formats.
 	 * TODO: use OpenColorIO view transform if available. */
 	if (ColorSpaceManager::detect_known_colorspace(
@@ -277,11 +285,31 @@ static void prep_session(ccl::Session *session)
 	pass->set_name(ustring("combined"));
 	pass->set_type(PASS_COMBINED);
 
-	ccl::Integrator *integrator = session->scene->integrator;
+	ccl::Scene *scene = session->scene;
+	ccl::Integrator *integrator = scene->integrator;
 
 	integrator->set_use_adaptive_sampling(false);
 	integrator->set_denoiser_type(ccl::DENOISER_NONE);
 	integrator->set_guiding_distribution_type(ccl::GUIDING_TYPE_DIRECTIONAL_QUAD_TREE);
+
+	scene->background->set_transparent_glass(true);
+	Shader *bgsh = scene->default_background;
+	ccl::ShaderGraph *graph = new ccl::ShaderGraph();
+	ccl::OutputNode *out = graph->output();
+	ustring nodename("background_shader");
+	ccl::ShaderNode *shn = nullptr;
+	const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
+	shn = (ShaderNode *)ntype->create(ntype);
+	shn->set_owner(graph);
+	{
+		ccl::BackgroundNode *bgn = (ccl::BackgroundNode *)shn;
+		bgn->set_color(ccl::make_float3(0.9, 0.6, 0.3));
+		bgn->set_strength(1.5f);
+	}
+	graph->add(shn);
+	graph->connect(shn->output("Background"), out->input("Surface"));
+	bgsh->set_graph(graph);
+	bgsh->tag_update(scene);
 }
 
 unsigned int cycles_session_create(unsigned int client_id, unsigned int session_params_id)
