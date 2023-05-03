@@ -16,7 +16,7 @@ limitations under the License.
 
 #include "internal_types.h"
 
-void cycles_film_set_exposure(unsigned int client_id, unsigned int scene_id, float exposure)
+void cycles_film_set_exposure(unsigned int scene_id, float exposure)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -26,7 +26,7 @@ void cycles_film_set_exposure(unsigned int client_id, unsigned int scene_id, flo
 	}
 }
 
-void cycles_film_set_filter(unsigned int client_id, unsigned int scene_id, unsigned int filter_type, float filter_width)
+void cycles_film_set_filter(unsigned int scene_id, unsigned int filter_type, float filter_width)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -37,7 +37,7 @@ void cycles_film_set_filter(unsigned int client_id, unsigned int scene_id, unsig
 	}
 }
 
-void cycles_film_set_use_sample_clamp(unsigned int client_id, unsigned int scene_id, bool use_sample_clamp)
+void cycles_film_set_use_sample_clamp(unsigned int scene_id, bool use_sample_clamp)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -46,7 +46,7 @@ void cycles_film_set_use_sample_clamp(unsigned int client_id, unsigned int scene
 	}
 }
 
-void cycles_film_tag_update(unsigned int client_id, unsigned int scene_id)
+void cycles_film_tag_update(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;

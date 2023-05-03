@@ -25,7 +25,7 @@ limitations under the License.
 std::vector<ccl::SceneParams*> scene_params;
 
 /* Create scene parameters, to be used when creating a new scene. */
-unsigned int cycles_scene_params_create(unsigned int client_id, 
+unsigned int cycles_scene_params_create(
 	unsigned int shadingsystem, unsigned int bvh_type, 
 	unsigned int use_bvh_spatial_split, 
 	int bvh_layout, unsigned int persistent_data)
@@ -42,22 +42,22 @@ unsigned int cycles_scene_params_create(unsigned int client_id,
 	scene_params.push_back(params);
 
     /*
-	logger.logit(client_id, "Created scene parameters ", scene_params.size() - 1, "\n\tshading system: ", params->shadingsystem, "\n\tbvh_type: ", params->bvh_type, "\n\tuse_bvh_spatial_split: ", params->use_bvh_spatial_split, "\n\tuse_qbvh: ", params->bvh_layout, "\n\tpersistent data: ", params->persistent_data);*/
+	logger.logit("Created scene parameters ", scene_params.size() - 1, "\n\tshading system: ", params->shadingsystem, "\n\tbvh_type: ", params->bvh_type, "\n\tuse_bvh_spatial_split: ", params->use_bvh_spatial_split, "\n\tuse_qbvh: ", params->bvh_layout, "\n\tpersistent data: ", params->persistent_data);*/
 
 	return (unsigned int)(scene_params.size() - 1);
 }
 
 /* Set scene parameters*/
-void cycles_scene_params_set_bvh_type(unsigned int client_id, unsigned int scene_params_id, unsigned int bvh_type)
+void cycles_scene_params_set_bvh_type(unsigned int scene_params_id, unsigned int bvh_type)
 {
 	SCENE_PARAM_CAST(scene_params_id, ccl::BVHType, bvh_type)
 }
 
-void cycles_scene_params_set_bvh_spatial_split(unsigned int client_id, unsigned int scene_params_id, unsigned int use_bvh_spatial_split)
+void cycles_scene_params_set_bvh_spatial_split(unsigned int scene_params_id, unsigned int use_bvh_spatial_split)
 {
 	SCENE_PARAM_BOOL(scene_params_id, use_bvh_spatial_split)
 }
-void cycles_scene_params_set_qbvh(unsigned int client_id, unsigned int scene_params_id, unsigned int use_qbvh)
+void cycles_scene_params_set_qbvh(unsigned int scene_params_id, unsigned int use_qbvh)
 {
     // TODO: XXXX revisit BVH settings, there are different ones now.
     // For now default to BVH_LAYOUT_BVH2, but there will be much better ones
@@ -65,11 +65,11 @@ void cycles_scene_params_set_qbvh(unsigned int client_id, unsigned int scene_par
 	SCENE_PARAM_CAST(scene_params_id, ccl::BVHLayout, bvh_layout)
 }
 
-void cycles_scene_params_set_shadingsystem(unsigned int client_id, unsigned int scene_params_id, unsigned int shadingsystem)
+void cycles_scene_params_set_shadingsystem(unsigned int scene_params_id, unsigned int shadingsystem)
 {
 	SCENE_PARAM_CAST(scene_params_id, ccl::ShadingSystem, shadingsystem)
 }
-void cycles_scene_params_set_persistent_data(unsigned int client_id, unsigned int scene_params_id, unsigned int persistent_data)
+void cycles_scene_params_set_persistent_data(unsigned int scene_params_id, unsigned int persistent_data)
 {
     // TODO: XXXX no longer exists
 	//SCENE_PARAM_BOOL(scene_params_id, persistent_data)

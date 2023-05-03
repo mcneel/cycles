@@ -20,12 +20,12 @@ limitations under the License.
 
 OIIO_NAMESPACE_USING
 
-void _init_shaders(unsigned int client_id, unsigned int scene_id)
+void _init_shaders(unsigned int scene_id)
 {
-	cycles_create_shader(client_id, scene_id); // default surface
-	cycles_create_shader(client_id, scene_id); // default light
-	cycles_create_shader(client_id, scene_id); // default background
-	cycles_create_shader(client_id, scene_id); // default empty
+	cycles_create_shader(scene_id); // default surface
+	cycles_create_shader(scene_id); // default light
+	cycles_create_shader(scene_id); // default background
+	cycles_create_shader(scene_id); // default empty
 }
 
 ccl::ShaderNode* _shader_node_find(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id)
@@ -61,7 +61,7 @@ void _set_colorspace(ustring& colorspace, int value)
 /* Create a new shader.
  TODO: name for shader
 */
-unsigned int cycles_create_shader(unsigned int client_id, unsigned int scene_id)
+unsigned int cycles_create_shader(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -78,7 +78,7 @@ unsigned int cycles_create_shader(unsigned int client_id, unsigned int scene_id)
 }
 
 /* Add shader to specified scene. */
-unsigned int cycles_scene_add_shader(unsigned int client_id, unsigned int scene_id, unsigned int shader_id)
+unsigned int cycles_scene_add_shader(unsigned int scene_id, unsigned int shader_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -95,7 +95,7 @@ unsigned int cycles_scene_add_shader(unsigned int client_id, unsigned int scene_
 	return (unsigned int)(-1);
 }
 
-void cycles_scene_tag_shader(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, bool use)
+void cycles_scene_tag_shader(unsigned int scene_id, unsigned int shader_id, bool use)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -109,7 +109,7 @@ void cycles_scene_tag_shader(unsigned int client_id, unsigned int scene_id, unsi
 }
 
 /* Get Cycles shader ID in specific scene. */
-unsigned int cycles_scene_shader_id(unsigned int client_id, unsigned int scene_id, unsigned int shader_id)
+unsigned int cycles_scene_shader_id(unsigned int scene_id, unsigned int shader_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -123,7 +123,7 @@ unsigned int cycles_scene_shader_id(unsigned int client_id, unsigned int scene_i
 	return (unsigned int)(-1);
 }
 
-void cycles_shader_new_graph(unsigned int client_id, unsigned int scene_id, unsigned int shader_id)
+void cycles_shader_new_graph(unsigned int scene_id, unsigned int shader_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -135,31 +135,31 @@ void cycles_shader_new_graph(unsigned int client_id, unsigned int scene_id, unsi
 }
 
 
-void cycles_shader_set_name(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, const char* _name)
+void cycles_shader_set_name(unsigned int scene_id, unsigned int shader_id, const char* _name)
 {
 	SHADER_SET(scene_id, shader_id, std::string, name, _name);
 }
 
-void cycles_shader_set_use_mis(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int use_mis)
+void cycles_shader_set_use_mis(unsigned int scene_id, unsigned int shader_id, unsigned int use_mis)
 {
 	// TODO: XXXX see if something similar is still necessary or if
 	// can just fully remove
 	//SHADER_SET(scene_id, shader_id, bool, use_mis, use_mis == 1)
 }
 
-void cycles_shader_set_use_transparent_shadow(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int use_transparent_shadow)
+void cycles_shader_set_use_transparent_shadow(unsigned int scene_id, unsigned int shader_id, unsigned int use_transparent_shadow)
 {
 	// TODO: XXXX investigate if transparent shadows are managed differently now
 	//SHADER_SET(scene_id, shader_id, bool, use_transparent_shadow, use_transparent_shadow == 1)
 }
 
-void cycles_shader_set_heterogeneous_volume(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int heterogeneous_volume)
+void cycles_shader_set_heterogeneous_volume(unsigned int scene_id, unsigned int shader_id, unsigned int heterogeneous_volume)
 {
 	// TODO: XXXX figure out if we want volume rendering at all
 	// SHADER_SET(scene_id, shader_id, bool, heterogeneous_volume, heterogeneous_volume == 1)
 }
 
-unsigned int cycles_add_shader_node(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, shadernode_type shn_type)
+unsigned int cycles_add_shader_node(unsigned int scene_id, unsigned int shader_id, shadernode_type shn_type)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -467,7 +467,7 @@ struct attrunion {
 	};
 };
 
-void shadernode_set_attribute(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, attrunion v)
+void shadernode_set_attribute(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, attrunion v)
 {
 	auto attr = std::string(attribute_name);
 	ccl::ShaderNode* shnode = _shader_node_find(scene_id, shader_id, shnode_id);
@@ -478,11 +478,11 @@ void shadernode_set_attribute(unsigned int client_id, unsigned int scene_id, uns
 				switch (v.type) {
 				case attr_type::INT:
 					inp->set(v.i);
-					logger.logit(client_id, "shader_id: ", shader_id, " -> shnode_id: ", shnode_id, " |> setting attribute: ", attribute_name, " to: ", v.i);
+					logger.logit("shader_id: ", shader_id, " -> shnode_id: ", shnode_id, " |> setting attribute: ", attribute_name, " to: ", v.i);
 					break;
 				case attr_type::FLOAT:
 					inp->set(v.f);
-					logger.logit(client_id, "shader_id: ", shader_id, " -> shnode_id: ", shnode_id, " |> setting attribute: ", attribute_name, " to: ", v.f);
+					logger.logit("shader_id: ", shader_id, " -> shnode_id: ", shnode_id, " |> setting attribute: ", attribute_name, " to: ", v.f);
 					break;
 				case attr_type::FLOAT4:
 					ccl::float3 f3;
@@ -490,7 +490,7 @@ void shadernode_set_attribute(unsigned int client_id, unsigned int scene_id, uns
 					f3.y = v.f4.y;
 					f3.z = v.f4.z;
 					inp->set(f3);
-					logger.logit(client_id, "shader_id: ", shader_id, " -> shnode_id: ", shnode_id, " |> setting attribute: ", attribute_name, " to: ", v.f4.x, ",", v.f4.y, ",", v.f4.z);
+					logger.logit("shader_id: ", shader_id, " -> shnode_id: ", shnode_id, " |> setting attribute: ", attribute_name, " to: ", v.f4.x, ",", v.f4.y, ",", v.f4.z);
 					break;
 				}
 				return;
@@ -534,7 +534,7 @@ void _set_mapping_node(ccl::MappingNode* node, int transform_type, float x, floa
 	}
 }
 
-void cycles_shadernode_texmapping_set_transformation(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, int transform_type, float x, float y, float z)
+void cycles_shadernode_texmapping_set_transformation(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, int transform_type, float x, float y, float z)
 {
 	ccl::ShaderNode* shnode = _shader_node_find(scene_id, shader_id, shnode_id);
 	if (shnode) {
@@ -550,7 +550,7 @@ void cycles_shadernode_texmapping_set_transformation(unsigned int client_id, uns
 			tp = "SCALE";
 			break;
 		}
-		logger.logit(client_id, "Setting texture map transformation (", tp, ") to ", x, ",", y, ",", z, " for shadernode type ", shn_type);
+		logger.logit("Setting texture map transformation (", tp, ") to ", x, ",", y, ",", z, " for shadernode type ", shn_type);
 		switch (shn_type) {
 		case shadernode_type::MAPPING:
 		{
@@ -625,11 +625,11 @@ void _set_texmapping_mapping(ccl::TextureMapping& tex_mapping, ccl::TextureMappi
 	tex_mapping.z_mapping = z;
 }
 
-void cycles_shadernode_texmapping_set_mapping(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z)
+void cycles_shadernode_texmapping_set_mapping(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z)
 {
 	ccl::ShaderNode* shnode = _shader_node_find(scene_id, shader_id, shnode_id);
 	if (shnode) {
-		logger.logit(client_id, "Setting texture map mapping to ", x, ",", y, ",", z, " for shadernode type ", shn_type);
+		logger.logit("Setting texture map mapping to ", x, ",", y, ",", z, " for shadernode type ", shn_type);
 		switch (shn_type) {
 		case shadernode_type::MAPPING:
 		{
@@ -699,12 +699,12 @@ void cycles_shadernode_texmapping_set_mapping(unsigned int client_id, unsigned i
 	}
 }
 
-void cycles_shadernode_texmapping_set_projection(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Projection tm_projection)
+void cycles_shadernode_texmapping_set_projection(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Projection tm_projection)
 {
 	/*
 	ccl::ShaderNode* shnode = _shader_node_find(scene_id, shader_id, shnode_id);
 	if (shnode) {
-		logger.logit(client_id, "Setting texture map projection type to ", tm_projection, " for shadernode type ", shn_type);
+		logger.logit("Setting texture map projection type to ", tm_projection, " for shadernode type ", shn_type);
 		switch (shn_type) {
 		case shadernode_type::MAPPING:
 			{
@@ -719,11 +719,11 @@ void cycles_shadernode_texmapping_set_projection(unsigned int client_id, unsigne
 	*/
 }
 
-void cycles_shadernode_texmapping_set_type(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::NodeMappingType tm_type)
+void cycles_shadernode_texmapping_set_type(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::NodeMappingType tm_type)
 {
 	ccl::ShaderNode* shnode = _shader_node_find(scene_id, shader_id, shnode_id);
 	if (shnode) {
-		logger.logit(client_id, "Setting texture map type to ", tm_type, " for shadernode type ", shn_type);
+		logger.logit("Setting texture map type to ", tm_type, " for shadernode type ", shn_type);
 		switch (shn_type) {
 		case shadernode_type::MAPPING:
 		{
@@ -739,7 +739,7 @@ void cycles_shadernode_texmapping_set_type(unsigned int client_id, unsigned int 
 
 /* TODO: add all enum possibilities.
  */
-void cycles_shadernode_set_enum(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* enum_name, int value)
+void cycles_shadernode_set_enum(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* enum_name, int value)
 {
 	auto ename = std::string{ enum_name };
 
@@ -978,7 +978,7 @@ CCImage* get_ccimage(std::string imgname, T* img, unsigned int width, unsigned i
 	return nimg;
 }
 
-void cycles_shadernode_set_member_float_img(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, float* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
+void cycles_shadernode_set_member_float_img(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, float* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
 {
 	// TODO: XXXX reimplement image/env texture setting
 	/*
@@ -1018,7 +1018,7 @@ void cycles_shadernode_set_member_float_img(unsigned int client_id, unsigned int
 	*/
 }
 
-void cycles_shadernode_set_member_byte_img(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, unsigned char* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
+void cycles_shadernode_set_member_byte_img(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, unsigned char* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
 {
 	// TODO: XXXX reimplement image/env texture setting
 	/*
@@ -1057,7 +1057,7 @@ void cycles_shadernode_set_member_byte_img(unsigned int client_id, unsigned int 
 	*/
 }
 
-void cycles_shadernode_set_member_bool(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, bool value)
+void cycles_shadernode_set_member_bool(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, bool value)
 {
 	auto mname = std::string{ member_name };
 	ccl::ShaderNode* shnode = _shader_node_find(scene_id, shader_id, shnode_id);
@@ -1210,7 +1210,7 @@ void cycles_shadernode_set_member_bool(unsigned int client_id, unsigned int scen
 	}
 }
 
-void cycles_shadernode_set_member_int(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, int value)
+void cycles_shadernode_set_member_int(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, int value)
 {
 	auto mname = std::string{ member_name };
 	ccl::ShaderNode* shnode = _shader_node_find(scene_id, shader_id, shnode_id);
@@ -1329,7 +1329,7 @@ void cycles_shadernode_set_member_int(unsigned int client_id, unsigned int scene
 }
 
 
-void cycles_shadernode_set_member_float(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float value)
+void cycles_shadernode_set_member_float(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float value)
 {
 	auto mname = std::string{ member_name };
 
@@ -1560,7 +1560,7 @@ static void _set_transform(ccl::Transform& tfm, float x, float y, float z, float
 	}
 }
 
-void cycles_shadernode_set_member_vec4_at_index(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z, float w, int index)
+void cycles_shadernode_set_member_vec4_at_index(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z, float w, int index)
 {
 	auto mname = std::string{ member_name };
 
@@ -1614,7 +1614,7 @@ void cycles_shadernode_set_member_vec4_at_index(unsigned int client_id, unsigned
 	}
 }
 
-void cycles_shadernode_set_member_vec(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z)
+void cycles_shadernode_set_member_vec(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z)
 {
 	auto mname = std::string{ member_name };
 
@@ -1709,7 +1709,7 @@ void cycles_shadernode_set_member_vec(unsigned int client_id, unsigned int scene
 	}
 }
 
-void cycles_shadernode_set_member_string(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* value)
+void cycles_shadernode_set_member_string(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* value)
 {
 	auto mname = std::string{ member_name };
 	auto mval = std::string{ value };
@@ -1748,36 +1748,36 @@ void cycles_shadernode_set_member_string(unsigned int client_id, unsigned int sc
 /*
 Set an integer attribute with given name to value. shader_id is the global shader ID.
 */
-void cycles_shadernode_set_attribute_int(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, int value)
+void cycles_shadernode_set_attribute_int(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, int value)
 {
 	attrunion v{ attr_type::INT };
 	v.i = value;
-	shadernode_set_attribute(client_id, scene_id, shader_id, shnode_id, attribute_name, v);
+	shadernode_set_attribute(scene_id, shader_id, shnode_id, attribute_name, v);
 }
 
 /*
 Set a float attribute with given name to value. shader_id is the global shader ID.
 */
-void cycles_shadernode_set_attribute_float(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float value)
+void cycles_shadernode_set_attribute_float(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float value)
 {
 	attrunion v{ attr_type::FLOAT };
 	v.f = value;
-	shadernode_set_attribute(client_id, scene_id, shader_id, shnode_id, attribute_name, v);
+	shadernode_set_attribute(scene_id, shader_id, shnode_id, attribute_name, v);
 }
 
 /*
 Set a vector of floats attribute with given name to x, y and z. shader_id is the global shader ID.
 */
-void cycles_shadernode_set_attribute_vec(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float x, float y, float z)
+void cycles_shadernode_set_attribute_vec(unsigned int scene_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float x, float y, float z)
 {
 	attrunion v{ attr_type::FLOAT4 };
 	v.f4.x = x;
 	v.f4.y = y;
 	v.f4.z = z;
-	shadernode_set_attribute(client_id, scene_id, shader_id, shnode_id, attribute_name, v);
+	shadernode_set_attribute(scene_id, shader_id, shnode_id, attribute_name, v);
 }
 
-void cycles_shader_connect_nodes(unsigned int client_id, unsigned int scene_id, unsigned int shader_id, unsigned int from_id, const char* from, unsigned int to_id, const char* to)
+void cycles_shader_connect_nodes(unsigned int scene_id, unsigned int shader_id, unsigned int from_id, const char* from, unsigned int to_id, const char* to)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -1805,7 +1805,7 @@ void cycles_shader_connect_nodes(unsigned int client_id, unsigned int scene_id, 
 		if (shfrom == shfrom_end || shto == shto_end) {
 			return; // TODO: figure out what to do on errors like this
 		}
-		logger.logit(client_id, "Shader ", shader_id, " :: ", from_id, ":", from, " -> ", to_id, ":", to);
+		logger.logit("Shader ", shader_id, " :: ", from_id, ":", from, " -> ", to_id, ":", to);
 
 		sh->graph->connect((*shfrom)->output(from), (*shto)->input(to));
 	}

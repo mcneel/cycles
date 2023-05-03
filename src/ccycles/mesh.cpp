@@ -21,7 +21,7 @@ limitations under the License.
 
 using namespace OIIO;
 
-unsigned int cycles_scene_add_mesh(unsigned int client_id, unsigned int scene_id, unsigned int shader_id)
+unsigned int cycles_scene_add_mesh(unsigned int scene_id, unsigned int shader_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -35,7 +35,7 @@ unsigned int cycles_scene_add_mesh(unsigned int client_id, unsigned int scene_id
 		mesh->used_shaders.push_back(sh);
 		sce->meshes.push_back(mesh);
 
-		logger.logit(client_id, "Add mesh ", sce->meshes.size() - 1, " in scene ", scene_id, " using default surface shader ", shader_id);
+		logger.logit("Add mesh ", sce->meshes.size() - 1, " in scene ", scene_id, " using default surface shader ", shader_id);
         
 		return (unsigned int)(sce->meshes.size() - 1);
 	}
@@ -44,7 +44,7 @@ unsigned int cycles_scene_add_mesh(unsigned int client_id, unsigned int scene_id
 	return UINT_MAX;
 }
 
-unsigned int cycles_scene_add_mesh_object(unsigned int client_id, unsigned int scene_id, unsigned int object_id, unsigned int shader_id)
+unsigned int cycles_scene_add_mesh_object(unsigned int scene_id, unsigned int object_id, unsigned int shader_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -61,7 +61,7 @@ unsigned int cycles_scene_add_mesh_object(unsigned int client_id, unsigned int s
 		mesh->used_shaders.push_back(sh);
 		sce->meshes.push_back(mesh);
 
-		logger.logit(client_id, "Add mesh ", sce->meshes.size() - 1, " to object ", object_id, " in scene ", scene_id, " using default surface shader ", shader_id);
+		logger.logit("Add mesh ", sce->meshes.size() - 1, " to object ", object_id, " in scene ", scene_id, " using default surface shader ", shader_id);
 
 		return (unsigned int)(sce->meshes.size() - 1);
 	}
@@ -70,7 +70,7 @@ unsigned int cycles_scene_add_mesh_object(unsigned int client_id, unsigned int s
 	return UINT_MAX;
 }
 
-void cycles_mesh_set_shader(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, unsigned int shader_id)
+void cycles_mesh_set_shader(unsigned int scene_id, unsigned int mesh_id, unsigned int shader_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -95,7 +95,7 @@ void cycles_mesh_set_shader(unsigned int client_id, unsigned int scene_id, unsig
     */
 }
 
-void cycles_mesh_clear(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id)
+void cycles_mesh_clear(unsigned int scene_id, unsigned int mesh_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -108,7 +108,7 @@ void cycles_mesh_clear(unsigned int client_id, unsigned int scene_id, unsigned i
     */
 }
 
-void cycles_mesh_tag_rebuild(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id)
+void cycles_mesh_tag_rebuild(unsigned int scene_id, unsigned int mesh_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -122,7 +122,7 @@ void cycles_mesh_tag_rebuild(unsigned int client_id, unsigned int scene_id, unsi
     */
 }
 
-void cycles_mesh_set_smooth(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, unsigned int smooth)
+void cycles_mesh_set_smooth(unsigned int scene_id, unsigned int mesh_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -140,7 +140,7 @@ void cycles_mesh_set_smooth(unsigned int client_id, unsigned int scene_id, unsig
 }
 
 
-void cycles_mesh_reserve(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
+void cycles_mesh_reserve(unsigned int scene_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -154,7 +154,7 @@ void cycles_mesh_reserve(unsigned int client_id, unsigned int scene_id, unsigned
     */
 }
 
-void cycles_mesh_resize(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
+void cycles_mesh_resize(unsigned int scene_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -169,7 +169,7 @@ void cycles_mesh_resize(unsigned int client_id, unsigned int scene_id, unsigned 
 }
 
 
-void cycles_mesh_set_verts(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, float *verts, unsigned int vcount)
+void cycles_mesh_set_verts(unsigned int scene_id, unsigned int mesh_id, float *verts, unsigned int vcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -185,7 +185,7 @@ void cycles_mesh_set_verts(unsigned int client_id, unsigned int scene_id, unsign
 			f3.x = verts[i];
 			f3.y = verts[i+1];
 			f3.z = verts[i+2];
-			//logger.logit(client_id, "v: ", f3.x, ",", f3.y, ",", f3.z);
+			//logger.logit("v: ", f3.x, ",", f3.y, ",", f3.z);
 			me->verts[j] = f3;
 			generated[j] = f3;
 		}
@@ -194,7 +194,7 @@ void cycles_mesh_set_verts(unsigned int client_id, unsigned int scene_id, unsign
     */
 }
 
-void cycles_mesh_set_tris(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_tris(unsigned int scene_id, unsigned int mesh_id, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -207,7 +207,7 @@ void cycles_mesh_set_tris(unsigned int client_id, unsigned int scene_id, unsigne
 
 		for (int i = 0, j = 0; i < (int)fcount*3; i += 3, j++)
 		{
-			//logger.logit(client_id, "f: ", faces[i], ",", faces[i + 1], ",", faces[i + 2]);
+			//logger.logit("f: ", faces[i], ",", faces[i + 1], ",", faces[i + 2]);
 			me->triangles[i] = faces[i];
 			me->triangles[i + 1] = faces[i + 1];
 			me->triangles[i + 2] = faces[i + 2];
@@ -216,12 +216,12 @@ void cycles_mesh_set_tris(unsigned int client_id, unsigned int scene_id, unsigne
 		}
 		me->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 
-		cycles_mesh_set_shader(client_id, scene_id, mesh_id, shader_id);
+		cycles_mesh_set_shader(scene_id, mesh_id, shader_id);
 	}
     */
 }
 
-void cycles_mesh_set_triangle(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_triangle(unsigned int scene_id, unsigned int mesh_id, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -238,7 +238,7 @@ void cycles_mesh_set_triangle(unsigned int client_id, unsigned int scene_id, uns
     */
 }
 
-void cycles_mesh_add_triangle(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_add_triangle(unsigned int scene_id, unsigned int mesh_id, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -251,7 +251,7 @@ void cycles_mesh_add_triangle(unsigned int client_id, unsigned int scene_id, uns
     */
 }
 
-void cycles_mesh_set_uvs(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, float *uvs, unsigned int uvcount, const char* uvmap_name)
+void cycles_mesh_set_uvs(unsigned int scene_id, unsigned int mesh_id, float *uvs, unsigned int uvcount, const char* uvmap_name)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -277,7 +277,7 @@ void cycles_mesh_set_uvs(unsigned int client_id, unsigned int scene_id, unsigned
     */
 }
 
-void cycles_mesh_set_vertex_normals(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, float *vnormals, unsigned int vnormalcount)
+void cycles_mesh_set_vertex_normals(unsigned int scene_id, unsigned int mesh_id, float *vnormals, unsigned int vnormalcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -302,7 +302,7 @@ void cycles_mesh_set_vertex_normals(unsigned int client_id, unsigned int scene_i
     */
 }
 
-void cycles_mesh_set_vertex_colors(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, float *vcolors, unsigned int vcolorcount)
+void cycles_mesh_set_vertex_colors(unsigned int scene_id, unsigned int mesh_id, float *vcolors, unsigned int vcolorcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -496,7 +496,7 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 }
 #endif
 
-void cycles_mesh_attr_tangentspace(unsigned int client_id, unsigned int scene_id, unsigned int mesh_id, const char* uvmap_name)
+void cycles_mesh_attr_tangentspace(unsigned int scene_id, unsigned int mesh_id, const char* uvmap_name)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;

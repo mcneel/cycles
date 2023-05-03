@@ -16,7 +16,7 @@ limitations under the License.
 
 #include "internal_types.h"
 
-unsigned int cycles_scene_add_object(unsigned int client_id, unsigned int scene_id)
+unsigned int cycles_scene_add_object(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -26,7 +26,7 @@ unsigned int cycles_scene_add_object(unsigned int client_id, unsigned int scene_
 		ob->set_tfm(ccl::transform_identity());
 		sce->objects.push_back(ob);
 
-		logger.logit(client_id, "Added object ", sce->objects.size() - 1, " to scene ", scene_id);
+		logger.logit("Added object ", sce->objects.size() - 1, " to scene ", scene_id);
 
 		ob->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
@@ -37,7 +37,7 @@ unsigned int cycles_scene_add_object(unsigned int client_id, unsigned int scene_
 	return UINT_MAX;
 }
 
-void cycles_scene_object_set_mesh(unsigned int client_id, unsigned int scene_id, unsigned int object_id, unsigned int mesh_id)
+void cycles_scene_object_set_mesh(unsigned int scene_id, unsigned int object_id, unsigned int mesh_id)
 {
     // TODO: XXXX revisit mesh adding
     /*
@@ -53,7 +53,7 @@ void cycles_scene_object_set_mesh(unsigned int client_id, unsigned int scene_id,
     */
 }
 
-void cycles_object_tag_update(unsigned int client_id, unsigned int scene_id, unsigned int object_id)
+void cycles_object_tag_update(unsigned int scene_id, unsigned int object_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -64,7 +64,7 @@ void cycles_object_tag_update(unsigned int client_id, unsigned int scene_id, uns
 	}
 }
 
-unsigned int cycles_scene_object_get_mesh(unsigned int client_id, unsigned int scene_id, unsigned int object_id)
+unsigned int cycles_scene_object_get_mesh(unsigned int scene_id, unsigned int object_id)
 {
     // TODO: XXXX revisit mesh access
     /*
@@ -180,7 +180,7 @@ void cycles_scene_object_set_ignore_cutout(unsigned int client, unsigned int sce
 	}*/
 }
 
-void _cycles_scene_object_set_transform(unsigned int client_id, unsigned int scene_id, unsigned int object_id, unsigned int transform_type,
+void _cycles_scene_object_set_transform(unsigned int scene_id, unsigned int object_id, unsigned int transform_type,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -207,32 +207,32 @@ void _cycles_scene_object_set_transform(unsigned int client_id, unsigned int sce
 	}
 }
 
-void cycles_scene_object_set_matrix(unsigned int client_id, unsigned int scene_id, unsigned int object_id,
+void cycles_scene_object_set_matrix(unsigned int scene_id, unsigned int object_id,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
 	)
 {
-	_cycles_scene_object_set_transform(client_id, scene_id, object_id, 0,
+	_cycles_scene_object_set_transform(scene_id, object_id, 0,
 		a, b, c, d,
 		e, f, g, h,
 		i, j, k, l);
 }
 
-void cycles_scene_object_set_ocs_frame(unsigned int client_id, unsigned int scene_id, unsigned int object_id,
+void cycles_scene_object_set_ocs_frame(unsigned int scene_id, unsigned int object_id,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
 	)
 {
-	_cycles_scene_object_set_transform(client_id, scene_id, object_id, 1,
+	_cycles_scene_object_set_transform(scene_id, object_id, 1,
 		a, b, c, d,
 		e, f, g, h,
 		i, j, k, l);
 }
 
 
-void cycles_object_set_pass_id(unsigned int client_id, unsigned int scene_id, unsigned int object_id, int pass_id)
+void cycles_object_set_pass_id(unsigned int scene_id, unsigned int object_id, int pass_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -242,7 +242,7 @@ void cycles_object_set_pass_id(unsigned int client_id, unsigned int scene_id, un
 	}
 }
 
-void cycles_object_set_random_id(unsigned int client_id, unsigned int scene_id, unsigned int object_id, unsigned int random_id)
+void cycles_object_set_random_id(unsigned int scene_id, unsigned int object_id, unsigned int random_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -252,7 +252,7 @@ void cycles_object_set_random_id(unsigned int client_id, unsigned int scene_id, 
 	}
 }
 
-void cycles_scene_clear_clipping_planes(unsigned int client_id, unsigned int scene_id)
+void cycles_scene_clear_clipping_planes(unsigned int scene_id)
 {
     // TODO: XXXX port clipping planes (or reimplement)
     /*
@@ -265,7 +265,7 @@ void cycles_scene_clear_clipping_planes(unsigned int client_id, unsigned int sce
     */
 }
 
-unsigned int cycles_scene_add_clipping_plane(unsigned int client_id, unsigned int scene_id, float a, float b, float c, float d)
+unsigned int cycles_scene_add_clipping_plane(unsigned int scene_id, float a, float b, float c, float d)
 {
     // TODO: XXXX port clipping planes (or reimplement)
     /*
@@ -275,7 +275,7 @@ unsigned int cycles_scene_add_clipping_plane(unsigned int client_id, unsigned in
 		ccl::float4 cp = ccl::make_float4(a, b, c, d);
 		sce->clipping_planes.push_back(cp);
 
-		logger.logit(client_id, "Added clipping plane ", sce->clipping_planes.size() - 1, " to scene ", scene_id);
+		logger.logit("Added clipping plane ", sce->clipping_planes.size() - 1, " to scene ", scene_id);
 
 		sce->object_manager->need_clipping_plane_update = true;
 
@@ -286,12 +286,12 @@ unsigned int cycles_scene_add_clipping_plane(unsigned int client_id, unsigned in
 	return UINT_MAX;
 }
 
-void cycles_scene_discard_clipping_plane(unsigned int client_id, unsigned int scene_id, unsigned int cp_id)
+void cycles_scene_discard_clipping_plane(unsigned int scene_id, unsigned int cp_id)
 {
-	cycles_scene_set_clipping_plane(client_id, scene_id, cp_id, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
+	cycles_scene_set_clipping_plane(scene_id, cp_id, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
 }
 
-void cycles_scene_set_clipping_plane(unsigned int client_id, unsigned int scene_id, unsigned int cp_id, float a, float b, float c, float d)
+void cycles_scene_set_clipping_plane(unsigned int scene_id, unsigned int cp_id, float a, float b, float c, float d)
 {
     // TODO: XXXX port clipping planes (or reimplement)
     /*
@@ -301,7 +301,7 @@ void cycles_scene_set_clipping_plane(unsigned int client_id, unsigned int scene_
 		ccl::float4 cp = ccl::make_float4(a, b, c, d);
 		sce->clipping_planes[cp_id] = cp;
 
-		logger.logit(client_id, "Setting clipping plane ", sce->clipping_planes.size() - 1, " to scene ", scene_id);
+		logger.logit("Setting clipping plane ", sce->clipping_planes.size() - 1, " to scene ", scene_id);
 
 		sce->object_manager->need_clipping_plane_update = true;
 	}

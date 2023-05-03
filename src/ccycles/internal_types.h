@@ -17,6 +17,8 @@ limitations under the License.
 #pragma once
 
 
+#include <algorithm>
+#include <unordered_set>
 #include <vector>
 #include <chrono>
 //#include <ctime>
@@ -83,7 +85,7 @@ public:
 	 * adds the head to logger_msg.
 	 */
 	template<typename T, typename... Tail>
-	void logit(unsigned int client_id, T head, Tail... tail) {
+	void logit(T head, Tail... tail) {
 		m.lock();
 		/* reset logger_msg */
 		logger_msg.str("");
@@ -101,14 +103,14 @@ public:
 		 * follow up :)
 		 */
 		logger_msg << tsstr << ": " << head;
-		logit_followup(client_id, tail...);
+		logit_followup( tail...);
 	}
 
 private:
 	template<typename T, typename... Tail>
-	void logit_followup(unsigned int client_id, T head, Tail... tail) {
+	void logit_followup(T head, Tail... tail) {
 		logger_msg << head;
-		logit_followup(client_id, tail...);
+		logit_followup(tail...);
 	}
 
 	/* The final logit function call that will realise the
@@ -116,11 +118,8 @@ private:
 	 * function. Upon completion reset the logger_msg to
 	 * an empty string.
 	 */
-	void logit_followup(unsigned int client_id) {
+	void logit_followup() {
 #if defined(DEBUG)
-		LOGGER_FUNC_CB logger_func = loggers[client_id];
-		if (logger_func) logger_func(logger_msg.str().c_str());
-
 		// also print to std::cout if wanted
 		if (tostdout) std::cout << logger_msg.str().c_str() << std::endl;
 #endif
@@ -302,7 +301,7 @@ public:
 extern std::vector<ccl::SceneParams*> scene_params;
 extern std::vector<ccl::DeviceInfo> devices;
 extern std::vector<ccl::DeviceInfo> multi_devices;
-extern std::vector<ccl::SessionParams*> session_params;
+extern std::unordered_set<ccl::SessionParams*> session_params;
 
 /* rhino procedural data */
 extern ccl::vector<float> ccycles_rhino_perlin_noise_table;
@@ -318,13 +317,13 @@ extern ccl::vector<float> ccycles_rhino_aaltonen_noise_table;
 extern ccl::Shader* find_shader_in_scene(ccl::Scene* sce, unsigned int shader_id);
 extern unsigned int get_idx_for_shader_in_scene(ccl::Scene* sce, ccl::Shader* sh);
 extern bool scene_find(unsigned int scid, CCScene** csce, ccl::Scene** sce);
-extern bool session_find(unsigned int sid, CCSession** ccsess, ccl::Session** session);
+extern bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session);
 extern void scene_clear_pointer(ccl::Scene* sce);
 extern void set_ccscene_null(unsigned int scene_id);
 
 extern void _cleanup_scenes();
 extern void _cleanup_sessions();
-extern void _init_shaders(unsigned int client_id, unsigned int scene_id);
+extern void _init_shaders(unsigned int scene_id);
 
 /********************************/
 /* Some useful defines			*/
@@ -335,21 +334,21 @@ extern void _init_shaders(unsigned int client_id, unsigned int scene_id);
 #define PARAM_BOOL(param_type, params_id, varname) \
 	if (0 <= params_id && params_id < param_type.size()) { \
 		param_type[params_id]-> varname = varname == 1; \
-		logger.logit(client_id, "Set " #param_type " " #varname " to ", varname); \
+		logger.logit("Set " #param_type " " #varname " to ", varname); \
 	}
 
 /* Set parameter varname of param_type. */
 #define PARAM(param_type, params_id, varname) \
 	if (0 <= params_id && params_id < param_type.size()) { \
 		param_type[params_id]-> varname = varname; \
-		logger.logit(client_id, "Set " #param_type " " #varname " to ", varname); \
+		logger.logit("Set " #param_type " " #varname " to ", varname); \
 	}
 
 /* Set parameter varname of param_type, casting to typecast*/
 #define PARAM_CAST(param_type, params_id, typecast, varname) \
 	if (0 <= params_id && params_id < param_type.size()) { \
 		param_type[params_id]-> varname = static_cast<typecast>(varname); \
-		logger.logit(client_id, "Set " #param_type " " #varname " to ", varname, " casting to " #typecast); \
+		logger.logit("Set " #param_type " " #varname " to ", varname, " casting to " #typecast); \
 	}
 
 #define LIGHT_FIND(scene_id, light_id) \
@@ -371,6 +370,6 @@ extern void _init_shaders(unsigned int client_id, unsigned int scene_id);
 	if (scene_find(scene_id, &csce, &sce)) { \
 		CCShader* sh = csce->shaders[shid]; \
 		sh->shader-> var = (type)(val); \
-		logger.logit(client_id, "Set " #var " of shader ", shid, " to ", val, " casting to " #type); \
+		logger.logit("Set " #var " of shader ", shid, " to ", val, " casting to " #type); \
 	}
 
