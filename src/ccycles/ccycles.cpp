@@ -43,15 +43,6 @@ Logger logger;
 
 std::vector<LOGGER_FUNC_CB> loggers;
 
-void _cleanup_loggers()
-{
-	for (int i = 0; i < loggers.size(); i++) {
-		loggers[i] = nullptr;
-	}
-
-	loggers.clear();
-}
-
 void cycles_path_init(const char* path, const char* user_path)
 {
 	ccl::path_init(std::string(path), std::string(user_path));
@@ -121,18 +112,12 @@ void cycles_debug_set_opencl_device_type(int type)
 
 void cycles_shutdown()
 {
-#ifdef WIN32
-	_set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
 	if (!initialised) {
 		return;
 	}
 
 	logger_func = nullptr;
 
-	_cleanup_loggers();
-
-	_cleanup_scenes();
 	_cleanup_sessions();
 }
 
@@ -141,30 +126,8 @@ void cycles_log_to_stdout(int tostdout)
 	logger.tostdout = tostdout == 1;
 }
 
-void cycles_set_logger(unsigned int client_id, LOGGER_FUNC_CB logger_func_)
+void cycles_set_logger(LOGGER_FUNC_CB logger_func_)
 {
-	loggers[client_id] = logger_func_;
-}
-
-unsigned int cycles_new_client()
-{
-	unsigned int logfunc_count{ 0 };
-	//std::vector<int*>* lotsonumbers = new std::vector<int*>(100000);
-	for(auto logfunc : loggers) {
-		if (logfunc == nullptr)
-		{
-			return logfunc_count;
-		}
-		++logfunc_count;
-	}
-	loggers.push_back(nullptr);
-	assert(loggers.size() == logfunc_count+1);
-	return logfunc_count;
-}
-
-void cycles_release_client(unsigned int client_id)
-{
-	loggers[client_id] = nullptr;
 }
 
 void cycles_f4_add(ccl::float4 a, ccl::float4 b, ccl::float4& res) {

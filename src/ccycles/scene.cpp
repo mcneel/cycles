@@ -108,42 +108,23 @@ bool CCScene::builtin_image_float_pixels(const std::string& builtin_name, void* 
 
 /* *** */
 
-void _cleanup_scenes()
-{
-	// clear out scene params vector
-	scene_params.clear();
-	auto scend = scenes.end();
-	auto scit = scenes.begin();
-
-	for (CCScene* sce : scenes) {
-		if (sce) {
-			if (sce->scene) {
-				delete sce->scene;
-			}
-			delete sce;
-		}
-	}
-
-	scenes.clear();
-}
-
-unsigned int cycles_scene_create(unsigned int client_id, unsigned int scene_params_id, unsigned int session_id)
+unsigned int cycles_scene_create(unsigned int scene_params_id, unsigned int session_id)
 {
 	return UINT_MAX;
 }
 
-void cycles_scene_set_default_surface_shader(unsigned int client_id, unsigned int scene_id, unsigned int shader_id)
+void cycles_scene_set_default_surface_shader(unsigned int scene_id, unsigned int shader_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
 	if(scene_find(scene_id, &csce, &sce)) {
 		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
 		sce->default_surface = sh;
-		logger.logit(client_id, "Scene ", scene_id, " set default surface shader ", shader_id);
+		logger.logit("Scene ", scene_id, " set default surface shader ", shader_id);
 	}
 }
 
-unsigned int cycles_scene_get_default_surface_shader(unsigned int client_id, unsigned int scene_id)
+unsigned int cycles_scene_get_default_surface_shader(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -154,7 +135,7 @@ unsigned int cycles_scene_get_default_surface_shader(unsigned int client_id, uns
 	return UINT_MAX;
 }
 
-void cycles_scene_reset(unsigned int client_id, unsigned int scene_id)
+void cycles_scene_reset(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -163,7 +144,7 @@ void cycles_scene_reset(unsigned int client_id, unsigned int scene_id)
 	}
 }
 
-bool cycles_scene_try_lock(unsigned int client_id, unsigned int scene_id)
+bool cycles_scene_try_lock(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -173,7 +154,7 @@ bool cycles_scene_try_lock(unsigned int client_id, unsigned int scene_id)
 	return false;
 }
 
-void cycles_scene_lock(unsigned int client_id, unsigned int scene_id)
+void cycles_scene_lock(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
@@ -182,7 +163,7 @@ void cycles_scene_lock(unsigned int client_id, unsigned int scene_id)
 	}
 }
 
-void cycles_scene_unlock(unsigned int client_id, unsigned int scene_id)
+void cycles_scene_unlock(unsigned int scene_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
