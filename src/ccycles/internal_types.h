@@ -43,6 +43,7 @@ limitations under the License.
 #include "scene/object.h"
 #include "scene/scene.h"
 #include "session/session.h"
+#include "session/display_driver.h"
 #include "session/output_driver.h"
 #include "scene/shader.h"
 
@@ -151,23 +152,52 @@ struct CCImage {
 };
 
 class CCyclesDebugDriver : public ccl::OutputDriver {
-public:
-	typedef std::function<void(const std::string &)> LogFunction;
+	public:
+		typedef std::function<void(const std::string &)> LogFunction;
 
-	CCyclesDebugDriver(LogFunction log);
-	virtual ~CCyclesDebugDriver();
+		CCyclesDebugDriver(LogFunction log);
+		virtual ~CCyclesDebugDriver();
 
-	void write_render_tile(const Tile &tile) override;
-protected:
-	LogFunction log_;
+		void write_render_tile(const Tile &tile) override;
+
+	protected:
+		LogFunction log_;
+};
+
+class CCyclesDisplayDriver : public ccl::DisplayDriver {
+	public:
+		typedef std::function<void(const std::string &)> LogFunction;
+
+		CCyclesDisplayDriver(std::vector<float> *pixels, LogFunction log);
+		virtual ~CCyclesDisplayDriver();
+
+		virtual void next_tile_begin() override;
+		virtual bool update_begin(const Params &params, int width, int height) override;
+		virtual void update_end() override;
+		virtual ccl::half4 *map_texture_buffer() override;
+		virtual void unmap_texture_buffer() override;
+		virtual void clear() override;
+		virtual void draw(const Params &params) override;
+
+// Optional
+
+		virtual GraphicsInterop graphics_interop_get() override;
+		virtual void graphics_interop_activate() override;
+		virtual void graphics_interop_deactivate() override;
+
+	protected:
+		LogFunction log_;
+
+		std::vector<ccl::half4> pixels;
+		std::vector<float>* float_pixels;
 };
 
 class CCSession final {
 public:
 	unsigned int id{ 0 };
 	ccl::SessionParams params;
-		ccl::SceneParams scene_params;
-		ccl::Session* session = nullptr;
+	ccl::SceneParams scene_params;
+	ccl::Session* session = nullptr;
 
 	/* The status update handler for ccl::Session update callback.
 	 */
@@ -192,6 +222,8 @@ public:
 	int height{ 0 };
 
 	ccl::BufferParams buffer_params;
+
+	std::unique_ptr<std::vector<float>> float_pixels;
 
 	/* Create a new CCSession, initialise all necessary memory. */
 	static CCSession* create(int width, int height, unsigned int buffer_stride);

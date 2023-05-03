@@ -192,6 +192,7 @@ CCSession* CCSession::create(int width, int height, unsigned int buffer_stride) 
 	CCSession* se = new CCSession();
 	se->width = width;
 	se->height = height;
+	se->float_pixels = std::make_unique<std::vector<float>>(width * height * buffer_stride);
 	se->_size_has_changed = false;
 
 	return se;
@@ -261,6 +262,88 @@ void CCyclesDebugDriver::write_render_tile(const Tile &tile)
 	image_output->close();
 }
 
+CCyclesDisplayDriver::CCyclesDisplayDriver(std::vector<float> *float_pixels,
+										   CCyclesDisplayDriver::LogFunction log)
+	: float_pixels(float_pixels)
+	, log_(log)
+{
+}
+
+CCyclesDisplayDriver::~CCyclesDisplayDriver()
+{
+}
+
+void CCyclesDisplayDriver::next_tile_begin()
+{
+	int a = 0;
+}
+
+bool CCyclesDisplayDriver::update_begin(const Params &params, int width, int height)
+{
+	size_t half4_count = width * height;
+	pixels.resize(half4_count);
+
+	return true;
+}
+
+void CCyclesDisplayDriver::update_end()
+{
+	if (float_pixels) {
+		float_pixels->resize(pixels.size() * 4);
+
+		for (int i = 0, p = 0; i < pixels.size(); i++) {
+			(*float_pixels)[p++] = half_to_float_image(pixels[i].x);
+			(*float_pixels)[p++] = half_to_float_image(pixels[i].y);
+			(*float_pixels)[p++] = half_to_float_image(pixels[i].z);
+			(*float_pixels)[p++] = half_to_float_image(pixels[i].w);
+		}
+	}
+}
+
+ccl::half4 *CCyclesDisplayDriver::map_texture_buffer()
+{
+	return pixels.data();
+}
+
+void CCyclesDisplayDriver::unmap_texture_buffer()
+{
+	int a = 0;
+}
+
+void CCyclesDisplayDriver::clear()
+{
+	static ccl::half halfzero = float_to_half_image(0.0f);
+	static ccl::half halfone = float_to_half_image(1.0f);
+
+	for (int i = 0; i < pixels.size(); i++) {
+		pixels[i].x = halfzero;
+		pixels[i].y = halfzero;
+		pixels[i].z = halfzero;
+		pixels[i].w = halfone;
+	}
+}
+
+void CCyclesDisplayDriver::draw(const Params &params)
+{
+	int a = 0;
+}
+
+CCyclesDisplayDriver::GraphicsInterop CCyclesDisplayDriver::graphics_interop_get()
+{
+	int a = 0;
+	return GraphicsInterop();
+}
+
+void CCyclesDisplayDriver::graphics_interop_activate()
+{
+	int a = 0;
+}
+
+void CCyclesDisplayDriver::graphics_interop_deactivate()
+{
+	int a = 0;
+}
+
 static void log_print(const std::string& msg)
 {
 	std::cout << msg << std::endl;
@@ -268,7 +351,7 @@ static void log_print(const std::string& msg)
 	OutputDebugString("\n");
 }
 
-static void prep_session(ccl::Session *session)
+static void prep_session(ccl::Session *session, std::vector<float>* output_pixel_buffer)
 {
 	ccl::Camera *cam = session->scene->camera;
 	cam->set_full_height(512);
@@ -278,7 +361,9 @@ static void prep_session(ccl::Session *session)
 	cam->update(session->scene);
 
 
-	session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
+	//session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
+	session->set_display_driver(
+		std::make_unique<CCyclesDisplayDriver>(output_pixel_buffer, log_print));
 
 	/* add pass for output. */
 	ccl::Pass *pass = session->scene->create_node<ccl::Pass>();
@@ -344,7 +429,7 @@ unsigned int cycles_session_create(unsigned int client_id, unsigned int session_
 
 	session->session = new ccl::Session(session->params, session->scene_params);
 
-	prep_session(session->session);
+	prep_session(session->session, session->float_pixels.get());
 
 	ccl::BufferParams bparam;
 	bparam.width = 512;
@@ -678,7 +763,7 @@ int cycles_session_sample(unsigned int client_id, unsigned int session_id)
 		return -13;
 	}
 		*/
-	return -1;
+	return 1;
 }
 
 void cycles_session_wait(unsigned int client_id, unsigned int session_id)
@@ -738,20 +823,19 @@ void cycles_session_copy_buffer(unsigned int client_id, unsigned int session_id,
 
 void cycles_session_get_float_buffer(unsigned int client_id, unsigned int session_id, int passtype, float** pixels)
 {
-		// TODO: XXXX use output driver instead
-		/*
-	ccl::DeviceDrawParams draw_params = ccl::DeviceDrawParams();
-	draw_params.bind_display_space_shader_cb = nullptr;
-	draw_params.unbind_display_space_shader_cb = nullptr;
 
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
-		if (ccl::Pass::contains(ccsess->buffer_params.passes, (ccl::PassType)passtype) && session->display_buffers[(ccl::PassType)passtype]) {
-			*pixels = (float*)session->display_buffers[(ccl::PassType)passtype]->prepare_pixels(session->device, draw_params);
+		if (ccsess)
+		{
+			size_t pixel_count = ccsess->width * ccsess->height;
+			std::vector<float> *session_float_pixels = ccsess->float_pixels.get();
+			if (session_float_pixels) {
+				*pixels = session_float_pixels->data();
+			}
 		}
 	}
-		*/
 }
 
 void cycles_progress_reset(unsigned int client_id, unsigned int session_id)
