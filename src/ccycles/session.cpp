@@ -17,6 +17,8 @@ limitations under the License.
 #include <iostream>
 #include <filesystem>
 #include <cstdlib>
+#include <numeric>
+#include <random>
 
 namespace fs = std::filesystem;
 
@@ -398,8 +400,11 @@ static void prep_session(ccl::Session *session, std::vector<float>* output_pixel
 	shn = (ShaderNode *)ntype->create(ntype);
 	shn->set_owner(graph);
 	{
+		std::random_device r;
+		std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
+		std::uniform_real_distribution<> dist(0.0, 1.0);
 		ccl::BackgroundNode *bgn = (ccl::BackgroundNode *)shn;
-		bgn->set_color(ccl::make_float3(0.9, 0.6, 0.3));
+		bgn->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
 		bgn->set_strength(1.5f);
 	}
 	graph->add(shn);
@@ -416,7 +421,7 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 	int csesid{ -1 };
 	int hid{ 0 };
 
-	CCSession* session = CCSession::create(512, 512, 4);
+	CCSession* session = CCSession::create(10, 10, 4);
 
 	// TODO: XXXX these are hardcoded params/sceneparams
 	session->params.background = true;
@@ -445,7 +450,7 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 	bparam.full_width = 512;
 	bparam.full_height = 512;
 
-	session->session->reset(*params, bparam);
+	//session->session->reset(*params, bparam);
 
 	for(CCSession* csess : sessions) {
 		if(csess==nullptr) {
@@ -582,21 +587,29 @@ int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned 
 			ccsess->buffer_params.width = width;
 			ccsess->buffer_params.height = height;
 
+			ccsess->float_pixels.get()->reserve(full_width * full_height * 4);
+
 			ccsess->params.samples = samples;
 
-			ccl::vector<ccl::Pass>& passes = get_passes(session_id);
+			// TODO: XXXX remove temporary camera adjustment
+			ccl::Camera *cam = session->scene->camera;
+			cam->set_full_width(full_width);
+			cam->set_full_height(full_height);
+			cam->compute_auto_viewplane();
+			cam->need_flags_update = true;
+			cam->update(session->scene);
 
-						// TODO: XXXX Passes rework
-						/*
+
+			// TODO: XXXX Passes rework
+			/*
+			ccl::vector<ccl::Pass>& passes = get_passes(session_id);
 			session->scene->film->tag_passes_update(session->scene, passes);
 			session->scene->film->display_pass = ccl::PassType::PASS_COMBINED;
 			session->scene->film->tag_update(session->scene);
 
 			ccsess->buffer_params.passes = passes;
-
-
-			session->reset(ccsess->buffer_params, (int)samples);
-						*/
+			*/
+			session->reset(ccsess->params, ccsess->buffer_params);
 		}
 		catch (CyclesRenderCrashException)
 		{
@@ -844,7 +857,7 @@ void cycles_session_get_float_buffer(ccl::Session* session_id, int passtype, flo
 	if (session_find(session_id, &ccsess, &session)) {
 		if (ccsess)
 		{
-			size_t pixel_count = ccsess->width * ccsess->height;
+			size_t pixel_count = ccsess->buffer_params.width * ccsess->buffer_params.height;
 			std::vector<float> *session_float_pixels = ccsess->float_pixels.get();
 			if (session_float_pixels) {
 				*pixels = session_float_pixels->data();
