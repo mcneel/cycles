@@ -163,11 +163,30 @@ class CCyclesDebugDriver : public ccl::OutputDriver {
 		LogFunction log_;
 };
 
+class CCyclesOutputDriver : public ccl::OutputDriver {
+	public:
+		typedef std::function<void(const std::string &)> LogFunction;
+
+		CCyclesOutputDriver(std::mutex *pixels_mutex, std::vector<float> *pixels, LogFunction log);
+		virtual ~CCyclesOutputDriver();
+
+		virtual void write_render_tile(const Tile &tile) override;
+		virtual bool update_render_tile(const Tile & /* tile */) override;
+
+	protected:
+		LogFunction log_;
+
+		std::mutex *pixels_mutex;
+		std::vector<float> *pixels;
+};
+
 class CCyclesDisplayDriver : public ccl::DisplayDriver {
 	public:
 		typedef std::function<void(const std::string &)> LogFunction;
 
-		CCyclesDisplayDriver(std::vector<float> *pixels, LogFunction log);
+		CCyclesDisplayDriver(std::mutex *pixels_mutex,
+							 std::vector<float> *pixels,
+							 LogFunction log);
 		virtual ~CCyclesDisplayDriver();
 
 		virtual void next_tile_begin() override;
@@ -187,8 +206,10 @@ class CCyclesDisplayDriver : public ccl::DisplayDriver {
 	protected:
 		LogFunction log_;
 
-		std::vector<ccl::half4> pixels;
-		std::vector<float>* float_pixels;
+		std::vector<ccl::half4> pixels_half4;
+
+		std::mutex *pixels_mutex;
+		std::vector<float>* pixels;
 };
 
 class CCSession final {
@@ -222,7 +243,8 @@ public:
 
 	ccl::BufferParams buffer_params;
 
-	std::unique_ptr<std::vector<float>> float_pixels;
+	std::mutex pixels_mutex;
+	std::vector<float> pixels;
 
 	/* Create a new CCSession, initialise all necessary memory. */
 	static CCSession* create(int width, int height, unsigned int buffer_stride);
