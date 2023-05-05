@@ -979,15 +979,11 @@ void cycles_progress_reset(ccl::Session *session_id)
 
 int cycles_progress_get_sample(ccl::Session* session_id)
 {
-		// TODO: revisit result acquisition
-		/*
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
-		ccl::TileManager &tm = session->tile_manager;
-		return tm.state.sample;
+		return session->progress.get_current_sample();
 	}
-		*/
 	return INT_MIN;
 }
 
