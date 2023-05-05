@@ -150,6 +150,25 @@ struct CCImage {
 		bool is_float;
 };
 
+class CCyclesPasses {
+	public:
+		CCyclesPasses();
+
+	public:
+		void lock();
+		void unlock();
+
+		ccl::PassType get_pass_type() const;
+		void set_pass_type(ccl::PassType value);
+
+		std::vector<float> &pixels();
+
+	private:
+		std::mutex m_lock;
+		ccl::PassType m_pass_type;
+		std::vector<float> m_pixels;
+};
+
 class CCyclesDebugDriver : public ccl::OutputDriver {
 	public:
 		typedef std::function<void(const std::string &)> LogFunction;
@@ -167,7 +186,7 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 	public:
 		typedef std::function<void(const std::string &)> LogFunction;
 
-		CCyclesOutputDriver(std::mutex *pixels_mutex, std::vector<float> *pixels, LogFunction log);
+		CCyclesOutputDriver(CCyclesPasses* passes, LogFunction log);
 		virtual ~CCyclesOutputDriver();
 
 		virtual void write_render_tile(const Tile &tile) override;
@@ -175,17 +194,13 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 
 	protected:
 		LogFunction log_;
-
-		std::mutex *pixels_mutex;
-		std::vector<float> *pixels;
 };
 
 class CCyclesDisplayDriver : public ccl::DisplayDriver {
 	public:
 		typedef std::function<void(const std::string &)> LogFunction;
 
-		CCyclesDisplayDriver(std::mutex *pixels_mutex,
-							 std::vector<float> *pixels,
+		CCyclesDisplayDriver(CCyclesPasses *passes,
 							 LogFunction log);
 		virtual ~CCyclesDisplayDriver();
 
@@ -208,8 +223,7 @@ class CCyclesDisplayDriver : public ccl::DisplayDriver {
 
 		std::vector<ccl::half4> pixels_half4;
 
-		std::mutex *pixels_mutex;
-		std::vector<float>* pixels;
+		CCyclesPasses *passes;
 };
 
 class CCSession final {
@@ -243,8 +257,7 @@ public:
 
 	ccl::BufferParams buffer_params;
 
-	std::mutex pixels_mutex;
-	std::vector<float> pixels;
+	CCyclesPasses passes;
 
 	/* Create a new CCSession, initialise all necessary memory. */
 	static CCSession* create(int width, int height, unsigned int buffer_stride);
