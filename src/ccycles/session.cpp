@@ -205,7 +205,6 @@ CCSession* CCSession::create(int width, int height, unsigned int buffer_stride) 
 	CCSession* se = new CCSession();
 	se->width = width;
 	se->height = height;
-	se->pixels.resize(width * height * buffer_stride);
 	se->_size_has_changed = false;
 
 	return se;
@@ -215,6 +214,35 @@ bool CCSession::size_has_changed() {
 	bool rc = _size_has_changed;
 	_size_has_changed = false;
 	return rc;
+}
+
+CCyclesPasses::CCyclesPasses() : m_lock(), m_pass_type(PASS_COMBINED), m_pixels()
+{
+}
+
+void CCyclesPasses::lock()
+{
+	m_lock.lock();
+}
+
+void CCyclesPasses::unlock()
+{
+	m_lock.unlock();
+}
+
+ccl::PassType CCyclesPasses::get_pass_type() const
+{
+	return m_pass_type;
+}
+
+void CCyclesPasses::set_pass_type(ccl::PassType value)
+{
+	m_pass_type = value;
+}
+
+std::vector<float> &CCyclesPasses::pixels()
+{
+	return m_pixels;
 }
 
 CCyclesDebugDriver::CCyclesDebugDriver(CCyclesDebugDriver::LogFunction log) : log_(log) {}
@@ -275,11 +303,9 @@ void CCyclesDebugDriver::write_render_tile(const Tile &tile)
 	image_output->close();
 }
 
-CCyclesOutputDriver::CCyclesOutputDriver(std::mutex *pixels_mutex,
-										 std::vector<float> *pixels,
+CCyclesOutputDriver::CCyclesOutputDriver(CCyclesPasses *passes,
 										 CCyclesOutputDriver::LogFunction log)
-	: pixels_mutex(pixels_mutex)
-	, pixels(pixels)
+	: passes(passes)
 	, log_(log)
 {
 }
@@ -290,61 +316,62 @@ CCyclesOutputDriver::~CCyclesOutputDriver()
 
 void CCyclesOutputDriver::write_render_tile(const Tile &tile)
 {
-	if (pixels_mutex == nullptr)
-		return;
-
-	if (pixels == nullptr)
+	if (passes == nullptr)
 		return;
 
 	log_(string_printf(
 		"Handling tile layer %s, size %d %d", tile.layer.c_str(), tile.size.x, tile.size.y));
 
-	pixels_mutex->lock();
+	passes->lock();
+
+	PassInfo pass_info = Pass::get_info(passes->get_pass_type());
 
 	const int width = tile.size.x;
 	const int height = tile.size.y;
-	pixels->resize(width * height * 4);
+	passes->pixels().resize(width * height * pass_info.num_components);
 
-	if (!tile.get_pass_pixels("combined", 4, pixels->data())) {
+	if (!tile.get_pass_pixels(pass_type_as_string(passes->get_pass_type()),
+							  pass_info.num_components,
+							  passes->pixels().data())) {
 		log_("Failed to read render pass pixels");
-		return;
 	}
 
-	pixels_mutex->unlock();
+	passes->unlock();
 }
 
 bool CCyclesOutputDriver::update_render_tile(const Tile &tile)
 {
-	if (pixels_mutex == nullptr)
-		return false;
+	bool rc = true;
 
-	if (pixels == nullptr)
+	if (passes == nullptr)
 		return false;
 
 	log_(string_printf(
 		"Handling tile layer %s, size %d %d", tile.layer.c_str(), tile.size.x, tile.size.y));
 
-	pixels_mutex->lock();
+	passes->lock();
+
+	PassInfo pass_info = Pass::get_info(passes->get_pass_type());
 
 	const int width = tile.size.x;
 	const int height = tile.size.y;
-	pixels->resize(width * height * 4);
+	passes->pixels().resize(width * height * pass_info.num_components);
 
-	if (!tile.get_pass_pixels("combined", 4, pixels->data())) {
+	if (!tile.get_pass_pixels(pass_type_as_string(passes->get_pass_type()),
+							  pass_info.num_components,
+							  passes->pixels().data())) {
 		log_("Failed to read render pass pixels");
-		return false;
+		rc = false;
 	}
 
-	pixels_mutex->unlock();
+	passes->unlock();
 
-	return true;
+	return rc;
 }
 
-CCyclesDisplayDriver::CCyclesDisplayDriver(std::mutex *pixels_mutex,
-										   std::vector<float> *float_pixels,
+CCyclesDisplayDriver::CCyclesDisplayDriver(CCyclesPasses *passes,
 										   CCyclesDisplayDriver::LogFunction log)
-	: pixels_mutex(pixels_mutex)
-	, pixels(pixels)
+	: passes(passes)
 	, log_(log)
 {
 }
@@ -368,24 +395,23 @@ bool CCyclesDisplayDriver::update_begin(const Params &params, int width, int hei
 
 void CCyclesDisplayDriver::update_end()
 {
-	if (pixels_mutex == nullptr)
+	if (passes == nullptr)
 		return;
 
-	if (pixels == nullptr)
-		return;
+	passes->lock();
 
-	pixels_mutex->lock();
+	std::vector<float> &pixels = passes->pixels();
 
-	pixels->resize(pixels_half4.size() * 4);
+	pixels.resize(pixels_half4.size() * 4);
 
 	for (int i = 0, p = 0; i < pixels_half4.size(); i++) {
-		(*pixels)[p++] = half_to_float_image(pixels_half4[i].x);
-		(*pixels)[p++] = half_to_float_image(pixels_half4[i].y);
-		(*pixels)[p++] = half_to_float_image(pixels_half4[i].z);
-		(*pixels)[p++] = half_to_float_image(pixels_half4[i].w);
+		pixels[p++] = half_to_float_image(pixels_half4[i].x);
+		pixels[p++] = half_to_float_image(pixels_half4[i].y);
+		pixels[p++] = half_to_float_image(pixels_half4[i].z);
+		pixels[p++] = half_to_float_image(pixels_half4[i].w);
 	}
 
-	pixels_mutex->unlock();
+	passes->unlock();
 }
 
 ccl::half4 *CCyclesDisplayDriver::map_texture_buffer()
@@ -440,8 +466,7 @@ static void log_print(const std::string& msg)
 }
 
 static void prep_session(ccl::Session *session,
-						 std::mutex *pixels_mutex,
-						 std::vector<float> *output_pixels)
+						 CCyclesPasses* passes)
 {
 	ccl::Camera *cam = session->scene->camera;
 	cam->set_full_height(512);
@@ -450,17 +475,20 @@ static void prep_session(ccl::Session *session,
 	cam->need_flags_update = true;
 	cam->update(session->scene);
 
-
-	//session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
-	session->set_output_driver(
-		std::make_unique<CCyclesOutputDriver>(pixels_mutex, output_pixels, log_print));
-	//session->set_display_driver(
-	//	std::make_unique<CCyclesDisplayDriver>(pixels_mutex, output_pixels, log_print));
-
 	/* add pass for output. */
 	ccl::Pass *pass = session->scene->create_node<ccl::Pass>();
+	//pass->set_name(ustring("combined"));
+	//pass->set_type(PASS_COMBINED);
 	pass->set_name(ustring("combined"));
 	pass->set_type(PASS_COMBINED);
+
+	{
+		passes->set_pass_type(PASS_COMBINED);
+		auto output_driver = std::make_unique<CCyclesOutputDriver>(passes, log_print);
+		session->set_output_driver(std::move(output_driver));
+		// session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
+		// session->set_display_driver(std::make_unique<CCyclesDisplayDriver>(passes, log_print));
+	}
 
 	ccl::Scene *scene = session->scene;
 	ccl::Integrator *integrator = scene->integrator;
@@ -521,7 +549,7 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 
 	session->session = new ccl::Session(session->params, session->scene_params);
 
-	prep_session(session->session, &session->pixels_mutex, &session->pixels);
+	prep_session(session->session, &session->passes);
 
 	ccl::BufferParams bparam;
 	bparam.width = 512;
@@ -665,8 +693,6 @@ int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned 
 			ccsess->buffer_params.full_height = full_height;
 			ccsess->buffer_params.width = width;
 			ccsess->buffer_params.height = height;
-
-			ccsess->pixels.reserve(full_width * full_height * 4);
 
 			ccsess->params.samples = samples;
 
@@ -950,8 +976,10 @@ void cycles_session_retain_float_buffer(ccl::Session *session_id,
 	ccl::Session *session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		if (ccsess) {
-			ccsess->pixels_mutex.lock();
-			*pixels = ccsess->pixels.data();
+			ccsess->passes.lock();
+			if (passtype == ccsess->passes.get_pass_type()) {
+				*pixels = ccsess->passes.pixels().data();
+			}
 		}
 	}
 }
@@ -963,7 +991,7 @@ void cycles_session_release_float_buffer(ccl::Session *session_id,
 	ccl::Session *session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		if (ccsess) {
-			ccsess->pixels_mutex.unlock();
+			ccsess->passes.unlock();
 		}
 	}
 }
