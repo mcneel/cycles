@@ -150,9 +150,9 @@ struct CCImage {
 		bool is_float;
 };
 
-class CCyclesPasses {
+class CCyclesPassOutput {
 	public:
-		CCyclesPasses();
+		CCyclesPassOutput();
 
 	public:
 		void lock();
@@ -186,7 +186,7 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 	public:
 		typedef std::function<void(const std::string &)> LogFunction;
 
-		CCyclesOutputDriver(CCyclesPasses* passes, LogFunction log);
+		CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *passes, LogFunction log);
 		virtual ~CCyclesOutputDriver();
 
 		virtual void write_render_tile(const Tile &tile) override;
@@ -194,13 +194,15 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 
 	protected:
 		LogFunction log_;
+
+		std::vector<std::unique_ptr<CCyclesPassOutput>> *passes;
 };
 
 class CCyclesDisplayDriver : public ccl::DisplayDriver {
 	public:
 		typedef std::function<void(const std::string &)> LogFunction;
 
-		CCyclesDisplayDriver(CCyclesPasses *passes,
+		CCyclesDisplayDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *passes,
 							 LogFunction log);
 		virtual ~CCyclesDisplayDriver();
 
@@ -223,7 +225,7 @@ class CCyclesDisplayDriver : public ccl::DisplayDriver {
 
 		std::vector<ccl::half4> pixels_half4;
 
-		CCyclesPasses *passes;
+		std::vector<std::unique_ptr<CCyclesPassOutput>> *passes;
 };
 
 class CCSession final {
@@ -257,7 +259,7 @@ public:
 
 	ccl::BufferParams buffer_params;
 
-	CCyclesPasses passes;
+	std::vector<std::unique_ptr<CCyclesPassOutput>> passes;
 
 	/* Create a new CCSession, initialise all necessary memory. */
 	static CCSession* create(int width, int height, unsigned int buffer_stride);
