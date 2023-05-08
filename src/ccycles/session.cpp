@@ -39,7 +39,7 @@ namespace fs = std::filesystem;
 using namespace ccl;
 
 /* Hold all created sessions. */
-std::vector<CCSession*> sessions;
+std::unordered_set<CCSession*> sessions;
 
 /* Four vectors to hold registered callback functions.
  * For each created session a corresponding idx into these
@@ -565,37 +565,14 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 	bparam.full_width = 512;
 	bparam.full_height = 512;
 
-	//session->session->reset(*params, bparam);
-
-	for(CCSession* csess : sessions) {
-		if(csess==nullptr) {
-			csesid = hid;
-			break;
-		}
-		hid++;
-	}
-
-	if (csesid == -1) {
-		sessions.push_back(session);
-		csesid = (unsigned int)(sessions.size() - 1);
-		status_cbs.push_back(nullptr);
-		cancel_cbs.push_back(nullptr);
-		update_cbs.push_back(nullptr);
-		write_cbs.push_back(nullptr);
-		display_update_cbs.push_back(nullptr);
-		passes_vec.insert(std::make_pair(session->session, new ccl::vector<ccl::Pass>()));
-	}
-	else {
-		sessions[csesid] = session;
-		status_cbs[csesid] = nullptr;
-		update_cbs[csesid] = nullptr;
-		write_cbs[csesid] = nullptr;
-		display_update_cbs[csesid] = nullptr;
-		passes_vec[session->session]->clear();
-	}
-
-
-	session->id = csesid;
+	sessions.insert(session);
+	csesid = (unsigned int)(sessions.size() - 1);
+	status_cbs.push_back(nullptr);
+	cancel_cbs.push_back(nullptr);
+	update_cbs.push_back(nullptr);
+	write_cbs.push_back(nullptr);
+	display_update_cbs.push_back(nullptr);
+	passes_vec.insert(std::make_pair(session->session, new ccl::vector<ccl::Pass>()));
 
 	return session->session;
 }
@@ -632,7 +609,7 @@ void cycles_session_destroy(ccl::Session* session_id, unsigned int scene_id)
 		}
 		*/
 
-		sessions[ccsess->id] = nullptr;
+		sessions.erase(ccsess);
 		delete ccsess;
 
 
