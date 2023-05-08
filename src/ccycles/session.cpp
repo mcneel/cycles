@@ -482,21 +482,9 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	cam->need_flags_update = true;
 	cam->update(session->scene);
 
-	/* add pass for output. */
-	ccl::Pass *pass = session->scene->create_node<ccl::Pass>();
-	pass->set_name(ustring("combined"));
-	pass->set_type(PASS_COMBINED);
-
-	{
-		std::unique_ptr<CCyclesPassOutput> pass = std::make_unique<CCyclesPassOutput>();
-		pass->set_pass_type(PASS_COMBINED);
-		passes->push_back(std::move(pass));
-	}
-	{
-		session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print));
-		//session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
-		//session->set_display_driver(std::make_unique<CCyclesDisplayDriver>(passes, log_print));
-	}
+	session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print));
+	//session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
+	//session->set_display_driver(std::make_unique<CCyclesDisplayDriver>(passes, log_print));
 
 	ccl::Scene *scene = session->scene;
 	ccl::Integrator *integrator = scene->integrator;
@@ -602,49 +590,38 @@ void cycles_session_destroy(ccl::Session* session_id)
 	}
 }
 
-ccl::vector<ccl::Pass>& get_passes(ccl::Session* session_id) {
-	ccl::vector<ccl::Pass>* passes = passes_vec[session_id];
-
-	return *passes;
-}
-
 void cycles_session_clear_passes(ccl::Session* session_id)
 {
-	ccl::vector<ccl::Pass>& passes = get_passes(session_id);
+	ccl::vector<ccl::Pass*>& passes = session_id->scene->passes;
+	for (ccl::Pass *pass : passes) {
+		session_id->scene->delete_node(pass);
+	}
+
 	passes.clear();
+
+	ccl::Session *session = nullptr;
+	CCSession *ccsess = nullptr;
+	if (session_find(session_id, &ccsess, &session)) {
+		ccsess->passes.clear();
+	}
 }
 
-void cycles_session_add_pass(ccl::Session* session_id, int pass_id)
+void cycles_session_add_pass(ccl::Session *session_id, int pass_id)
 {
 	ccl::PassType passtype = (ccl::PassType)pass_id;
-	ccl::vector<ccl::Pass>& passes = get_passes(session_id);
-  /*
-	switch (passtype) {
-		case ccl::PASS_COMBINED:
-			ccl::Pass::add(passtype, passes, "Combined");
-			break;
-		case ccl::PASS_DEPTH:
-			ccl::Pass::add(passtype, passes, "Depth");
-			break;
-		case ccl::PASS_NORMAL:
-			ccl::Pass::add(passtype, passes, "Normal");
-			break;
-		case ccl::PASS_DIFFUSE_COLOR:
-			ccl::Pass::add(passtype, passes, "DiffCol");
-			break;
-		case ccl::PASS_OBJECT_ID:
-			ccl::Pass::add(passtype, passes, "IndexOB");
-			break;
-		case ccl::PASS_MATERIAL_ID:
-			ccl::Pass::add(passtype, passes, "IndexMA");
-			break;
-		case ccl::PASS_UV:
-			ccl::Pass::add(passtype, passes, "UV");
-			break;
-		default:
-			break;
+
+	ccl::Pass *pass = session_id->scene->create_node<ccl::Pass>();
+	pass->set_name(ustring(pass_type_as_string(passtype)));
+	pass->set_type(passtype);
+
+	ccl::Session *session = nullptr;
+	CCSession *ccsess = nullptr;
+	if (session_find(session_id, &ccsess, &session)) {
+		std::unique_ptr<CCyclesPassOutput> pass = std::make_unique<CCyclesPassOutput>();
+		pass->set_pass_type(passtype);
+
+		ccsess->passes.push_back(std::move(pass));
 	}
-		*/
 }
 
 
@@ -675,16 +652,6 @@ int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned 
 			cam->need_flags_update = true;
 			cam->update(session->scene);
 
-
-			// TODO: XXXX Passes rework
-			/*
-			ccl::vector<ccl::Pass>& passes = get_passes(session_id);
-			session->scene->film->tag_passes_update(session->scene, passes);
-			session->scene->film->display_pass = ccl::PassType::PASS_COMBINED;
-			session->scene->film->tag_update(session->scene);
-
-			ccsess->buffer_params.passes = passes;
-			*/
 			session->reset(ccsess->params, ccsess->buffer_params);
 		}
 		catch (CyclesRenderCrashException)
