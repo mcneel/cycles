@@ -21,13 +21,12 @@ limitations under the License.
 
 using namespace OIIO;
 
-unsigned int cycles_scene_add_mesh(unsigned int scene_id, unsigned int shader_id)
+unsigned int cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* mesh = new ccl::Mesh();
 
 		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
@@ -35,7 +34,7 @@ unsigned int cycles_scene_add_mesh(unsigned int scene_id, unsigned int shader_id
 		mesh->used_shaders.push_back(sh);
 		sce->meshes.push_back(mesh);
 
-		logger.logit("Add mesh ", sce->meshes.size() - 1, " in scene ", scene_id, " using default surface shader ", shader_id);
+		logger.logit("Add mesh ", sce->meshes.size() - 1, " in scene ", session_id, " using default surface shader ", shader_id);
         
 		return (unsigned int)(sce->meshes.size() - 1);
 	}
@@ -44,13 +43,12 @@ unsigned int cycles_scene_add_mesh(unsigned int scene_id, unsigned int shader_id
 	return UINT_MAX;
 }
 
-unsigned int cycles_scene_add_mesh_object(unsigned int scene_id, unsigned int object_id, unsigned int shader_id)
+unsigned int cycles_scene_add_mesh_object(ccl::Session* session_id, unsigned int object_id, unsigned int shader_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* mesh = new ccl::Mesh();
 		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
 
@@ -61,7 +59,7 @@ unsigned int cycles_scene_add_mesh_object(unsigned int scene_id, unsigned int ob
 		mesh->used_shaders.push_back(sh);
 		sce->meshes.push_back(mesh);
 
-		logger.logit("Add mesh ", sce->meshes.size() - 1, " to object ", object_id, " in scene ", scene_id, " using default surface shader ", shader_id);
+		logger.logit("Add mesh ", sce->meshes.size() - 1, " to object ", object_id, " in scene ", session_id, " using default surface shader ", shader_id);
 
 		return (unsigned int)(sce->meshes.size() - 1);
 	}
@@ -70,13 +68,12 @@ unsigned int cycles_scene_add_mesh_object(unsigned int scene_id, unsigned int ob
 	return UINT_MAX;
 }
 
-void cycles_mesh_set_shader(unsigned int scene_id, unsigned int mesh_id, unsigned int shader_id)
+void cycles_mesh_set_shader(ccl::Session* session_id, unsigned int mesh_id, unsigned int shader_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
 
@@ -95,26 +92,24 @@ void cycles_mesh_set_shader(unsigned int scene_id, unsigned int mesh_id, unsigne
     */
 }
 
-void cycles_mesh_clear(unsigned int scene_id, unsigned int mesh_id)
+void cycles_mesh_clear(ccl::Session* session_id, unsigned int mesh_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 		me->clear();
 	}
     */
 }
 
-void cycles_mesh_tag_rebuild(unsigned int scene_id, unsigned int mesh_id)
+void cycles_mesh_tag_rebuild(ccl::Session* session_id, unsigned int mesh_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 		me->tag_update(sce, true);
 		sce->light_manager->tag_update(sce);
@@ -122,13 +117,12 @@ void cycles_mesh_tag_rebuild(unsigned int scene_id, unsigned int mesh_id)
     */
 }
 
-void cycles_mesh_set_smooth(unsigned int scene_id, unsigned int mesh_id, unsigned int smooth)
+void cycles_mesh_set_smooth(ccl::Session* session_id, unsigned int mesh_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 		bool use_smooth = smooth == 1;
 		me->smooth.resize(me->triangles.size());
@@ -140,13 +134,12 @@ void cycles_mesh_set_smooth(unsigned int scene_id, unsigned int mesh_id, unsigne
 }
 
 
-void cycles_mesh_reserve(unsigned int scene_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
+void cycles_mesh_reserve(ccl::Session* session_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 
 		me->reserve_mesh(vcount, fcount);
@@ -154,13 +147,12 @@ void cycles_mesh_reserve(unsigned int scene_id, unsigned int mesh_id, unsigned v
     */
 }
 
-void cycles_mesh_resize(unsigned int scene_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
+void cycles_mesh_resize(ccl::Session* session_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 
 		me->resize_mesh(vcount, fcount);
@@ -169,13 +161,12 @@ void cycles_mesh_resize(unsigned int scene_id, unsigned int mesh_id, unsigned vc
 }
 
 
-void cycles_mesh_set_verts(unsigned int scene_id, unsigned int mesh_id, float *verts, unsigned int vcount)
+void cycles_mesh_set_verts(ccl::Session* session_id, unsigned int mesh_id, float *verts, unsigned int vcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 
 		ccl::float3 f3;
@@ -194,13 +185,12 @@ void cycles_mesh_set_verts(unsigned int scene_id, unsigned int mesh_id, float *v
     */
 }
 
-void cycles_mesh_set_tris(unsigned int scene_id, unsigned int mesh_id, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_tris(ccl::Session* session_id, unsigned int mesh_id, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 
 		me->reserve_mesh(fcount * 3, fcount);
@@ -216,18 +206,17 @@ void cycles_mesh_set_tris(unsigned int scene_id, unsigned int mesh_id, int *face
 		}
 		me->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 
-		cycles_mesh_set_shader(scene_id, mesh_id, shader_id);
+		cycles_mesh_set_shader(session_id, mesh_id, shader_id);
 	}
     */
 }
 
-void cycles_mesh_set_triangle(unsigned int scene_id, unsigned int mesh_id, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_triangle(ccl::Session* session_id, unsigned int mesh_id, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 		me->triangles[tri_idx] = (int)v0;
 		me->triangles[tri_idx + 1] = (int)v1;
@@ -238,26 +227,24 @@ void cycles_mesh_set_triangle(unsigned int scene_id, unsigned int mesh_id, unsig
     */
 }
 
-void cycles_mesh_add_triangle(unsigned int scene_id, unsigned int mesh_id, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_add_triangle(ccl::Session* session_id, unsigned int mesh_id, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 		me->add_triangle((int)v0, (int)v1, (int)v2, shader_id, smooth == 1);
 	}
     */
 }
 
-void cycles_mesh_set_uvs(unsigned int scene_id, unsigned int mesh_id, float *uvs, unsigned int uvcount, const char* uvmap_name)
+void cycles_mesh_set_uvs(ccl::Session* session_id, unsigned int mesh_id, float *uvs, unsigned int uvcount, const char* uvmap_name)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 
 		ccl::ustring uvmap = uvmap_name ? ccl::ustring(uvmap_name) : ccl::ustring("uvmap1");
@@ -277,13 +264,12 @@ void cycles_mesh_set_uvs(unsigned int scene_id, unsigned int mesh_id, float *uvs
     */
 }
 
-void cycles_mesh_set_vertex_normals(unsigned int scene_id, unsigned int mesh_id, float *vnormals, unsigned int vnormalcount)
+void cycles_mesh_set_vertex_normals(ccl::Session* session_id, unsigned int mesh_id, float *vnormals, unsigned int vnormalcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 
 		ccl::Attribute* attr = me->attributes.add(ccl::ATTR_STD_VERTEX_NORMAL);
@@ -302,13 +288,12 @@ void cycles_mesh_set_vertex_normals(unsigned int scene_id, unsigned int mesh_id,
     */
 }
 
-void cycles_mesh_set_vertex_colors(unsigned int scene_id, unsigned int mesh_id, float *vcolors, unsigned int vcolorcount)
+void cycles_mesh_set_vertex_colors(ccl::Session* session_id, unsigned int mesh_id, float *vcolors, unsigned int vcolorcount)
 {
     // TODO: XXXX revisit mesh handling
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Mesh* me = sce->meshes[mesh_id];
 
 		ccl::Attribute *attr = me->attributes.add(ustring("vertexcolor"),
@@ -496,11 +481,10 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 }
 #endif
 
-void cycles_mesh_attr_tangentspace(unsigned int scene_id, unsigned int mesh_id, const char* uvmap_name)
+void cycles_mesh_attr_tangentspace(ccl::Session* session_id, unsigned int mesh_id, const char* uvmap_name)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		// TODO: XXXX revisit mesh access
         //ccl::Mesh* me = sce->meshes[mesh_id];
         // TODO: XXXX reintroduce mikktspace

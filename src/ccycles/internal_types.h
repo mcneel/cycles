@@ -353,14 +353,14 @@ extern ccl::vector<float> ccycles_rhino_aaltonen_noise_table;
 
 extern ccl::Shader* find_shader_in_scene(ccl::Scene* sce, unsigned int shader_id);
 extern unsigned int get_idx_for_shader_in_scene(ccl::Scene* sce, ccl::Shader* sh);
-extern bool scene_find(unsigned int scid, CCScene** csce, ccl::Scene** sce);
+extern bool scene_find(ccl::Session* scid, ccl::Scene** sce);
 extern bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session);
 extern void scene_clear_pointer(ccl::Scene* sce);
-extern void set_ccscene_null(unsigned int scene_id);
+extern void set_ccscene_null(ccl::Session* session_id);
 
 extern void _cleanup_scenes();
 extern void _cleanup_sessions();
-extern void _init_shaders(unsigned int scene_id);
+extern void _init_shaders(ccl::Session* session_id);
 
 /********************************/
 /* Some useful defines			*/
@@ -388,10 +388,9 @@ extern void _init_shaders(unsigned int scene_id);
 		logger.logit("Set " #param_type " " #varname " to ", varname, " casting to " #typecast); \
 	}
 
-#define LIGHT_FIND(scene_id, light_id) \
-	CCScene* csce = nullptr; \
+#define LIGHT_FIND(session_id, light_id) \
 	ccl::Scene* sce = nullptr; \
-	if(scene_find(scene_id, &csce, &sce)) { \
+	if(scene_find(session_id, &sce)) { \
 		ccl::Light* l = sce->lights[light_id]; \
 
 #define LIGHT_FIND_END() \
@@ -401,12 +400,9 @@ extern void _init_shaders(unsigned int scene_id);
 #define SHADER_VAR2(a,b) a ## b
 #define SHADER_VAR(a, b) SHADER_VAR2(a,b)
 /* Set a var of shader to val of type. */
-#define SHADER_SET(scene_id, shid, type, var, val) \
-	CCScene* csce = nullptr; \
+#define SHADER_SET(session_id, shid, type, var, val) \
 	ccl::Scene* sce = nullptr; \
-	if (scene_find(scene_id, &csce, &sce)) { \
-		CCShader* sh = csce->shaders[shid]; \
+	if (scene_find(session_id, &sce)) { \
 		sh->shader-> var = (type)(val); \
-		logger.logit("Set " #var " of shader ", shid, " to ", val, " casting to " #type); \
 	}
 
