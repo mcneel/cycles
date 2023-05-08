@@ -16,33 +16,31 @@ limitations under the License.
 
 #include "internal_types.h"
 
-/* Set shader_id as default background shader for scene_id.
+/* Set shader_id as default background shader for session_id.
  * Note that shader_id is the ID for the shader specific to this scene.
  * 
  * The correct ID can be found with cycles_scene_shader_id. The ID is also
  * returned from cycles_scene_add_shader.
  */
-void cycles_scene_set_background_shader(unsigned int scene_id, unsigned int shader_id)
+void cycles_scene_set_background_shader(ccl::Session* session_id, unsigned int shader_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Shader* bg = find_shader_in_scene(sce, shader_id);
 		if (bg != nullptr) {
 			sce->default_background = bg;
 			sce->background->set_shader(bg);
 			sce->background->set_use_shader(true);
 			sce->background->tag_update(sce);
-			logger.logit("Scene ", scene_id, " set background shader ", shader_id);
+			logger.logit("Scene ", session_id, " set background shader ", shader_id);
 		}
 	}
 }
 
-unsigned int cycles_scene_get_background_shader(unsigned int scene_id)
+unsigned int cycles_scene_get_background_shader(ccl::Session* session_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		unsigned int idx = 0;
 		auto bi = sce->shaders.cbegin();
 		auto ei = sce->shaders.cend();
@@ -56,52 +54,48 @@ unsigned int cycles_scene_get_background_shader(unsigned int scene_id)
 	return UINT_MAX;
 }
 
-void cycles_scene_set_background_transparent(unsigned int scene_id, unsigned int transparent)
+void cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->background->set_transparent(transparent == 1);
 		sce->background->tag_update(sce);
-		logger.logit("Scene ", scene_id, " set background transparent", transparent);
+		logger.logit("Scene ", session_id, " set background transparent", transparent);
 	}
 }
 
-void cycles_scene_set_background_ao_factor(unsigned int scene_id, float ao_factor)
+void cycles_scene_set_background_ao_factor(ccl::Session* session_id, float ao_factor)
 {
     // TODO: XXXX ao factor no longer in bg, find out if other way or fully deprecated
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->background->ao_factor = ao_factor;
 		sce->background->tag_update(sce);
-		logger.logit("Scene ", scene_id, " set background ao factor ", ao_factor);
+		logger.logit("Scene ", session_id, " set background ao factor ", ao_factor);
 	}
     */
 }
 
-void cycles_scene_set_background_ao_distance(unsigned int scene_id, float ao_distance)
+void cycles_scene_set_background_ao_distance(ccl::Session* session_id, float ao_distance)
 {
     // TODO: XXXX ao distance no longer in bg, find out if other way or fully deprecated
     /*
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->background->ao_distance = ao_distance;
 		sce->background->tag_update(sce);
-		logger.logit("Scene ", scene_id, " set background ao distance ", ao_distance);
+		logger.logit("Scene ", session_id, " set background ao distance ", ao_distance);
 	}
     */
 }
 
-void cycles_scene_set_background_visibility(unsigned int scene_id, unsigned int path_ray_flag)
+void cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->background->set_visibility((ccl::PathRayFlag)path_ray_flag);
 		sce->background->tag_update(sce);
-		logger.logit("Scene ", scene_id, " set background path ray visibility ", path_ray_flag);
+		logger.logit("Scene ", session_id, " set background path ray visibility ", path_ray_flag);
 	}
 }

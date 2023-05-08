@@ -577,34 +577,20 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 	return session->session;
 }
 
-void cycles_session_set_scene(ccl::Session* session_id, unsigned int scene_id)
-{
-	// TODO: XXXX Session creation now handles scene creation etc
-	/*CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		CCScene* csce = nullptr;
-		ccl::Scene* sce = nullptr;
-		if (scene_find(scene_id, &csce, &sce)) {
-			session->scene = sce;
-		}
-	}*/
-}
-
-void cycles_session_destroy(ccl::Session* session_id, unsigned int scene_id)
+void cycles_session_destroy(ccl::Session* session_id)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		/* CCScene *csce = nullptr;
 		ccl::Scene* sce = nullptr;
-		if (scene_find(scene_id, &csce, &sce))
+		if (scene_find(session_id, &csce, &sce))
 		{
 			if(session->scene == sce) {
 				csce->scene = nullptr;
 				delete csce;
 				csce = nullptr;
-				set_ccscene_null(scene_id);
+				set_ccscene_null(session_id);
 			}
 		}
 		*/

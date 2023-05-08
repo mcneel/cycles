@@ -16,41 +16,40 @@ limitations under the License.
 
 #include "internal_types.h"
 
-void cycles_film_set_exposure(unsigned int scene_id, float exposure)
+void cycles_film_set_exposure(ccl::Session* session_id, float exposure)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->film->set_exposure(exposure);
 		sce->film->tag_modified();
 	}
 }
 
-void cycles_film_set_filter(unsigned int scene_id, unsigned int filter_type, float filter_width)
+void cycles_film_set_filter(ccl::Session* session_id, unsigned int filter_type, float filter_width)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->film->set_filter_type((ccl::FilterType)filter_type);
 		if (sce->film->get_filter_type() == ccl::FilterType::FILTER_BOX) sce->film->set_filter_width(1.0f);
 		else sce->film->set_filter_width(filter_width);
 	}
 }
 
-void cycles_film_set_use_sample_clamp(unsigned int scene_id, bool use_sample_clamp)
+void cycles_film_set_use_sample_clamp(ccl::Session* session_id, bool use_sample_clamp)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		//sce->film->use_sample_clamp = use_sample_clamp;
 	}
 }
 
-void cycles_film_tag_update(unsigned int scene_id)
+void cycles_film_tag_update(ccl::Session* session_id)
 {
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->film->tag_modified();
 	}
 }

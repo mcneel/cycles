@@ -16,32 +16,19 @@ limitations under the License.
 
 #include "internal_types.h"
 
-std::vector<CCScene*> scenes;
-
 /* Find pointers for CCScene and ccl::Scene. Return false if either fails. */
-bool scene_find(unsigned int scid, CCScene** csce, ccl::Scene** sce)
+bool scene_find(ccl::Session* sid, ccl::Scene** sce)
 {
-	if (0 <= (scid) && (scid) < scenes.size()) {
-		*csce = scenes[scid];
-		if((*csce)!=nullptr) *sce = (*csce)->scene;
-		return *sce != nullptr && *csce!=nullptr;
+	CCSession *ccsess = nullptr;
+	ccl::Session *session = nullptr;
+	if (session_find(sid, &ccsess, &session))
+	{
+		(*sce) = session->scene;
+		return *sce != nullptr;
 	}
 	return false;
 }
 
-void set_ccscene_null(unsigned int scene_id)
-{
-	scenes[scene_id] = nullptr;
-}
-
-void scene_clear_pointer(ccl::Scene* sce)
-{
-		for (CCScene* csc : scenes) {
-			if (csc->scene == sce) {
-				csc->scene = nullptr; /* don't delete here, since session deconstructor takes care of it. */
-			}
-		}
-}
 
 /* Find a ccl::Shader in a given ccl::Scene, based on shader_id
 */
@@ -113,61 +100,55 @@ unsigned int cycles_scene_create(unsigned int scene_params_id, unsigned int sess
 	return UINT_MAX;
 }
 
-void cycles_scene_set_default_surface_shader(unsigned int scene_id, unsigned int shader_id)
+void cycles_scene_set_default_surface_shader(ccl::Session* session_id, unsigned int shader_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
 		sce->default_surface = sh;
-		logger.logit("Scene ", scene_id, " set default surface shader ", shader_id);
+		logger.logit("Scene ", session_id, " set default surface shader ", shader_id);
 	}
 }
 
-unsigned int cycles_scene_get_default_surface_shader(unsigned int scene_id)
+unsigned int cycles_scene_get_default_surface_shader(ccl::Session* session_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		return get_idx_for_shader_in_scene(sce, sce->default_surface);
 	}
 
 	return UINT_MAX;
 }
 
-void cycles_scene_reset(unsigned int scene_id)
+void cycles_scene_reset(ccl::Session* session_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->reset();
 	}
 }
 
-bool cycles_scene_try_lock(unsigned int scene_id)
+bool cycles_scene_try_lock(ccl::Session* session_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		return sce->mutex.try_lock();
 	}
 	return false;
 }
 
-void cycles_scene_lock(unsigned int scene_id)
+void cycles_scene_lock(ccl::Session* session_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->mutex.lock();
 	}
 }
 
-void cycles_scene_unlock(unsigned int scene_id)
+void cycles_scene_unlock(ccl::Session* session_id)
 {
-	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
-	if(scene_find(scene_id, &csce, &sce)) {
+	if(scene_find(session_id, &sce)) {
 		sce->mutex.unlock();
 	}
 }
