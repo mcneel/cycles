@@ -568,7 +568,8 @@ CCL_CAPI void __cdecl cycles_session_set_samples(ccl::Session* session_id, int s
 /** Clear resources for session. */
 CCL_CAPI void __cdecl cycles_session_destroy(ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_session_get_float_buffer(ccl::Session* session_id, int passtype, float** pixels);
-CCL_CAPI void __cdecl cycles_session_retain_float_buffer(ccl::Session *session_id, int passtype, float **pixels);
+CCL_CAPI void __cdecl cycles_session_retain_float_buffer(
+	ccl::Session *session_id, int passtype, int width, int height, float **pixels);
 CCL_CAPI void __cdecl cycles_session_release_float_buffer(ccl::Session *session_id, int passtype);
 	/** Get pixel data buffer pointer. */
 CCL_CAPI void __cdecl cycles_session_prepare_run(ccl::Session* session_id);
