@@ -216,7 +216,8 @@ bool CCSession::size_has_changed() {
 	return rc;
 }
 
-CCyclesPassOutput::CCyclesPassOutput() : m_lock(), m_pass_type(PASS_COMBINED), m_pixels()
+CCyclesPassOutput::CCyclesPassOutput()
+	: m_lock(), m_pass_type(PASS_COMBINED), m_width(0), m_height(0), m_pixels()
 {
 }
 
@@ -238,6 +239,26 @@ ccl::PassType CCyclesPassOutput::get_pass_type() const
 void CCyclesPassOutput::set_pass_type(ccl::PassType value)
 {
 	m_pass_type = value;
+}
+
+int CCyclesPassOutput::get_width() const
+{
+	return m_width;
+}
+
+void CCyclesPassOutput::set_width(int width)
+{
+	m_width = width;
+}
+
+int CCyclesPassOutput::get_height() const
+{
+	return m_height;
+}
+
+void CCyclesPassOutput::set_height(int height)
+{
+	m_height = height;
 }
 
 std::vector<float> &CCyclesPassOutput::pixels()
@@ -328,6 +349,8 @@ void CCyclesOutputDriver::write_render_tile(const Tile &tile)
 
 		const int width = tile.size.x;
 		const int height = tile.size.y;
+		pass->set_width(width);
+		pass->set_height(height);
 		pass->pixels().resize(width * height * pass_info.num_components);
 
 		if (!tile.get_pass_pixels(pass_type_as_string(pass->get_pass_type()),
@@ -357,6 +380,8 @@ bool CCyclesOutputDriver::update_render_tile(const Tile &tile)
 
 		const int width = tile.size.x;
 		const int height = tile.size.y;
+		pass->set_width(width);
+		pass->set_height(height);
 		pass->pixels().resize(width * height * pass_info.num_components);
 
 		if (!tile.get_pass_pixels(pass_type_as_string(pass->get_pass_type()),
@@ -519,7 +544,10 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 {
 	ccl::thread_scoped_lock lock(session_mutex);
+
 	ccl::SessionParams *params = (*(session_params.find(session_params_id)));
+	if (params == nullptr)
+		return nullptr;
 
 	int csesid{ -1 };
 	int hid{ 0 };
@@ -527,13 +555,12 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 	CCSession* session = CCSession::create(10, 10, 4);
 
 	// TODO: XXXX these are hardcoded params/sceneparams
+	session->params = *params;
 	session->params.background = true;
 	session->params.tile_size = 2048;
 	session->params.use_auto_tile = true;
 	session->params.experimental = true;
-	session->params.samples = 50;
 	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
-	session->params.time_limit = 10.0f;
 	session->params.use_resolution_divider = false;
 
 	ccl::DeviceType device_type = ccl::Device::type_from_string("CPU");
@@ -546,12 +573,6 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 	session->session = new ccl::Session(session->params, session->scene_params);
 
 	prep_session(session->session, &session->passes);
-
-	ccl::BufferParams bparam;
-	bparam.width = 512;
-	bparam.height = 512;
-	bparam.full_width = 512;
-	bparam.full_height = 512;
 
 	sessions.insert(session);
 	csesid = (unsigned int)(sessions.size() - 1);
@@ -906,17 +927,16 @@ void cycles_session_get_float_buffer(ccl::Session* session_id, int passtype, flo
 	//}
 }
 
-void cycles_session_retain_float_buffer(ccl::Session *session_id,
-										int passtype,
-										float **pixels)
+void cycles_session_retain_float_buffer(
+	ccl::Session *session_id, int passtype, int width, int height, float **pixels)
 {
 	CCSession *ccsess = nullptr;
 	ccl::Session *session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		if (ccsess) {
-			for (auto& pass : ccsess->passes)
-			{
-				if (passtype == pass->get_pass_type()) {
+			for (auto &pass : ccsess->passes) {
+				if (passtype == pass->get_pass_type() && width == pass->get_width() &&
+					height == pass->get_height()) {
 					pass->lock();
 					*pixels = pass->pixels().data();
 					break;

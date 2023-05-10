@@ -161,11 +161,19 @@ class CCyclesPassOutput {
 		ccl::PassType get_pass_type() const;
 		void set_pass_type(ccl::PassType value);
 
+		int get_width() const;
+		void set_width(int width);
+
+		int get_height() const;
+		void set_height(int height);
+
 		std::vector<float> &pixels();
 
 	private:
 		std::mutex m_lock;
 		ccl::PassType m_pass_type;
+		int m_width;
+		int m_height;
 		std::vector<float> m_pixels;
 };
 
