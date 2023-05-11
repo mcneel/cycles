@@ -64,32 +64,6 @@ void cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned 
 	}
 }
 
-void cycles_scene_set_background_ao_factor(ccl::Session* session_id, float ao_factor)
-{
-    // TODO: XXXX ao factor no longer in bg, find out if other way or fully deprecated
-    /*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->background->ao_factor = ao_factor;
-		sce->background->tag_update(sce);
-		logger.logit("Scene ", session_id, " set background ao factor ", ao_factor);
-	}
-    */
-}
-
-void cycles_scene_set_background_ao_distance(ccl::Session* session_id, float ao_distance)
-{
-    // TODO: XXXX ao distance no longer in bg, find out if other way or fully deprecated
-    /*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->background->ao_distance = ao_distance;
-		sce->background->tag_update(sce);
-		logger.logit("Scene ", session_id, " set background ao distance ", ao_distance);
-	}
-    */
-}
-
 void cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag)
 {
 	ccl::Scene* sce = nullptr;
