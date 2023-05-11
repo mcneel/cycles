@@ -411,6 +411,10 @@ CCL_CAPI void __cdecl cycles_integrator_tag_update(ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_integrator_set_max_bounce(ccl::Session* session_id, int max_bounce);
 /** Set the minimum bounces for integrator. */
 CCL_CAPI void __cdecl cycles_integrator_set_min_bounce(ccl::Session* session_id, int min_bounce);
+CCL_CAPI void __cdecl cycles_integrator_set_ao_factor(ccl::Session* session_id, float ao_factor);
+CCL_CAPI void __cdecl cycles_integrator_set_ao_distance(ccl::Session* session_id, float ao_distance);
+CCL_CAPI void __cdecl cycles_integrator_set_ao_bounces(ccl::Session* session_id, int ao_bounces);
+CCL_CAPI void __cdecl cycles_integrator_set_ao_additive_factor(ccl::Session* session_id, float ao_additive_factor);
 /** Set to true if caustics should be skipped.
  * \todo split for caustics_reflective and caustics_refractive.
  */
@@ -418,20 +422,8 @@ CCL_CAPI void __cdecl cycles_integrator_set_no_caustics(ccl::Session* session_id
 /** Set to true if shadows shouldn't be traced.
  */
 CCL_CAPI void __cdecl cycles_integrator_set_no_shadows(ccl::Session* session_id, bool no_shadows);
-/** Set the amount of diffuse samples. */
-CCL_CAPI void __cdecl cycles_integrator_set_diffuse_samples(ccl::Session* session_id, int diffuse_samples);
-/** Set the amount of glossy samples. */
-CCL_CAPI void __cdecl cycles_integrator_set_glossy_samples(ccl::Session* session_id, int glossy_samples);
-/** Set the amount of transmission samples. */
-CCL_CAPI void __cdecl cycles_integrator_set_transmission_samples(ccl::Session* session_id, int transmission_samples);
-/** Set the amount of AO samples. */
-CCL_CAPI void __cdecl cycles_integrator_set_ao_samples(ccl::Session* session_id, int ao_samples);
 /** Set the amount of mesh light samples. */
 CCL_CAPI void __cdecl cycles_integrator_set_mesh_light_samples(ccl::Session* session_id, int mesh_light_samples);
-/** Set the amount of SSS samples. */
-CCL_CAPI void __cdecl cycles_integrator_set_subsurface_samples(ccl::Session* session_id, int subsurface_samples);
-/** Set the amount of volume samples. */
-CCL_CAPI void __cdecl cycles_integrator_set_volume_samples(ccl::Session* session_id, int volume_samples);
 /** Set the maximum amount of diffuse bounces. */
 CCL_CAPI void __cdecl cycles_integrator_set_max_diffuse_bounce(ccl::Session* session_id, int max_diffuse_bounce);
 /** Set the maximum amount of glossy bounces. */
@@ -454,12 +446,10 @@ CCL_CAPI void __cdecl cycles_integrator_set_method(ccl::Session* session_id, int
 CCL_CAPI void __cdecl cycles_integrator_set_sample_all_lights_direct(ccl::Session* session_id, bool sample_all_lights_direct);
 /** Set to true if all lights should be indirectly sampled. */
 CCL_CAPI void __cdecl cycles_integrator_set_sample_all_lights_indirect(ccl::Session* session_id, bool sample_all_lights_indirect);
-CCL_CAPI void __cdecl cycles_integrator_set_volume_step_size(ccl::Session* session_id, float volume_step_size);
+CCL_CAPI void __cdecl cycles_integrator_set_volume_step_rate(ccl::Session* session_id, float volume_step_rate);
 CCL_CAPI void __cdecl cycles_integrator_set_volume_max_steps(ccl::Session* session_id, int volume_max_steps);
-/* \todo update Cycles code to allow for caustics form separation
-void cycles_integrator_set_caustics_relective(ccl::Session* session_id, int caustics_relective)
-void cycles_integrator_set_caustics_refractive(ccl::Session* session_id, int caustics_refractive)
-*/
+CCL_CAPI void __cdecl cycles_integrator_set_caustics_reflective(ccl::Session *session_id, bool caustics_reflective);
+CCL_CAPI void __cdecl cycles_integrator_set_caustics_refractive(ccl::Session *session_id, bool caustics_refractive);
 CCL_CAPI void __cdecl cycles_integrator_set_seed(ccl::Session* session_id, int seed);
 
 enum class sampling_pattern : unsigned int {
@@ -615,8 +605,6 @@ CCL_CAPI unsigned int __cdecl cycles_scene_create(unsigned int scene_params_id, 
 CCL_CAPI void __cdecl cycles_scene_set_background_shader(ccl::Session* session_id, unsigned int shader_id);
 CCL_CAPI unsigned int __cdecl cycles_scene_get_background_shader(ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent);
-CCL_CAPI void __cdecl cycles_scene_set_background_ao_factor(ccl::Session* session_id, float ao_factor);
-CCL_CAPI void __cdecl cycles_scene_set_background_ao_distance(ccl::Session* session_id, float ao_distance);
 CCL_CAPI void __cdecl cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag);
 CCL_CAPI void __cdecl cycles_scene_reset(ccl::Session* session_id);
 CCL_CAPI bool __cdecl cycles_scene_try_lock(ccl::Session* session_id);

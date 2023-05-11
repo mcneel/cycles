@@ -64,39 +64,32 @@ void cycles_integrator_set_no_shadows(ccl::Session* session_id, bool no_shadows)
 #endif
 }
 
-// TODO: XXXX rename sample functions, they are now setting max bounce.
-// integrator has changed to do adaptive sampling where possible. This
-// means evaluating a pixel may stop before max bounce is reached.
-
-void cycles_integrator_set_diffuse_samples(ccl::Session* session_id, int diffuse_samples)
+void cycles_integrator_set_ao_bounces(ccl::Session* session_id, int ao_bounces)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_max_diffuse_bounce(diffuse_samples);
+        sce->integrator->set_ao_bounces(ao_bounces);
 	}
 }
-
-void cycles_integrator_set_glossy_samples(ccl::Session* session_id, int glossy_samples)
+void cycles_integrator_set_ao_factor(ccl::Session *session_id, float ao_factor)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_max_glossy_bounce(glossy_samples);
+        sce->integrator->set_ao_factor(ao_factor);
 	}
 }
-
-void cycles_integrator_set_transmission_samples(ccl::Session* session_id, int transmission_samples)
+void cycles_integrator_set_ao_distance(ccl::Session *session_id, float ao_distance)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_max_transmission_bounce(transmission_samples);
+        sce->integrator->set_ao_distance(ao_distance);
 	}
 }
-
-void cycles_integrator_set_ao_samples(ccl::Session* session_id, int ao_samples)
+void cycles_integrator_set_ao_additive_factor(ccl::Session *session_id, float ao_additive_factor)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-        sce->integrator->set_ao_bounces(ao_samples);
+        sce->integrator->set_ao_additive_factor(ao_additive_factor);
 	}
 }
 
@@ -111,29 +104,8 @@ void cycles_integrator_set_mesh_light_samples(ccl::Session* session_id, int mesh
     */
 }
 
-void cycles_integrator_set_subsurface_samples(ccl::Session* session_id, int subsurface_samples)
-{
-    // TODO: XXXX re-evaluate SSS sampling, if still necessary
-    /*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->subsurface_samples = subsurface_samples;
-	}
-    */
-}
-
-void cycles_integrator_set_volume_samples(ccl::Session* session_id, int volume_samples)
-{
-    // TODO: XXXX wrap volume related integrator settings
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_volume_max_steps(volume_samples);
-	}
-}
-
 void cycles_integrator_set_max_diffuse_bounce(ccl::Session* session_id, int max_diffuse_bounce)
 {
-    // TODO: XXXX fold into diffuse bounce
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		sce->integrator->set_max_diffuse_bounce(max_diffuse_bounce);
@@ -142,7 +114,6 @@ void cycles_integrator_set_max_diffuse_bounce(ccl::Session* session_id, int max_
 
 void cycles_integrator_set_max_glossy_bounce(ccl::Session* session_id, int max_glossy_bounce)
 {
-    // TODO: XXXX fold into glossy bounce
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		sce->integrator->set_max_glossy_bounce(max_glossy_bounce);
@@ -227,14 +198,12 @@ void cycles_integrator_set_sample_all_lights_indirect(ccl::Session* session_id, 
     */
 }
 
-void cycles_integrator_set_volume_step_size(ccl::Session* session_id, float volume_step_size)
+void cycles_integrator_set_volume_step_rate(ccl::Session* session_id, float volume_step_rate)
 {
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->volume_step_size = volume_step_size;
+		sce->integrator->set_volume_step_rate(volume_step_rate);
 	}
-    */
 }
 
 void cycles_integrator_set_volume_max_steps(ccl::Session* session_id, int volume_max_steps)
@@ -245,23 +214,21 @@ void cycles_integrator_set_volume_max_steps(ccl::Session* session_id, int volume
 	}
 }
 
-/* \todo update Cycles code to allow for caustics form separation
-void cycles_integrator_set_caustics_relective(ccl::Session* session_id, int caustics_relective)
+void cycles_integrator_set_caustics_reflective(ccl::Session* session_id, bool caustics_reflective)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->caustics_relective = caustics_relective;
+		sce->integrator->set_caustics_reflective(caustics_reflective);
 	}
 }
 
-void cycles_integrator_set_caustics_refractive(ccl::Session* session_id, int caustics_refractive)
+void cycles_integrator_set_caustics_refractive(ccl::Session* session_id, bool caustics_refractive)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->caustics_refractive = caustics_refractive;
+		sce->integrator->set_caustics_refractive(caustics_refractive);
 	}
 }
-*/
 
 void cycles_integrator_set_seed(ccl::Session* session_id, int seed)
 {
