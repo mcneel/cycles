@@ -249,17 +249,7 @@ public:
 	/* The test cancel handler for ccl::Session cancellation test
 	 */
 	void test_cancel(void);
-	/* The update render tile handler for ccl::Session rendertile update callback.
-	 */
-	// TODO: XXXX Rework render result updating via output driver
-	//void update_render_tile(ccl::RenderTile &tile, bool highlight);
-	/* The write render tile handler for ccl::Session rendertile write callback.
-	 */
-	// TODO: XXXX Rework render result updating via output driver
-	//void write_render_tile(ccl::RenderTile &tile);
-	/* The display update handler for ccl::Session.
-	 *
-	 */
+
 	void display_update(int sample);
 
 	int width{ 0 };

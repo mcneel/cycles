@@ -150,20 +150,6 @@ void CCSession::test_cancel(void) {
 	#endif
 }
 
-/* Wrapper callback for render tile update. Copies tile result into session full image buffer. */
-/*
- void CCSession::update_render_tile(ccl::RenderTile &tile, bool highlight)
-{
-}
-*/
-
-/* Wrapper callback for render tile write. Copies tile result into session full image buffer. */
-/*
-void CCSession::write_render_tile(ccl::RenderTile &tile)
-{
-}
-*/
-
 /* Wrapper callback for display update stuff. When this is called one pass has been conducted. */
 void CCSession::display_update(int sample)
 {
@@ -556,7 +542,6 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 
 	// TODO: XXXX these are hardcoded params/sceneparams
 	session->params = *params;
-	session->params.background = true;
 	session->params.tile_size = 2048;
 	session->params.use_auto_tile = true;
 	session->params.experimental = true;
@@ -875,18 +860,6 @@ void cycles_session_set_pause(ccl::Session* session_id, bool pause)
 	if (session_find(session_id, &ccsess, &session)) {
 		session->set_pause(pause);
 	}
-}
-
-bool cycles_session_is_paused(ccl::Session* session_id)
-{
-/*
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		return false; // session->is_paused();
-	}*/
-
-	return false;
 }
 
 void cycles_session_set_samples(ccl::Session* session_id, int samples)
