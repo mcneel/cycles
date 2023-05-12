@@ -788,19 +788,6 @@ void cycles_session_start(ccl::Session* session_id)
 	}
 }
 
-void cycles_session_prepare_run(ccl::Session* session_id)
-{
-		// TODO: XXXX revisit session running
-		/*
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		logger.logit("Preparing run for session ", session_id);
-		session->prepare_run(ccsess->buffer_params, ccsess->params.samples);
-	}
-		*/
-}
-
 void cycles_session_end_run(ccl::Session* session_id)
 {
 		// TODO: XXXX revisit session running

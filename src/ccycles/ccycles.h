@@ -562,7 +562,6 @@ CCL_CAPI void __cdecl cycles_session_retain_float_buffer(
 	ccl::Session *session_id, int passtype, int width, int height, float **pixels);
 CCL_CAPI void __cdecl cycles_session_release_float_buffer(ccl::Session *session_id, int passtype);
 	/** Get pixel data buffer pointer. */
-CCL_CAPI void __cdecl cycles_session_prepare_run(ccl::Session* session_id);
 CCL_CAPI int __cdecl cycles_session_sample(ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_session_end_run(ccl::Session* session_id);
 
