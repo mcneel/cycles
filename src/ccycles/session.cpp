@@ -548,11 +548,6 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 	session->params.use_resolution_divider = false;
 
-	ccl::DeviceType device_type = ccl::Device::type_from_string("CPU");
-	ccl::vector<ccl::DeviceInfo> devices = ccl::Device::available_devices(
-			DEVICE_MASK(device_type));
-	session->params.device = devices.front();
-
 	session->scene_params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 
 	session->session = new ccl::Session(session->params, session->scene_params);
