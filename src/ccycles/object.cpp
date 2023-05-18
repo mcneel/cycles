@@ -19,11 +19,12 @@ limitations under the License.
 unsigned int cycles_scene_add_object(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = new ccl::Object();
+	if(scene_find(session_id, &sce)) 
+	{
+		auto ob = sce->create_node<ccl::Object>();
+
 		// TODO: APIfy object matrix setting, for now hard-code to be closer to PoC plugin
 		ob->set_tfm(ccl::transform_identity());
-		sce->objects.push_back(ob);
 
 		logger.logit("Added object ", sce->objects.size() - 1, " to scene ", session_id);
 
@@ -38,17 +39,15 @@ unsigned int cycles_scene_add_object(ccl::Session* session_id)
 
 void cycles_scene_object_set_mesh(ccl::Session* session_id, unsigned int object_id, unsigned int mesh_id)
 {
-    // TODO: XXXX revisit mesh adding
-    /*
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
+	if(scene_find(session_id, &sce)) 
+	{
 		ccl::Object* ob = sce->objects[object_id];
-		ccl::Mesh* me = sce->meshes[mesh_id];
-		ob->mesh = me;
+		auto geometry = sce->geometry[mesh_id];
+		ob->set_geometry(geometry);
 		ob->tag_update(sce);
-		sce->light_manager->tag_update(sce);
+		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
-    */
 }
 
 void cycles_object_tag_update(ccl::Session* session_id, unsigned int object_id)
@@ -63,22 +62,26 @@ void cycles_object_tag_update(ccl::Session* session_id, unsigned int object_id)
 
 unsigned int cycles_scene_object_get_mesh(ccl::Session* session_id, unsigned int object_id)
 {
-    // TODO: XXXX revisit mesh access
-    /*
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
+	if(scene_find(session_id, &sce)) 
+	{
 		ccl::Object* ob = sce->objects[object_id];
-		auto cmeshit = sce->meshes.begin();
-		auto cmeshend = sce->meshes.end();
+
+		//[NATHAN_LOOK] - This looks buggy to me - the iterator increased...
+
+		auto cmeshit = sce->geometry.begin();
+		auto cmeshend = sce->geometry.end();
 		unsigned int i = 0;
-		while (cmeshit != cmeshend) {
-			if ((*cmeshit) == ob->mesh) {
+		while (cmeshit != cmeshend) 
+		{
+			if ((*cmeshit) == ob->get_geometry()) 
+			{
 				return i;
 			}
 			++i;
 		}
 	}
-    */
+
 	return UINT_MAX;
 }
 

@@ -504,27 +504,52 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	integrator->set_denoiser_type(ccl::DENOISER_NONE);
 	integrator->set_guiding_distribution_type(ccl::GUIDING_TYPE_DIRECTIONAL_QUAD_TREE);
 
-	scene->background->set_transparent_glass(true);
-	Shader *bgsh = scene->default_background;
-	ccl::ShaderGraph *graph = new ccl::ShaderGraph();
-	ccl::OutputNode *out = graph->output();
-	ustring nodename("background_shader");
-	ccl::ShaderNode *shn = nullptr;
-	const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
-	shn = (ShaderNode *)ntype->create(ntype);
-	shn->set_owner(graph);
 	{
-		std::random_device r;
-		std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
-		std::uniform_real_distribution<> dist(0.0, 1.0);
-		ccl::BackgroundNode *bgn = (ccl::BackgroundNode *)shn;
-		bgn->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
-		bgn->set_strength(1.5f);
+		scene->background->set_transparent_glass(true);
+		Shader *bgsh = scene->default_background;
+		ccl::ShaderGraph *graph = new ccl::ShaderGraph();
+		ccl::OutputNode *out = graph->output();
+		ustring nodename("background_shader");
+		ccl::ShaderNode *shn = nullptr;
+		const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
+		shn = (ShaderNode *)ntype->create(ntype);
+		shn->set_owner(graph);
+		{
+			std::random_device r;
+			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
+			std::uniform_real_distribution<> dist(0.0, 1.0);
+			ccl::BackgroundNode *bgn = (ccl::BackgroundNode *)shn;
+			bgn->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
+			bgn->set_strength(1.5f);
+		}
+		graph->add(shn);
+		graph->connect(shn->output("Background"), out->input("Surface"));
+		bgsh->set_graph(graph);
+		bgsh->tag_update(scene);
 	}
-	graph->add(shn);
-	graph->connect(shn->output("Background"), out->input("Surface"));
-	bgsh->set_graph(graph);
-	bgsh->tag_update(scene);
+
+	{
+		auto default_surface_shader = scene->default_surface;
+		auto graph = new ccl::ShaderGraph();
+		auto out = graph->output();
+		ustring nodename("diffuse_bsdf");
+		ccl::ShaderNode* shader_node = nullptr;
+		const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
+		shader_node = (ShaderNode *)ntype->create(ntype);
+		shader_node->set_owner(graph);
+		{
+			std::random_device r;
+			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
+			std::uniform_real_distribution<> dist(0.0, 1.0);
+			auto diff = (ccl::DiffuseBsdfNode *)shader_node;
+			diff->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
+			diff->set_roughness(1.0f);
+		}
+		graph->add(shader_node);
+		graph->connect(shader_node->output("BSDF"), out->input("Surface"));
+		default_surface_shader->set_graph(graph);
+		default_surface_shader->tag_update(scene);
+	}
 }
 
 ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
