@@ -21,7 +21,7 @@ limitations under the License.
 
 using namespace OIIO;
 
-unsigned int cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id)
+ccl::Geometry* cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
@@ -34,13 +34,13 @@ unsigned int cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader
 
 		logger.logit("Add mesh ", sce->geometry.size() - 1, " in scene ", session_id, " using default surface shader ", shader_id);
 
-		return (unsigned int)(sce->geometry.size() - 1);
+		return mesh;
 	}
 
-	return UINT_MAX;
+	return nullptr;
 }
 
-void cycles_mesh_set_shader(ccl::Session* session_id, unsigned int mesh_id, unsigned int shader_id)
+void cycles_geometry_set_shader(ccl::Session* session_id, ccl::Geometry*, unsigned int shader_id)
 {
     // TODO: XXXX revisit mesh handling
     /*
@@ -64,39 +64,35 @@ void cycles_mesh_set_shader(ccl::Session* session_id, unsigned int mesh_id, unsi
     */
 }
 
-void cycles_mesh_clear(ccl::Session* session_id, unsigned int mesh_id)
+void cycles_geometry_clear(ccl::Session* session_id, ccl::Geometry* geometry)
 {
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	ASSERT(geometry);
+
+	if (geometry)
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
-		if (mesh)
-		{
-			mesh->clear();
-		}
+		geometry->clear();
 	}
 }
 
-void cycles_mesh_tag_rebuild(ccl::Session* session_id, unsigned int mesh_id)
+void cycles_geometry_tag_rebuild(ccl::Session* session_id, ccl::Geometry* geometry)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
-		if (mesh)
-		{
-			mesh->tag_update(sce, true);
-			sce->light_manager->tag_update(sce, ccl::LightManager::MESH_NEED_REBUILD);
-		}
+		geometry->tag_update(sce, true);
+		sce->light_manager->tag_update(sce, ccl::LightManager::MESH_NEED_REBUILD);
 	}
 }
 
-void cycles_mesh_set_smooth(ccl::Session* session_id, unsigned int mesh_id, unsigned int smooth)
+void cycles_mesh_set_smooth(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int smooth)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			bool use_smooth = smooth == 1;
@@ -111,12 +107,15 @@ void cycles_mesh_set_smooth(ccl::Session* session_id, unsigned int mesh_id, unsi
 }
 
 
-void cycles_mesh_reserve(ccl::Session* session_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
+void cycles_mesh_reserve(ccl::Session* session_id, ccl::Geometry* geometry, unsigned vcount, unsigned fcount)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			mesh->reserve_mesh(vcount, fcount);
@@ -124,12 +123,15 @@ void cycles_mesh_reserve(ccl::Session* session_id, unsigned int mesh_id, unsigne
 	}
 }
 
-void cycles_mesh_resize(ccl::Session* session_id, unsigned int mesh_id, unsigned vcount, unsigned fcount)
+void cycles_mesh_resize(ccl::Session* session_id, ccl::Geometry* geometry, unsigned vcount, unsigned fcount)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			mesh->resize_mesh(vcount, fcount);
@@ -138,12 +140,15 @@ void cycles_mesh_resize(ccl::Session* session_id, unsigned int mesh_id, unsigned
 }
 
 
-void cycles_mesh_set_verts(ccl::Session* session_id, unsigned int mesh_id, float *in_verts, unsigned int in_vcount)
+void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, float *in_verts, unsigned int in_vcount)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			ccl::float3* generated = mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_float3();
@@ -170,43 +175,53 @@ void cycles_mesh_set_verts(ccl::Session* session_id, unsigned int mesh_id, float
 	}
 }
 
-void cycles_mesh_set_tris(ccl::Session* session_id, unsigned int mesh_id, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* geometry, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		mesh->reserve_mesh(fcount * 3, fcount);
+		ASSERT(mesh);
 
-		auto& cycles_mesh_triangles = mesh->get_triangles();
-
-		for (auto i = 0U, j = 0U; i < fcount * 3; i += 3, j++)
+		if (mesh)
 		{
-			//logger.logit("f: ", faces[i], ",", faces[i + 1], ",", faces[i + 2]);
-			cycles_mesh_triangles[i + 0] = faces[i + 0];
-			cycles_mesh_triangles[i + 1] = faces[i + 1];
-			cycles_mesh_triangles[i + 2] = faces[i + 2];
+			mesh->reserve_mesh(fcount * 3, fcount);
 
-			// TODO: XXXX revisit shader handling
-			//mesh->shader[j] = shader_id;
+			auto& cycles_mesh_triangles = mesh->get_triangles();
 
-			mesh->get_smooth()[j] = (1 == smooth);
+			for (auto i = 0U, j = 0U; i < fcount * 3; i += 3, j++)
+			{
+				//logger.logit("f: ", faces[i], ",", faces[i + 1], ",", faces[i + 2]);
+				cycles_mesh_triangles[i + 0] = faces[i + 0];
+				cycles_mesh_triangles[i + 1] = faces[i + 1];
+				cycles_mesh_triangles[i + 2] = faces[i + 2];
+
+				// TODO: XXXX revisit shader handling
+				//mesh->shader[j] = shader_id;
+
+				mesh->get_smooth()[j] = (1 == smooth);
+			}
+
+			//ALB: IT looks like all meshes are triangles in CyclesX
+			//mesh->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
+
+			cycles_geometry_set_shader(session_id, geometry, shader_id);
 		}
-
-		//ALB: IT looks like all meshes are triangles in CyclesX
-		//mesh->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
-
-		cycles_mesh_set_shader(session_id, mesh_id, shader_id);
 	}
 }
 
-void cycles_mesh_set_triangle(ccl::Session* session_id, unsigned int mesh_id, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
 {
+	ASSERT(geometry);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			auto& cycles_mesh_triangle = mesh->get_triangle(tri_idx);
@@ -218,17 +233,25 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, unsigned int mesh_id, un
 			// TODO: XXXX revisit shader handling
 			//me->shader[tri_idx / 3] = shader_id;
 
-			mesh->get_smooth()[mesh_id] = (1 == smooth);
+			mesh->get_smooth()[tri_idx] = (1 == smooth);
+
+			//I'm not sure about this - this is the old code. [NATHAN_LOOK]
+			//mesh->get_smooth()[mesh_id] = (1 == smooth);
 		}
 	}
 }
 
-void cycles_mesh_add_triangle(ccl::Session* session_id, unsigned int mesh_id, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
 {
+	ASSERT(geometry);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			mesh->add_triangle((int)v0, (int)v1, (int)v2, shader_id, smooth == 1);
@@ -236,12 +259,17 @@ void cycles_mesh_add_triangle(ccl::Session* session_id, unsigned int mesh_id, un
 	}
 }
 
-void cycles_mesh_set_uvs(ccl::Session* session_id, unsigned int mesh_id, float *uvs, unsigned int uvcount, const char* uvmap_name)
+void cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* geometry, float *uvs, unsigned int uvcount, const char* uvmap_name)
 {
+	ASSERT(geometry);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			ccl::ustring uvmap = uvmap_name ? ccl::ustring(uvmap_name) : ccl::ustring("uvmap1");
@@ -264,12 +292,17 @@ void cycles_mesh_set_uvs(ccl::Session* session_id, unsigned int mesh_id, float *
 	}
 }
 
-void cycles_mesh_set_vertex_normals(ccl::Session* session_id, unsigned int mesh_id, float *vnormals, unsigned int vnormalcount)
+void cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* geometry, float *vnormals, unsigned int vnormalcount)
 {
+	ASSERT(geometry);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			ccl::Attribute* attr = mesh->attributes.add(ccl::ATTR_STD_VERTEX_NORMAL);
@@ -291,12 +324,17 @@ void cycles_mesh_set_vertex_normals(ccl::Session* session_id, unsigned int mesh_
 	}
 }
 
-void cycles_mesh_set_vertex_colors(ccl::Session* session_id, unsigned int mesh_id, float *vcolors, unsigned int vcolorcount)
+void cycles_mesh_set_vertex_colors(ccl::Session* session_id, ccl::Geometry* geometry, float *vcolors, unsigned int vcolorcount)
 {
+	ASSERT(geometry);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			ccl::Attribute *attr = mesh->attributes.add(ustring("vertexcolor"),
@@ -487,12 +525,17 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 }
 #endif
 
-void cycles_mesh_attr_tangentspace(ccl::Session* session_id, unsigned int mesh_id, const char* uvmap_name)
+void cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* geometry, const char* uvmap_name)
 {
+	ASSERT(geometry);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(sce->geometry[mesh_id]);
+		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
+
+		ASSERT(mesh);
+
 		if (mesh)
 		{
 			// TODO: XXXX reintroduce mikktspace

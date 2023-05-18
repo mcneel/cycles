@@ -293,22 +293,22 @@ CCL_CAPI void __cdecl cycles_scene_params_set_persistent_data(unsigned int scene
  * Create a new mesh in session_id, using shader_id
  * \ingroup ccycles_scene
  */
-CCL_CAPI unsigned int __cdecl cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id);
+CCL_CAPI ccl::Geometry* __cdecl cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id);
 /**
  * Create a new mesh for object_id in session_id, using shader_id
  * \ingroup ccycles_scene
  */
-CCL_CAPI unsigned int __cdecl cycles_scene_add_mesh_object(ccl::Session* session_id, unsigned int object_id, unsigned int shader_id);
+//CCL_CAPI unsigned int __cdecl cycles_scene_add_mesh_object(ccl::Session* session_id, unsigned int object_id, unsigned int shader_id);
 /**
  * Create a new object for session_id
  * \ingroup ccycles_scene
  */
-CCL_CAPI unsigned int __cdecl cycles_scene_add_object(ccl::Session* session_id);
+CCL_CAPI ccl::Object* __cdecl cycles_scene_add_object(ccl::Session* session_id);
 /**
  * Set transformation matrix for object
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_matrix(ccl::Session* session_id, unsigned int object_id,
+CCL_CAPI void __cdecl cycles_scene_object_set_matrix(ccl::Session* session_id, ccl::Object*,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -317,7 +317,7 @@ CCL_CAPI void __cdecl cycles_scene_object_set_matrix(ccl::Session* session_id, u
  * Set OCS frame for object
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_ocs_frame(ccl::Session* session_id, unsigned int object_id,
+CCL_CAPI void __cdecl cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object*,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -326,65 +326,65 @@ CCL_CAPI void __cdecl cycles_scene_object_set_ocs_frame(ccl::Session* session_id
  * Set object mesh
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_mesh(ccl::Session* session_id, unsigned int object_id, unsigned int mesh_id);
+CCL_CAPI void __cdecl cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object*, ccl::Geometry*);
 /**
  * Get mesh id for object
  * \ingroup ccycles_object
  */
-CCL_CAPI unsigned int __cdecl cycles_scene_object_get_mesh(ccl::Session* session_id, unsigned int object_id);
+CCL_CAPI ccl::Geometry* __cdecl cycles_scene_object_get_geometry(ccl::Session* session_id, ccl::Object*);
 /**
  * Set visibility flag for object
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_visibility(unsigned int client, ccl::Session* session_id, unsigned int object_id, unsigned int visibility);
+CCL_CAPI void __cdecl cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object*, unsigned int visibility);
 /**
  * Set object shader
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_shader(unsigned int client, ccl::Session* session_id, unsigned int object_id, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_scene_object_set_shader(ccl::Session* session_id, ccl::Object*, unsigned int shader_id);
 /**
  * Set is_shadow_catcher flag for object
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_is_shadowcatcher(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool is_shadowcatcher);
+CCL_CAPI void __cdecl cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object*, bool is_shadowcatcher);
 /**
  * Set mesh_light_no_cast_shadow flag for object. This is to signal that this mesh light shouldn't cast shadows.
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_mesh_light_no_cast_shadow(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool mesh_light_no_cast_shadow);
+CCL_CAPI void __cdecl cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id, ccl::Object*, bool mesh_light_no_cast_shadow);
 /**
  * Set is_block_instance flag for object. This ensures we can handle meshes
  * properly also when only one block instance for a mesh is in the scene.
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_is_block_instance(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool is_block_instance);
+CCL_CAPI void __cdecl cycles_scene_object_set_is_block_instance(ccl::Session* session_id, ccl::Object*, bool is_block_instance);
 /**
  * Set cutout flag for object. This object is used for cutout/clipping.
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_cutout(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool cutout);
+CCL_CAPI void __cdecl cycles_scene_object_set_cutout(ccl::Session* session_id, ccl::Object*, bool cutout);
 /**
  * Set ignore_cutout flag for object. Ignore cutout object.
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_ignore_cutout(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool ignore_cutout);
+CCL_CAPI void __cdecl cycles_scene_object_set_ignore_cutout(ccl::Session* session_id, ccl::Object*, bool ignore_cutout);
 /**
  * Tag object for update
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_object_tag_update(ccl::Session* session_id, unsigned int object_id);
+CCL_CAPI void __cdecl cycles_object_tag_update(ccl::Session* session_id, ccl::Object*);
 
 /**
  * Set the pass id
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_object_set_pass_id(ccl::Session* session_id, unsigned int object_id, int pass_id);
+CCL_CAPI void __cdecl cycles_object_set_pass_id(ccl::Session* session_id, ccl::Object*, int pass_id);
 
 /**
  * Set the random id
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_object_set_random_id(ccl::Session* session_id, unsigned int object_id, unsigned int random_id);
+CCL_CAPI void __cdecl cycles_object_set_random_id(ccl::Session* session_id, ccl::Object*, unsigned int random_id);
 
 /**
  * Clear clipping planes list.
@@ -611,20 +611,20 @@ CCL_CAPI void __cdecl cycles_scene_lock(ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_scene_unlock(ccl::Session* session_id);
 
 /* Mesh geometry API */
-CCL_CAPI void __cdecl cycles_mesh_set_verts(ccl::Session* session_id, unsigned int mesh_id, float *verts, unsigned int vcount);
-CCL_CAPI void __cdecl cycles_mesh_set_tris(ccl::Session* session_id, unsigned int mesh_id, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth);
-CCL_CAPI void __cdecl cycles_mesh_set_triangle(ccl::Session* session_id, unsigned int mesh_id, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth);
-CCL_CAPI void __cdecl cycles_mesh_add_triangle(ccl::Session* session_id, unsigned int mesh_id, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth);
-CCL_CAPI void __cdecl cycles_mesh_set_uvs(ccl::Session* session_id, unsigned int mesh_id, float *uvs, unsigned int uvcount, const char *uvmap_name);
-CCL_CAPI void __cdecl cycles_mesh_set_vertex_normals(ccl::Session* session_id, unsigned int mesh_id, float *vnormals, unsigned int vnormalcount);
-CCL_CAPI void __cdecl cycles_mesh_set_vertex_colors(ccl::Session* session_id, unsigned int mesh_id, float *vcolors, unsigned int vcolorcount);
-CCL_CAPI void __cdecl cycles_mesh_set_smooth(ccl::Session* session_id, unsigned int mesh_id, unsigned int smooth);
-CCL_CAPI void __cdecl cycles_mesh_clear(ccl::Session* session_id, unsigned int mesh_id);
-CCL_CAPI void __cdecl cycles_mesh_reserve(ccl::Session* session_id, unsigned int mesh_id, unsigned vcount, unsigned fcount);
-CCL_CAPI void __cdecl cycles_mesh_resize(ccl::Session* session_id, unsigned int mesh_id, unsigned vcount, unsigned fcount);
-CCL_CAPI void __cdecl cycles_mesh_tag_rebuild(ccl::Session* session_id, unsigned int mesh_id);
-CCL_CAPI void __cdecl cycles_mesh_set_shader(ccl::Session* session_id, unsigned int mesh_id, unsigned int shader_id);
-CCL_CAPI void __cdecl cycles_mesh_attr_tangentspace(ccl::Session* session_id, unsigned int mesh_id, const char* uvmap_name);
+CCL_CAPI void __cdecl cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* mesh, float *verts, unsigned int vcount);
+CCL_CAPI void __cdecl cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* mesh, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth);
+CCL_CAPI void __cdecl cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* mesh, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth);
+CCL_CAPI void __cdecl cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* mesh, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth);
+CCL_CAPI void __cdecl cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* mesh, float *uvs, unsigned int uvcount, const char *uvmap_name);
+CCL_CAPI void __cdecl cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* mesh, float *vnormals, unsigned int vnormalcount);
+CCL_CAPI void __cdecl cycles_mesh_set_vertex_colors(ccl::Session* session_id, ccl::Geometry* mesh, float *vcolors, unsigned int vcolorcount);
+CCL_CAPI void __cdecl cycles_mesh_set_smooth(ccl::Session* session_id, ccl::Geometry* mesh, unsigned int smooth);
+CCL_CAPI void __cdecl cycles_geometry_clear(ccl::Session* session_id, ccl::Geometry* geo);
+CCL_CAPI void __cdecl cycles_mesh_reserve(ccl::Session* session_id, ccl::Geometry* mesh, unsigned vcount, unsigned fcount);
+CCL_CAPI void __cdecl cycles_mesh_resize(ccl::Session* session_id, ccl::Geometry* mesh, unsigned vcount, unsigned fcount);
+CCL_CAPI void __cdecl cycles_geometry_tag_rebuild(ccl::Session* session_id, ccl::Geometry* geo);
+CCL_CAPI void __cdecl cycles_geometry_set_shader(ccl::Session* session_id, ccl::Geometry* mesh, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* mesh, const char* uvmap_name);
 
 /* Shader API */
 

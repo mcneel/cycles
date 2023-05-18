@@ -16,7 +16,7 @@ limitations under the License.
 
 #include "internal_types.h"
 
-unsigned int cycles_scene_add_object(ccl::Session* session_id)
+ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
@@ -31,100 +31,111 @@ unsigned int cycles_scene_add_object(ccl::Session* session_id)
 		ob->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 
-		return (unsigned int)(sce->objects.size() - 1);
+		return ob;
 	}
 
-	return UINT_MAX;
+	return nullptr;
 }
 
-void cycles_scene_object_set_mesh(ccl::Session* session_id, unsigned int object_id, unsigned int mesh_id)
+void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* object, ccl::Geometry* geometry)
 {
+	ASSERT(object);
+	ASSERT(geometry);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		ccl::Object* ob = sce->objects[object_id];
-		auto geometry = sce->geometry[mesh_id];
-		ob->set_geometry(geometry);
-		ob->tag_update(sce);
+		object->set_geometry(geometry);
+		object->tag_update(sce);
+
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
 }
 
-void cycles_object_tag_update(ccl::Session* session_id, unsigned int object_id)
+void cycles_object_tag_update(ccl::Session* session_id, ccl::Object* object)
 {
+	ASSERT(object);
+
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->tag_update(sce);
+	if(scene_find(session_id, &sce)) 
+	{
+		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
 }
 
-unsigned int cycles_scene_object_get_mesh(ccl::Session* session_id, unsigned int object_id)
+ccl::Geometry* cycles_scene_object_get_geometry(ccl::Session* session_id, ccl::Object* object)
 {
+	ASSERT(object);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
-		ccl::Object* ob = sce->objects[object_id];
-
 		//[NATHAN_LOOK] - This looks buggy to me - the iterator increased...
+		//In fact, I don't really understand what this is trying to do at all...
 
 		auto cmeshit = sce->geometry.begin();
 		auto cmeshend = sce->geometry.end();
 		unsigned int i = 0;
 		while (cmeshit != cmeshend) 
 		{
-			if ((*cmeshit) == ob->get_geometry()) 
+			if ((*cmeshit) == object->get_geometry())
 			{
-				return i;
+				return *cmeshit;
 			}
 			++i;
 		}
 	}
 
-	return UINT_MAX;
+	return nullptr;
 }
 
-void cycles_scene_object_set_visibility(unsigned int client, ccl::Session* session_id, unsigned int object_id, unsigned int visibility)
+void cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* object, unsigned int visibility)
 {
+	ASSERT(object);
+
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->set_visibility(visibility);
-		ob->tag_update(sce);
+	if(scene_find(session_id, &sce)) 
+	{
+		object->set_visibility(visibility);
+		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
 }
 
-void cycles_scene_object_set_shader(unsigned int client, ccl::Session* session_id, unsigned int object_id, unsigned int shader_id)
+void cycles_scene_object_set_shader(ccl::Session* session_id, ccl::Object* object, unsigned int shader_id)
 {
+	ASSERT(object);
+
     // TODO: XXXX revisit shader assignment to objects
     // Needed for our approach to block instance shading
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
 		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
 		// TODO: XXXX shader stuff appears to have moved to ccl::Geometry... ob->shader = sh;
 		sh->tag_update(sce);
 		sh->tag_used(sce);
-		ob->tag_update(sce);
+		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
 }
 
-void cycles_scene_object_set_is_shadowcatcher(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool is_shadowcatcher)
+void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object* object, bool is_shadowcatcher)
 {
+	ASSERT(object);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->set_is_shadow_catcher(is_shadowcatcher);
-		ob->tag_update(sce);
+		object->set_is_shadow_catcher(is_shadowcatcher);
+		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
 }
 
-void cycles_scene_object_set_mesh_light_no_cast_shadow(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool mesh_light_no_cast_shadow)
+void cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id, ccl::Object* object, bool mesh_light_no_cast_shadow)
 {
+	ASSERT(object);
+
     // TODO: XXXX port this from old Cycles integration
     /*
 	ccl::Scene* sce = nullptr;
@@ -137,8 +148,10 @@ void cycles_scene_object_set_mesh_light_no_cast_shadow(unsigned int client, ccl:
     */
 }
 
-void cycles_scene_object_set_is_block_instance(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool is_block_instance)
+void cycles_scene_object_set_is_block_instance(ccl::Session* session_id, ccl::Object* object, bool is_block_instance)
 {
+	ASSERT(object);
+
     // TODO: XXXX port this from old Cycles integration
     // unless there is a better way to do this in new cycles
     /*
@@ -152,8 +165,10 @@ void cycles_scene_object_set_is_block_instance(unsigned int client, ccl::Session
     */
 }
 
-void cycles_scene_object_set_cutout(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool cutout)
+void cycles_scene_object_set_cutout(ccl::Session* session_id, ccl::Object* object, bool cutout)
 {
+	ASSERT(object);
+
 	/*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -163,8 +178,10 @@ void cycles_scene_object_set_cutout(unsigned int client, ccl::Session* session_i
 	}*/
 }
 
-void cycles_scene_object_set_ignore_cutout(unsigned int client, ccl::Session* session_id, unsigned int object_id, bool ignore_cutout)
+void cycles_scene_object_set_ignore_cutout(ccl::Session* session_id, ccl::Object* object, bool ignore_cutout)
 {
+	ASSERT(object);
+
 	/*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -174,7 +191,7 @@ void cycles_scene_object_set_ignore_cutout(unsigned int client, ccl::Session* se
 	}*/
 }
 
-void _cycles_scene_object_set_transform(ccl::Session* session_id, unsigned int object_id, unsigned int transform_type,
+static void _cycles_scene_object_set_transform(ccl::Session* session_id, ccl::Object* object, unsigned int transform_type,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -182,11 +199,10 @@ void _cycles_scene_object_set_transform(ccl::Session* session_id, unsigned int o
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
 		ccl::Transform mat = ccl::make_transform(a, b, c, d, e, f, g, h, i, j, k, l);
 		switch (transform_type) {
 		case 0:
-			ob->set_tfm(mat);
+			object->set_tfm(mat);
 			break;
         // TODO: XXXX port OCS frame from old integration
         /*
@@ -196,50 +212,57 @@ void _cycles_scene_object_set_transform(ccl::Session* session_id, unsigned int o
 			break;
         */
 		}
-		ob->tag_update(sce);
+		object->tag_update(sce);
 	}
 }
 
-void cycles_scene_object_set_matrix(ccl::Session* session_id, unsigned int object_id,
+void cycles_scene_object_set_matrix(ccl::Session* session_id, ccl::Object* object,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
 	)
 {
-	_cycles_scene_object_set_transform(session_id, object_id, 0,
+	ASSERT(object);
+
+	_cycles_scene_object_set_transform(session_id, object, 0,
 		a, b, c, d,
 		e, f, g, h,
 		i, j, k, l);
 }
 
-void cycles_scene_object_set_ocs_frame(ccl::Session* session_id, unsigned int object_id,
+void cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object* object,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
 	)
 {
-	_cycles_scene_object_set_transform(session_id, object_id, 1,
+	ASSERT(object);
+
+	_cycles_scene_object_set_transform(session_id, object, 1,
 		a, b, c, d,
 		e, f, g, h,
 		i, j, k, l);
 }
 
 
-void cycles_object_set_pass_id(ccl::Session* session_id, unsigned int object_id, int pass_id)
+void cycles_object_set_pass_id(ccl::Session* session_id, ccl::Object* object, int pass_id)
 {
+	ASSERT(object);
+
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->set_pass_id(pass_id);
+	if(scene_find(session_id, &sce)) 
+	{
+		object->set_pass_id(pass_id);
 	}
 }
 
-void cycles_object_set_random_id(ccl::Session* session_id, unsigned int object_id, unsigned int random_id)
+void cycles_object_set_random_id(ccl::Session* session_id, ccl::Object* object, unsigned int random_id)
 {
+	ASSERT(object);
+
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->set_random_id(random_id);
+		object->set_random_id(random_id);
 	}
 }
 
