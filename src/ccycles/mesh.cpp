@@ -19,6 +19,8 @@ limitations under the License.
 #include "util/algorithm.h"
 #include "util/math.h"
 
+#include "mikktspace.h"
+
 using namespace OIIO;
 
 ccl::Geometry* cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id)
@@ -360,9 +362,7 @@ void cycles_mesh_set_vertex_colors(ccl::Session* session_id, ccl::Geometry* geom
 	}
 }
 
-#if defined(MIKKTSPACE_DONE)
 
-#include "mikktspace.hh"
 struct MikkUserData {
 	MikkUserData(
 			 ustring layer_name,
@@ -409,8 +409,7 @@ static int mikk_get_num_verts_of_face(const SMikkTSpaceContext *context,
 
 static int mikk_vertex_index(const ccl::Mesh *mesh, const int face_num, const int vert_num)
 {
-    // TODO: XXXX revisit tri access
-    return 0; //return mesh->triangles[face_num * 3 + vert_num];
+	return mesh->get_triangles()[face_num * 3 + vert_num];
 }
 
 static int mikk_corner_index(const ccl::Mesh *mesh, const int face_num, const int vert_num)
@@ -425,8 +424,7 @@ static void mikk_get_position(const SMikkTSpaceContext *context,
 	const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
 	const ccl::Mesh *mesh = userdata->mesh;
 	const int vertex_index = mikk_vertex_index(mesh, face_num, vert_num);
-    // TODO: XXXX revisit vert access
-    const ccl::float3 vP = ccl::make_float3(0.0f, 0.0f, 0.0f); //const ccl::float3 vP = mesh->verts[vertex_index];
+	const ccl::float3 vP = mesh->get_verts()[vertex_index];
 	P[0] = vP.x;
 	P[1] = vP.y;
 	P[2] = vP.z;
@@ -453,21 +451,19 @@ static void mikk_get_texture_coordinate(const SMikkTSpaceContext *context,
 static void mikk_get_normal(const SMikkTSpaceContext *context, float N[3],
 							const int face_num, const int vert_num)
 {
-    // TODO: XXXX revisit normal access
-    /*
 	const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
 	const ccl::Mesh *mesh = userdata->mesh;
 	ccl::float3 vN;
-    
-	if(mesh->smooth[face_num]) {
+
+	if(mesh->get_smooth()[face_num]) {
 		const int vertex_index = mikk_vertex_index(mesh, face_num, vert_num);
 		vN = userdata->vertex_normal[vertex_index];
 	}
 	else {
 		const ccl::Mesh::Triangle tri = mesh->get_triangle(face_num);
-		vN = tri.compute_normal(&mesh->verts[0]);
+		vN = tri.compute_normal(&mesh->get_verts()[0]);
 	}
-    */
+
 	N[0] = vN.x;
 	N[1] = vN.y;
 	N[2] = vN.z;
@@ -523,7 +519,6 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 	/* Compute tangents. */
 	genTangSpaceDefault(&context);
 }
-#endif
 
 void cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* geometry, const char* uvmap_name)
 {
@@ -538,8 +533,7 @@ void cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* geom
 
 		if (mesh)
 		{
-			// TODO: XXXX reintroduce mikktspace
-			//mikk_compute_tangents(me, ccl::ustring(uvmap_name));
+			mikk_compute_tangents(mesh, ccl::ustring(uvmap_name));
 		}
 	}
 }
