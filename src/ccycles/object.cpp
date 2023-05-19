@@ -169,6 +169,8 @@ void cycles_scene_object_set_cutout(ccl::Session* session_id, ccl::Object* objec
 {
 	ASSERT(object);
 
+	// TODO: XXXX port cutouts (or reimplement)
+
 	/*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -181,6 +183,8 @@ void cycles_scene_object_set_cutout(ccl::Session* session_id, ccl::Object* objec
 void cycles_scene_object_set_ignore_cutout(ccl::Session* session_id, ccl::Object* object, bool ignore_cutout)
 {
 	ASSERT(object);
+
+	// TODO: XXXX port cutouts (or reimplement)
 
 	/*
 	ccl::Scene* sce = nullptr;
