@@ -19,7 +19,7 @@ set(LIB
   cycles_util
 )
 
-#file( GLOB SRCS *.cpp *.h)
+#file( GLOB SRCS *.h *.cpp)
 #add_library( ccycles STATIC ${SRCS} )
 
 add_definitions(-DCCL_CAPI_DLL)
@@ -83,7 +83,7 @@ include_directories(SYSTEM ${INC_SYS})
 # Application build targets
 
 if(WITH_CYCLES_STANDALONE)
-  file( GLOB SRC *.cpp *.h)
+  file( GLOB SRC *.cpp *.h *.c)
 
   add_library(ccycles SHARED ${SRC} ${INC} ${INC_SYS})
   unset(SRC)
