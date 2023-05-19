@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "../camera/camera.h"
+
 CCL_NAMESPACE_BEGIN
 
 /* wcs_box_coord gives a Rhino-style WCS box texture coordinate mapping. */
@@ -177,11 +179,11 @@ ccl_device_inline float3 map_to_plane(const float3 co, const DecalData decal)
 // sweeps.x/y = horizontal start/end
 ccl_device_inline float3 map_to_cylinder_section(const float3 co, const DecalData decal)
 {
-  float len, u, v, hit, t, height;
+  float len, u, v, hit, t/*, height*/;
   float4 sweeps;
 
   sweeps = decal.sweeps;
-  height = decal.height;
+  //height = decal.height;
 
   float3 rst = transform_point(&decal.pxyz, co);
 
@@ -361,14 +363,14 @@ ccl_device_inline void decal_data_read(KernelGlobals kg,
     const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
     data = sd->P + dP.dy;
   }
-  Transform tfm, itfm, pxyz, nxyz, uvw;
+  Transform /*tfm, itfm,*/ pxyz, nxyz, uvw;
   float3 n = sd->N;
-  tfm.x = read_node_float(kg, offset);
-  tfm.y = read_node_float(kg, offset);
-  tfm.z = read_node_float(kg, offset);
-  itfm.x = read_node_float(kg, offset);
-  itfm.y = read_node_float(kg, offset);
-  itfm.z = read_node_float(kg, offset);
+  //tfm.x = read_node_float(kg, offset);
+  //tfm.y = read_node_float(kg, offset);
+  //tfm.z = read_node_float(kg, offset);
+  //itfm.x = read_node_float(kg, offset);
+  //itfm.y = read_node_float(kg, offset);
+  //itfm.z = read_node_float(kg, offset);
   pxyz.x = read_node_float(kg, offset);
   pxyz.y = read_node_float(kg, offset);
   pxyz.z = read_node_float(kg, offset);

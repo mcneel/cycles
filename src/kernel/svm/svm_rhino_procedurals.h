@@ -126,7 +126,7 @@ ccl_device void svm_rhino_node_checker_texture(
 
 ccl_device float bias_func(float x, float b)
 {
-  float smallv = 1e-6;
+  float smallv = 1e-6f;
   if (b < smallv)
     b = smallv;
 
@@ -511,19 +511,19 @@ ccl_device_inline float WHN_rand3d(int x, int y, int z)
 
 ccl_device_inline float WHN_hpoly1(float t)
 {
-  return ((2.0 * t - 3.0) * t * t + 1.0);
+  return ((2.0f * t - 3.0f) * t * t + 1.0f);
 }
 ccl_device_inline float WHN_hpoly2(float t)
 {
-  return (-2.0 * t + 3.0) * t * t;
+  return (-2.0f * t + 3.0f) * t * t;
 }
 ccl_device_inline float WHN_hpoly3(float t)
 {
-  return ((t - 2.0) * t + 1.0) * t;
+  return ((t - 2.0f) * t + 1.0f) * t;
 }
 ccl_device_inline float WHN_hpoly4(float t)
 {
-  return (t - 1.0) * t * t;
+  return (t - 1.0f) * t * t;
 }
 
 ccl_device_inline float4 WHN_rand(int i, int3 xlim[2])
@@ -1088,7 +1088,7 @@ ccl_device float4 gradient_texture(float3 uvw,
 
     case RHINO_GRADIENT_PONG:
       t = atan2f(uvw.x, uvw.y) / (2.0f * PI / 8.0f);
-      cell_parity = int(floorf(0.5 * t));
+      cell_parity = int(floorf(0.5f * t));
       t = fmodf(t + 80.0f, 2.0f);
       if (t > 1.0f)
         t = 2.0f - t;
@@ -1102,7 +1102,7 @@ ccl_device float4 gradient_texture(float3 uvw,
   }
 
   if (flip_alternate && is_odd(cell_parity)) {
-    t = 1.0 - t;
+    t = 1.0f - t;
   }
 
   if (use_custom_curve) {
@@ -1266,7 +1266,7 @@ ccl_device float3 LogMapYxy(float3 Yxy, float exposure, float world_luminance, f
   float exp_adapt = 1.0f;
 
   float fAvLum = expf(world_luminance) / exp_adapt;
-  float fBiasP = (logf(fBias) / logf(0.5));
+  float fBiasP = (logf(fBias) / logf(0.5f));
   float fContP = (0.0f != fCont) ? 1.0f / fCont : 1e22f;
   float fLmax = max_luminance / fAvLum;
   float fDivider = log10(fLmax + 1.0f);
@@ -1308,10 +1308,10 @@ ccl_device float3 yxy_to_rgb(float3 Yxy)
   float x = Yxy.y;
   float y = Yxy.z;
 
-  float X = 0.0;
-  float Z = 0.0;
+  float X = 0.0f;
+  float Z = 0.0f;
 
-  if ((x > 0.0) && (y > 0.0)) {
+  if ((x > 0.0f) && (y > 0.0f)) {
     X = (x * Y) / y;
     Z = (X / x) - X - Y;
   }
@@ -1370,7 +1370,7 @@ ccl_device void svm_rhino_node_exposure_texture(
 
 ccl_device float fbm(KernelGlobals kg, float3 P, bool is_turbulent, float omega, int maxOctaves)
 {
-  float sum = 0.0, lambda = 1.0, o = 1.0;
+  float sum = 0.0f, lambda = 1.0f, o = 1.0f;
   for (int i = 0; i < maxOctaves; ++i) {
     float3 lambda_p = lambda * P;
     float noise_value = noise(kg, lambda_p.x, lambda_p.y, lambda_p.z);
@@ -1379,7 +1379,7 @@ ccl_device float fbm(KernelGlobals kg, float3 P, bool is_turbulent, float omega,
       noise_value = fabsf(noise_value);
 
     sum += o * noise_value;
-    lambda *= 1.99;
+    lambda *= 1.99f;
     o *= omega;
   }
 
@@ -1446,24 +1446,24 @@ ccl_device void svm_rhino_node_fbm_texture(
 
 ccl_device int get_segment(float u, float v, float thickness, float margin)
 {
-  if (u < 2.0 * margin || 1.0 - 2.0 * margin < u || v < margin) {
+  if (u < 2.0f * margin || 1.0f - 2.0f * margin < u || v < margin) {
     return 0;
   }
 
-  if (u > 2.0 * (margin + thickness) && u < 1.0 - 2.0 * (margin + thickness) &&
-      v > margin + thickness && v < 0.5 - 0.5 * thickness) {
+  if (u > 2.0f * (margin + thickness) && u < 1.0f - 2.0f * (margin + thickness) &&
+      v > margin + thickness && v < 0.5f - 0.5f * thickness) {
     return 0;
   }
 
-  if (u - 2.0 * v > 0.0 && u + 2.0 * v < 1.0) {
+  if (u - 2.0f * v > 0.0f && u + 2.0f * v < 1.0f) {
     return 1;
   }
 
-  if (0.25 * u + v > 0.5 * margin + 0.5 && 0.25 * u - v < -0.5 * margin - 0.25) {
+  if (0.25f * u + v > 0.5f * margin + 0.5f && 0.25f * u - v < -0.5f * margin - 0.25f) {
     return 4;
   }
 
-  if (u < 0.5) {
+  if (u < 0.5f) {
     return 2;
   }
 
@@ -1492,9 +1492,9 @@ ccl_device int test_digit(int n, float u, float v, float thickness, float margin
   if (n < 0 || 9 < n)
     return 0;
 
-  bool mirror = v > 0.5;
+  bool mirror = v > 0.5f;
   if (mirror) {
-    v = 1.0 - v;
+    v = 1.0f - v;
   }
 
   int s = get_segment(u, v, thickness, margin);
@@ -1511,7 +1511,7 @@ ccl_device int test_digit(int n, float u, float v, float thickness, float margin
 
 ccl_device int TestNumber(int digits, int number, float thickness, float margin, float u, float v)
 {
-  float digitIndexDbl = 0.0;
+  float digitIndexDbl = 0.0f;
   float digitU = modff(u * digits, &digitIndexDbl);
   float digitV = v;
   int digitIndex = int(digitIndexDbl);
@@ -1536,10 +1536,10 @@ grid_texture(float3 uvw, float4 color1, float4 color2, int cells, float font_thi
   float u = fractf(uvw.x);
   float v = fractf(uvw.y);
 
-  float gridU = 0.0;
-  float gridV = 0.0;
-  float cellU = 0.0;
-  float cellV = 0.0;
+  float gridU = 0.0f;
+  float gridV = 0.0f;
+  float cellU = 0.0f;
+  float cellV = 0.0f;
 
   cellU = modff(cells * u, &gridU);
   cellV = modff(cells * v, &gridV);
@@ -1563,15 +1563,15 @@ grid_texture(float3 uvw, float4 color1, float4 color2, int cells, float font_thi
                    maxCellNumber < 1000 ? 3 :
                    maxCellNumber < 1000 ? 4 :
                                           5;
-  float numberStartU = (5 - digitCount) * 0.1;
-  float numberEndU = 1.0 - numberStartU;
-  float numberStartV = 0.3;
-  float numberEndV = 0.7;
+  float numberStartU = (5 - digitCount) * 0.1f;
+  float numberEndU = 1.0f - numberStartU;
+  float numberStartV = 0.3f;
+  float numberEndV = 0.7f;
   float numberU = (cellU - numberStartU) / (numberEndU - numberStartU);
   float numberV = (cellV - numberStartV) / (numberEndV - numberStartV);
 
   int hitResult = TestNumber(
-      digitCount, cellNumber, 0.12 * font_thickness, 0.1, numberU, 1.0 - numberV);
+      digitCount, cellNumber, 0.12f * font_thickness, 0.1f, numberU, 1.0f - numberV);
 
   if (2 == hitResult)
     return make_float4(colNumber.x, colNumber.y, colNumber.z, 1);
@@ -1674,30 +1674,30 @@ ccl_device float2 world_to_equirect(float3 n)
 
   float theta, phi;
 
-  if (x == 0.0 && y == 0.0) {
-    theta = 0.0;
-    phi = (z >= 0.0 ? 0.5 * PI : -0.5 * PI);
+  if (x == 0.0f && y == 0.0f) {
+    theta = 0.0f;
+    phi = (z >= 0.0f ? 0.5f * PI : -0.5f * PI);
   }
   else {
     theta = atan2(y, x);
-    if (theta < 0.0)
-      theta += 2.0 * PI;
+    if (theta < 0.0f)
+      theta += 2.0f * PI;
 
     float r;
     if (fabsf(x) >= fabsf(y)) {
       r = y / x;
-      r = fabsf(x) * sqrt(1.0 + r * r);
+      r = fabsf(x) * sqrt(1.0f + r * r);
     }
     else {
       r = x / y;
-      r = fabsf(y) * sqrt(1.0 + r * r);
+      r = fabsf(y) * sqrt(1.0f + r * r);
     }
 
     phi = atan(z / r);
   }
 
-  float u = theta / (2.0 * PI);
-  float v = (-phi + 0.5 * PI) / PI;
+  float u = theta / (2.0f * PI);
+  float v = (-phi + 0.5f * PI) / PI;
 
   return make_float2(u, v);
 }
@@ -2108,10 +2108,10 @@ ccl_device float2 world_to_emap(float3 n)
   float y = n.y;
   float z = n.z;
 
-  float m = 2.0 * sqrt((x * x) + (y * y) + (z + 1.0) * (z + 1.0));
+  float m = 2.0f * sqrt((x * x) + (y * y) + (z + 1.0f) * (z + 1.0f));
 
-  float u = x / m + 0.5;
-  float v = y / m + 0.5;
+  float u = x / m + 0.5f;
+  float v = y / m + 0.5f;
 
   return make_float2(u, v);
 }
@@ -2136,7 +2136,7 @@ ccl_device Transform rotation_matrix(float3 axis, float angle)
 {
   float s = -sin(angle);
   float c = cos(angle);
-  float oc = 1.0 - c;
+  float oc = 1.0f - c;
 
   Transform tf;
   tf.x.x = oc * axis.x * axis.x + c;
@@ -2159,7 +2159,7 @@ ccl_device Transform rotation_matrix(float3 axis, float angle)
 
 ccl_device bool is_parallel_to(float3 a, float3 b)
 {
-  return len(cross(a, b)) < 1e-6;
+  return len(cross(a, b)) < 1e-6f;
 }
 
 ccl_device float4 projection_changer_texture(float3 uvw,
@@ -2212,7 +2212,7 @@ ccl_device float4 projection_changer_texture(float3 uvw,
         break;
     }
 
-    float3 rotate_axis = make_float3(0, 1, 0);
+    float3 rotate_axis = make_float3(0.0f, 1.0f, 0.0f);
 
     Transform transform = rotation_matrix(rotate_axis, azimuth);
     vec = transform_direction(&transform, vec);
@@ -2256,7 +2256,7 @@ ccl_device float4 projection_changer_texture(float3 uvw,
     uvw.y = uv.y;
   }
 
-  return make_float4(uvw.x, uvw.y, uvw.z, 1.0);
+  return make_float4(uvw.x, uvw.y, uvw.z, 1.0f);
 }
 
 ccl_device void svm_rhino_node_projection_changer_texture(
@@ -2285,7 +2285,7 @@ ccl_device void svm_rhino_node_projection_changer_texture(
 
 ccl_device float4 mask_texture(float4 color, RhinoProceduralMaskType mask_type)
 {
-  float alphaValue = 0.5;
+  float alphaValue = 0.5f;
 
   switch (mask_type) {
     case RHINO_MASK_LUMINANCE:
@@ -2344,47 +2344,47 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
                                         float color1_sat,
                                         float color2_sat)
 {
-  float totalValue = 0.0;
-  float freq = 1.0;
+  float totalValue = 0.0f;
+  float freq = 1.0f;
   float weight = noise_amount;
   for (int o = 0; o < levels; o++) {
     float x = uvw.x * freq + float(o);
-    float y = uvw.y * freq + float(o) * 2.0;
+    float y = uvw.y * freq + float(o) * 2.0f;
     float z = uvw.z * freq - float(o);
     float value = noise(kg, x * size, y * size, z * size);
     totalValue += weight * value;
-    freq *= 2.17;
-    weight *= 0.5;
+    freq *= 2.17f;
+    weight *= 0.5f;
   }
 
   float phase = totalValue - floorf(totalValue);
 
   float3 startColor;
   float3 endColor;
-  float tweenValue = 0.0;
+  float tweenValue = 0.0f;
 
-  if (0.0 <= phase && phase < 0.1) {
-    tweenValue = phase * 10.0;
+  if (0.0f <= phase && phase < 0.1f) {
+    tweenValue = phase * 10.0f;
 
     startColor = color1;
     endColor = startColor * color1_sat;
   }
-  if (0.1 <= phase && phase < 0.5) {
-    tweenValue = (phase - 0.1) * 2.5;
+  if (0.1f <= phase && phase < 0.5f) {
+    tweenValue = (phase - 0.1f) * 2.5f;
 
     startColor = color1;
     startColor *= color1_sat;
 
     endColor = color2;
   }
-  if (0.5 <= phase && phase < 0.6) {
-    tweenValue = (phase - 0.5) * 10.0;
+  if (0.5f <= phase && phase < 0.6f) {
+    tweenValue = (phase - 0.5f) * 10.0f;
 
     startColor = color2;
     endColor = startColor * color2_sat;
   }
-  if (0.6 <= phase && phase <= 1.0) {
-    tweenValue = (phase - 0.6) * 2.5;
+  if (0.6f <= phase && phase <= 1.0f) {
+    tweenValue = (phase - 0.6f) * 2.5f;
 
     startColor = color2;
     startColor *= color2_sat;
@@ -2392,19 +2392,19 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
     endColor = color1;
   }
 
-  if (blur > 0.0) {
-    tweenValue = 0.5 + (2.0 * tweenValue - 1.0) / blur * 0.5;
-    if (tweenValue < 0.0)
-      tweenValue = 0.0;
-    if (tweenValue > 1.0)
-      tweenValue = 1.0;
+  if (blur > 0.0f) {
+    tweenValue = 0.5f + (2.0f * tweenValue - 1.0f) / blur * 0.5f;
+    if (tweenValue < 0.0f)
+      tweenValue = 0.0f;
+    if (tweenValue > 1.0f)
+      tweenValue = 1.0f;
   }
   else
-    tweenValue = tweenValue > 0.5 ? 1.0 : 0.0;
+    tweenValue = tweenValue > 0.5f ? 1.0f : 0.0f;
 
-  float3 colOut = startColor * (1.0 - tweenValue) + endColor * tweenValue;
+  float3 colOut = startColor * (1.0f - tweenValue) + endColor * tweenValue;
 
-  return make_float4(colOut.x, colOut.y, colOut.z, 1);
+  return make_float4(colOut.x, colOut.y, colOut.z, 1.0f);
 }
 
 ccl_device void svm_rhino_node_perlin_marble_texture(
@@ -2478,7 +2478,7 @@ ccl_device float4 physical_sky_texture(float3 uvw,
   vSkyDir.y = vSkyDir.z;
   vSkyDir.z = -tmp;
 
-  float4 color_out = make_float4(0, 0, 0, 1);
+  float4 color_out = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
 
   //////////////////////////////////////
   // BEGIN: Physical Sky algorithm...
@@ -2501,7 +2501,7 @@ ccl_device float4 physical_sky_texture(float3 uvw,
   const float fScale = 1.0f / (fOuterRadius - fInnerRadius);
   const float fScaleDepth = 0.25f;
   const float fScaleOverScaleDepth = fScale / fScaleDepth;
-  float3 vGroundPos = make_float3(0.0, 0.0, fInnerRadius + 1.0e-6f);
+  float3 vGroundPos = make_float3(0.0f, 0.0f, fInnerRadius + 1.0e-6f);
   float IR2 = vGroundPos.z * vGroundPos.z;
 
   // Precomputed Mie constants...
@@ -2863,9 +2863,9 @@ ccl_device void svm_rhino_node_texture_adjustment_texture(
 ccl_device bool tile_texture_rectangular_test_3d(float3 uvw, float3 join_width)
 {
   for (int i = 0; i < 3; i++) {
-    float dHalfWidth = get_float_from_f3(join_width, i) * 0.5;
+    float dHalfWidth = get_float_from_f3(join_width, i) * 0.5f;
 
-    if (get_float_from_f3(uvw, i) < dHalfWidth || get_float_from_f3(uvw, i) > 1.0 - dHalfWidth) {
+    if (get_float_from_f3(uvw, i) < dHalfWidth || get_float_from_f3(uvw, i) > 1.0f - dHalfWidth) {
       return true;
     }
   }
@@ -2876,9 +2876,9 @@ ccl_device bool tile_texture_rectangular_test_3d(float3 uvw, float3 join_width)
 ccl_device bool tile_texture_rectangular_test_2d(float3 uvw, float3 join_width)
 {
   for (int i = 0; i < 2; i++) {
-    float dHalfWidth = get_float_from_f3(join_width, i) * 0.5;
+    float dHalfWidth = get_float_from_f3(join_width, i) * 0.5f;
 
-    if (get_float_from_f3(uvw, i) < dHalfWidth || get_float_from_f3(uvw, i) > 1.0 - dHalfWidth) {
+    if (get_float_from_f3(uvw, i) < dHalfWidth || get_float_from_f3(uvw, i) > 1.0f - dHalfWidth) {
       return true;
     }
   }
@@ -2891,7 +2891,7 @@ ccl_device bool is_point_near_half_line_starting_from_origin(
 {
   float dotP = pointU * tangentU + pointV * tangentV;
 
-  if (0.0 > dotP)
+  if (0.0f > dotP)
     return false;
 
   float pointDistance = pointU * tangentV - pointV * tangentU;
@@ -2907,13 +2907,13 @@ ccl_device bool is_point_near_half_line_starting_from_origin(
 
 ccl_device bool tile_texture_hexagonal_test(float3 uvw, float3 join_width)
 {
-  const float sqrtOfThree = sqrt(3.0);
-  float u = (uvw.x <= 0.5 ? uvw.x : 1.0 - uvw.x);
-  float v = (uvw.y <= 0.5 ? uvw.y : 1.0 - uvw.y);
+  const float sqrtOfThree = sqrt(3.0f);
+  float u = (uvw.x <= 0.5f ? uvw.x : 1.0f - uvw.x);
+  float v = (uvw.y <= 0.5f ? uvw.y : 1.0f - uvw.y);
 
-  float knot_u = (u < v ? 0.0 : 0.5);
-  float knot_v = (u < v ? 2.0 / 6.0 : 1.0 / 6.0);
-  float dJunctionVScale = (u < v ? 1.0 : -1.0);
+  float knot_u = (u < v ? 0.0f : 0.5f);
+  float knot_v = (u < v ? 2.0f / 6.0f : 1.0f / 6.0f);
+  float dJunctionVScale = (u < v ? 1.0f : -1.0f);
 
   float trim_u = (u - knot_u);
   float trim_v = (v - knot_v) * sqrtOfThree * dJunctionVScale;
@@ -2923,18 +2923,18 @@ ccl_device bool tile_texture_hexagonal_test(float3 uvw, float3 join_width)
 
   float trimLengthSquared = trim_u * trim_u + trim_v * trim_v;
 
-  if (4.0 * trimLengthSquared < maxJointWidthSquared)
+  if (4.0f * trimLengthSquared < maxJointWidthSquared)
     return true;
 
-  if (is_point_near_half_line_starting_from_origin(trim_u, trim_v, 0.0, 1.0, join_width.x / 2.0))
-    return true;
-
-  if (is_point_near_half_line_starting_from_origin(
-          trim_u, trim_v, 0.5 * sqrtOfThree, -0.5, join_width.y / 2.0))
+  if (is_point_near_half_line_starting_from_origin(trim_u, trim_v, 0.0f, 1.0f, join_width.x / 2.0f))
     return true;
 
   if (is_point_near_half_line_starting_from_origin(
-          trim_u, trim_v, -0.5 * sqrtOfThree, -0.5, join_width.y / 2.0))
+          trim_u, trim_v, 0.5f * sqrtOfThree, -0.5f, join_width.y / 2.0f))
+    return true;
+
+  if (is_point_near_half_line_starting_from_origin(
+          trim_u, trim_v, -0.5f * sqrtOfThree, -0.5f, join_width.y / 2.0f))
     return true;
 
   return false;
@@ -2942,48 +2942,48 @@ ccl_device bool tile_texture_hexagonal_test(float3 uvw, float3 join_width)
 
 ccl_device bool tile_texture_triangular_test(float3 uvw, float3 join_width)
 {
-  const float vFactor = sqrt(3.0) / 2.0;
-  float u = uvw.x > 0.5 ? 1.0 - uvw.x : uvw.x;
-  float v = (uvw.y > 0.5 ? 1.0 - uvw.y : uvw.y) * 2.0 * vFactor;
+  const float vFactor = sqrt(3.0f) / 2.0f;
+  float u = uvw.x > 0.5f ? 1.0f - uvw.x : uvw.x;
+  float v = (uvw.y > 0.5f ? 1.0f - uvw.y : uvw.y) * 2.0f * vFactor;
 
-  float dHalfWidth = join_width.x * 0.5;
+  float dHalfWidth = join_width.x * 0.5f;
 
   if (v < dHalfWidth || v > vFactor - dHalfWidth)
     return true;
 
   float v2 = v / vFactor;
-  u -= (1.0 - v2) * 0.5;
+  u -= (1.0f - v2) * 0.5f;
 
-  dHalfWidth = join_width.y * 0.5 * vFactor;
+  dHalfWidth = join_width.y * 0.5f * vFactor;
 
   return abs(u) < dHalfWidth;
 }
 
 ccl_device bool tile_texture_octagonal_test(float3 uvw, float3 join_width)
 {
-  const float sqrtOfTwo = sqrt(2.0);
-  const float b = 1.0 / (2.0 + sqrtOfTwo);
+  const float sqrtOfTwo = sqrt(2.0f);
+  const float b = 1.0f / (2.0f + sqrtOfTwo);
 
-  float u = uvw.x > 0.5 ? 1.0 - uvw.x : uvw.x;
-  float v = uvw.y > 0.5 ? 1.0 - uvw.y : uvw.y;
+  float u = uvw.x > 0.5f ? 1.0f - uvw.x : uvw.x;
+  float v = uvw.y > 0.5f ? 1.0f - uvw.y : uvw.y;
 
-  if (u + v < b - sqrtOfTwo * 0.5 * join_width.x) {
-    if (v > b - 0.5 * join_width.y)
+  if (u + v < b - sqrtOfTwo * 0.5f * join_width.x) {
+    if (v > b - 0.5f * join_width.y)
       return true;
 
-    if (u > b - 0.5 * join_width.y)
+    if (u > b - 0.5f * join_width.y)
       return true;
 
     return false;
   }
 
-  if (u < 0.5 * join_width.y)
+  if (u < 0.5f * join_width.y)
     return true;
 
-  if (v < 0.5 * join_width.y)
+  if (v < 0.5f * join_width.y)
     return true;
 
-  if (u + v < b + sqrtOfTwo * 0.5 * join_width.x)
+  if (u + v < b + sqrtOfTwo * 0.5f * join_width.x)
     return true;
 
   return false;
@@ -3341,7 +3341,7 @@ ccl_device void ProcessDotColor(KernelGlobals kg,
   if (rings && ring_radius != 1.0f) {
     float ringRadius = ring_radius;
     virtualRadius = radius * ringRadius;
-    float actualRingRadius = radius * (1.0 - ringRadius);
+    float actualRingRadius = radius * (1.0f - ringRadius);
     virtualDistance = abs(actualRingRadius - virtualDistance);
     virtualSquaredDistance = virtualDistance * virtualDistance;
   }
@@ -3358,31 +3358,31 @@ ccl_device void ProcessDotColor(KernelGlobals kg,
         break;
 
       case RHINO_DOTS_FALLOFF_LINEAR:
-        value = amplitude * (1.0 - sqrt(virtualSquaredDistance) / virtualRadius);
+        value = amplitude * (1.0f - sqrt(virtualSquaredDistance) / virtualRadius);
         break;
 
       case RHINO_DOTS_FALLOFF_CUBIC: {
         float param = sqrt(virtualSquaredDistance) / virtualRadius;
-        float alpha = 1.0;
-        float a = 2.0 * alpha;
-        float b = -3.0 * alpha;
-        float c = 0.0;
+        float alpha = 1.0f;
+        float a = 2.0f * alpha;
+        float b = -3.0f * alpha;
+        float c = 0.0f;
         float d = alpha;
         value = amplitude * (((a * param + b) * param + c) * param + d);
       } break;
 
       case RHINO_DOTS_FALLOFF_ELLIPTIC: {
         float xSquared = virtualSquaredDistance / (virtualRadius * virtualRadius);
-        value = amplitude * sqrt(1.0 - xSquared);
+        value = amplitude * sqrt(1.0f - xSquared);
       } break;
       default:
         value = amplitude;
         break;
     }
 
-    float h = 0.0;
-    float s = 0.0;
-    float b = 0.0;
+    float h = 0.0f;
+    float s = 0.0f;
+    float b = 0.0f;
 
     float4 dotColor = originalDotColor;
 
