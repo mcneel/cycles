@@ -328,11 +328,6 @@ CCL_CAPI void __cdecl cycles_scene_object_set_ocs_frame(ccl::Session* session_id
  */
 CCL_CAPI void __cdecl cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object*, ccl::Geometry*);
 /**
- * Get mesh id for object
- * \ingroup ccycles_object
- */
-CCL_CAPI ccl::Geometry* __cdecl cycles_scene_object_get_geometry(ccl::Session* session_id, ccl::Object*);
-/**
  * Set visibility flag for object
  * \ingroup ccycles_object
  */

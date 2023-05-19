@@ -64,32 +64,6 @@ void cycles_object_tag_update(ccl::Session* session_id, ccl::Object* object)
 	}
 }
 
-ccl::Geometry* cycles_scene_object_get_geometry(ccl::Session* session_id, ccl::Object* object)
-{
-	ASSERT(object);
-
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
-	{
-		//[NATHAN_LOOK] - This looks buggy to me - the iterator increased...
-		//In fact, I don't really understand what this is trying to do at all...
-
-		auto cmeshit = sce->geometry.begin();
-		auto cmeshend = sce->geometry.end();
-		unsigned int i = 0;
-		while (cmeshit != cmeshend) 
-		{
-			if ((*cmeshit) == object->get_geometry())
-			{
-				return *cmeshit;
-			}
-			++i;
-		}
-	}
-
-	return nullptr;
-}
-
 void cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* object, unsigned int visibility)
 {
 	ASSERT(object);
