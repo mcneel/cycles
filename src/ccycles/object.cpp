@@ -110,16 +110,12 @@ void cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id,
 {
 	ASSERT(object);
 
-    // TODO: XXXX port this from old Cycles integration
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->mesh_light_no_cast_shadow = mesh_light_no_cast_shadow;
-		ob->tag_update(sce);
-		sce->light_manager->tag_update(sce);
+		object->set_mesh_light_no_cast_shadow(mesh_light_no_cast_shadow);
+		object->tag_update(sce);
+		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
-    */
 }
 
 void cycles_scene_object_set_is_block_instance(ccl::Session* session_id, ccl::Object* object, bool is_block_instance)
