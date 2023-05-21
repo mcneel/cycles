@@ -31,6 +31,12 @@ ccl_device_noinline void svm_node_convert(KernelGlobals kg,
       stack_store_float(stack, to, g);
       break;
     }
+    case NODE_CONVERT_CF2: {
+      float3 f = stack_load_float3(stack, from);
+      float l = linear_rgb_to_luminance(kg, f);
+      stack_store_float(stack, to, l);
+      break;
+    }
     case NODE_CONVERT_CI: {
       float3 f = stack_load_float3(stack, from);
       int i = (int)linear_rgb_to_gray(kg, f);

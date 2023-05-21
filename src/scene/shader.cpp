@@ -577,6 +577,7 @@ void ShaderManager::device_update_common(Device * /*device*/,
   kfilm->xyz_to_g = float3_to_float4(xyz_to_g);
   kfilm->xyz_to_b = float3_to_float4(xyz_to_b);
   kfilm->rgb_to_y = float3_to_float4(rgb_to_y);
+  kfilm->rgb_to_lum = float3_to_float4(rgb_to_lum);
   kfilm->rec709_to_r = float3_to_float4(rec709_to_r);
   kfilm->rec709_to_g = float3_to_float4(rec709_to_g);
   kfilm->rec709_to_b = float3_to_float4(rec709_to_b);
@@ -740,6 +741,11 @@ float ShaderManager::linear_rgb_to_gray(float3 c)
   return dot(c, rgb_to_y);
 }
 
+float ShaderManager::linear_rgb_to_luminance(float3 c)
+{
+	return dot(c, rgb_to_lum);
+}
+
 float3 ShaderManager::rec709_to_scene_linear(float3 c)
 {
   return make_float3(dot(rec709_to_r, c), dot(rec709_to_g, c), dot(rec709_to_b, c));
@@ -824,6 +830,7 @@ void ShaderManager::init_xyz_transforms()
   xyz_to_g = float4_to_float3(xyz_to_rec709.y);
   xyz_to_b = float4_to_float3(xyz_to_rec709.z);
   rgb_to_y = make_float3(0.2126729f, 0.7151522f, 0.0721750f);
+  rgb_to_lum = make_float3(0.2989f, 0.5870f, 0.1140f);
 
   rec709_to_r = make_float3(1.0f, 0.0f, 0.0f);
   rec709_to_g = make_float3(0.0f, 1.0f, 0.0f);
