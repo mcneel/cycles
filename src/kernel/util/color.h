@@ -33,6 +33,11 @@ ccl_device float linear_rgb_to_gray(KernelGlobals kg, float3 c)
   return dot(c, float4_to_float3(kernel_data.film.rgb_to_y));
 }
 
+ccl_device float linear_rgb_to_luminance(KernelGlobals kg, float3 c)
+{
+	return dot(c, float4_to_float3(kernel_data.film.rgb_to_lum));
+}
+
 ccl_device_inline Spectrum rgb_to_spectrum(float3 rgb)
 {
   return rgb;
