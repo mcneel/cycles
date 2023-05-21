@@ -427,6 +427,14 @@ class RGBToBWNode : public ShaderNode {
   NODE_SOCKET_API(float3, color)
 };
 
+class RGBToLuminanceNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(RGBToLuminanceNode)
+		void constant_fold(const ConstantFolder& folder);
+
+	NODE_SOCKET_API(float3, color)
+};
+
 class ConvertNode : public ShaderNode {
  public:
   ConvertNode(SocketType::Type from, SocketType::Type to, bool autoconvert = false);
