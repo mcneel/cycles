@@ -870,6 +870,8 @@ enum ShaderDataObjectFlag {
   SD_OBJECT_CAUSTICS_RECEIVER = (1 << 10),
   /* object has attribute for volume motion */
   SD_OBJECT_HAS_VOLUME_MOTION = (1 << 11),
+  /* object is mesh lamp, but doesn't cast shadows */
+  SD_OBJECT_LIGHT_NO_CAST_SHADOWS = (1 << 12),
 
   /* object is using caustics */
   SD_OBJECT_CAUSTICS = (SD_OBJECT_CAUSTICS_CASTER | SD_OBJECT_CAUSTICS_RECEIVER),

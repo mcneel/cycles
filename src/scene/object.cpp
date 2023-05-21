@@ -90,6 +90,7 @@ NODE_DEFINE(Object)
   SOCKET_STRING(asset_name, "Asset Name", ustring());
 
   SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
+  SOCKET_BOOLEAN(mesh_light_no_cast_shadow, "Mesh Light No Cast Shadow", false);
 
   SOCKET_BOOLEAN(is_caustics_caster, "Cast Shadow Caustics", false);
   SOCKET_BOOLEAN(is_caustics_receiver, "Receive Shadow Caustics", false);
@@ -831,6 +832,13 @@ void ObjectManager::device_update_flags(
     else {
       object_flag[object->index] &= ~SD_OBJECT_SHADOW_CATCHER;
     }
+
+	if (object->mesh_light_no_cast_shadow) {
+		object_flag[object->index] |= SD_OBJECT_LIGHT_NO_CAST_SHADOWS;
+	}
+	else {
+		object_flag[object->index] &= ~SD_OBJECT_LIGHT_NO_CAST_SHADOWS;
+	}
 
     if (bounds_valid) {
       object->intersects_volume = false;
