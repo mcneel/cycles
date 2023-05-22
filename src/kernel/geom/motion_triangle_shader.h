@@ -32,7 +32,7 @@ ccl_device_noinline void motion_triangle_shader_setup(KernelGlobals kg,
                                                       bool is_local)
 {
   /* Get shader. */
-  sd->shader = kernel_data_fetch(tri_shader, sd->prim);
+  sd->shader = object_shader(kg, sd->object);// kernel_data_fetch(tri_shader, sd->prim);
 
   /* Compute motion info. */
   int numsteps, numverts, step;

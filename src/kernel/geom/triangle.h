@@ -59,7 +59,7 @@ ccl_device_inline void triangle_point_normal(KernelGlobals kg,
     *Ng = normalize(cross(v1 - v0, v2 - v0));
   }
   /* shader`*/
-  int sh = kernel_data_fetch(tri_shader, prim);
+  int sh = object_shader(kg, object);// kernel_data_fetch(tri_shader, prim);
 
   if (object_flag & SD_OBJECT_LIGHT_NO_CAST_SHADOWS) {
 	  *shader = sh & ~SHADER_CAST_SHADOW;

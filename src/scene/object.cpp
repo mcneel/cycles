@@ -99,6 +99,8 @@ NODE_DEFINE(Object)
   SOCKET_NODE(particle_system, "Particle System", ParticleSystem::get_node_type());
   SOCKET_INT(particle_index, "Particle Index", 0);
 
+  SOCKET_NODE(shader, "Shader", nullptr);
+
   SOCKET_FLOAT(ao_distance, "AO Distance", 0.0f);
 
   SOCKET_STRING(lightgroup, "Light Group", ustring());
@@ -117,6 +119,7 @@ Object::Object() : Node(get_node_type())
   attr_map_offset = 0;
   bounds = BoundBox::empty;
   intersects_volume = false;
+  shader = nullptr;
 }
 
 Object::~Object() {}
@@ -631,6 +634,8 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   else {
     kobject.lightgroup = LIGHTGROUP_NONE;
   }
+
+  kobject.shader = ob->shader ? state->scene->shader_manager->get_shader_id(ob->shader, true) : 0;
 }
 
 void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dscene, Scene *scene)

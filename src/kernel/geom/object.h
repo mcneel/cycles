@@ -396,6 +396,14 @@ ccl_device_inline uint object_patch_map_offset(KernelGlobals kg, int object)
   return kernel_data_fetch(objects, object).patch_map_offset;
 }
 
+ccl_device_inline int object_shader(KernelGlobals kg, int object)
+{
+	if (object == OBJECT_NONE)
+		return 0;
+
+	return kernel_data_fetch(objects, object).shader;
+}
+
 /* Volume step size */
 
 ccl_device_inline float object_volume_density(KernelGlobals kg, int object)

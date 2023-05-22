@@ -582,8 +582,75 @@ ccl_device_forceinline void kernel_embree_filter_occluded_func(
   CCLIntersectContext *ctx = (CCLIntersectContext *)(args->context);
 
   switch (ctx->type) {
-    case CCLIntersectContext::RAY_SHADOW_ALL:
-      kernel_embree_filter_occluded_shadow_all_func_impl(args);
+    case CCLIntersectContext::RAY_SHADOW_ALL: {
+      Intersection current_isect;
+      kernel_embree_convert_hit(kg, ray, hit, &current_isect);
+      if (intersection_skip_self_shadow(cray->self, current_isect.object, current_isect.prim)) {
+        *args->valid = 0;
+        return;
+      }
+      /* If no transparent shadows or max number of hits exceeded, all light is blocked. */
+      const int flags = intersection_get_shader_flags(kg, current_isect.prim, current_isect.object, current_isect.type);
+      if (!(flags & (SD_HAS_TRANSPARENT_SHADOW)) || ctx->num_hits >= ctx->max_hits) {
+        ctx->opaque_hit = true;
+        return;
+      }
+
+      ++ctx->num_hits;
+
+      /* Always use baked shadow transparency for curves. */
+      if (current_isect.type & PRIMITIVE_CURVE) {
+        ctx->throughput *= intersection_curve_shadow_transparency(
+            kg, current_isect.object, current_isect.prim, current_isect.type, current_isect.u);
+
+        if (ctx->throughput < CURVE_SHADOW_TRANSPARENCY_CUTOFF) {
+          ctx->opaque_hit = true;
+          return;
+        }
+        else {
+          *args->valid = 0;
+          return;
+        }
+      }
+
+      /* Test if we need to record this transparent intersection. */
+      const uint max_record_hits = min(ctx->max_hits, INTEGRATOR_SHADOW_ISECT_SIZE);
+      if (ctx->num_recorded_hits < max_record_hits || ray->tfar < ctx->max_t) {
+        /* If maximum number of hits was reached, replace the intersection with the
+         * highest distance. We want to find the N closest intersections. */
+        const uint num_recorded_hits = min(ctx->num_recorded_hits, max_record_hits);
+        uint isect_index = num_recorded_hits;
+        if (num_recorded_hits + 1 >= max_record_hits) {
+          float max_t = ctx->isect_s[0].t;
+          uint max_recorded_hit = 0;
+
+          for (uint i = 1; i < num_recorded_hits; ++i) {
+            if (ctx->isect_s[i].t > max_t) {
+              max_recorded_hit = i;
+              max_t = ctx->isect_s[i].t;
+            }
+          }
+
+          if (num_recorded_hits >= max_record_hits) {
+            isect_index = max_recorded_hit;
+          }
+
+          /* Limit the ray distance and stop counting hits beyond this.
+           * TODO: is there some way we can tell Embree to stop intersecting beyond
+           * this distance when max number of hits is reached?. Or maybe it will
+           * become irrelevant if we make max_hits a very high number on the CPU. */
+          ctx->max_t = max(current_isect.t, max_t);
+        }
+
+        ctx->isect_s[isect_index] = current_isect;
+      }
+
+      /* Always increase the number of recorded hits, even beyond the maximum,
+       * so that we can detect this and trace another ray if needed. */
+      ++ctx->num_recorded_hits;
+
+      /* This tells Embree to continue tracing. */
+      *args->valid = 0;
       break;
     case CCLIntersectContext::RAY_LOCAL:
     case CCLIntersectContext::RAY_SSS:
