@@ -1265,6 +1265,8 @@ typedef struct KernelObject {
   int numsteps;
   int numverts;
 
+  int shader;
+
   uint patch_map_offset;
   uint attribute_map_offset;
   uint motion_offset;

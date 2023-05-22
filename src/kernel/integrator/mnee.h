@@ -135,7 +135,7 @@ ccl_device_forceinline void mnee_setup_manifold_vertex(KernelGlobals kg,
   sd_vtx->u = isect->u;
   sd_vtx->v = isect->v;
 
-  sd_vtx->shader = kernel_data_fetch(tri_shader, sd_vtx->prim);
+  sd_vtx->shader = object_shader(kg, sd_vtx->object);//kernel_data_fetch(tri_shader, sd_vtx->prim);
 
   float3 verts[3];
   float3 normals[3];
