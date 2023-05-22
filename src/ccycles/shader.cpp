@@ -54,6 +54,7 @@ void _set_colorspace(ustring& colorspace, int value)
 ccl::Shader* cycles_create_shader(ccl::Session* session)
 {
 	ccl::Shader* shader = session->scene->create_node<ccl::Shader>();
+	shader->set_graph(new ccl::ShaderGraph());
 	shader->set_displacement_method(ccl::DisplacementMethod::DISPLACE_TRUE);
 	shader->has_displacement = true;
 	return shader;
