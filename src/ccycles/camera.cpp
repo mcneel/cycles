@@ -101,9 +101,22 @@ void cycles_camera_update(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->camera->need_flags_update = true;
-        sce->camera->need_device_update = true;
 		sce->camera->update(sce);
+
+		// 2023-05-22 David E. (RH-74901)
+		// NOTE: This is a hack. I'm calling tag_modified() here
+		// because otherwise the updated camera will get ignored in 
+		// Scene::update_kernel_features() due to need_update() returning
+		// false. It seems like camera->update(...) should not get called
+		// while we're rendering with CyclesX. Instead, we should be
+		// doing what the standalone app does:
+		//   camera->set_matrix(matrix);
+		//   camera->need_flags_update = true;
+		//   camera->need_device_update = true;
+		// The code above will set only what's needed and correctly tag
+		// the camera that it's been modified.
+		// Please see YouTrack item RH-74901.
+		sce->camera->tag_modified();
 	}
 }
 

@@ -671,12 +671,12 @@ int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned 
 			ccsess->params.samples = samples;
 
 			// TODO: XXXX remove temporary camera adjustment
-			ccl::Camera *cam = session->scene->camera;
-			cam->set_full_width(full_width);
-			cam->set_full_height(full_height);
-			cam->compute_auto_viewplane();
-			cam->need_flags_update = true;
-			cam->update(session->scene);
+			//ccl::Camera *cam = session->scene->camera;
+			//cam->set_full_width(full_width);
+			//cam->set_full_height(full_height);
+			//cam->compute_auto_viewplane();
+			//cam->need_flags_update = true;
+			//cam->update(session->scene);
 
 			session->reset(ccsess->params, ccsess->buffer_params);
 		}
