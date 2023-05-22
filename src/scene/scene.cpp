@@ -86,7 +86,7 @@ DeviceScene::DeviceScene(Device *device)
   memset((void *)&data, 0, sizeof(data));
 }
 
-Scene::Scene(const SceneParams &params_, Device *device)
+Scene::Scene(const SceneParams &params_, Device *device_)
     : name("Scene"),
       bvh(NULL),
       default_surface(NULL),
@@ -94,15 +94,15 @@ Scene::Scene(const SceneParams &params_, Device *device)
       default_light(NULL),
       default_background(NULL),
       default_empty(NULL),
-      device(device),
-      dscene(device),
+      device(device_),
+      dscene(new DeviceScene(device)),
       params(params_),
       update_stats(NULL),
       kernels_loaded(false),
       /* TODO(sergey): Check if it's indeed optimal value for the split kernel. */
       max_closure_global(1)
 {
-  memset((void *)&dscene.data, 0, sizeof(dscene.data));
+  memset((void *)&dscene->data, 0, sizeof(dscene->data));
 
   shader_manager = ShaderManager::create(
       device->info.has_osl ? params.shadingsystem : SHADINGSYSTEM_SVM, device);
@@ -168,10 +168,10 @@ void Scene::free_memory(bool final)
   passes.clear();
 
   if (device) {
-    camera->device_free(device, &dscene, this);
-    film->device_free(device, &dscene, this);
-    background->device_free(device, &dscene);
-    integrator->device_free(device, &dscene, true);
+    camera->device_free(device, dscene, this);
+    film->device_free(device, dscene, this);
+    background->device_free(device, dscene);
+    integrator->device_free(device, dscene, true);
   }
 
   if (final) {
@@ -191,21 +191,21 @@ void Scene::free_memory(bool final)
 
   /* Now that all nodes have been deleted, we can safely delete managers and device data. */
   if (device) {
-    object_manager->device_free(device, &dscene, true);
-    geometry_manager->device_free(device, &dscene, true);
-    shader_manager->device_free(device, &dscene, this);
-    light_manager->device_free(device, &dscene);
+    object_manager->device_free(device, dscene, true);
+    geometry_manager->device_free(device, dscene, true);
+    shader_manager->device_free(device, dscene, this);
+    light_manager->device_free(device, dscene);
 
-    particle_system_manager->device_free(device, &dscene);
+    particle_system_manager->device_free(device, dscene);
 
-    bake_manager->device_free(device, &dscene);
+    bake_manager->device_free(device, dscene);
 
     if (final)
       image_manager->device_free(device);
     else
       image_manager->device_free_builtin(device);
 
-    lookup_tables->device_free(device, &dscene);
+    lookup_tables->device_free(device, dscene);
   }
 
   if (final) {
@@ -219,6 +219,7 @@ void Scene::free_memory(bool final)
     delete bake_manager;
     delete update_stats;
     delete procedural_manager;
+    delete dscene;
   }
 }
 
@@ -262,7 +263,7 @@ void Scene::device_update(Device *device_, Progress &progress)
   }
 
   progress.set_status("Updating Shaders");
-  shader_manager->device_update(device, &dscene, this, progress);
+  shader_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
@@ -273,13 +274,13 @@ void Scene::device_update(Device *device_, Progress &progress)
     return;
 
   progress.set_status("Updating Background");
-  background->device_update(device, &dscene, this);
+  background->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Camera");
-  camera->device_update(device, &dscene, this);
+  camera->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
@@ -290,31 +291,31 @@ void Scene::device_update(Device *device_, Progress &progress)
     return;
 
   progress.set_status("Updating Objects");
-  object_manager->device_update(device, &dscene, this, progress);
+  object_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Particle Systems");
-  particle_system_manager->device_update(device, &dscene, this, progress);
+  particle_system_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Meshes");
-  geometry_manager->device_update(device, &dscene, this, progress);
+  geometry_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Objects Flags");
-  object_manager->device_update_flags(device, &dscene, this, progress);
+  object_manager->device_update_flags(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Primitive Offsets");
-  object_manager->device_update_prim_offsets(device, &dscene, this);
+  object_manager->device_update_prim_offsets(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
@@ -326,52 +327,52 @@ void Scene::device_update(Device *device_, Progress &progress)
     return;
 
   progress.set_status("Updating Camera Volume");
-  camera->device_update_volume(device, &dscene, this);
+  camera->device_update_volume(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Lookup Tables");
-  lookup_tables->device_update(device, &dscene, this);
+  lookup_tables->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Lights");
-  light_manager->device_update(device, &dscene, this, progress);
+  light_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Integrator");
-  integrator->device_update(device, &dscene, this);
+  integrator->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Film");
-  film->device_update(device, &dscene, this);
+  film->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Lookup Tables");
-  lookup_tables->device_update(device, &dscene, this);
+  lookup_tables->device_update(device, dscene, this);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Baking");
-  bake_manager->device_update(device, &dscene, this, progress);
+  bake_manager->device_update(device, dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   if (device->have_error() == false) {
-    dscene.data.volume_stack_size = get_volume_stack_size();
+    dscene->data.volume_stack_size = get_volume_stack_size();
 
     progress.set_status("Updating Device", "Writing constant memory");
-    device->const_copy_to("data", &dscene.data, sizeof(dscene.data));
+    device->const_copy_to("data", &(dscene->data), sizeof(dscene->data));
   }
 
   device->optimize_for_scene(this);
@@ -550,9 +551,9 @@ void Scene::update_kernel_features()
     }
   }
 
-  dscene.data.integrator.use_caustics = false;
+  dscene->data.integrator.use_caustics = false;
   if (has_caustics_caster && has_caustics_receiver && has_caustics_light) {
-    dscene.data.integrator.use_caustics = true;
+    dscene->data.integrator.use_caustics = true;
     kernel_features |= KERNEL_FEATURE_MNEE;
   }
 
@@ -567,12 +568,12 @@ void Scene::update_kernel_features()
   kernel_features |= film->get_kernel_features(this);
   kernel_features |= integrator->get_kernel_features();
 
-  dscene.data.kernel_features = kernel_features;
+  dscene->data.kernel_features = kernel_features;
 
   /* Currently viewport render is faster with higher max_closures, needs investigating. */
   const uint max_closures = (params.background) ? get_max_closure_count() : MAX_CLOSURE;
-  dscene.data.max_closures = max_closures;
-  dscene.data.max_shaders = shaders.size();
+  dscene->data.max_closures = max_closures;
+  dscene->data.max_shaders = shaders.size();
 }
 
 bool Scene::update(Progress &progress)
@@ -624,7 +625,7 @@ bool Scene::load_kernels(Progress &progress)
 {
   update_kernel_features();
 
-  const uint kernel_features = dscene.data.kernel_features;
+  const uint kernel_features = dscene->data.kernel_features;
 
   if (!kernels_loaded || loaded_kernel_features != kernel_features) {
     progress.set_status("Loading render kernels (may take a few minutes the first time)");
