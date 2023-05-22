@@ -1562,7 +1562,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   }
 
   /* tag the device arrays for reallocation or modification */
-  DeviceScene *dscene = &scene->dscene;
+  DeviceScene *dscene = scene->dscene;
 
   if (device_update_flags & (DEVICE_MESH_DATA_NEEDS_REALLOC | DEVICE_CURVE_DATA_NEEDS_REALLOC |
                              DEVICE_POINT_DATA_NEEDS_REALLOC)) {
