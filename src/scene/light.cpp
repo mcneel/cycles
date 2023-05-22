@@ -264,6 +264,42 @@ void LightManager::test_enabled_lights(Scene *scene)
   }
 }
 
+bool LightManager::object_usable_as_light(Object *object)
+{
+  Geometry *geom = object->get_geometry();
+  if (geom->geometry_type != Geometry::MESH && geom->geometry_type != Geometry::VOLUME) {
+    return false;
+  }
+  /* Skip objects with NaNs */
+  if (!object->bounds.valid()) {
+    return false;
+  }
+  /* Skip if we are not visible for BSDFs. */
+  if (!(object->get_visibility() & (PATH_RAY_DIFFUSE | PATH_RAY_GLOSSY | PATH_RAY_TRANSMIT))) {
+    return false;
+  }
+  /* Skip if we have no emission shaders. */
+  /* TODO(sergey): Ideally we want to avoid such duplicated loop, since it'll
+   * iterate all geometry shaders twice (when counting and when calculating
+   * triangle area.
+   */
+
+  foreach (Node *node, geom->get_used_shaders()) {
+    Shader *shader = static_cast<Shader *>(node);
+    if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      return true;
+    }
+  }
+
+  Shader* shader = object->get_shader();
+  if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE)
+  {
+    return true;
+  }
+
+  return false;
+}
+
 void LightManager::device_update_distribution(Device *,
                                               DeviceScene *dscene,
                                               Scene *scene,
@@ -289,13 +325,13 @@ void LightManager::device_update_distribution(Device *,
     Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
     int mesh_num_triangles = static_cast<int>(mesh->num_triangles());
 
-    for (int i = 0; i < mesh_num_triangles; i++) {
-      int shader_index = mesh->get_shader()[i];
-      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
+    for (size_t i = 0; i < mesh_num_triangles; i++) {
+      //int shader_index = mesh->get_shader()[i];
+      Shader* shader = object->get_shader();/* (shader_index < mesh->get_used_shaders().size()) ?
                            static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+                           scene->default_surface;*/
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         num_triangles++;
       }
     }
@@ -358,12 +394,12 @@ void LightManager::device_update_distribution(Device *,
 
     size_t mesh_num_triangles = mesh->num_triangles();
     for (size_t i = 0; i < mesh_num_triangles; i++) {
-      int shader_index = mesh->get_shader()[i];
-      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
+      //int shader_index = mesh->get_shader()[i];
+      Shader* shader = object->get_shader();/* (shader_index < mesh->get_used_shaders().size()) ?
                            static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+                           scene->default_surface;*/
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         distribution[offset].totarea = totarea;
         distribution[offset].prim = i + mesh->prim_offset;
         distribution[offset].mesh_light.shader_flag = shader_flag;
