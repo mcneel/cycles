@@ -37,21 +37,13 @@ void cycles_scene_set_background_shader(ccl::Session* session_id, unsigned int s
 	}
 }
 
-unsigned int cycles_scene_get_background_shader(ccl::Session* session_id)
+ccl::Shader* cycles_scene_get_background_shader(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		unsigned int idx = 0;
-		auto bi = sce->shaders.cbegin();
-		auto ei = sce->shaders.cend();
-		while (bi != ei) {
-			if (*bi == sce->background->get_shader()) break;
-			idx++;
-			bi++;
-		}
-		return idx;
+		return sce->default_background;
 	}
-	return UINT_MAX;
+	return nullptr;
 }
 
 void cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent)

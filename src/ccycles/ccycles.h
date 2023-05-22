@@ -80,6 +80,13 @@ extern "C" {
 
 /***********************************/
 
+class StringHolder
+{
+public:
+	std::string thestring;
+};
+
+
 /**
  * Logger function signature. Used to register a logging
  * function with CCycles using
@@ -597,7 +604,7 @@ CCL_CAPI void __cdecl cycles_session_params_set_pixel_size(ccl::SessionParams* s
 /* Create a new scene for specified device. */
 CCL_CAPI unsigned int __cdecl cycles_scene_create(unsigned int scene_params_id, ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_scene_set_background_shader(ccl::Session* session_id, unsigned int shader_id);
-CCL_CAPI unsigned int __cdecl cycles_scene_get_background_shader(ccl::Session* session_id);
+CCL_CAPI ccl::Shader* __cdecl cycles_scene_get_background_shader(ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent);
 CCL_CAPI void __cdecl cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag);
 CCL_CAPI void __cdecl cycles_scene_reset(ccl::Session* session_id);
@@ -719,6 +726,10 @@ enum class shadernode_type : unsigned int {
 };
 
 CCL_CAPI ccl::Shader* __cdecl cycles_create_shader(ccl::Session* session_id);
+CCL_CAPI int __cdecl cycles_shader_node_count(ccl::Shader *shader);
+CCL_CAPI ccl::ShaderNode *__cdecl cycles_shader_node_get(ccl::Shader *shader, int idx);
+CCL_CAPI bool __cdecl cycles_shadernode_get_name(ccl::ShaderNode *shn, void *strholder);
+CCL_CAPI bool __cdecl cycles_shader_get_name(ccl::Shader* shader, void* stringholder);
 CCL_CAPI void __cdecl cycles_scene_tag_shader(ccl::Session* session_id, unsigned int shader_id, bool use);
 CCL_CAPI unsigned int __cdecl cycles_scene_add_shader(ccl::Session* session_id, unsigned int shader_id);
 /** Set shader_id as default surface shader for session_id.
@@ -734,30 +745,30 @@ CCL_CAPI void __cdecl cycles_scene_set_default_surface_shader(ccl::Session* sess
 CCL_CAPI unsigned int __cdecl cycles_scene_get_default_surface_shader(ccl::Session* session_id);
 CCL_CAPI unsigned int __cdecl cycles_scene_shader_id(ccl::Session* session_id, unsigned int shader_id);
 CCL_CAPI unsigned int __cdecl cycles_add_shader_node(ccl::Session* session_id, unsigned int shader_id, shadernode_type shn_type);
-CCL_CAPI void __cdecl cycles_shadernode_set_attribute_int(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, int value);
-CCL_CAPI void __cdecl cycles_shadernode_set_attribute_float(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float value);
-CCL_CAPI void __cdecl cycles_shadernode_set_attribute_vec(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float x, float y, float z);
-CCL_CAPI void __cdecl cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* enum_name, int value);
-CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_transformation(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, int transform_type, float x, float y, float z);
-CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_mapping(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z);
+CCL_CAPI void __cdecl cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value);
+CCL_CAPI void __cdecl cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const char* attribute_name, float value);
+CCL_CAPI void __cdecl cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char* attribute_name, float x, float y, float z);
+CCL_CAPI void __cdecl cycles_shadernode_set_enum(ccl::ShaderNode* shnode_id, const char* enum_name, int value);
+CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_transformation(ccl::ShaderNode* shnode, int transform_type, float x, float y, float z);
+CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode* shnode, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z);
 CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_projection(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Projection tm_projection);
 CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_type(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::NodeMappingType tm_type);
 
-CCL_CAPI void __cdecl cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, bool value);
-CCL_CAPI void __cdecl cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float value);
-CCL_CAPI void __cdecl cycles_shadernode_set_member_int(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, int value);
-CCL_CAPI void __cdecl cycles_shadernode_set_member_vec(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z);
-CCL_CAPI void __cdecl cycles_shadernode_set_member_string(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* value);
-CCL_CAPI void __cdecl cycles_shadernode_set_member_vec4_at_index(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z, float w, int index);
+CCL_CAPI void __cdecl cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* member_name, bool value);
+CCL_CAPI void __cdecl cycles_shadernode_set_member_float(ccl::ShaderNode* shnode_id, const char* member_name, float value);
+CCL_CAPI void __cdecl cycles_shadernode_set_member_int(ccl::ShaderNode* shnode, const char* member_name, int value);
+CCL_CAPI void __cdecl cycles_shadernode_set_member_vec(ccl::ShaderNode* shnode, const char* member_name, float x, float y, float z);
+CCL_CAPI void __cdecl cycles_shadernode_set_member_string(ccl::ShaderNode* shnode_id, const char* member_name, const char* value);
+CCL_CAPI void __cdecl cycles_shadernode_set_member_vec4_at_index(ccl::ShaderNode* shnode, const char* member_name, float x, float y, float z, float w, int index);
 
 CCL_CAPI void __cdecl cycles_shadernode_set_member_float_img(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, float* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels);
 CCL_CAPI void __cdecl cycles_shadernode_set_member_byte_img(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, unsigned char* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels);
 
-CCL_CAPI void __cdecl cycles_shader_set_name(ccl::Session* session_id, unsigned int shader_id, const char* name);
+CCL_CAPI void __cdecl cycles_shader_set_name(ccl::Shader* shader, const char* name);
 CCL_CAPI void __cdecl cycles_shader_set_use_mis(ccl::Session* session_id, unsigned int shader_id, unsigned int use_mis);
 CCL_CAPI void __cdecl cycles_shader_set_use_transparent_shadow(ccl::Session* session_id, unsigned int shader_id, unsigned int use_transparent_shadow);
 CCL_CAPI void __cdecl cycles_shader_set_heterogeneous_volume(ccl::Session* session_id, unsigned int shader_id, unsigned int heterogeneous_volume);
-CCL_CAPI void __cdecl cycles_shader_new_graph(ccl::Session* session_id, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_shader_new_graph(ccl::Shader* shader);
 
 CCL_CAPI void __cdecl cycles_shader_connect_nodes(ccl::Session* session_id, unsigned int shader_id, unsigned int from_id, const char* from, unsigned int to_id, const char* to);
 
