@@ -217,6 +217,11 @@ void Session::run_main_render_loop()
 
 void Session::thread_run()
 {
+#ifdef _WIN32
+  HANDLE thread_handle = GetCurrentThread();
+  SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
+#endif
+
   while (true) {
     {
       thread_scoped_lock session_thread_lock(session_thread_mutex_);

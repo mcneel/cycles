@@ -201,6 +201,11 @@ void DedicatedTaskPool::thread_run()
 {
   TaskRunFunction task;
 
+#ifdef _WIN32
+  HANDLE thread_handle = GetCurrentThread();
+  SetThreadPriority(thread_handle, THREAD_PRIORITY_BELOW_NORMAL);
+#endif
+
   /* keep popping off tasks */
   while (thread_wait_pop(task)) {
     /* run task */
