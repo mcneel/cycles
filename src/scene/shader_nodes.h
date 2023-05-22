@@ -116,6 +116,7 @@ class ImageTextureNode : public ImageSlotTextureNode {
   NODE_SOCKET_API(bool, animated)
   NODE_SOCKET_API(float3, vector)
   NODE_SOCKET_API_ARRAY(array<int>, tiles)
+  NODE_SOCKET_API(bool, alternate_tiles);
 
  protected:
   void cull_tiles(Scene *scene, ShaderGraph *graph);

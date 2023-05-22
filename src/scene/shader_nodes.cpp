@@ -206,6 +206,7 @@ NODE_DEFINE(ImageTextureNode)
 
   SOCKET_STRING(filename, "Filename", ustring());
   SOCKET_STRING(colorspace, "Colorspace", u_colorspace_auto);
+  SOCKET_BOOLEAN(alternate_tiles, "Alternate Tiles", false);
 
   static NodeEnum alpha_type_enum;
   alpha_type_enum.insert("auto", IMAGE_ALPHA_AUTO);
@@ -418,6 +419,9 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
         compiler.add_node(node.x, node.y, node.z, node.w);
       }
     }
+    // add information about alternate tiles. In Rhino box projection isn't used.
+    // so add support only here
+    compiler.add_node(alternate_tiles ? 1 : 0);
   }
   else {
     assert(handle.num_tiles() == 1);
