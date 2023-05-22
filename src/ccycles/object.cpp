@@ -118,23 +118,6 @@ void cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id,
 	}
 }
 
-void cycles_scene_object_set_is_block_instance(ccl::Session* session_id, ccl::Object* object, bool is_block_instance)
-{
-	ASSERT(object);
-
-    // TODO: XXXX port this from old Cycles integration
-    // unless there is a better way to do this in new cycles
-    /*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->is_block_instance = is_block_instance;
-		ob->tag_update(sce);
-		sce->light_manager->tag_update(sce);
-	}
-    */
-}
-
 void cycles_scene_object_set_cutout(ccl::Session* session_id, ccl::Object* object, bool cutout)
 {
 	ASSERT(object);
