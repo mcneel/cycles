@@ -214,7 +214,7 @@ ccl_device_inline
               /* detect if this surface has a shader with transparent shadows */
               /* todo: optimize so primitive visibility flag indicates if
                * the primitive has a transparent shadow shader? */
-              const int flags = intersection_get_shader_flags(kg, isect.prim, isect.type);
+              const int flags = intersection_get_shader_flags(kg, isect.prim, isect.object, isect.type);
 
               if (!(flags & SD_HAS_TRANSPARENT_SHADOW) || num_hits >= max_hits) {
                 /* If no transparent shadows, all light is blocked and we can
