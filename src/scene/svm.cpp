@@ -165,7 +165,7 @@ SVMCompiler::SVMCompiler(Scene *scene) : scene(scene)
   compile_failed = false;
 
   /* This struct has one entry for every node, in order of ShaderNodeType definition. */
-  svm_node_types_used = (std::atomic_int *)&scene->dscene.data.svm_usage;
+  svm_node_types_used = (std::atomic_int *)&scene->dscene->data.svm_usage;
 }
 
 int SVMCompiler::stack_size(SocketType::Type type)
