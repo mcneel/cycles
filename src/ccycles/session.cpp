@@ -995,12 +995,6 @@ void cycles_progress_get_progress(ccl::Session* session_id, float* progress)
 	}
 }
 
-class StringHolder
-{
-public:
-	std::string thestring;
-};
-
 void* cycles_string_holder_new()
 {
 	return new StringHolder();

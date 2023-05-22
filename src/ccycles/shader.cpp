@@ -20,14 +20,6 @@ limitations under the License.
 
 OIIO_NAMESPACE_USING
 
-void _init_shaders(ccl::Session* session_id)
-{
-	cycles_create_shader(session_id); // default surface
-	cycles_create_shader(session_id); // default light
-	cycles_create_shader(session_id); // default background
-	cycles_create_shader(session_id); // default empty
-}
-
 ccl::ShaderNode* _shader_node_find(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id)
 {
 #if LEGACY_SHADERS
@@ -59,24 +51,58 @@ void _set_colorspace(ustring& colorspace, int value)
 	}
 }
 
-/* Create a new shader.
- TODO: name for shader
-*/
-ccl::Shader* cycles_create_shader(ccl::Session* session_id)
+ccl::Shader* cycles_create_shader(ccl::Session* session)
 {
-	// TODO: XXXX revisit shader creation
-	// probably remove CCShader and directly access shaders from
-	// session->scene instead
-	ccl::Scene* sce = nullptr;
-	if (scene_find(session_id, &sce)) {
-		CCShader* sh = new CCShader();
-		sh->shader->set_displacement_method(ccl::DisplacementMethod::DISPLACE_TRUE);
-		sh->shader->has_displacement = true;
-		sh->shader->graph = sh->graph;
-		return sh->shader;
+	ccl::Shader* shader = session->scene->create_node<ccl::Shader>();
+	shader->set_displacement_method(ccl::DisplacementMethod::DISPLACE_TRUE);
+	shader->has_displacement = true;
+	return shader;
+}
+
+int cycles_shader_node_count(ccl::Shader* shader)
+{
+	return shader->graph->nodes.size();
+}
+
+ccl::ShaderNode *cycles_shader_node_get(ccl::Shader *shader, int idx)
+{
+	int count = 0;
+	auto it = shader->graph->nodes.cbegin();
+	while (it != shader->graph->nodes.cend() && count < shader->graph->nodes.size() - 1) {
+		if (count == idx)
+			return *it;
+		it++;
 	}
 
 	return nullptr;
+}
+
+bool cycles_shadernode_get_name(ccl::ShaderNode* shn, void* strholder)
+{
+	if (shn && strholder) {
+		StringHolder *holder = (StringHolder *)strholder;
+		std::string name{shn->type->name};
+
+		holder->thestring = name;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool cycles_shader_get_name(ccl::Shader* sh, void* strholder)
+{
+	if (sh && strholder) {
+		StringHolder *holder = (StringHolder *)strholder;
+		std::string name{sh->name};
+
+		holder->thestring = name;
+
+		return true;
+	}
+
+	return false;
 }
 
 /* Add shader to specified scene. */
@@ -128,22 +154,15 @@ unsigned int cycles_scene_shader_id(ccl::Session* session_id, unsigned int shade
 	return (unsigned int)(-1);
 }
 
-void cycles_shader_new_graph(ccl::Session* session_id, unsigned int shader_id)
+void cycles_shader_new_graph(ccl::Shader* shader)
 {
-#if LEGACY_SHADERS
-	ccl::Scene* sce = nullptr;
-	if (scene_find(session_id, &sce)) {
-		CCShader* sh = csce->shaders[shader_id];
-		sh->graph = new ccl::ShaderGraph();
-		sh->shader->set_graph(sh->graph);
-	}
-#endif
+	shader->set_graph(new ccl::ShaderGraph());
 }
 
 
-void cycles_shader_set_name(ccl::Session* session_id, unsigned int shader_id, const char* _name)
+void cycles_shader_set_name(ccl::Shader* shader, const char* _name)
 {
-	// TODO: XXXX SHADER_SET(session_id, shader_id, std::string, name, _name);
+	shader->name = _name;
 }
 
 void cycles_shader_set_use_mis(ccl::Session* session_id, unsigned int shader_id, unsigned int use_mis)
@@ -474,37 +493,6 @@ struct attrunion {
 	};
 };
 
-void shadernode_set_attribute(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, attrunion v)
-{
-#if LEGACY_SHADERS
-	auto attr = std::string(attribute_name);
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
-	if (shnode) {
-		for (ccl::ShaderInput* inp : shnode->inputs) {
-			auto inpname = inp->name().string();
-			if (ccl::string_iequals(inpname, attribute_name)) {
-				switch (v.type) {
-				case attr_type::INT:
-					inp->set(v.i);
-					break;
-				case attr_type::FLOAT:
-					inp->set(v.f);
-					break;
-				case attr_type::FLOAT4:
-					ccl::float3 f3;
-					f3.x = v.f4.x;
-					f3.y = v.f4.y;
-					f3.z = v.f4.z;
-					inp->set(f3);
-					break;
-				}
-				return;
-			}
-		}
-	}
-#endif
-}
-
 void _set_texture_mapping_transformation(ccl::TextureMapping& mapping, int transform_type, float x, float y, float z)
 {
 	switch (transform_type) {
@@ -540,7 +528,7 @@ void _set_mapping_node(ccl::MappingNode* node, int transform_type, float x, floa
 	}
 }
 
-void cycles_shadernode_texmapping_set_transformation(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, int transform_type, float x, float y, float z)
+void cycles_shadernode_texmapping_set_transformation(ccl::ShaderNode* shnode, int transform_type, float x, float y, float z)
 {
 #if LEGACY_SHADERS
 	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
@@ -632,80 +620,66 @@ void _set_texmapping_mapping(ccl::TextureMapping& tex_mapping, ccl::TextureMappi
 	tex_mapping.z_mapping = z;
 }
 
-void cycles_shadernode_texmapping_set_mapping(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z)
+void cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode* shnode, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z)
 {
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::MAPPING:
+		std::string shn_type = shnode->type->name.string();
+		if (shn_type == "mapping")
 		{
 			/*
 			ccl::MappingNode* node = dynamic_cast<ccl::MappingNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 			*/
 		}
-		break;
-		case shadernode_type::ENVIRONMENT_TEXTURE:
+		else if (shn_type == "environment_texture")
 		{
 			ccl::EnvironmentTextureNode* node = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::IMAGE_TEXTURE:
+		else if (shn_type == "image_texture")
 		{
 			ccl::ImageTextureNode* node = dynamic_cast<ccl::ImageTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::GRADIENT_TEXTURE:
+		else if (shn_type == "gradient_texture")
 		{
 			ccl::GradientTextureNode* node = dynamic_cast<ccl::GradientTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::WAVE_TEXTURE:
+		else if (shn_type == "wave_texture")
 		{
 			ccl::WaveTextureNode* node = dynamic_cast<ccl::WaveTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::VORONOI_TEXTURE:
+		else if (shn_type == "voronoi_texture")
 		{
 			ccl::VoronoiTextureNode* node = dynamic_cast<ccl::VoronoiTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::MUSGRAVE_TEXTURE:
+		else if (shn_type == "musgrave_texture")
 		{
 			ccl::MusgraveTextureNode* node = dynamic_cast<ccl::MusgraveTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::BRICK_TEXTURE:
+		else if (shn_type == "brick_texture")
 		{
 			ccl::BrickTextureNode* node = dynamic_cast<ccl::BrickTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::MAGIC_TEXTURE:
+		else if (shn_type == "magic_texture")
 		{
 			ccl::MagicTextureNode* node = dynamic_cast<ccl::MagicTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		case shadernode_type::NOISE_TEXTURE:
+		else if (shn_type == "noise_texture")
 		{
 			ccl::NoiseTextureNode* node = dynamic_cast<ccl::NoiseTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
-		break;
-		default:
-			break;
-		}
 	}
 }
 
-void cycles_shadernode_texmapping_set_projection(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Projection tm_projection)
+void cycles_shadernode_texmapping_set_projection(ccl::ShaderNode* shnode, ccl::TextureMapping::Projection tm_projection)
 {
 	/*
 	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
@@ -724,87 +698,72 @@ void cycles_shadernode_texmapping_set_projection(ccl::Session* session_id, unsig
 	*/
 }
 
-void cycles_shadernode_texmapping_set_type(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::NodeMappingType tm_type)
+void cycles_shadernode_texmapping_set_type(ccl::ShaderNode* shnode, ccl::NodeMappingType tm_type)
 {
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::MAPPING:
+		std::string shn_type = shnode->type->name.string();
+		if (shn_type == "mapping")
 		{
 			ccl::MappingNode* node = dynamic_cast<ccl::MappingNode*>(shnode);
 			node->set_mapping_type(tm_type);
-		}
-		break;
-		default:
-			break;
 		}
 	}
 }
 
 /* TODO: add all enum possibilities.
  */
-void cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* enum_name, int value)
+void cycles_shadernode_set_enum(ccl::ShaderNode* shnode, const char* enum_name, int value)
 {
 	auto ename = std::string{ enum_name };
 
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
+	auto shntype = shnode->type->name.string();
+
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::MATH:
-		{
+		if (shntype == "math") {
 			ccl::MathNode* node = dynamic_cast<ccl::MathNode*>(shnode);
 			node->set_math_type((ccl::NodeMathType)value);
 		}
-		break;
-		case shadernode_type::VECT_MATH:
+		else if (shntype == "vector_math")
 		{
 			ccl::VectorMathNode* node = dynamic_cast<ccl::VectorMathNode*>(shnode);
 			node->set_math_type((ccl::NodeVectorMathType)value);
 		}
-		break;
-		case shadernode_type::RHINO_MATRIX_MATH:
+		else if (shntype == "matrix_math")
 		{
 			ccl::MatrixMathNode* node = dynamic_cast<ccl::MatrixMathNode*>(shnode);
 			node->type = (ccl::NodeMatrixMath)value;
 		}
-		break;
-		case shadernode_type::MIX:
+		else if (shntype == "mix")
 		{
 			ccl::MixNode* node = dynamic_cast<ccl::MixNode*>(shnode);
 			node->set_mix_type((ccl::NodeMix)value);
 		}
-		break;
-		case shadernode_type::REFRACTION:
+		else if (shntype == "refraction_bsdf")
 		{
 			ccl::RefractionBsdfNode* node = dynamic_cast<ccl::RefractionBsdfNode*>(shnode);
 			node->set_distribution((ccl::ClosureType)value);
 		}
-		break;
-		case shadernode_type::TOON:
+		else if (shntype == "toon_bsdf")
 		{
 			ccl::ToonBsdfNode* node = dynamic_cast<ccl::ToonBsdfNode*>(shnode);
 			node->set_component((ccl::ClosureType)value);
 		}
-		break;
-		case shadernode_type::GLOSSY:
+		else if (shntype == "glossy_bsdf")
 		{
 			ccl::GlossyBsdfNode* node = dynamic_cast<ccl::GlossyBsdfNode*>(shnode);
 			node->set_distribution((ccl::ClosureType)value);
 		}
-		break;
-		case shadernode_type::GLASS:
+		else if (shntype == "glass_bsdf")
 		{
 			ccl::GlassBsdfNode* node = dynamic_cast<ccl::GlassBsdfNode*>(shnode);
 			node->set_distribution((ccl::ClosureType)value);
 		}
-		break;
-		case shadernode_type::ANISOTROPIC:
+		else if (shntype == "anisotropic_bsdf")
 		{
 			ccl::AnisotropicBsdfNode* node = dynamic_cast<ccl::AnisotropicBsdfNode*>(shnode);
 			node->set_distribution((ccl::ClosureType)value);
 		}
-		break;
-		case shadernode_type::WAVE_TEXTURE:
+		else if (shntype == "wave_texture")
 		{
 			if (ename == "wave") {
 				ccl::WaveTextureNode* node = dynamic_cast<ccl::WaveTextureNode*>(shnode);
@@ -815,8 +774,7 @@ void cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id
 				node->set_profile((ccl::NodeWaveProfile)value);
 			}
 		}
-		break;
-		case shadernode_type::VORONOI_TEXTURE:
+		else if (shntype == "voronoi_texture")
 		{
 			ccl::VoronoiTextureNode* node = dynamic_cast<ccl::VoronoiTextureNode*>(shnode);
 			if (ename == "metric") {
@@ -829,8 +787,7 @@ void cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id
 				node->set_dimensions(value);
 			}
 		}
-		break;
-		case shadernode_type::MUSGRAVE_TEXTURE:
+		else if (shntype == "musgrave_texture")
 		{
 			ccl::MusgraveTextureNode* node = dynamic_cast<ccl::MusgraveTextureNode*>(shnode);
 			if(ename=="musgrave") {
@@ -839,14 +796,12 @@ void cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id
 				node->set_dimensions(value);
 			}
 		}
-		break;
-		case shadernode_type::SKY_TEXTURE:
+		else if (shntype == "sky_texture")
 		{
 			ccl::SkyTextureNode* node = dynamic_cast<ccl::SkyTextureNode*>(shnode);
 			node->set_sky_type((ccl::NodeSkyType)value);
 		}
-		break;
-		case shadernode_type::ENVIRONMENT_TEXTURE:
+		else if (shntype == "environment_texture")
 		{
 			ccl::EnvironmentTextureNode* node = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
 			if (ename == "color_space") {
@@ -861,8 +816,7 @@ void cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id
 				node->set_interpolation((ccl::InterpolationType)value);
 			}
 		}
-		break;
-		case shadernode_type::IMAGE_TEXTURE:
+		else if (shntype == "image_texture")
 		{
 			ccl::ImageTextureNode* node = dynamic_cast<ccl::ImageTextureNode*>(shnode);
 			if (ename == "color_space") {
@@ -876,29 +830,26 @@ void cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id
 			else if (ename == "interpolation") {
 				node->set_interpolation((ccl::InterpolationType)value);
 			}
-			break;
 		}
-		case shadernode_type::RHINO_TEXTURE_COORDINATE: {
+		else if (shntype == "rhino_texture_coordinate")
+		{
 			ccl::RhinoTextureCoordinateNode *node =
 				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			if (ename == "decal_projection") {
 				node->set_decal_projection((ccl::NodeImageDecalProjection)value);
 			}
-			break;
 		}
-		case shadernode_type::GRADIENT_TEXTURE:
+		else if (shntype == "gradient_texture")
 		{
 			ccl::GradientTextureNode* node = dynamic_cast<ccl::GradientTextureNode*>(shnode);
 			node->set_gradient_type((ccl::NodeGradientType)value);
-			break;
 		}
-		case shadernode_type::SUBSURFACE_SCATTERING:
+		else if (shntype == "subsurface_scattering")
 		{
 			ccl::SubsurfaceScatteringNode* node = dynamic_cast<ccl::SubsurfaceScatteringNode*>(shnode);
 			node->set_method((ccl::ClosureType)value);
-			break;
 		}
-		case shadernode_type::PRINCIPLED_BSDF:
+		else if (shntype == "principled_bsdf")
 		{
 			if (ename == "distribution") {
 				ccl::PrincipledBsdfNode* node = dynamic_cast<ccl::PrincipledBsdfNode*>(shnode);
@@ -908,17 +859,12 @@ void cycles_shadernode_set_enum(ccl::Session* session_id, unsigned int shader_id
 				ccl::PrincipledBsdfNode* node = dynamic_cast<ccl::PrincipledBsdfNode*>(shnode);
 				node->set_subsurface_method((ccl::ClosureType)value);
 			}
-			break;
 
 		}
-		case shadernode_type::NORMALMAP:
+		else if (shntype == "normal_map")
 		{
 			ccl::NormalMapNode* node = dynamic_cast<ccl::NormalMapNode*>(shnode);
 			node->set_space((ccl::NodeNormalMapSpace)value);
-			break;
-		}
-		default:
-			break;
 		}
 	}
 }
@@ -985,7 +931,7 @@ CCImage* get_ccimage(std::string imgname, T* img, unsigned int width, unsigned i
 	return nullptr;
 }
 
-void cycles_shadernode_set_member_float_img(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, float* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
+void cycles_shadernode_set_member_float_img(ccl::ShaderNode* shnode, const char* member_name, const char* img_name, float* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
 {
 	// TODO: XXXX reimplement image/env texture setting
 	/*
@@ -1064,27 +1010,17 @@ void cycles_shadernode_set_member_byte_img(ccl::Session* session_id, unsigned in
 	*/
 }
 
-void cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, bool value)
+void cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* member_name, bool value)
 {
 	auto mname = std::string{ member_name };
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::MATH:
+		std::string shntype = shnode->type->name.string();
+		if (shntype == "math")
 		{
 			ccl::MathNode* mnode = dynamic_cast<ccl::MathNode*>(shnode);
 			mnode->set_use_clamp(value);
 		}
-		break;
-		case shadernode_type::MAPPING:
-		{
-			/*ccl::MappingNode* mapping = dynamic_cast<ccl::MappingNode*>(shnode);
-			if (mname == "useminmax") {
-				mapping->tex_mapping.use_minmax = value;
-			}*/
-		}
-		break;
-		case shadernode_type::COLOR_RAMP:
+		if (shntype == "rgb_ramp")
 		{
 			ccl::RGBRampNode* colorramp = dynamic_cast<ccl::RGBRampNode*>(shnode);
 			if (mname == "interpolate")
@@ -1092,16 +1028,14 @@ void cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int sh
 				colorramp->set_interpolate(value);
 			}
 		}
-		break;
-		case shadernode_type::BUMP:
+		if (shntype == "bump")
 		{
 			ccl::BumpNode* bump = dynamic_cast<ccl::BumpNode*>(shnode);
 			if (mname == "invert") {
 				bump->set_invert(value);
 			}
 		}
-		break;
-		case shadernode_type::IMAGE_TEXTURE:
+		if (shntype == "image_texture")
 		{
 			ccl::ImageTextureNode* imgtex = dynamic_cast<ccl::ImageTextureNode*>(shnode);
 			if (mname == "use_alpha") {
@@ -1122,16 +1056,14 @@ void cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int sh
 			}
 			*/
 		}
-		break;
-		case shadernode_type::ENVIRONMENT_TEXTURE:
+		if (shntype == "environment_texture")
 		{
 			/*ccl::EnvironmentTextureNode* envtex = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
 			if (mname == "is_linear") {
 				envtex->is_linear = value;
 			}*/
 		}
-		break;
-		case shadernode_type::RHINO_TEXTURE_COORDINATE:
+		if (shntype == "rhino_texture_coordinate")
 		{
 			ccl::RhinoTextureCoordinateNode *texco =
 				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
@@ -1139,16 +1071,14 @@ void cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int sh
 				texco->set_use_transform(value);
 			}
 		}
-		break;
-		case shadernode_type::MIX:
+		if (shntype == "mix")
 		{
 			ccl::MixNode* mix = dynamic_cast<ccl::MixNode*>(shnode);
 			if (mname == "use_clamp") {
 				mix->set_use_clamp(value);
 			}
 		}
-		break;
-		case shadernode_type::RHINO_NOISE_TEXTURE:
+		if (shntype == "rhino_noise_texture")
 		{
 			ccl::RhinoNoiseTextureNode* node = dynamic_cast<ccl::RhinoNoiseTextureNode*>(shnode);
 			if (mname == "ScaleToClamp")
@@ -1158,15 +1088,13 @@ void cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int sh
 			if (mname == "OctaveCount")
 				node->octave_count = value;
 		}
-		break;
-		case shadernode_type::RHINO_WAVES_TEXTURE:
+		if (shntype == "rhino_waves_texture")
 		{
 			ccl::RhinoWavesTextureNode* node = dynamic_cast<ccl::RhinoWavesTextureNode*>(shnode);
 			if (mname == "WaveWidthTextureOn")
 				node->wave_width_texture_on = value;
 		}
-		break;
-		case shadernode_type::RHINO_GRADIENT_TEXTURE:
+		if (shntype == "rhino_gradient_texture")
 		{
 			ccl::RhinoGradientTextureNode* node = dynamic_cast<ccl::RhinoGradientTextureNode*>(shnode);
 			if (mname == "FlipAlternate")
@@ -1174,29 +1102,25 @@ void cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int sh
 			else if (mname == "UseCustomCurve")
 				node->use_custom_curve = value;
 		}
-		break;
-		case shadernode_type::RHINO_BLEND_TEXTURE:
+		if (shntype == "rhino_blend_texture")
 		{
 			ccl::RhinoBlendTextureNode* node = dynamic_cast<ccl::RhinoBlendTextureNode*>(shnode);
 			if (mname == "UseBlendColor")
 				node->use_blend_color = value;
 		}
-		break;
-		case shadernode_type::RHINO_FBM_TEXTURE:
+		if (shntype == "rhino_fbm_texture")
 		{
 			ccl::RhinoFbmTextureNode* node = dynamic_cast<ccl::RhinoFbmTextureNode*>(shnode);
 			if (mname == "IsTurbulent")
 				node->is_turbulent = value;
 		}
-		break;
-		case shadernode_type::RHINO_PHYSICAL_SKY_TEXTURE:
+		if (shntype == "rhino_physical_sky_texture")
 		{
 			ccl::RhinoPhysicalSkyTextureNode* node = dynamic_cast<ccl::RhinoPhysicalSkyTextureNode*>(shnode);
 			if (mname == "ShowSun")
 				node->show_sun = value;
 		}
-		break;
-		case shadernode_type::RHINO_TEXTURE_ADJUSTMENT_TEXTURE:
+		if (shntype == "rhino_texture_adjustment_texture")
 		{
 			ccl::RhinoTextureAdjustmentTextureNode* node = dynamic_cast<ccl::RhinoTextureAdjustmentTextureNode*>(shnode);
 			if (mname == "Grayscale")
@@ -1210,20 +1134,15 @@ void cycles_shadernode_set_member_bool(ccl::Session* session_id, unsigned int sh
 			else if (mname == "IsHdr")
 				node->is_hdr = value;
 		}
-		break;
-		default:
-			break;
-		}
 	}
 }
 
-void cycles_shadernode_set_member_int(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, int value)
+void cycles_shadernode_set_member_int(ccl::ShaderNode* shnode, const char* member_name, int value)
 {
 	auto mname = std::string{ member_name };
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::BRICK_TEXTURE:
+		std::string shn_type = shnode->type->name.string();
+		if (shn_type == "brick_texture")
 		{
 			ccl::BrickTextureNode* bricknode = dynamic_cast<ccl::BrickTextureNode*>(shnode);
 			if (mname == "offset_frequency")
@@ -1231,8 +1150,7 @@ void cycles_shadernode_set_member_int(ccl::Session* session_id, unsigned int sha
 			else if (mname == "squash_frequency")
 				bricknode->set_squash_frequency(value);
 		}
-		break;
-		case shadernode_type::IMAGE_TEXTURE:
+		else if (shn_type == "image_texture")
 		{
 			ccl::ImageTextureNode* imgnode = dynamic_cast<ccl::ImageTextureNode*>(shnode);
 			if (mname == "interpolation") {
@@ -1242,16 +1160,14 @@ void cycles_shadernode_set_member_int(ccl::Session* session_id, unsigned int sha
 				imgnode->set_extension((ccl::ExtensionType)value);
 			}
 		}
-		break;
-		case shadernode_type::MAGIC_TEXTURE:
+		else if (shn_type == "magic_texture")
 		{
 			ccl::MagicTextureNode* envnode = dynamic_cast<ccl::MagicTextureNode*>(shnode);
 			if (mname == "depth") {
 				envnode->set_depth(value);
 			}
 		}
-		break;
-		case shadernode_type::RHINO_NOISE_TEXTURE:
+		else if (shn_type == "rhino_noise_texture")
 		{
 			ccl::RhinoNoiseTextureNode* node = dynamic_cast<ccl::RhinoNoiseTextureNode*>(shnode);
 			if (mname == "NoiseType")
@@ -1261,22 +1177,19 @@ void cycles_shadernode_set_member_int(ccl::Session* session_id, unsigned int sha
 			if (mname == "OctaveCount")
 				node->octave_count = value;
 		}
-		break;
-		case shadernode_type::RHINO_WAVES_TEXTURE:
+		else if (shn_type == "rhino_waves_texture")
 		{
 			ccl::RhinoWavesTextureNode* node = dynamic_cast<ccl::RhinoWavesTextureNode*>(shnode);
 			if (mname == "WaveType")
 				node->wave_type = (ccl::RhinoProceduralWavesType)value;
 		}
-		break;
-		case shadernode_type::RHINO_WAVES_WIDTH_TEXTURE:
+		else if (shn_type == "rhino_waves_width_texture")
 		{
 			ccl::RhinoWavesWidthTextureNode* node = dynamic_cast<ccl::RhinoWavesWidthTextureNode*>(shnode);
 			if (mname == "WaveType")
 				node->wave_type = (ccl::RhinoProceduralWavesType)value;
 		}
-		break;
-		case shadernode_type::RHINO_GRADIENT_TEXTURE:
+		else if (shn_type == "rhino_gradient_texture")
 		{
 			ccl::RhinoGradientTextureNode* node = dynamic_cast<ccl::RhinoGradientTextureNode*>(shnode);
 			if (mname == "GradientType")
@@ -1284,22 +1197,19 @@ void cycles_shadernode_set_member_int(ccl::Session* session_id, unsigned int sha
 			else
 				assert(false);
 		}
-		break;
-		case shadernode_type::RHINO_FBM_TEXTURE:
+		else if (shn_type == "rhino_fbm_texture")
 		{
 			ccl::RhinoFbmTextureNode* node = dynamic_cast<ccl::RhinoFbmTextureNode*>(shnode);
 			if (mname == "MaxOctaves")
 				node->max_octaves = value;
 		}
-		break;
-		case shadernode_type::RHINO_GRID_TEXTURE:
+		else if (shn_type == "rhino_grid_texture")
 		{
 			ccl::RhinoGridTextureNode* node = dynamic_cast<ccl::RhinoGridTextureNode*>(shnode);
 			if (mname == "Cells")
 				node->cells = value;
 		}
-		break;
-		case shadernode_type::RHINO_PROJECTION_CHANGER_TEXTURE:
+		else if (shn_type == "rhino_projection_changer_texture")
 		{
 			ccl::RhinoProjectionChangerTextureNode* node = dynamic_cast<ccl::RhinoProjectionChangerTextureNode*>(shnode);
 			if (mname == "InputProjectionType")
@@ -1307,57 +1217,47 @@ void cycles_shadernode_set_member_int(ccl::Session* session_id, unsigned int sha
 			else if (mname == "OutputProjectionType")
 				node->output_projection_type = (ccl::RhinoProceduralProjectionType)value;
 		}
-		break;
-		case shadernode_type::RHINO_MASK_TEXTURE:
+		else if (shn_type == "rhino_mask_texture")
 		{
 			ccl::RhinoMaskTextureNode* node = dynamic_cast<ccl::RhinoMaskTextureNode*>(shnode);
 			if (mname == "MaskType")
 				node->mask_type = (ccl::RhinoProceduralMaskType)value;
 		}
-		break;
-		case shadernode_type::RHINO_PERLIN_MARBLE_TEXTURE:
+		else if (shn_type == "rhino_perlin_marble_texture")
 		{
 			ccl::RhinoPerlinMarbleTextureNode* node = dynamic_cast<ccl::RhinoPerlinMarbleTextureNode*>(shnode);
 			if (mname == "Levels")
 				node->levels = value;
 		}
-		break;
-		case shadernode_type::RHINO_TILE_TEXTURE:
+		else if (shn_type == "rhino_tile_texture")
 		{
 			ccl::RhinoTileTextureNode* node = dynamic_cast<ccl::RhinoTileTextureNode*>(shnode);
 			if (mname == "Type")
 				node->tile_type = (ccl::RhinoProceduralTileType)value;
 		}
-		break;
-		default:
-			break;
-		}
 	}
 }
 
 
-void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float value)
+void cycles_shadernode_set_member_float(ccl::ShaderNode* shnode, const char* member_name, float value)
 {
 	auto mname = std::string{ member_name };
 
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::VALUE:
+		std::string shn_type = shnode->type->name.string();
+		if (shn_type == "value")
 		{
 			ccl::ValueNode* valuenode = dynamic_cast<ccl::ValueNode*>(shnode);
 			valuenode->set_value(value);
 		}
-		break;
-		case shadernode_type::IMAGE_TEXTURE:
+		else if (shn_type == "image_texture")
 		{
 			ccl::ImageTextureNode* imtexnode = dynamic_cast<ccl::ImageTextureNode*>(shnode);
 			if (mname == "projection_blend") {
 				imtexnode->set_projection_blend(value);
 			}
 		}
-		break;
-		case shadernode_type::RHINO_TEXTURE_COORDINATE:
+		else if (shn_type == "rhino_texture_coordinate")
 		{
 			ccl::RhinoTextureCoordinateNode *texconode =
 				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
@@ -1380,8 +1280,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 				texconode->set_vertical_sweep_end(value);
 			}
 		}
-		break;
-		case shadernode_type::BRICK_TEXTURE:
+		else if (shn_type == "brick_texture")
 		{
 			ccl::BrickTextureNode* bricknode = dynamic_cast<ccl::BrickTextureNode*>(shnode);
 			if (mname == "offset")
@@ -1389,8 +1288,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "squash")
 				bricknode->set_squash(value);
 		}
-		break;
-		case shadernode_type::SKY_TEXTURE:
+		else if (shn_type == "sky_texture")
 		{
 			ccl::SkyTextureNode* skynode = dynamic_cast<ccl::SkyTextureNode*>(shnode);
 			if (mname == "turbidity")
@@ -1398,8 +1296,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "ground_albedo")
 				skynode->set_ground_albedo(value);
 		}
-		break;
-		case shadernode_type::RHINO_AZIMUTH_ALTITUDE_TRANSFORM:
+		else if (shn_type == "azimuth_altitude_transform")
 		{
 			ccl::AzimuthAltitudeTransformNode* azimuth_altitude_node = dynamic_cast<ccl::AzimuthAltitudeTransformNode*>(shnode);
 			if (mname == "azimuth")
@@ -1409,8 +1306,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "threshold")
 				azimuth_altitude_node->threshold = value;
 		}
-		break;
-		case shadernode_type::RHINO_NOISE_TEXTURE:
+		else if (shn_type == "rhino_noise_texture")
 		{
 			ccl::RhinoNoiseTextureNode* node = dynamic_cast<ccl::RhinoNoiseTextureNode*>(shnode);
 			if (mname == "FrequencyMultiplier")
@@ -1424,8 +1320,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "Gain")
 				node->gain = value;
 		}
-		break;
-		case shadernode_type::RHINO_WAVES_TEXTURE:
+		else if (shn_type == "rhino_waves_texture")
 		{
 			ccl::RhinoWavesTextureNode* node = dynamic_cast<ccl::RhinoWavesTextureNode*>(shnode);
 			if (mname == "WaveWidth")
@@ -1435,22 +1330,19 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "Contrast2")
 				node->contrast2 = value;
 		}
-		break;
-		case shadernode_type::RHINO_PERTURBING_PART2_TEXTURE:
+		else if (shn_type == "rhino_perturbing_part2_texture")
 		{
 			ccl::RhinoPerturbingPart2TextureNode* node = dynamic_cast<ccl::RhinoPerturbingPart2TextureNode*>(shnode);
 			if (mname == "Amount")
 				node->amount = value;
 		}
-		break;
-		case shadernode_type::RHINO_BLEND_TEXTURE:
+		else if (shn_type == "rhino_blend_texture")
 		{
 			ccl::RhinoBlendTextureNode* node = dynamic_cast<ccl::RhinoBlendTextureNode*>(shnode);
 			if (mname == "BlendFactor")
 				node->blend_factor = value;
 		}
-		break;
-		case shadernode_type::RHINO_EXPOSURE_TEXTURE:
+		else if (shn_type == "rhino_exposure_texture")
 		{
 			ccl::RhinoExposureTextureNode* node = dynamic_cast<ccl::RhinoExposureTextureNode*>(shnode);
 			if (mname == "Exposure")
@@ -1462,8 +1354,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "MaxLuminance")
 				node->max_luminance = value;
 		}
-		break;
-		case shadernode_type::RHINO_FBM_TEXTURE:
+		else if (shn_type == "rhino_fbm_texture")
 		{
 			ccl::RhinoFbmTextureNode* node = dynamic_cast<ccl::RhinoFbmTextureNode*>(shnode);
 			if (mname == "Gain")
@@ -1471,15 +1362,13 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "Roughness")
 				node->roughness = value;
 		}
-		break;
-		case shadernode_type::RHINO_GRID_TEXTURE:
+		else if (shn_type == "rhino_grid_texture")
 		{
 			ccl::RhinoGridTextureNode* node = dynamic_cast<ccl::RhinoGridTextureNode*>(shnode);
 			if (mname == "FontThickness")
 				node->font_thickness = value;
 		}
-		break;
-		case shadernode_type::RHINO_PROJECTION_CHANGER_TEXTURE:
+		else if (shn_type == "rhino_projection_changer_texture")
 		{
 			ccl::RhinoProjectionChangerTextureNode* node = dynamic_cast<ccl::RhinoProjectionChangerTextureNode*>(shnode);
 			if (mname == "Azimuth")
@@ -1487,8 +1376,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "Altitude")
 				node->altitude = value;
 		}
-		break;
-		case shadernode_type::RHINO_PERLIN_MARBLE_TEXTURE:
+		else if (shn_type == "rhino_perlin_marble_texture")
 		{
 			ccl::RhinoPerlinMarbleTextureNode* node = dynamic_cast<ccl::RhinoPerlinMarbleTextureNode*>(shnode);
 			if (mname == "Noise")
@@ -1502,8 +1390,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "Color2Saturation")
 				node->color2_sat = value;
 		}
-		break;
-		case shadernode_type::RHINO_PHYSICAL_SKY_TEXTURE:
+		else if (shn_type == "rhino_physical_sky_texture")
 		{
 			ccl::RhinoPhysicalSkyTextureNode* node = dynamic_cast<ccl::RhinoPhysicalSkyTextureNode*>(shnode);
 			if (mname == "AtmosphericDensity")
@@ -1519,8 +1406,7 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 			else if (mname == "Exposure")
 				node->exposure = value;
 		}
-		break;
-		case shadernode_type::RHINO_TEXTURE_ADJUSTMENT_TEXTURE:
+		else if (shn_type == "rhino_texture_adjustment_texture")
 		{
 			ccl::RhinoTextureAdjustmentTextureNode* node = dynamic_cast<ccl::RhinoTextureAdjustmentTextureNode*>(shnode);
 			if (mname == "Multiplier")
@@ -1537,10 +1423,6 @@ void cycles_shadernode_set_member_float(ccl::Session* session_id, unsigned int s
 				node->saturation = value;
 			else if (mname == "HueShift")
 				node->hue_shift = value;
-		}
-		break;
-		default:
-			break;
 		}
 	}
 }
@@ -1567,14 +1449,13 @@ static void _set_transform(ccl::Transform& tfm, float x, float y, float z, float
 	}
 }
 
-void cycles_shadernode_set_member_vec4_at_index(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z, float w, int index)
+void cycles_shadernode_set_member_vec4_at_index(ccl::ShaderNode* shnode, const char* member_name, float x, float y, float z, float w, int index)
 {
 	auto mname = std::string{ member_name };
 
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::COLOR_RAMP:
+		std::string shn_type = shnode->type->name.string();
+		if (shn_type == "rbg_ramp")
 		{
 			ccl::RGBRampNode* colorramp = dynamic_cast<ccl::RGBRampNode*>(shnode);
 			auto ramp = colorramp->get_ramp();
@@ -1586,8 +1467,7 @@ void cycles_shadernode_set_member_vec4_at_index(ccl::Session* session_id, unsign
 			ramp[index] = ccl::make_float3(x, y, z);
 			ramp_alpha[index] = w;
 		}
-		break;
-		case shadernode_type::RHINO_TEXTURE_COORDINATE :
+		else if (shn_type == "rhino_texture_coordinate")
 		{
 			ccl::RhinoTextureCoordinateNode *texco =
 				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
@@ -1608,39 +1488,31 @@ void cycles_shadernode_set_member_vec4_at_index(ccl::Session* session_id, unsign
 				_set_transform(tf, x, y, z, w, index);
 			}
 		}
-		break;
-		case shadernode_type::RHINO_MATRIX_MATH:
+		else if (shn_type == "matrix_math")
 		{
 			ccl::MatrixMathNode* matmath = dynamic_cast<ccl::MatrixMathNode*>(shnode);
 			_set_transform(matmath->tfm, x, y, z, w, index);
 		}
-		break;
-		default:
-			break;
-		}
 	}
 }
 
-void cycles_shadernode_set_member_vec(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, float x, float y, float z)
+void cycles_shadernode_set_member_vec(ccl::ShaderNode* shnode, const char* member_name, float x, float y, float z)
 {
 	auto mname = std::string{ member_name };
 
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::COLOR:
+		std::string shn_type = shnode->type->name.string();
+		if (shn_type == "color")
 		{
 			ccl::ColorNode* colnode = dynamic_cast<ccl::ColorNode*>(shnode);
 			colnode->set_value(ccl::make_float3(x, y, z));
 		}
-		break;
-		case shadernode_type::SKY_TEXTURE:
+		else if (shn_type == "sky_texture")
 		{
 			ccl::SkyTextureNode* sunnode = dynamic_cast<ccl::SkyTextureNode*>(shnode);
 			sunnode->set_sun_direction(ccl::make_float3(x, y, z));
 		}
-		break;
-		case shadernode_type::MAPPING:
+		else if (shn_type == "mapping")
 		{
 			/*ccl::MappingNode* mapping = dynamic_cast<ccl::MappingNode*>(shnode);
 			if (mname == "min") {
@@ -1654,8 +1526,7 @@ void cycles_shadernode_set_member_vec(ccl::Session* session_id, unsigned int sha
 				mapping->tex_mapping.max.z = z;
 			}*/
 		}
-		break;
-		case shadernode_type::RHINO_TEXTURE_COORDINATE:
+		else if (shn_type == "rhino_texture_coordinate")
 		{
 			ccl::RhinoTextureCoordinateNode *texco =
 				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
@@ -1669,8 +1540,7 @@ void cycles_shadernode_set_member_vec(ccl::Session* session_id, unsigned int sha
 				texco->set_decal_up(ccl::make_float3(x, y, z));
 			}
 		}
-		break;
-		case shadernode_type::RHINO_PHYSICAL_SKY_TEXTURE:
+		else if (shn_type == "rhino_physical_sky_texture")
 		{
 			ccl::RhinoPhysicalSkyTextureNode* node = dynamic_cast<ccl::RhinoPhysicalSkyTextureNode*>(shnode);
 			if (mname == "SunDirection")
@@ -1692,8 +1562,7 @@ void cycles_shadernode_set_member_vec(ccl::Session* session_id, unsigned int sha
 				node->inv_wavelengths.z = z;
 			}
 		}
-		break;
-		case shadernode_type::RHINO_TILE_TEXTURE:
+		else if (shn_type == "rhino_tile_texture")
 		{
 			ccl::RhinoTileTextureNode* node = dynamic_cast<ccl::RhinoTileTextureNode*>(shnode);
 			if (mname == "Phase")
@@ -1709,45 +1578,33 @@ void cycles_shadernode_set_member_vec(ccl::Session* session_id, unsigned int sha
 				node->join_width.z = z;
 			}
 		}
-		break;
-		default:
-			break;
-		}
 	}
 }
 
-void cycles_shadernode_set_member_string(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* value)
+void cycles_shadernode_set_member_string(ccl::ShaderNode* shnode, const char* member_name, const char* value)
 {
 	auto mname = std::string{ member_name };
 	auto mval = std::string{ value };
 	ustring umval = ustring(mval);
 
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode)
 	{
-		switch (shn_type)
-		{
-		case shadernode_type::ATTRIBUTE:
+		std::string shntype = shnode->type->name.string();
+		if (shntype == "attribute")
 		{
 			ccl::AttributeNode* attrn = dynamic_cast<ccl::AttributeNode*>(shnode);
 			attrn->set_attribute(umval);
 		}
-		break;
-		case shadernode_type::RHINO_TEXTURE_COORDINATE:
+		else if (shntype == "rhino_texture_coordinate")
 		{
 			ccl::RhinoTextureCoordinateNode *texco =
 				dynamic_cast<ccl::RhinoTextureCoordinateNode *>(shnode);
 			texco->set_uvmap(umval);
 		}
-		break;
-		case shadernode_type::NORMALMAP:
+		else if (shntype == "normal_map")
 		{
 			ccl::NormalMapNode* normalmap = dynamic_cast<ccl::NormalMapNode*>(shnode);
 			normalmap->set_attribute(umval);
-		}
-		break;
-		default:
-			break;
 		}
 	}
 }
@@ -1755,33 +1612,65 @@ void cycles_shadernode_set_member_string(ccl::Session* session_id, unsigned int 
 /*
 Set an integer attribute with given name to value. shader_id is the global shader ID.
 */
-void cycles_shadernode_set_attribute_int(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, int value)
+void cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value)
 {
-	attrunion v{ attr_type::INT };
-	v.i = value;
-	shadernode_set_attribute(session_id, shader_id, shnode_id, attribute_name, v);
+	ustring sockname{attribute_name};
+	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
+	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
+		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
+			continue;
+		}
+		if (socket.flags & ccl::SocketType::INTERNAL) {
+			continue;
+		}
+		if (socket.name == sockname) {
+			shnode_id->set(socket, value);
+			break;
+		}
+	}
 }
 
 /*
-Set a float attribute with given name to value. shader_id is the global shader ID.
+* Set a float attribute with given name to value. shader_id is the global shader ID.
 */
-void cycles_shadernode_set_attribute_float(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float value)
+void cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const char* attribute_name, float value)
 {
-	attrunion v{ attr_type::FLOAT };
-	v.f = value;
-	shadernode_set_attribute(session_id, shader_id, shnode_id, attribute_name, v);
+	ustring sockname{attribute_name};
+	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
+	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
+		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
+			continue;
+		}
+		if (socket.flags & ccl::SocketType::INTERNAL) {
+			continue;
+		}
+		if (socket.name == sockname) {
+			shnode_id->set(socket, value);
+			break;
+		}
+	}
 }
 
 /*
 Set a vector of floats attribute with given name to x, y and z. shader_id is the global shader ID.
 */
-void cycles_shadernode_set_attribute_vec(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, const char* attribute_name, float x, float y, float z)
+void cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char* attribute_name, float x, float y, float z)
 {
-	attrunion v{ attr_type::FLOAT4 };
-	v.f4.x = x;
-	v.f4.y = y;
-	v.f4.z = z;
-	shadernode_set_attribute(session_id, shader_id, shnode_id, attribute_name, v);
+	ccl::float3 f3 = ccl::make_float3(x, y, z);
+	ustring sockname{attribute_name};
+	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
+	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
+		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
+			continue;
+		}
+		if (socket.flags & ccl::SocketType::INTERNAL) {
+			continue;
+		}
+		if (socket.name == sockname) {
+			shnode_id->set(socket, f3);
+			break;
+		}
+	}
 }
 
 void cycles_shader_connect_nodes(ccl::Session* session_id, unsigned int shader_id, unsigned int from_id, const char* from, unsigned int to_id, const char* to)
