@@ -31,13 +31,17 @@ $ccycles_files = Get-ChildItem "$cwd\build\bin\$buildConfig\ccycl*"
 Write-Host "Copying $ccycles_files"
 Copy-Item "$cwd\build\bin\$buildConfig\ccycl*" "$install_location\."
 
-$cuda_files = Get-ChildItem "$cwd\install\lib\*"
-Write-Host "Copying $cuda_files"
+if(Test-Path "$cwd\install\lib")
+{
 
-$cuda_files_dest = "$install_location\RhinoCycles\lib"
+    $cuda_files = Get-ChildItem "$cwd\install\lib\*"
+    Write-Host "Copying $cuda_files"
 
-if (!(Test-Path $cuda_files_dest)) {
-    New-Item -ItemType Directory -Force -Path $cuda_files_dest | Out-Null
+    $cuda_files_dest = "$install_location\RhinoCycles\lib"
+
+    if (!(Test-Path $cuda_files_dest)) {
+        New-Item -ItemType Directory -Force -Path $cuda_files_dest | Out-Null
+    }
+
+    Copy-Item "$cwd\install\lib\*" "$cuda_files_dest\."
 }
-
-Copy-Item "$cwd\install\lib\*" "$cuda_files_dest\."
