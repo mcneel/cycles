@@ -259,12 +259,20 @@ bool LightManager::object_usable_as_light(Object *object)
    * iterate all geometry shaders twice (when counting and when calculating
    * triangle area.
    */
+
   foreach (Node *node, geom->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
     if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
       return true;
     }
   }
+
+  Shader* shader = object->get_shader();
+  if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE)
+  {
+    return true;
+  }
+
   return false;
 }
 
@@ -294,12 +302,12 @@ void LightManager::device_update_distribution(Device *,
     size_t mesh_num_triangles = mesh->num_triangles();
 
     for (size_t i = 0; i < mesh_num_triangles; i++) {
-      int shader_index = mesh->get_shader()[i];
-      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
+      //int shader_index = mesh->get_shader()[i];
+      Shader* shader = object->get_shader();/* (shader_index < mesh->get_used_shaders().size()) ?
                            static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+                           scene->default_surface;*/
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         num_triangles++;
       }
     }
@@ -362,12 +370,12 @@ void LightManager::device_update_distribution(Device *,
 
     size_t mesh_num_triangles = mesh->num_triangles();
     for (size_t i = 0; i < mesh_num_triangles; i++) {
-      int shader_index = mesh->get_shader()[i];
-      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
+      //int shader_index = mesh->get_shader()[i];
+      Shader* shader = object->get_shader();/* (shader_index < mesh->get_used_shaders().size()) ?
                            static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+                           scene->default_surface;*/
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         distribution[offset].totarea = totarea;
         distribution[offset].prim = i + mesh->prim_offset;
         distribution[offset].mesh_light.shader_flag = shader_flag;
@@ -523,12 +531,12 @@ void LightManager::device_update_tree(Device *,
     int mesh_num_triangles = static_cast<int>(mesh->num_triangles());
 
     for (int i = 0; i < mesh_num_triangles; i++) {
-      int shader_index = mesh->get_shader()[i];
-      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
+      //int shader_index = mesh->get_shader()[i];
+      Shader* shader = object->get_shader();/* (shader_index < mesh->get_used_shaders().size()) ?
                            static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+                           scene->default_surface;*/
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         light_prims.emplace_back(scene, i, object_id);
       }
     }
@@ -596,8 +604,8 @@ void LightManager::device_update_tree(Device *,
           int shader_flag = 0;
           Object *object = scene->objects[prim.object_id];
           Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
-          Shader *shader = static_cast<Shader *>(
-              mesh->get_used_shaders()[mesh->get_shader()[prim.prim_id]]);
+          Shader* shader = object->get_shader();/* static_cast<Shader*>(
+              mesh->get_used_shaders()[mesh->get_shader()[prim.prim_id]]);*/
 
           if (!(object->get_visibility() & PATH_RAY_CAMERA)) {
             shader_flag |= SHADER_EXCLUDE_CAMERA;
@@ -620,7 +628,7 @@ void LightManager::device_update_tree(Device *,
 
           light_tree_emitters[emitter_index].prim = prim.prim_id + mesh->prim_offset;
           light_tree_emitters[emitter_index].mesh_light.shader_flag = shader_flag;
-          light_tree_emitters[emitter_index].emission_sampling = shader->emission_sampling;
+          light_tree_emitters[emitter_index].emission_sampling = shader ? shader->emission_sampling : EMISSION_SAMPLING_NONE;
           triangle_array[prim.prim_id + object_lookup_offsets[prim.object_id]] = emitter_index;
         }
         else {
