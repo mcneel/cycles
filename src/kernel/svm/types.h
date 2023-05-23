@@ -136,6 +136,11 @@ typedef enum NodeImageDecalProjection {
   NODE_IMAGE_DECAL_BACKWARD = 2,
 } NodeImageDecalProjection;
 
+typedef enum NodeImageDecalMapSide {
+  NODE_IMAGE_DECAL_MAP_OUTSIDE = 0,
+  NODE_IMAGE_DECAL_MAP_INSIDE = 1,
+} NodeImageDecalMapSide;
+
 typedef enum NodeMix {
   NODE_MIX_BLEND = 0,
   NODE_MIX_ADD,

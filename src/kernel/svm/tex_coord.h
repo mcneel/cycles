@@ -797,12 +797,122 @@ ccl_device_noinline int svm_node_tex_coord_bump_dx(KernelGlobals kg,
 #  endif
       break;
     }
+    case NODE_TEXCO_WCS_BOX: {
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = sd->P + dP.dx;
+      if (node.w == 0) {
+        if (sd->object != OBJECT_NONE) {
+          object_inverse_position_transform(kg, sd, &data);
+        }
+      }
+      else {
+        Transform tfm;
+        tfm.x = read_node_float(kg, &offset);
+        tfm.y = read_node_float(kg, &offset);
+        tfm.z = read_node_float(kg, &offset);
+        data = transform_direction(&tfm, data);
+      }
+      wcs_box_coord(kg, sd, &data);
+      break;
+    }
+    case NODE_TEXCO_ENV_SPHERICAL: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = make_float3(data.y, -data.z, -data.x);
+      data = env_spherical(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_EMAP: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = make_float3(-data.z, data.x, -data.y);
+      Transform tfm = kernel_data.cam.worldtocamera;
+      data = transform_direction(&tfm, data);
+      data = env_world_emap(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_LIGHTPROBE: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = env_light_probe(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = env_cubemap(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = env_cubemap_vertical_cross(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = env_cubemap_horizontal_cross(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_HEMI: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = make_float3(data.y, -data.z, -data.x);
+      data = env_hemispherical(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_UV: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 0);
+      data = decal.data;
+      // data = map_to_uv(data, decal);
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_PLANAR: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 1);
+      data = decal.data;
+      data = map_to_plane(data, decal);
+      if (!(data.x >= 0.0f && data.x <= 1.0f && data.y >= 0 && data.y <= 1.0f) ||
+          !decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_SPHERICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 1);
+      data = decal.data;
+      data = map_to_sphere_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 1);
+      data = decal.data;
+      data = map_to_cylinder_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
   }
 
   stack_store_float3(stack, out_offset, data);
   return offset;
 #else
-  return svm_node_tex_coord(kg, sd, path_flag, stack, node, offset);
+  return svm_rhino_node_tex_coord(kg, sd, path_flag, stack, node, offset);
 #endif
 }
 
@@ -882,12 +992,122 @@ ccl_device_noinline int svm_node_tex_coord_bump_dy(KernelGlobals kg,
 #  endif
       break;
     }
+    case NODE_TEXCO_WCS_BOX: {
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = sd->P + dP.dy;
+      if (node.w == 0) {
+        if (sd->object != OBJECT_NONE) {
+          object_inverse_position_transform(kg, sd, &data);
+        }
+      }
+      else {
+        Transform tfm;
+        tfm.x = read_node_float(kg, &offset);
+        tfm.y = read_node_float(kg, &offset);
+        tfm.z = read_node_float(kg, &offset);
+        data = transform_direction(&tfm, data);
+      }
+      wcs_box_coord(kg, sd, &data);
+      break;
+    }
+    case NODE_TEXCO_ENV_SPHERICAL: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = make_float3(data.y, -data.z, -data.x);
+      data = env_spherical(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_EMAP: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = make_float3(-data.z, data.x, -data.y);
+      Transform tfm = kernel_data.cam.worldtocamera;
+      data = transform_direction(&tfm, data);
+      data = env_world_emap(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_LIGHTPROBE: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = env_light_probe(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = env_cubemap(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = env_cubemap_vertical_cross(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = env_cubemap_horizontal_cross(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_HEMI: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = make_float3(data.y, -data.z, -data.x);
+      data = env_hemispherical(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_UV: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 0);
+      data = decal.data;
+      // data = map_to_uv(data, decal);
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_PLANAR: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 2);
+      data = decal.data;
+      data = map_to_plane(data, decal);
+      if (!(data.x >= 0.0f && data.x <= 1.0f && data.y >= 0 && data.y <= 1.0f) ||
+          !decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_SPHERICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 2);
+      data = decal.data;
+      data = map_to_sphere_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+      DecalData decal;
+      decal_data_read(kg, sd, stack, node, &offset, &decal, 2);
+      data = decal.data;
+      data = map_to_cylinder_section(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
+      break;
+    }
   }
 
   stack_store_float3(stack, out_offset, data);
   return offset;
 #else
-  return svm_node_tex_coord(kg, sd, path_flag, stack, node, offset);
+  return svm_rhino_node_tex_coord(kg, sd, path_flag, stack, node, offset);
 #endif
 }
 
