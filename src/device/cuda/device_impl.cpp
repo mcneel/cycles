@@ -257,7 +257,7 @@ string CUDADevice::compile_kernel(const string &common_cflags,
     int ptx_major = major, ptx_minor = minor;
     while (ptx_major >= 3) {
       const string ptx = path_get(
-          string_printf("lib/%s_compute_%d%d.ptx", name, ptx_major, ptx_minor));
+          string_printf("lib/%s_compute.ptx", name));
       VLOG_INFO << "Testing for pre-compiled kernel " << ptx << ".";
       if (path_exists(ptx)) {
         VLOG_INFO << "Using precompiled kernel.";
