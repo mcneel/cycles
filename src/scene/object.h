@@ -151,6 +151,7 @@ class ObjectManager {
     HOLDOUT_MODIFIED = (1 << 6),
     TRANSFORM_MODIFIED = (1 << 7),
     VISIBILITY_MODIFIED = (1 << 8),
+    CLIPPING_PLANE_MODIFIED = (1 << 9),
 
     /* tag everything in the manager for an update */
     UPDATE_ALL = ~0u,
@@ -158,10 +159,16 @@ class ObjectManager {
     UPDATE_NONE = 0u,
   };
 
+  bool need_clipping_plane_update = true;
   bool need_flags_update;
 
   ObjectManager();
   ~ObjectManager();
+
+  void device_update_clipping_planes(Device* device,
+      DeviceScene* dscene,
+      Scene* scene,
+      Progress& progress);
 
   void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
   void device_update_transforms(DeviceScene *dscene, Scene *scene, Progress &progress);

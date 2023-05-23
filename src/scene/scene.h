@@ -136,6 +136,7 @@ class Scene : public NodeOwner {
   vector<ParticleSystem *> particle_systems;
   vector<Pass *> passes;
   vector<Procedural *> procedurals;
+  vector<float4> clipping_planes;
 
   /* data managers */
   ImageManager *image_manager;

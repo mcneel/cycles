@@ -1743,6 +1743,8 @@ enum KernelFeatureFlag : uint32_t {
   /* Light and shadow linking. */
   KERNEL_FEATURE_LIGHT_LINKING = (1U << 27U),
   KERNEL_FEATURE_SHADOW_LINKING = (1U << 28U),
+  /* Clipping planes. */
+  KERNEL_FEATURE_CLIPPING_PLANES = (1U << 29U),
 };
 
 /* Shader node feature mask, to specialize shader evaluation for kernels. */

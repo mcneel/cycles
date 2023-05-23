@@ -47,6 +47,10 @@ ccl_device void integrator_volume_stack_update_for_subsurface(KernelGlobals kg,
 
     for (uint hit = 0; hit < num_hits; ++hit, ++isect) {
       shader_setup_from_ray(kg, stack_sd, &volume_ray, isect);
+
+      if (path_clip_ray(kg, state, stack_sd, &volume_ray))
+          continue;
+
       volume_stack_enter_exit(kg, state, stack_sd);
     }
   }
@@ -56,6 +60,10 @@ ccl_device void integrator_volume_stack_update_for_subsurface(KernelGlobals kg,
   while (step < 2 * volume_stack_size &&
          scene_intersect_volume(kg, &volume_ray, &isect, visibility)) {
     shader_setup_from_ray(kg, stack_sd, &volume_ray, &isect);
+
+    if (path_clip_ray(kg, state, stack_sd, &volume_ray))
+        continue;
+
     volume_stack_enter_exit(kg, state, stack_sd);
 
     /* Move ray forward. */
@@ -118,6 +126,10 @@ ccl_device void integrator_volume_stack_init(KernelGlobals kg, IntegratorState s
 
     for (uint hit = 0; hit < num_hits; ++hit, ++isect) {
       shader_setup_from_ray(kg, stack_sd, &volume_ray, isect);
+
+      if (path_clip_ray(kg, state, stack_sd, &volume_ray))
+          continue;
+
       if (stack_sd->flag & SD_BACKFACING) {
         bool need_add = true;
         for (int i = 0; i < enclosed_index && need_add; ++i) {
@@ -164,6 +176,10 @@ ccl_device void integrator_volume_stack_init(KernelGlobals kg, IntegratorState s
     }
 
     shader_setup_from_ray(kg, stack_sd, &volume_ray, &isect);
+
+    if (path_clip_ray(kg, state, stack_sd, &volume_ray))
+        continue;
+
     if (stack_sd->flag & SD_BACKFACING) {
       /* If ray exited the volume and never entered to that volume
        * it means that camera is inside such a volume.

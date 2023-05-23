@@ -115,6 +115,7 @@ void Scene::free_memory(bool final)
   particle_systems.clear();
   procedurals.clear();
   passes.clear();
+  clipping_planes.clear();
 
   if (device) {
     camera->device_free(device, dscene, this);
@@ -216,6 +217,9 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   if (progress.get_cancel() || device->have_error())
     return;
+
+  progress.set_status("Updating Clipping Planes");
+  object_manager->device_update_clipping_planes(device, dscene, this, progress);
 
   procedural_manager->update(this, progress);
 
@@ -387,7 +391,7 @@ bool Scene::need_update()
 
 bool Scene::need_data_update()
 {
-  return (background->is_modified() || image_manager->need_update() ||
+  return (background->is_modified() || image_manager->need_update() || object_manager->need_clipping_plane_update ||
           object_manager->need_update() || geometry_manager->need_update() ||
           light_manager->need_update() || lookup_tables->need_update() ||
           integrator->is_modified() || shader_manager->need_update() ||

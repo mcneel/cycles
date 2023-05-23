@@ -225,20 +225,15 @@ void cycles_object_set_random_id(ccl::Session* session_id, ccl::Object* object, 
 
 void cycles_scene_clear_clipping_planes(ccl::Session* session_id)
 {
-    // TODO: XXXX port clipping planes (or reimplement)
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		sce->clipping_planes.clear();
 		sce->object_manager->need_clipping_plane_update = true;
 	}
-    */
 }
 
 unsigned int cycles_scene_add_clipping_plane(ccl::Session* session_id, float a, float b, float c, float d)
 {
-    // TODO: XXXX port clipping planes (or reimplement)
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		ccl::float4 cp = ccl::make_float4(a, b, c, d);
@@ -250,7 +245,6 @@ unsigned int cycles_scene_add_clipping_plane(ccl::Session* session_id, float a, 
 
 		return (unsigned int)(sce->clipping_planes.size() - 1);
 	}
-    */
 
 	return UINT_MAX;
 }
@@ -262,8 +256,6 @@ void cycles_scene_discard_clipping_plane(ccl::Session* session_id, unsigned int 
 
 void cycles_scene_set_clipping_plane(ccl::Session* session_id, unsigned int cp_id, float a, float b, float c, float d)
 {
-    // TODO: XXXX port clipping planes (or reimplement)
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		ccl::float4 cp = ccl::make_float4(a, b, c, d);
@@ -273,5 +265,4 @@ void cycles_scene_set_clipping_plane(ccl::Session* session_id, unsigned int cp_i
 
 		sce->object_manager->need_clipping_plane_update = true;
 	}
-    */
 }

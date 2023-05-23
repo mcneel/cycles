@@ -5,6 +5,7 @@
 #pragma once
 
 #include "kernel/sample/pattern.h"
+#include "kernel/bvh/util.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -254,6 +255,60 @@ ccl_device_inline uint path_state_ray_visibility(ConstIntegratorState state)
 
   return visibility;
 }
+
+ccl_device_forceinline bool path_clip_ray(
+    KernelGlobals kg,
+    IntegratorState state,
+    ShaderData* sd,
+    Ray* ray)
+{
+    /* Check against clipping planes. If camera ray and
+     * clipped by planes adjust ray position and iterate
+     * for next potential hit.
+     */
+
+    const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
+    const uint32_t visibility = path_flag & PATH_RAY_ALL_VISIBILITY;
+
+    if ((visibility & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+        for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+            float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
+            float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
+            if (testdist < 0) {
+
+                const auto clip_depth_ = INTEGRATOR_STATE(state, path, clip_depth);
+                const auto prev_P_     = INTEGRATOR_STATE(state, path, prev_P);
+                const auto prev_prim_  = INTEGRATOR_STATE(state, path, prev_prim);
+
+                if (
+                    clip_depth_ > 9 ||
+                    (prev_P_.x == sd->P.x
+                        && prev_P_.y == sd->P.y
+                        && prev_P_.z == sd->P.z
+                        && prev_prim_ == sd->prim)) {
+                    break;
+                }
+
+                INTEGRATOR_STATE_WRITE(state, path, prev_P) = sd->P;
+                INTEGRATOR_STATE_WRITE(state, path, prev_prim) = sd->prim;
+                INTEGRATOR_STATE_WRITE(state, path, clip_depth)++;
+
+                ray->P = ray_offset(sd->P, -sd->Ng); // start ray a bit after hit point, using negative geometry normal
+                return true;
+            }
+        }
+    }
+
+    INTEGRATOR_STATE_WRITE(state, path, prev_P) = make_float3(FLT_MAX, FLT_MAX, FLT_MAX);
+    INTEGRATOR_STATE_WRITE(state, path, prev_prim) = PRIM_NONE;
+    INTEGRATOR_STATE_WRITE(state, path, clip_depth) = 0;
+
+    return false;
+}
+
+
+
+
 
 ccl_device_inline float path_state_continuation_probability(KernelGlobals kg,
                                                             ConstIntegratorState state,
