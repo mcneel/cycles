@@ -1026,6 +1026,8 @@ void ObjectManager::tag_update(Scene *scene, uint32_t flag)
   if (flag & (OBJECT_ADDED | OBJECT_REMOVED | OBJECT_MODIFIED)) {
     scene->integrator->tag_update(scene, Integrator::OBJECT_MANAGER);
   }
+
+  need_clipping_plane_update = true;
 }
 
 bool ObjectManager::need_update() const
@@ -1065,5 +1067,41 @@ string ObjectManager::get_cryptomatte_assets(Scene *scene)
   manifest[manifest.size() - 1] = '}';
   return manifest;
 }
+
+
+
+void ObjectManager::device_update_clipping_planes(Device*, DeviceScene* dscene,
+    Scene* scene,
+    Progress& progress)
+{
+    float4* cps;
+    need_clipping_plane_update = false;
+    /* Set the clipping planes. */
+    dscene->clipping_planes.free();
+    int num_cps = 0;
+    for (float4 cp : scene->clipping_planes) {
+        if (cp.x == FLT_MAX) continue;
+        num_cps++;
+    }
+    cps = dscene->clipping_planes.alloc(num_cps);
+
+    int cp_idx = 0;
+    for (float4 cp : scene->clipping_planes) {
+        float4& dscene_cp = cps[cp_idx];
+        if (cp.x == FLT_MAX) continue;
+        dscene_cp.x = cp.x;
+        dscene_cp.y = cp.y;
+        dscene_cp.z = cp.z;
+        dscene_cp.w = cp.w;
+        cp_idx++;
+    }
+
+    KernelIntegrator* kintegrator = &dscene->data.integrator;
+    kintegrator->num_clipping_planes = cp_idx;
+
+    dscene->clipping_planes.copy_to_device();
+
+}
+
 
 CCL_NAMESPACE_END
