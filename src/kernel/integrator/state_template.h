@@ -59,6 +59,11 @@ KERNEL_STRUCT_MEMBER(path, PackedSpectrum, denoising_feature_throughput, KERNEL_
 /* Shader sorting. */
 /* TODO: compress as uint16? or leave out entirely and recompute key in sorting code? */
 KERNEL_STRUCT_MEMBER(path, uint32_t, shader_sort_key, KERNEL_FEATURE_PATH_TRACING)
+
+KERNEL_STRUCT_MEMBER(path, packed_float3, prev_P, KERNEL_FEATURE_CLIPPING_PLANES)
+KERNEL_STRUCT_MEMBER(path, int, prev_prim, KERNEL_FEATURE_CLIPPING_PLANES)
+KERNEL_STRUCT_MEMBER(path, int, clip_depth, KERNEL_FEATURE_CLIPPING_PLANES)
+
 KERNEL_STRUCT_END(path)
 
 /************************************** Ray ***********************************/
