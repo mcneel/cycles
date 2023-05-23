@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <eh.h>
+#endif
+
+#include <exception>
+
 #include "bvh/bvh2.h"
 
 #include "device/device.h"
@@ -191,6 +197,38 @@ vector<DeviceType> Device::available_types()
   return types;
 }
 
+
+class CyclesDriverCrashException : std::exception
+{
+public:
+    CyclesDriverCrashException() : m_nVDE(-1) {}
+    CyclesDriverCrashException(unsigned int n) : m_nVDE(n) {}
+
+    unsigned int VDENumber() const { return m_nVDE; }
+
+private:
+    unsigned int m_nVDE;
+};
+
+#ifdef _WIN32
+
+static
+void crash_translator_function(unsigned int eCode, EXCEPTION_POINTERS*)
+{
+    throw CyclesDriverCrashException(eCode);
+}
+
+class CrashTranslatorHelper
+{
+private:
+    const _se_translator_function old_SE_translator;
+public:
+    CrashTranslatorHelper(_se_translator_function new_SE_translator) noexcept
+        : old_SE_translator{ _set_se_translator(new_SE_translator) } {}
+    ~CrashTranslatorHelper() noexcept { _set_se_translator(old_SE_translator); }
+};
+#endif
+
 vector<DeviceInfo> Device::available_devices(uint mask)
 {
   /* Lazy initialize devices. On some platforms OpenCL or CUDA drivers can
@@ -199,85 +237,107 @@ vector<DeviceInfo> Device::available_devices(uint mask)
   thread_scoped_lock lock(device_mutex);
   vector<DeviceInfo> devices;
 
+#ifdef _WIN32
+  CrashTranslatorHelper se_translator(crash_translator_function);
+#endif
+
 #if defined(WITH_CUDA) || defined(WITH_OPTIX)
   if (mask & (DEVICE_MASK_CUDA | DEVICE_MASK_OPTIX)) {
-    if (!(devices_initialized_mask & DEVICE_MASK_CUDA)) {
-      if (device_cuda_init()) {
-        device_cuda_info(cuda_devices);
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_CUDA)) {
+              if (device_cuda_init()) {
+                  device_cuda_info(cuda_devices);
+              }
+              devices_initialized_mask |= DEVICE_MASK_CUDA;
+          }
+          if (mask & DEVICE_MASK_CUDA) {
+              foreach(DeviceInfo & info, cuda_devices) {
+                  devices.push_back(info);
+              }
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_CUDA;
-    }
-    if (mask & DEVICE_MASK_CUDA) {
-      foreach (DeviceInfo &info, cuda_devices) {
-        devices.push_back(info);
-      }
-    }
+      catch (CyclesDriverCrashException&) {}
   }
 #endif
 
 #ifdef WITH_OPTIX
   if (mask & DEVICE_MASK_OPTIX) {
-    if (!(devices_initialized_mask & DEVICE_MASK_OPTIX)) {
-      if (device_optix_init()) {
-        device_optix_info(cuda_devices, optix_devices);
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_OPTIX)) {
+              if (device_optix_init()) {
+                  device_optix_info(cuda_devices, optix_devices);
+              }
+              devices_initialized_mask |= DEVICE_MASK_OPTIX;
+          }
+          foreach(DeviceInfo & info, optix_devices) {
+              devices.push_back(info);
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_OPTIX;
-    }
-    foreach (DeviceInfo &info, optix_devices) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException&) {}
   }
 #endif
 
 #ifdef WITH_HIP
   if (mask & DEVICE_MASK_HIP) {
-    if (!(devices_initialized_mask & DEVICE_MASK_HIP)) {
-      if (device_hip_init()) {
-        device_hip_info(hip_devices);
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_HIP)) {
+              if (device_hip_init()) {
+                  device_hip_info(hip_devices);
+              }
+              devices_initialized_mask |= DEVICE_MASK_HIP;
+          }
+          foreach(DeviceInfo & info, hip_devices) {
+              devices.push_back(info);
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_HIP;
-    }
-    foreach (DeviceInfo &info, hip_devices) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException&) {}
   }
 #endif
 
 #ifdef WITH_ONEAPI
   if (mask & DEVICE_MASK_ONEAPI) {
-    if (!(devices_initialized_mask & DEVICE_MASK_ONEAPI)) {
-      if (device_oneapi_init()) {
-        device_oneapi_info(oneapi_devices);
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_ONEAPI)) {
+              if (device_oneapi_init()) {
+                  device_oneapi_info(oneapi_devices);
+              }
+              devices_initialized_mask |= DEVICE_MASK_ONEAPI;
+          }
+          foreach(DeviceInfo & info, oneapi_devices) {
+              devices.push_back(info);
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_ONEAPI;
-    }
-    foreach (DeviceInfo &info, oneapi_devices) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException&) {}
   }
 #endif
 
   if (mask & DEVICE_MASK_CPU) {
-    if (!(devices_initialized_mask & DEVICE_MASK_CPU)) {
-      device_cpu_info(cpu_devices);
-      devices_initialized_mask |= DEVICE_MASK_CPU;
-    }
-    foreach (DeviceInfo &info, cpu_devices) {
-      devices.push_back(info);
-    }
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_CPU)) {
+              device_cpu_info(cpu_devices);
+              devices_initialized_mask |= DEVICE_MASK_CPU;
+          }
+          foreach(DeviceInfo & info, cpu_devices) {
+              devices.push_back(info);
+          }
+      }
+      catch (CyclesDriverCrashException&) {}
   }
 
 #ifdef WITH_METAL
   if (mask & DEVICE_MASK_METAL) {
-    if (!(devices_initialized_mask & DEVICE_MASK_METAL)) {
-      if (device_metal_init()) {
-        device_metal_info(metal_devices);
+      try {
+        if (!(devices_initialized_mask & DEVICE_MASK_METAL)) {
+          if (device_metal_init()) {
+            device_metal_info(metal_devices);
+          }
+          devices_initialized_mask |= DEVICE_MASK_METAL;
+        }
+        foreach (DeviceInfo &info, metal_devices) {
+          devices.push_back(info);
+        }
       }
-      devices_initialized_mask |= DEVICE_MASK_METAL;
-    }
-    foreach (DeviceInfo &info, metal_devices) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException&) {}
   }
 #endif
 
