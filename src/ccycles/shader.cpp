@@ -69,10 +69,11 @@ ccl::ShaderNode *cycles_shader_node_get(ccl::Shader *shader, int idx)
 {
 	int count = 0;
 	auto it = shader->graph->nodes.cbegin();
-	while (it != shader->graph->nodes.cend() && count < shader->graph->nodes.size() - 1) {
+	while (it != shader->graph->nodes.cend() && count < shader->graph->nodes.size()) {
 		if (count == idx)
 			return *it;
 		it++;
+		count++;
 	}
 
 	return nullptr;
