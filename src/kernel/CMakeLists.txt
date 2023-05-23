@@ -436,10 +436,15 @@ if(WITH_CYCLES_CUDA_BINARIES)
   macro(CYCLES_CUDA_KERNEL_ADD arch prev_arch name flags sources experimental)
     if(${arch} MATCHES "compute_.*")
       set(format "ptx")
+      # 2023-05-23 David E.
+      # Don't include shader model version in filename for ptx files since they are all the same.
+      # This commit includes change to CyclesX to look for ptx file without shader model version in file name.
+      set(filename_arch "compute")
     else()
       set(format "cubin")
+      set(filename_arch ${arch})
     endif()
-    set(cuda_file ${name}_${arch}.${format})
+    set(cuda_file ${name}_${filename_arch}.${format})
 
     set(kernel_sources ${sources})
     if(NOT ${prev_arch} STREQUAL "none")
