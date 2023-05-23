@@ -263,7 +263,7 @@ ccl_device_forceinline bool path_clip_ray(
     const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
     const uint32_t visibility = path_flag & PATH_RAY_ALL_VISIBILITY;
 
-    if ((visibility & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+    //if ((visibility & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
         for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
             float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
             float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
@@ -290,7 +290,7 @@ ccl_device_forceinline bool path_clip_ray(
                 return true;
             }
         }
-    }
+    //}
 
     INTEGRATOR_STATE_WRITE(state, path, prev_P) = make_float3(FLT_MAX, FLT_MAX, FLT_MAX);
     INTEGRATOR_STATE_WRITE(state, path, prev_prim) = PRIM_NONE;
