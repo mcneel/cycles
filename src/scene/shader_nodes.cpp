@@ -243,6 +243,9 @@ NODE_DEFINE(ImageTextureNode)
 
   SOCKET_IN_POINT(vector, "Vector", zero_float3(), SocketType::LINK_TEXTURE_UV);
 
+  SOCKET_IN_FLOAT(decalforward, "DecalForward", 0.5f);
+  SOCKET_IN_FLOAT(decalusage, "DecalUsage", 0.0f);
+
   SOCKET_OUT_COLOR(color, "Color");
   SOCKET_OUT_FLOAT(alpha, "Alpha");
 
@@ -402,6 +405,13 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
                                              flags),
                       projection);
 
+    ShaderInput *decalusage_input = input("DecalUsage");
+    // add information about alternate tiles. In Rhino box projection isn't used.
+    // so add support only here
+    uint encode = compiler.encode_uchar4(
+        alternate_tiles ? 1 : 0, compiler.stack_assign_if_linked(decalusage_input), 0, 0);
+    compiler.add_node(encode);
+
     if (num_nodes > 0) {
       for (int i = 0; i < num_nodes; i++) {
         int4 node;
@@ -418,9 +428,6 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
         compiler.add_node(node.x, node.y, node.z, node.w);
       }
     }
-    // add information about alternate tiles. In Rhino box projection isn't used.
-    // so add support only here
-    compiler.add_node(alternate_tiles ? 1 : 0);
   }
   else {
     assert(handle.num_tiles() == 1);
