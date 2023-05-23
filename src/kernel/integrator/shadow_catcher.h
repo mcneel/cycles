@@ -26,6 +26,10 @@ ccl_device_inline bool kernel_shadow_catcher_is_path_split_bounce(KernelGlobals 
     return false;
   }
 
+  //CORE_PATCH: Only do shadow catching when hitting front face.
+  if ((object_flag & SD_BACKFACING) == SD_BACKFACING)
+      return false;
+
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
 
   if ((path_flag & PATH_RAY_TRANSPARENT_BACKGROUND) == 0) {
