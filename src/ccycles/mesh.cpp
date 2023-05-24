@@ -226,11 +226,10 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 
 		if (mesh)
 		{
-			auto& cycles_mesh_triangle = mesh->get_triangle(tri_idx);
+			mesh->get_triangle(tri_idx).v[0] + (int)v0;
+			mesh->get_triangle(tri_idx).v[1] + (int)v1;
+			mesh->get_triangle(tri_idx).v[2] + (int)v2;
 
-			cycles_mesh_triangle.v[0] = (int)v0;
-			cycles_mesh_triangle.v[1] = (int)v1;
-			cycles_mesh_triangle.v[2] = (int)v2;
 
 			// TODO: XXXX revisit shader handling
 			//me->shader[tri_idx / 3] = shader_id;

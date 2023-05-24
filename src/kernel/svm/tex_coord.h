@@ -191,7 +191,7 @@ ccl_device_inline float3 map_to_cylinder_section(const float3 co, const DecalDat
   len = sqrtf(rst.x * rst.x + rst.y * rst.y);
   if (len > 0.0f) {
     t = ((rst.x != 0.0f || rst.y != 0.0f) ? atan2f(rst.y, rst.x) : 0.0f);
-    rst.x = 0.5 * M_1_PI_F * t;
+    rst.x = 0.5f * M_1_PI_F * t;
     if (rst.x < 0.0f) {
       rst.x += 1.0f;
     }
@@ -210,20 +210,20 @@ ccl_device_inline float3 map_to_cylinder_section(const float3 co, const DecalDat
     float sta_longitude = sweeps.x, end_longitude = sweeps.y;
 
     // Longitudes relative to decal start longitudeitude
-    float rel_decal_sta_longitude = 0.0;
+    float rel_decal_sta_longitude = 0.0f;
     float rel_decal_end_longitude = principal_value_angle_rad(end_longitude - sta_longitude);
     float rel_pt_longitude = principal_value_angle_rad(pt_longitude - sta_longitude);
 
     // If end and start longitudeitudes have same value then decal is supposed to go around the
     // cylinder
-    if (rel_decal_end_longitude == 0.0)
+    if (rel_decal_end_longitude == 0.0f)
       rel_decal_end_longitude = M_2PI_F;
 
     if (rel_decal_sta_longitude <= rel_pt_longitude &&
         rel_decal_end_longitude >= rel_pt_longitude) {
       // Scale longitudeitude to texture u-coordinate
       u = rel_pt_longitude / rel_decal_end_longitude;
-      if (u >= 0.0 && u <= 1.0 && v >= 0.0 && v <= 1.0) {
+      if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
         hit = 1.0f;
       }
       else {
