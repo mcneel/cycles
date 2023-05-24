@@ -834,17 +834,17 @@ ccl_device float luminance(float3 color)
 ccl_device float4 waves_width_texture(float3 uvw,
                                       RhinoProceduralWavesType wave_type)
 {
-  float3 uvw_perturbed = make_float3(uvw.x, 0.5 + floorf(uvw.y), 0.0);
+  float3 uvw_perturbed = make_float3(uvw.x, 0.5f + floorf(uvw.y), 0.0f);
 
   if (wave_type == RHINO_WAVES_RADIAL) {
     float uvw_length = len(uvw);
-    if (uvw_length == 0.0)
+    if (uvw_length == 0.0f)
       uvw_perturbed = make_float3(0.0f, 0.0f, 0.0f);
     else
-      uvw_perturbed = (uvw / uvw_length) * (0.5 + floorf(uvw_length));
+      uvw_perturbed = (uvw / uvw_length) * (0.5f + floorf(uvw_length));
   }
 
-  return make_float4(uvw_perturbed.x, uvw_perturbed.y, uvw_perturbed.z, 1.0);
+  return make_float4(uvw_perturbed.x, uvw_perturbed.y, uvw_perturbed.z, 1.0f);
 }
 
 ccl_device void svm_rhino_node_waves_width_texture(
@@ -1849,7 +1849,7 @@ ccl_device float3 vertical_cross_cubemap_to_world(float2 uv)
   float uAdj = fabsf(uLtd - uCube);
   float vAdj = fabsf(vLtd - vCube);
 
-  if (uAdj != 0.0 && vAdj != 0.0) {
+  if (uAdj != 0.0f && vAdj != 0.0f) {
     if (uAdj <= vAdj && uAdj < borderU) {
       uCube = uLtd;
     }
@@ -1976,7 +1976,7 @@ ccl_device float3 horizontal_cross_cubemap_to_world(float2 uv)
   float uAdj = fabsf(uLtd - uCube);
   float vAdj = fabsf(vLtd - vCube);
 
-  if (uAdj != 0.0 && vAdj != 0.0) {
+  if (uAdj != 0.0f && vAdj != 0.0f) {
     if (uAdj <= vAdj && uAdj < borderU) {
       uCube = uLtd;
     }
@@ -2956,7 +2956,7 @@ ccl_device bool tile_texture_triangular_test(float3 uvw, float3 join_width)
 
   dHalfWidth = join_width.y * 0.5f * vFactor;
 
-  return abs(u) < dHalfWidth;
+  return fabsf(u) < dHalfWidth;
 }
 
 ccl_device bool tile_texture_octagonal_test(float3 uvw, float3 join_width)
@@ -3342,7 +3342,7 @@ ccl_device void ProcessDotColor(KernelGlobals kg,
     float ringRadius = ring_radius;
     virtualRadius = radius * ringRadius;
     float actualRingRadius = radius * (1.0f - ringRadius);
-    virtualDistance = abs(actualRingRadius - virtualDistance);
+    virtualDistance = fabsf(actualRingRadius - virtualDistance);
     virtualSquaredDistance = virtualDistance * virtualDistance;
   }
 
@@ -3395,7 +3395,7 @@ ccl_device void ProcessDotColor(KernelGlobals kg,
     s = hsb.y;
     b = hsb.z;
 
-    float shiftedHue = mod(h + hueAdjust, 360.0f);
+    float shiftedHue = fmod(h + hueAdjust, 360.0f);
 
     if (shiftedHue < 0)
       shiftedHue += 360.0f;

@@ -480,8 +480,10 @@ void CCyclesDisplayDriver::graphics_interop_deactivate()
 static void log_print(const std::string& msg)
 {
 	std::cout << msg << std::endl;
+#ifdef WIN32
 	OutputDebugString(msg.c_str());
 	OutputDebugString("\n");
+#endif
 }
 
 static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyclesPassOutput>> *passes)
