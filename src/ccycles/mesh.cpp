@@ -26,7 +26,7 @@ using namespace OIIO;
 ccl::Geometry* cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id)
 {
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		ccl::Geometry* mesh = sce->create_node<ccl::Mesh>();
 
@@ -89,7 +89,7 @@ void cycles_geometry_tag_rebuild(ccl::Session* session_id, ccl::Geometry* geomet
 void cycles_mesh_set_smooth(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int smooth)
 {
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -100,7 +100,7 @@ void cycles_mesh_set_smooth(ccl::Session* session_id, ccl::Geometry* geometry, u
 			bool use_smooth = smooth == 1;
 			mesh->get_smooth().resize(mesh->get_triangles().size());
 
-			for (int i = 0; i < mesh->get_triangles().size(); i++) 
+			for (int i = 0; i < mesh->get_triangles().size(); i++)
 			{
 				mesh->get_smooth()[i] = use_smooth;
 			}
@@ -112,7 +112,7 @@ void cycles_mesh_set_smooth(ccl::Session* session_id, ccl::Geometry* geometry, u
 void cycles_mesh_reserve(ccl::Session* session_id, ccl::Geometry* geometry, unsigned vcount, unsigned fcount)
 {
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -145,7 +145,7 @@ void cycles_mesh_resize(ccl::Session* session_id, ccl::Geometry* geometry, unsig
 void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, float *in_verts, unsigned int in_vcount)
 {
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -157,7 +157,7 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 
 			auto& cycles_mesh_vertices = mesh->get_verts();
 
-			for (int i = 0U, j = 0U; i < in_vcount * 3; i += 3, j++) 
+			for (int i = 0U, j = 0U; i < in_vcount * 3; i += 3, j++)
 			{
 				ccl::float3 cycles_vertex;
 
@@ -180,7 +180,7 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 void cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* geometry, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
 {
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -218,7 +218,7 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 	ASSERT(geometry);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -226,9 +226,9 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 
 		if (mesh)
 		{
-			mesh->get_triangle(tri_idx).v[0] + (int)v0;
-			mesh->get_triangle(tri_idx).v[1] + (int)v1;
-			mesh->get_triangle(tri_idx).v[2] + (int)v2;
+			mesh->get_triangle(tri_idx).v[0] = (int)v0;
+			mesh->get_triangle(tri_idx).v[1] = (int)v1;
+			mesh->get_triangle(tri_idx).v[2] = (int)v2;
 
 
 			// TODO: XXXX revisit shader handling
@@ -247,7 +247,7 @@ void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 	ASSERT(geometry);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -265,7 +265,7 @@ void cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* geometry, floa
 	ASSERT(geometry);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -280,13 +280,13 @@ void cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* geometry, floa
 
 			ccl::float2 f2;
 
-			for (int i = 0, j = 0; i < (int)uvcount * 2; i += 2, j++) 
+			for (int i = 0, j = 0; i < (int)uvcount * 2; i += 2, j++)
 			{
 				f2.x = uvs[i];
 				f2.y = uvs[i + 1];
 				fdata[j] = f2;
 			}
-			
+
 			//ALB: IT looks like all meshes are triangles in CyclesX
 			//me->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 		}
@@ -298,7 +298,7 @@ void cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* geo
 	ASSERT(geometry);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
@@ -311,7 +311,7 @@ void cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* geo
 
 			ccl::float3 f3;
 
-			for (int i = 0, j = 0; i < (int)vnormalcount * 3; i += 3, j++) 
+			for (int i = 0, j = 0; i < (int)vnormalcount * 3; i += 3, j++)
 			{
 				f3.x = vnormals[i];
 				f3.y = vnormals[i + 1];
@@ -524,7 +524,7 @@ void cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* geom
 	ASSERT(geometry);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
