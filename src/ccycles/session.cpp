@@ -252,63 +252,6 @@ std::vector<float> &CCyclesPassOutput::pixels()
 	return m_pixels;
 }
 
-CCyclesDebugDriver::CCyclesDebugDriver(CCyclesDebugDriver::LogFunction log) : log_(log) {}
-
-CCyclesDebugDriver::~CCyclesDebugDriver() {}
-
-void CCyclesDebugDriver::write_render_tile(const Tile &tile)
-{
-  log_(string_printf(
-      "Handling tile layer %s, size %d %d", tile.layer.c_str(), tile.size.x, tile.size.y));
-
-	fs::path userprofile(std::getenv("USERPROFILE"));
-	fs::path save_path = userprofile / "integration_testrender.png";
-
-	const int width = tile.size.x;
-	const int height = tile.size.y;
-	vector<float> pixels(width * height * 4);
-
-	if (!tile.get_pass_pixels("combined", 4, pixels.data())) {
-		log_("Failed to read render pass pixels");
-		return;
-	}
-
-	unique_ptr<ImageOutput> image_output(ImageOutput::create("png"));
-	if (image_output == nullptr) {
-		log_("Failed to create image file. 1");
-		return;
-	}
-
-	ImageSpec spec(width, height, 4, TypeDesc::FLOAT);
-  if (!image_output->open(save_path.string(), spec)) {
-		log_(image_output->geterror());
-		log_("Failed to create image file.2");
-		return;
-	}
-
-	/* Manipulate offset and stride to convert from bottom-up to top-down convention. */
-	ImageBuf image_buffer(spec,
-												pixels.data() + (height - 1) * width * 4,
-												AutoStride,
-												-width * 4 * sizeof(float),
-												AutoStride);
-
-#define DCOLORSPACE
-#if defined(DCOLORSPACE)
-	/* Apply gamma correction for (some) non-linear file formats.
-	 * TODO: use OpenColorIO view transform if available. */
-	if (ColorSpaceManager::detect_known_colorspace(
-					u_colorspace_auto, "", image_output->format_name(), true) == u_colorspace_srgb) {
-		const float g = 1.0f / 2.2f;
-		ImageBufAlgo::pow(image_buffer, image_buffer, {g, g, g, 1.0f});
-	}
-#endif
-
-	/* Write to disk and close */
-	image_buffer.set_write_format(TypeDesc::FLOAT);
-	image_buffer.write(image_output.get());
-	image_output->close();
-}
 
 CCyclesOutputDriver::CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *passes,
 										 CCyclesOutputDriver::LogFunction log)
@@ -496,7 +439,6 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	cam->update(session->scene);
 
 	session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print));
-	//session->set_output_driver(std::make_unique<CCyclesDebugDriver>(log_print));
 	//session->set_display_driver(std::make_unique<CCyclesDisplayDriver>(passes, log_print));
 
 	ccl::Scene *scene = session->scene;
