@@ -29,6 +29,8 @@ add_definitions(-DCCL_CAPI_DLL)
 #target_include_directories(ccycles PRIVATE ../../../../../../big_libs/OpenImageIO-2.2.19/include)
 #target_include_directories(ccycles PRIVATE ../../../../../../big_libs/OpenEXR-2.5.5/include)
 
+list(APPEND LIB ${OPENIMAGEIO_LIBRARIES})
+
 if(WITH_ALEMBIC)
   add_definitions(-DWITH_ALEMBIC)
   list(APPEND INC_SYS

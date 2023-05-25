@@ -215,6 +215,7 @@ void cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* geometry, int
 
 void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
 {
+	#if OLD_NOT_USED
 	ASSERT(geometry);
 
 	ccl::Scene* sce = nullptr;
@@ -240,6 +241,7 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 			//mesh->get_smooth()[mesh_id] = (1 == smooth);
 		}
 	}
+	#endif
 }
 
 void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
