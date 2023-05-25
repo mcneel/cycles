@@ -506,6 +506,11 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	integrator->set_denoiser_type(ccl::DENOISER_NONE);
 	integrator->set_guiding_distribution_type(ccl::GUIDING_TYPE_DIRECTIONAL_QUAD_TREE);
 
+	// This needs to be here (for now) so that the node will register itself
+	// through the dynamic initialization of the global variable. If not here
+	// compiler will optimize away the code in the .cpp file.
+	AzimuthAltitudeTransformNode derp;
+
 	{
 		scene->background->set_transparent_glass(true);
 		Shader *bgsh = scene->default_background;

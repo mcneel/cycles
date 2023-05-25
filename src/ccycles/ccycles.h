@@ -597,7 +597,7 @@ CCL_CAPI void __cdecl cycles_session_params_set_pixel_size(ccl::SessionParams* s
 
 /* Create a new scene for specified device. */
 CCL_CAPI unsigned int __cdecl cycles_scene_create(unsigned int scene_params_id, ccl::Session* session_id);
-CCL_CAPI void __cdecl cycles_scene_set_background_shader(ccl::Session* session_id, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_scene_set_background_shader(ccl::Session* session_id, ccl::Shader* shader_id);
 CCL_CAPI ccl::Shader* __cdecl cycles_scene_get_background_shader(ccl::Session* session_id);
 CCL_CAPI void __cdecl cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent);
 CCL_CAPI void __cdecl cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag);
@@ -738,15 +738,15 @@ CCL_CAPI void __cdecl cycles_scene_set_default_surface_shader(ccl::Session* sess
  */
 CCL_CAPI unsigned int __cdecl cycles_scene_get_default_surface_shader(ccl::Session* session_id);
 CCL_CAPI unsigned int __cdecl cycles_scene_shader_id(ccl::Session* session_id, unsigned int shader_id);
-CCL_CAPI unsigned int __cdecl cycles_add_shader_node(ccl::Session* session_id, unsigned int shader_id, shadernode_type shn_type);
+CCL_CAPI ccl::ShaderNode *__cdecl cycles_add_shader_node(ccl::Shader *shader, const char *node_name);
 CCL_CAPI void __cdecl cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value);
 CCL_CAPI void __cdecl cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const char* attribute_name, float value);
 CCL_CAPI void __cdecl cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char* attribute_name, float x, float y, float z);
 CCL_CAPI void __cdecl cycles_shadernode_set_enum(ccl::ShaderNode* shnode_id, const char* enum_name, int value);
 CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_transformation(ccl::ShaderNode* shnode, int transform_type, float x, float y, float z);
 CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode* shnode, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z);
-CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_projection(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::TextureMapping::Projection tm_projection);
-CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_type(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, ccl::NodeMappingType tm_type);
+CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_projection(ccl::ShaderNode *shnode, ccl::TextureMapping::Projection tm_projection);
+CCL_CAPI void __cdecl cycles_shadernode_texmapping_set_type(ccl::ShaderNode *shnode, ccl::NodeMappingType tm_type);
 
 CCL_CAPI void __cdecl cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* member_name, bool value);
 CCL_CAPI void __cdecl cycles_shadernode_set_member_float(ccl::ShaderNode* shnode_id, const char* member_name, float value);
@@ -764,7 +764,7 @@ CCL_CAPI void __cdecl cycles_shader_set_use_transparent_shadow(ccl::Session* ses
 CCL_CAPI void __cdecl cycles_shader_set_heterogeneous_volume(ccl::Session* session_id, unsigned int shader_id, unsigned int heterogeneous_volume);
 CCL_CAPI void __cdecl cycles_shader_new_graph(ccl::Shader* shader);
 
-CCL_CAPI void __cdecl cycles_shader_connect_nodes(ccl::Session* session_id, unsigned int shader_id, unsigned int from_id, const char* from, unsigned int to_id, const char* to);
+CCL_CAPI void __cdecl cycles_shader_connect_nodes(ccl::Shader *shader_id, ccl::ShaderNode *from_id, const char *from, ccl::ShaderNode *to_id, const char *to);
 
 /***** LIGHTS ****/
 

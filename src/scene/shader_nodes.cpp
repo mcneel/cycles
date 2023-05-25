@@ -4055,6 +4055,24 @@ NODE_DEFINE(RhinoTextureCoordinateNode)
   SOCKET_BOOLEAN(use_transform, "Use Transform", false);
   SOCKET_TRANSFORM(ob_tfm, "Object Transform", transform_identity());
 
+  SOCKET_IN_NORMAL(normal_osl,
+                   "NormalIn",
+                   make_float3(0.0f, 0.0f, 0.0f),
+                   SocketType::LINK_NORMAL | SocketType::OSL_INTERNAL);
+
+  SOCKET_FLOAT(horizontal_sweep_start, "Horizontal Sweep Start", 0.0);
+  SOCKET_FLOAT(horizontal_sweep_end, "Horizontal Sweep End", 1.0);
+  SOCKET_FLOAT(vertical_sweep_start, "Vertical Sweep Start", 0.0);
+  SOCKET_FLOAT(vertical_sweep_end, "Vertical Sweep End", 1.0);
+  SOCKET_FLOAT(height, "Height", 1.0);
+  SOCKET_FLOAT(radius, "Radius", 1.0);
+
+  static NodeEnum decal_projection_enum;
+  decal_projection_enum.insert("both", NODE_IMAGE_DECAL_BOTH);
+  decal_projection_enum.insert("forward", NODE_IMAGE_DECAL_FORWARD);
+  decal_projection_enum.insert("backward", NODE_IMAGE_DECAL_BACKWARD);
+  SOCKET_ENUM(decal_projection, "Decal Direction", decal_projection_enum, NODE_IMAGE_DECAL_BOTH);
+
   SOCKET_OUT_POINT(generated, "Generated");
   SOCKET_OUT_NORMAL(normal, "Normal");
   SOCKET_OUT_POINT(UV, "UV");
@@ -4062,6 +4080,23 @@ NODE_DEFINE(RhinoTextureCoordinateNode)
   SOCKET_OUT_POINT(camera, "Camera");
   SOCKET_OUT_POINT(window, "Window");
   SOCKET_OUT_NORMAL(reflection, "Reflection");
+
+  SOCKET_OUT_POINT(wcsbox, "WcsBox");
+  SOCKET_OUT_POINT(envspherical, "EnvSpherical");
+  SOCKET_OUT_POINT(envemap, "EnvEmap");
+  SOCKET_OUT_POINT(envbox, "EnvBox");
+  SOCKET_OUT_POINT(envlightprobe, "EnvLightProbe");
+  SOCKET_OUT_POINT(envcubemap, "EnvCubemap");
+  SOCKET_OUT_POINT(envcubemapverticalcross, "EnvCubemapVerticalCross");
+  SOCKET_OUT_POINT(envcubemaphorizontalcross, "EnvCubemapHorizontalCross");
+  SOCKET_OUT_POINT(envhemi, "EnvHemi");
+  SOCKET_OUT_POINT(decaluv, "DecalUv");
+  SOCKET_OUT_POINT(decalplanar, "DecalPlanar");
+  SOCKET_OUT_POINT(decalspherical, "DecalSpherical");
+  SOCKET_OUT_POINT(decalcylindrical, "DecalCylindrical");
+
+  SOCKET_OUT_FLOAT(decalforward, "DecalForward");
+  SOCKET_OUT_FLOAT(decalusage, "DecalUsage");
 
   return type;
 }
