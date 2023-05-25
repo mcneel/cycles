@@ -22,18 +22,15 @@ limitations under the License.
  * The correct ID can be found with cycles_scene_shader_id. The ID is also
  * returned from cycles_scene_add_shader.
  */
-void cycles_scene_set_background_shader(ccl::Session* session_id, unsigned int shader_id)
+void cycles_scene_set_background_shader(ccl::Session *session_id, ccl::Shader *shader_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Shader* bg = find_shader_in_scene(sce, shader_id);
-		if (bg != nullptr) {
-			sce->default_background = bg;
-			sce->background->set_shader(bg);
-			sce->background->set_use_shader(true);
-			sce->background->tag_update(sce);
-			logger.logit("Scene ", session_id, " set background shader ", shader_id);
-		}
+		sce->default_background = shader_id;
+		sce->background->set_shader(shader_id);
+		sce->background->set_use_shader(true);
+		sce->background->tag_update(sce);
+		logger.logit("Scene ", session_id, " set background shader ", shader_id);
 	}
 }
 

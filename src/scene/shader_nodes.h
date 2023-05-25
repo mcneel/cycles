@@ -983,17 +983,18 @@ class RhinoTextureCoordinateNode : public ShaderNode {
   NODE_SOCKET_API(Transform, ob_tfm);
 
   /* decal origin */
-  NODE_SOCKET_API(float3, decal_origin);
+  float3 decal_origin;
   /* decal across vector */
-  NODE_SOCKET_API(float3, decal_across);
+  float3 decal_across;
   /* decal up vector */
-  NODE_SOCKET_API(float3, decal_up);
+  float3 decal_up;
+
   /* Pxyz transform to map ShaderData->P to normalized mapping primitive */
-  NODE_SOCKET_API(Transform, pxyz);
+  Transform pxyz;
   /* Nxyz transform to map ShaderData->N to normalized mapping primitive */
-  NODE_SOCKET_API(Transform, nxyz);
+  Transform nxyz;
   /* UVW transform to map point to UV(W) space*/
-  NODE_SOCKET_API(Transform, uvw);
+  Transform uvw;
   /* Sweep used in spherical and tubular projections t. */
   NODE_SOCKET_API(float, horizontal_sweep_start);
   NODE_SOCKET_API(float, horizontal_sweep_end);
@@ -1005,7 +1006,7 @@ class RhinoTextureCoordinateNode : public ShaderNode {
   /* Projection used by decal: both, forward or backward */
   NODE_SOCKET_API(NodeImageDecalProjection, decal_projection);
   /* UV Map to use, used for Decals */
-  NODE_SOCKET_API(ustring, uvmap);
+  ustring uvmap;
 };
 
 class UVMapNode : public ShaderNode {

@@ -133,7 +133,7 @@ void Background::tag_update(Scene *scene)
 
 Shader *Background::get_shader(const Scene *scene)
 {
-  return (use_shader) ? ((shader) ? shader : scene->default_background) : scene->default_empty;
+  return (use_shader) ? ((shader) ? (Shader*)shader : scene->default_background) : scene->default_empty;
 }
 
 CCL_NAMESPACE_END
