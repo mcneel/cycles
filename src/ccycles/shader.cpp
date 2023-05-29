@@ -399,6 +399,9 @@ void cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode* shnode, ccl::Text
 			ccl::NoiseTextureNode* node = dynamic_cast<ccl::NoiseTextureNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
 		}
+		else {
+			assert(false);
+		}
 	}
 }
 
@@ -588,6 +591,9 @@ void cycles_shadernode_set_enum(ccl::ShaderNode* shnode, const char* enum_name, 
 		{
 			ccl::NormalMapNode* node = dynamic_cast<ccl::NormalMapNode*>(shnode);
 			node->set_space((ccl::NodeNormalMapSpace)value);
+		}
+		else {
+			assert(false);
 		}
 	}
 }
@@ -1362,7 +1368,7 @@ Set an integer attribute with given name to value. shader_id is the global shade
 */
 void cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value)
 {
-	ustring sockname{attribute_name};
+	std::string sockname{attribute_name};
 	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
@@ -1371,7 +1377,7 @@ void cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char*
 		if (socket.flags & ccl::SocketType::INTERNAL) {
 			continue;
 		}
-		if (socket.name == sockname) {
+		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, value);
 			break;
 		}
@@ -1383,7 +1389,7 @@ void cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char*
 */
 void cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const char* attribute_name, float value)
 {
-	ustring sockname{attribute_name};
+	std::string sockname{attribute_name};
 	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
@@ -1392,7 +1398,7 @@ void cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const cha
 		if (socket.flags & ccl::SocketType::INTERNAL) {
 			continue;
 		}
-		if (socket.name == sockname) {
+		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, value);
 			break;
 		}
@@ -1405,7 +1411,7 @@ Set a vector of floats attribute with given name to x, y and z. shader_id is the
 void cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char* attribute_name, float x, float y, float z)
 {
 	ccl::float3 f3 = ccl::make_float3(x, y, z);
-	ustring sockname{attribute_name};
+	std::string sockname{attribute_name};
 	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
@@ -1414,7 +1420,7 @@ void cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char*
 		if (socket.flags & ccl::SocketType::INTERNAL) {
 			continue;
 		}
-		if (socket.name == sockname) {
+		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, f3);
 			break;
 		}
