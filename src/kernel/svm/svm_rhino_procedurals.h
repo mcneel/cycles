@@ -94,7 +94,7 @@ ccl_device float4 checker_texture(float3 uvw,
 }
 
 ccl_device void svm_rhino_node_checker_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
   uint dummy;
@@ -773,7 +773,7 @@ ccl_device float4 noise_texture(KernelGlobals kg,
 }
 
 ccl_device void svm_rhino_node_noise_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
   uint dummy;
@@ -848,7 +848,7 @@ ccl_device float4 waves_width_texture(float3 uvw,
 }
 
 ccl_device void svm_rhino_node_waves_width_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, out_uvw_offset;
   uint dummy;
@@ -931,7 +931,7 @@ ccl_device float4 waves_texture(float3 uvw,
 }
 
 ccl_device void svm_rhino_node_waves_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, in_color3_offset, out_color_offset, out_alpha_offset;
 
@@ -974,7 +974,7 @@ ccl_device void svm_rhino_node_waves_texture(
     stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
-ccl_device void perturbing_part1_texture(float3 uvw, float3* out_uvw0, float3* out_uvw1, float3* out_uvw2)
+ccl_device void perturbing_part1_texture(float3 uvw, ccl_private float3* out_uvw0, ccl_private float3* out_uvw1, ccl_private float3* out_uvw2)
 {
   *out_uvw0 = uvw;
   *out_uvw1 = make_float3(1.0f, 0.0f, 0.0f) - uvw;
@@ -982,7 +982,7 @@ ccl_device void perturbing_part1_texture(float3 uvw, float3* out_uvw0, float3* o
 }
 
 ccl_device void svm_rhino_node_perturbing_part1_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, out_uvw0_offset, out_uvw1_offset, out_uvw2_offset;
 
@@ -1017,7 +1017,7 @@ ccl_device float3 perturbing_part2_texture(
 }
 
 ccl_device void svm_rhino_node_perturbing_part2_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color0_offset, in_color1_offset, in_color2_offset, out_uvw_offset;
   uint dummy;
@@ -1122,7 +1122,7 @@ ccl_device float4 gradient_texture(float3 uvw,
 }
 
 ccl_device void svm_rhino_node_gradient_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset,
       out_color_offset, out_alpha_offset;
@@ -1190,7 +1190,7 @@ ccl_device float4 blend_texture(float3 uvw,
 }
 
 ccl_device void svm_rhino_node_blend_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset,
       in_blend_color_offset, out_color_offset, out_alpha_offset;
@@ -1337,7 +1337,7 @@ ccl_device float4 exposure_texture(
 }
 
 ccl_device void svm_rhino_node_exposure_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_color_offset, out_color_offset, out_alpha_offset;
   uint dummy;
@@ -1404,7 +1404,7 @@ ccl_device float4 fbm_texture(KernelGlobals kg,
 }
 
 ccl_device void svm_rhino_node_fbm_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
   uint dummy;
@@ -1512,7 +1512,12 @@ ccl_device int test_digit(int n, float u, float v, float thickness, float margin
 ccl_device int TestNumber(int digits, int number, float thickness, float margin, float u, float v)
 {
   float digitIndexDbl = 0.0f;
-  float digitU = modff(u * digits, &digitIndexDbl);
+#if defined(__KERNEL_METAL__)
+  float digitU = modf(u * digits, digitIndexDbl);
+#else
+  float digitU = modf(u * digits, &digitIndexDbl);
+#endif
+
   float digitV = v;
   int digitIndex = int(digitIndexDbl);
 
@@ -1541,8 +1546,13 @@ grid_texture(float3 uvw, float4 color1, float4 color2, int cells, float font_thi
   float cellU = 0.0f;
   float cellV = 0.0f;
 
-  cellU = modff(cells * u, &gridU);
-  cellV = modff(cells * v, &gridV);
+#if defined(__KERNEL_METAL__)
+  cellU = modf(cells * u, gridU);
+  cellV = modf(cells * v, gridV);
+#else
+  cellU = modf(cells * u, &gridU);
+  cellV = modf(cells * v, &gridV);
+#endif
 
   int cellParity = (int(gridU) + int(gridV)) % 2;
 
@@ -1580,7 +1590,7 @@ grid_texture(float3 uvw, float4 color1, float4 color2, int cells, float font_thi
 }
 
 ccl_device void svm_rhino_node_grid_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset,
       out_color_offset, out_alpha_offset;
@@ -2260,7 +2270,7 @@ ccl_device float4 projection_changer_texture(float3 uvw,
 }
 
 ccl_device void svm_rhino_node_projection_changer_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, out_uvw_offset;
   uint dummy;
@@ -2309,7 +2319,7 @@ ccl_device float4 mask_texture(float4 color, RhinoProceduralMaskType mask_type)
 }
 
 ccl_device void svm_rhino_node_mask_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_color_offset, in_alpha_offset, out_color_offset, out_alpha_offset;
 
@@ -2408,7 +2418,7 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
 }
 
 ccl_device void svm_rhino_node_perlin_marble_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset, out_alpha_offset;
   uint dummy;
@@ -2579,7 +2589,7 @@ ccl_device float4 physical_sky_texture(float3 uvw,
 }
 
 ccl_device void svm_rhino_node_physical_sky_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, out_color_offset;
   uint dummy;
@@ -2592,7 +2602,7 @@ ccl_device void svm_rhino_node_physical_sky_texture(
   uint4 data1 = read_node(kg, offset);
   uint4 data2 = read_node(kg, offset);
   uint4 data3 = read_node(kg, offset);
-  
+
   float3 sun_dir = make_float3(
       __uint_as_float(data0.x), __uint_as_float(data0.y), __uint_as_float(data0.z));
   float atmospheric_density = __uint_as_float(data0.w);
@@ -2815,7 +2825,7 @@ ccl_device float4 texture_adjustment_texture(float4 color,
 }
 
 ccl_device void svm_rhino_node_texture_adjustment_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_color_offset, out_color_offset;
   uint dummy;
@@ -3034,7 +3044,7 @@ tile_texture(float3 uvw, float4 color1, float4 color2, int type, float3 phase, f
 }
 
 ccl_device void svm_rhino_node_tile_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_alpha1_offset, in_color2_offset, in_alpha2_offset, out_color_offset, out_alpha_offset;
   uint dummy;
@@ -3080,20 +3090,20 @@ const int STACK_STATE_SECOND_CHILD = 2;
 const int STACK_STATE_END = 3;
 
 ccl_device void RecurseTree(
-    int *dots_tree_stack, int *depth, int *index, int child_offset, int state)
+    ccl_private int *dots_tree_stack, ccl_private int *depth, ccl_private int *index, int child_offset, int state)
 {
   dots_tree_stack[*depth] = state;
   *depth += 1;
   *index = 2 * (*index) + child_offset;
 }
 
-ccl_device bool RecurseTreeChild1(int *dots_tree_stack,
+ccl_device bool RecurseTreeChild1(ccl_private int *dots_tree_stack,
                                   float3 uvw,
                                   float2 center,
                                   int axis,
                                   float radius,
-                                  int *depth,
-                                  int *index)
+                                  ccl_private int *depth,
+                                  ccl_private int *index)
 {
   if (get_float_from_f3(uvw, axis) <= get_float_from_f2(center, axis) + radius) {
     RecurseTree(dots_tree_stack, depth, index, 1, STACK_STATE_SECOND_CHILD);
@@ -3103,13 +3113,13 @@ ccl_device bool RecurseTreeChild1(int *dots_tree_stack,
   return false;
 }
 
-ccl_device bool RecurseTreeChild2(int *dots_tree_stack,
+ccl_device bool RecurseTreeChild2(ccl_private int *dots_tree_stack,
                                   float3 uvw,
                                   float2 center,
                                   int axis,
                                   float radius,
-                                  int *depth,
-                                  int *index)
+                                  ccl_private int *depth,
+                                  ccl_private int *index)
 {
   if (get_float_from_f3(uvw, axis) > get_float_from_f2(center, axis) - radius) {
     RecurseTree(dots_tree_stack, depth, index, 2, STACK_STATE_END);
@@ -3119,7 +3129,7 @@ ccl_device bool RecurseTreeChild2(int *dots_tree_stack,
   return false;
 }
 
-ccl_device void Return(int *dots_tree_stack, int *depth, int *index)
+ccl_device void Return(ccl_private int *dots_tree_stack, ccl_private int *depth, ccl_private int *index)
 {
   dots_tree_stack[*depth] = STACK_STATE_BEGIN;
   *depth -= 1;
@@ -3146,9 +3156,9 @@ ccl_device float4 dots_tree_data_fetch(KernelGlobals kg, int x)
 
 ccl_device void GetDotTreeData(KernelGlobals kg,
                                int tree_index,
-                               float2 *center,
-                               float *radius,
-                               int *dot_index)
+                               ccl_private float2 *center,
+                               ccl_private float *radius,
+                               ccl_private int *dot_index)
 {
   float4 dot_tree_node = dots_tree_data_fetch(kg, tree_index);
 
@@ -3160,10 +3170,10 @@ ccl_device void GetDotTreeData(KernelGlobals kg,
 ccl_device void FindIntersectingDot(KernelGlobals kg,
                                     float3 uvw,
                                     int dots_tree_node_count,
-                                    int *depth,
-                                    int *tree_index,
-                                    int *dot_index_output,
-                                    float *squared_distance_output)
+                                    ccl_private int *depth,
+                                    ccl_private int *tree_index,
+                                    ccl_private int *dot_index_output,
+                                    ccl_private float *squared_distance_output)
 {
   // Will support around 100 000 dots
   // UI is limited to 100 000 dots.
@@ -3324,9 +3334,9 @@ ccl_device void ProcessDotColor(KernelGlobals kg,
                                 RhinoProceduralDotsCompositionType composition_type,
                                 int dot_index,
                                 float squared_distance,
-                                float *standard_composition_value,
-                                float4 *color,
-                                int *colors_added)
+                                ccl_private float *standard_composition_value,
+                                ccl_private float4 *color,
+                                ccl_private int *colors_added)
 {
   dot_index *= 2;
 
@@ -3523,7 +3533,7 @@ ccl_device float4 dots_texture(KernelGlobals kg,
 }
 
 ccl_device void svm_rhino_node_dots_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, in_color1_offset, in_color2_offset, out_color_offset;
 
@@ -3563,16 +3573,16 @@ ccl_device void svm_rhino_node_dots_texture(
         stack, out_color_offset, make_float3(out_color.x, out_color.y, out_color.z));
 }
 
-ccl_device void normal_part1_texture(ShaderData *sd,
+ccl_device void normal_part1_texture(ccl_private ShaderData *sd,
                                        float3 uvw,
-                                       float3 *uvw1,
-                                       float3 *uvw2,
-                                       float3 *uvw3,
-                                       float3 *uvw4,
-                                       float3 *uvw5,
-                                       float3 *uvw6,
-                                       float3 *uvw7,
-                                       float3 *uvw8)
+                                       ccl_private float3 *uvw1,
+                                       ccl_private float3 *uvw2,
+                                       ccl_private float3 *uvw3,
+                                       ccl_private float3 *uvw4,
+                                       ccl_private float3 *uvw5,
+                                       ccl_private float3 *uvw6,
+                                       ccl_private float3 *uvw7,
+                                       ccl_private float3 *uvw8)
 {
   float2 uv_in = make_float2(uvw.x, uvw.y);
 
@@ -3602,7 +3612,7 @@ ccl_device void normal_part1_texture(ShaderData *sd,
 }
 
 ccl_device void svm_rhino_node_normal_part1_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_uvw_offset, out_uvw1_offset, out_uvw2_offset, out_uvw3_offset, out_uvw4_offset,
       out_uvw5_offset, out_uvw6_offset, out_uvw7_offset, out_uvw8_offset;
@@ -3672,7 +3682,7 @@ ccl_device float4 normal_part2_texture(float3 color1,
 }
 
 ccl_device void svm_rhino_node_normal_part2_texture(
-    KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+    KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint in_color1_offset, in_color2_offset, in_color3_offset, in_color4_offset, in_color5_offset,
       in_color6_offset, in_color7_offset, in_color8_offset, out_color_offset;

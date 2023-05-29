@@ -4,12 +4,14 @@
 
 #pragma once
 
+#if !defined(__KERNEL_METAL__)
 #include "../camera/camera.h"
+#endif
 
 CCL_NAMESPACE_BEGIN
 
 /* wcs_box_coord gives a Rhino-style WCS box texture coordinate mapping. */
-ccl_device_inline void wcs_box_coord(KernelGlobals kg, ShaderData *sd, float3 *data)
+ccl_device_inline void wcs_box_coord(KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float3 *data)
 {
   float3 N = sd->N;
   if (sd->object != OBJECT_NONE && kernel_data_fetch(objects, sd->object).use_ocs_frame) {
@@ -106,7 +108,7 @@ ccl_device_inline void wcs_box_coord(KernelGlobals kg, ShaderData *sd, float3 *d
   *data = v;
 }
 
-ccl_device_inline float3 get_reflected_incoming_ray(KernelGlobals kg, ShaderData *sd)
+ccl_device_inline float3 get_reflected_incoming_ray(KernelGlobals kg, ccl_private ShaderData *sd)
 {
   float3 n = sd->N;
   float3 i = sd->wi;
@@ -334,11 +336,11 @@ ccl_device_inline float3 map_to_sphere_section(const float3 co, const DecalData 
 }
 
 ccl_device_inline void decal_data_read(KernelGlobals kg,
-                                       ShaderData *sd,
-                                       float *stack,
+                                       ccl_private ShaderData *sd,
+                                       ccl_private float *stack,
                                        uint4 node,
-                                       int *offset,
-                                       DecalData *decal,
+                                       ccl_private int *offset,
+                                       ccl_private DecalData *decal,
                                        int derivative)
 {
   uint decal_forward_offset, decal_usage_offset;

@@ -45,6 +45,7 @@ std::vector<LOGGER_FUNC_CB> loggers;
 
 void cycles_path_init(const char* path, const char* user_path)
 {
+	std::cout << "XXXXXXXXXXX \n\n\n" << path << " and " << user_path << std::endl;
 	ccl::path_init(std::string(path), std::string(user_path));
 }
 

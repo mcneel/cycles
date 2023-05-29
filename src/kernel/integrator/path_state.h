@@ -259,8 +259,8 @@ ccl_device_inline uint path_state_ray_visibility(ConstIntegratorState state)
 ccl_device_forceinline bool path_clip_ray(
     KernelGlobals kg,
     IntegratorState state,
-    ShaderData* sd,
-    Ray* ray)
+    ccl_private ShaderData* sd,
+    ccl_private Ray* ray)
 {
     /* Check against clipping planes. If camera ray and
      * clipped by planes adjust ray position and iterate
