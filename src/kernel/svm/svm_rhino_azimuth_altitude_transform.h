@@ -51,7 +51,7 @@ ccl_device float3 azimuth_altitude_transform(float3 vector, float azimuth, float
   return rotated_vector;
 }
 
-ccl_device void svm_rhino_node_azimuth_altitude_transform(KernelGlobals kg, ShaderData *sd, float *stack, uint4 node, int *offset)
+ccl_device void svm_rhino_node_azimuth_altitude_transform(KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float *stack, uint4 node, ccl_private int *offset)
 {
   uint vector_in_offset, azimuth_offset, altitude_offset, threshold_offset;
   uint vector_out_offset = node.z;

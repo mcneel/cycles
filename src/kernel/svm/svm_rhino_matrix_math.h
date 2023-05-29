@@ -19,12 +19,12 @@ limitations under the License.
 CCL_NAMESPACE_BEGIN
 
 ccl_device void svm_rhino_node_matrix_math(KernelGlobals kg,
-                                     ShaderData *sd,
-                                     float *stack,
+                                     ccl_private ShaderData *sd,
+                                     ccl_private float *stack,
                                      uint itype,
                                      uint vec_offset,
                                      uint out_offset,
-                                     int *offset)
+                                     ccl_private int *offset)
 {
   NodeMatrixMath type = (NodeMatrixMath)itype;
   float3 v = stack_load_float3(stack, vec_offset);
