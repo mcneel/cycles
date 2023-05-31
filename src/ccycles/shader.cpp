@@ -22,6 +22,7 @@ OIIO_NAMESPACE_USING
 
 ccl::ShaderNode* _shader_node_find(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id)
 {
+	assert(false);
 #if LEGACY_SHADERS
 	ccl::Scene* sce = nullptr;
 	if (scene_find(session_id, &sce)) {
@@ -107,43 +108,21 @@ bool cycles_shader_get_name(ccl::Shader* sh, void* strholder)
 	return false;
 }
 
-/* Add shader to specified scene. */
-unsigned int cycles_scene_add_shader(ccl::Session* session_id, unsigned int shader_id)
+void cycles_scene_tag_shader(ccl::Session *session_id, ccl::Shader *shader_id, bool use)
 {
-#if REDO_SHADERS
-	// TODO: XXXX redo shader creation
 	ccl::Scene* sce = nullptr;
 	if (scene_find(session_id, &sce)) {
-		CCShader* sh = csce->shaders[shader_id];
-		sce->shaders.push_back(sh->shader);
-		sh->shader->tag_update(sce);
-		sh->shader->tag_used(sce);
-		unsigned int shid = (unsigned int)(sce->shaders.size() - 1);
-		sh->scene_mapping.insert({ session_id, shid });
-		return shid;
-	}
-#endif
-
-	return (unsigned int)(-1);
-}
-
-void cycles_scene_tag_shader(ccl::Session* session_id, unsigned int shader_id, bool use)
-{
-#if LEGACY_SHADERS
-	ccl::Scene* sce = nullptr;
-	if (scene_find(session_id, &sce)) {
-		CCShader* sh = csce->shaders[shader_id];
-		sh->shader->tag_update(sce);
+		shader_id->tag_update(sce);
 		if (use) {
-			sh->shader->tag_used(sce);
+			shader_id->tag_used(sce);
 		}
 	}
-#endif
 }
 
 /* Get Cycles shader ID in specific scene. */
 unsigned int cycles_scene_shader_id(ccl::Session* session_id, unsigned int shader_id)
 {
+	assert(false);
 #if LEGACY_SHADERS
 	ccl::Scene* sce = nullptr;
 	if (scene_find(session_id, &sce)) {
@@ -167,23 +146,25 @@ void cycles_shader_set_name(ccl::Shader* shader, const char* _name)
 	shader->name = _name;
 }
 
-void cycles_shader_set_use_mis(ccl::Session* session_id, unsigned int shader_id, unsigned int use_mis)
+void cycles_shader_set_use_mis(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int use_mis)
 {
-	// TODO: XXXX see if something similar is still necessary or if
-	// can just fully remove
-	//SHADER_SET(session_id, shader_id, bool, use_mis, use_mis == 1)
+	// TODO: XXXX Look into this - we clearly need to change the signature of this method to support three different sampling methods.
+	//if (shader_id)
+	//	shader_id->set_volume_sampling_method(use_mis == 1 ?
+	//											  ccl::VOLUME_SAMPLING_MULTIPLE_IMPORTANCE :
+	//											  ccl::VOLUME_SAMPLING_DISTANCE);
 }
 
-void cycles_shader_set_use_transparent_shadow(ccl::Session* session_id, unsigned int shader_id, unsigned int use_transparent_shadow)
+void cycles_shader_set_use_transparent_shadow(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int use_transparent_shadow)
 {
-	// TODO: XXXX investigate if transparent shadows are managed differently now
-	//SHADER_SET(session_id, shader_id, bool, use_transparent_shadow, use_transparent_shadow == 1)
+	if (shader_id)
+		shader_id->set_use_transparent_shadow(use_transparent_shadow == 1);
 }
 
-void cycles_shader_set_heterogeneous_volume(ccl::Session* session_id, unsigned int shader_id, unsigned int heterogeneous_volume)
+void cycles_shader_set_heterogeneous_volume(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int heterogeneous_volume)
 {
-	// TODO: XXXX figure out if we want volume rendering at all
-	// SHADER_SET(session_id, shader_id, bool, heterogeneous_volume, heterogeneous_volume == 1)
+	if (shader_id)
+		shader_id->set_heterogeneous_volume(heterogeneous_volume == 1);
 }
 
 ccl::ShaderNode *cycles_add_shader_node(ccl::Shader *shader_id, const char *node_name)
@@ -349,6 +330,7 @@ void cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode* shnode, ccl::Text
 		std::string shn_type = shnode->type->name.string();
 		if (shn_type == "mapping")
 		{
+			assert(false);
 			/*
 			ccl::MappingNode* node = dynamic_cast<ccl::MappingNode*>(shnode);
 			_set_texmapping_mapping(node->tex_mapping, x, y, z);
@@ -407,6 +389,7 @@ void cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode* shnode, ccl::Text
 
 void cycles_shadernode_texmapping_set_projection(ccl::ShaderNode* shnode, ccl::TextureMapping::Projection tm_projection)
 {
+	assert(false);
 	/*
 	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
 	if (shnode) {
@@ -621,6 +604,7 @@ CCImage* find_existing_ccimage(std::string imgname, unsigned int width, unsigned
 template <class T>
 CCImage* get_ccimage(std::string imgname, T* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels, bool is_float, ccl::Session* session_id)
 {
+	assert(false);
 #if LEGACY_IMAGES
 	// TODO: XXXX
 	CCImage* nimg = nullptr;
@@ -662,6 +646,7 @@ CCImage* get_ccimage(std::string imgname, T* img, unsigned int width, unsigned i
 
 void cycles_shadernode_set_member_float_img(ccl::ShaderNode* shnode, const char* member_name, const char* img_name, float* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
 {
+	assert(false);
 	// TODO: XXXX reimplement image/env texture setting
 	/*
 	CCScene* csce = nullptr;
@@ -702,6 +687,7 @@ void cycles_shadernode_set_member_float_img(ccl::ShaderNode* shnode, const char*
 
 void cycles_shadernode_set_member_byte_img(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, unsigned char* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
 {
+	assert(false);
 	// TODO: XXXX reimplement image/env texture setting
 	/*
 	CCScene* csce = nullptr;
@@ -775,15 +761,15 @@ void cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* memb
 					imgtex->set_alpha_type(ccl::ImageAlphaType::IMAGE_ALPHA_IGNORE);
 				}
 			}
-			/*else if (mname == "is_linear") {
-				imgtex->is_linear = value;
-			}*/
-			// TODO: XXXX port over alternate_tiles support from old Cycles integration
-			/*
-			else if (mname == "alternate_tiles") {
-				imgtex->alternate_tiles = value;
+			else if (mname == "is_linear") {
+				assert(false);
+				//imgtex->is_linear = value;
 			}
-			*/
+			// TODO: XXXX port over alternate_tiles support from old Cycles integration
+			else if (mname == "alternate_tiles") {
+				assert(false);
+				//imgtex->alternate_tiles = value;
+			}
 		}
 		else if (shntype == "environment_texture")
 		{
@@ -1262,6 +1248,7 @@ void cycles_shadernode_set_member_vec(ccl::ShaderNode* shnode, const char* membe
 		}
 		else if (shn_type == "mapping")
 		{
+			assert(false);
 			/*ccl::MappingNode* mapping = dynamic_cast<ccl::MappingNode*>(shnode);
 			if (mname == "min") {
 				mapping->tex_mapping.min.x = x;

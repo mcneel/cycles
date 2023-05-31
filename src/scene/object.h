@@ -77,6 +77,9 @@ class Object : public Node {
   NODE_SOCKET_API(uint, blocker_shadow_set)
   NODE_SOCKET_API(uint64_t, shadow_set_membership)
 
+  NODE_SOCKET_API(bool, use_ocs_frame)
+  NODE_SOCKET_API(Transform, ocs_frame) /* OCS frame for controlling WCS and WCS Box. */
+
   /* Set during device update. */
   bool intersects_volume;
 

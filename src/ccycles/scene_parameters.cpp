@@ -71,6 +71,7 @@ void cycles_scene_params_set_shadingsystem(unsigned int scene_params_id, unsigne
 }
 void cycles_scene_params_set_persistent_data(unsigned int scene_params_id, unsigned int persistent_data)
 {
+	assert(false);
     // TODO: XXXX no longer exists
 	//SCENE_PARAM_BOOL(scene_params_id, persistent_data)
 }

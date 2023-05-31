@@ -74,6 +74,8 @@ void CCScene::builtin_image_info(const std::string& builtin_name, void* builtin_
 	imdata.height = img->height;
 	imdata.depth = img->depth;
 	imdata.channels = img->channels;
+
+	assert(false);
 	// TODO: XXXX figure out how to do images
     // TODO: XXXX probably just utilize OIIO directly
     //imdata.is_float = img->is_float;
@@ -100,24 +102,23 @@ unsigned int cycles_scene_create(unsigned int scene_params_id, unsigned int sess
 	return UINT_MAX;
 }
 
-void cycles_scene_set_default_surface_shader(ccl::Session* session_id, unsigned int shader_id)
+void cycles_scene_set_default_surface_shader(ccl::Session *session_id, ccl::Shader *shader_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
-		sce->default_surface = sh;
+		sce->default_surface = shader_id;
 		logger.logit("Scene ", session_id, " set default surface shader ", shader_id);
 	}
 }
 
-unsigned int cycles_scene_get_default_surface_shader(ccl::Session* session_id)
+ccl::Shader *cycles_scene_get_default_surface_shader(ccl::Session *session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		return get_idx_for_shader_in_scene(sce, sce->default_surface);
+		return sce->default_surface;
 	}
 
-	return UINT_MAX;
+	return nullptr;
 }
 
 void cycles_scene_reset(ccl::Session* session_id)

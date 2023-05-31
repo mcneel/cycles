@@ -389,7 +389,7 @@ extern void _init_shaders(ccl::Session* session_id);
 #define LIGHT_FIND(session_id, light_id) \
 	ccl::Scene* sce = nullptr; \
 	if(scene_find(session_id, &sce)) { \
-		ccl::Light* l = sce->lights[light_id]; \
+		ccl::Light *l = light_id; \
 
 #define LIGHT_FIND_END() \
 		l->tag_update(sce); \
