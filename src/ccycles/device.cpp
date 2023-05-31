@@ -24,19 +24,12 @@ unsigned int cycles_number_multidevices() {
 	return (unsigned int)multi_devices.size();
 }
 
-unsigned int cycles_number_cuda_devices() {
+unsigned int cycles_number_devices_by_type(ccl::DeviceType device_type)
+{
 	int i{ 0 };
 	for (auto di : devices) {
-		if (di.type == ccl::DeviceType::DEVICE_CUDA) i++;
+		if (di.type == device_type) i++;
 	}
-
-	return i;
-}
-
-unsigned int cycles_number_opencl_devices() {
-	int i{ 0 };
-    
-    // TODO: XXXX deprecated, no OpenCL support anymore
 
 	return i;
 }
