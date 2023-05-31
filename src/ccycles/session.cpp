@@ -132,6 +132,7 @@ bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session)
 
 /* Wrap status update callback. */
 void CCSession::status_update(void) {
+	assert(false);
 	#if 0
 	TODO: XXXX
 	if (status_cbs[this->id] != nullptr) {
@@ -142,6 +143,7 @@ void CCSession::status_update(void) {
 
 /* Wrap status update callback. */
 void CCSession::test_cancel(void) {
+	assert(false);
 	#if 0
 	TODO: XXXX
 	if (cancel_cbs[this->id] != nullptr) {
@@ -153,6 +155,7 @@ void CCSession::test_cancel(void) {
 /* Wrapper callback for display update stuff. When this is called one pass has been conducted. */
 void CCSession::display_update(int sample)
 {
+	assert(false);
 	#if 0
 	TODO: XXXX
 	if (size_has_changed()) return;
@@ -545,23 +548,8 @@ void cycles_session_destroy(ccl::Session* session_id)
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
-		/* CCScene *csce = nullptr;
-		ccl::Scene* sce = nullptr;
-		if (scene_find(session_id, &csce, &sce))
-		{
-			if(session->scene == sce) {
-				csce->scene = nullptr;
-				delete csce;
-				csce = nullptr;
-				set_ccscene_null(session_id);
-			}
-		}
-		*/
-
 		sessions.erase(ccsess);
 		delete ccsess;
-
-
 	}
 }
 
@@ -643,6 +631,7 @@ int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned 
 
 void cycles_session_set_update_callback(ccl::Session* session_id, void(*update)(unsigned int sid))
 {
+	assert(false);
 	#if 0
   TODO: XXXX
 	CCSession* ccsess = nullptr;
@@ -663,6 +652,7 @@ void cycles_session_set_update_callback(ccl::Session* session_id, void(*update)(
 
 void cycles_session_set_cancel_callback(ccl::Session* session_id, void(*cancel)(unsigned int sid))
 {
+	assert(false);
   /*
   TODO: XXXX
 	CCSession* ccsess = nullptr;
@@ -683,6 +673,7 @@ void cycles_session_set_cancel_callback(ccl::Session* session_id, void(*cancel)(
 
 void cycles_session_set_update_tile_callback(ccl::Session* session_id, RENDER_TILE_CB update_tile_cb)
 {
+	assert(false);
   /*
   TODO: XXXX
 	CCSession* ccsess = nullptr;
@@ -702,6 +693,7 @@ void cycles_session_set_update_tile_callback(ccl::Session* session_id, RENDER_TI
 
 void cycles_session_set_write_tile_callback(ccl::Session* session_id, RENDER_TILE_CB write_tile_cb)
 {
+	assert(false);
 #if 0
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -720,6 +712,7 @@ void cycles_session_set_write_tile_callback(ccl::Session* session_id, RENDER_TIL
 
 void cycles_session_set_display_update_callback(ccl::Session* session_id, DISPLAY_UPDATE_CB display_update_cb)
 {
+	assert(false);
 #if 0
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -759,20 +752,13 @@ void cycles_session_start(ccl::Session* session_id)
 
 void cycles_session_end_run(ccl::Session* session_id)
 {
-		// TODO: XXXX revisit session running
-		/*
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		logger.logit("Ending run for session ", session_id);
-		session->end_run();
-	}
-		*/
+	// TODO: XXXX I don't think we need to do anything here anymore.
 }
 
 
 int cycles_session_sample(ccl::Session* session_id)
 {
+	assert(false);
 		// TODO: XXXX revisit rendering. check output driver
 		/*
 	RenderCrashTranslatorHelper render_crash_helper(render_crash_translator);
@@ -844,6 +830,7 @@ void cycles_session_copy_buffer(ccl::Session* session_id, float* pixel_buffer)
 
 void cycles_session_get_float_buffer(ccl::Session* session_id, int passtype, float** pixels)
 {
+	assert(false);
 	//CCSession* ccsess = nullptr;
 	//ccl::Session* session = nullptr;
 	//if (session_find(session_id, &ccsess, &session)) {
@@ -922,6 +909,7 @@ void cycles_progress_get_time(ccl::Session* session_id, double *total_time, doub
 
 void cycles_tilemanager_get_sample_info(ccl::Session* session_id, unsigned int* samples, unsigned int* total_samples)
 {
+	assert(false);
 		// TODO: XXXX revisit rendering and sampling
 		/*
 	CCSession* ccsess = nullptr;

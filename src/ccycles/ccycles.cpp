@@ -68,47 +68,12 @@ void cycles_initialise(unsigned int mask)
 	}
 }
 
-void cycles_debug_set_cpu_kernel(unsigned int state)
-{
-    // TODO: XXXX no more split cpu kernel
-	//ccl::DebugFlags().cpu.split_kernel = state == 1;
-}
-
 void cycles_debug_set_cpu_allow_qbvh(unsigned int state)
 {
+	assert(false);
     // TODO: XXXX no quad bvh
 	ccl::BVHLayout bvh_layout = ccl::BVHLayout::BVH_LAYOUT_BVH2;
 	ccl::DebugFlags().cpu.bvh_layout = bvh_layout;
-}
-
-void cycles_debug_set_cuda_kernel(unsigned int state)
-{
-    // TODO: XXXX no more split kernels
-	//ccl::DebugFlags().cuda.split_kernel = state == 1;
-}
-
-void cycles_debug_set_opencl_kernel(int state)
-{
-#if 0
-	if (state == -1)
-		ccl::DebugFlags().opencl.kernel_type = ccl::DebugFlags::OpenCL::KernelType::KERNEL_DEFAULT;
-	else if (state == 0)
-		ccl::DebugFlags().opencl.kernel_type = ccl::DebugFlags::OpenCL::KernelType::KERNEL_MEGA;
-	else if (state == 1)
-		ccl::DebugFlags().opencl.kernel_type = ccl::DebugFlags::OpenCL::KernelType::KERNEL_SPLIT;
-#endif
-}
-
-void cycles_debug_set_opencl_single_program(int state)
-{
-#if 0
-	ccl::DebugFlags().opencl.single_program = state == 1;
-#endif
-}
-
-void cycles_debug_set_opencl_device_type(int type)
-{
-	//ccl::DebugFlags().opencl.device_type = (ccl::DebugFlags::OpenCL::DeviceType)type;
 }
 
 void cycles_shutdown()

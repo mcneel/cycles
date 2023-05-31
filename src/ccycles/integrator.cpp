@@ -54,16 +54,6 @@ void cycles_integrator_set_no_caustics(ccl::Session* session_id, bool no_caustic
 	}
 }
 
-void cycles_integrator_set_no_shadows(ccl::Session* session_id, bool no_shadows)
-{
-#if 0
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->no_shadows = no_shadows;
-	}
-#endif
-}
-
 void cycles_integrator_set_ao_bounces(ccl::Session* session_id, int ao_bounces)
 {
 	ccl::Scene* sce = nullptr;
@@ -91,17 +81,6 @@ void cycles_integrator_set_ao_additive_factor(ccl::Session *session_id, float ao
 	if(scene_find(session_id, &sce)) {
         sce->integrator->set_ao_additive_factor(ao_additive_factor);
 	}
-}
-
-void cycles_integrator_set_mesh_light_samples(ccl::Session* session_id, int mesh_light_samples)
-{
-    // TODO: XXXX revisit light sampling approaches
-    /*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_li;
-	}
-    */
 }
 
 void cycles_integrator_set_max_diffuse_bounce(ccl::Session* session_id, int max_diffuse_bounce)
@@ -168,34 +147,20 @@ void cycles_integrator_set_filter_glossy(ccl::Session* session_id, float filter_
 	}
 }
 
-void cycles_integrator_set_method(ccl::Session* session_id, int method)
+void cycles_integrator_set_use_direct_light(ccl::Session *session_id, bool use_direct_light)
 {
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->method = (ccl::Integrator::Method)method;
+		sce->integrator->set_use_direct_light(use_direct_light);
 	}
-    */
 }
 
-void cycles_integrator_set_sample_all_lights_direct(ccl::Session* session_id, bool sample_all_lights_direct)
+void cycles_integrator_set_use_indirect_light(ccl::Session *session_id, bool use_indirect_light)
 {
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->sample_all_lights_direct = sample_all_lights_direct;
+		sce->integrator->set_use_indirect_light(use_indirect_light);
 	}
-     */
-}
-
-void cycles_integrator_set_sample_all_lights_indirect(ccl::Session* session_id, bool sample_all_lights_indirect)
-{
-    /*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->sample_all_lights_indirect = sample_all_lights_indirect;
-	}
-    */
 }
 
 void cycles_integrator_set_volume_step_rate(ccl::Session* session_id, float volume_step_rate)

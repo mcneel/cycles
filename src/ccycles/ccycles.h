@@ -161,30 +161,6 @@ CCL_CAPI void __cdecl cycles_debug_set_cpu_allow_qbvh(unsigned int state);
 CCL_CAPI void __cdecl cycles_debug_set_cuda_kernel(unsigned int state);
 
 /**
- * Set the OpenCL kernel type to use. 1 is split, 0 is mega. -1 means decide
- * automatically based on officially supported devices.
- * \ingroup ccycles
- */
-CCL_CAPI void __cdecl cycles_debug_set_opencl_kernel(int state);
-
-/**
- * Set the OpenCL kernel to be compiled as single program with 1.
- * \ingroup ccycles
- */
-CCL_CAPI void __cdecl cycles_debug_set_opencl_single_program(int state);
-
-/**
- * Set the OpenCL device type allowed.
- * 0 = none
- * 1 = all
- * 2 = default
- * 3 = CPU
- * 4 = GPU
- * 5 = accelerator
- */
-CCL_CAPI void __cdecl cycles_debug_set_opencl_device_type(int type);
-
-/**
  * Clean up everything, we're done.
  * \ingroup ccycles
  * \todo Add session specific cleanup, so we don't accidently delete sessions that are in progress.
@@ -257,9 +233,6 @@ CCL_CAPI const char* __cdecl cycles_device_id(int i);
 /* Query the index of a device. The index is the nth for the type the device is of. */
 CCL_CAPI int __cdecl cycles_device_num(int i);
 
-/* Query if device supports advanced shading. */
-CCL_CAPI bool __cdecl cycles_device_advanced_shading(int i);
-
 /* Query if device is used as display device. */
 CCL_CAPI bool __cdecl cycles_device_display_device(int i);
 
@@ -300,7 +273,7 @@ CCL_CAPI void __cdecl cycles_scene_params_set_persistent_data(unsigned int scene
  * Create a new mesh in session_id, using shader_id
  * \ingroup ccycles_scene
  */
-CCL_CAPI ccl::Geometry* __cdecl cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id);
+CCL_CAPI ccl::Geometry* __cdecl cycles_scene_add_mesh(ccl::Session* session_id, ccl::Shader *shader_id);
 /**
  * Create a new mesh for object_id in session_id, using shader_id
  * \ingroup ccycles_scene
@@ -343,7 +316,7 @@ CCL_CAPI void __cdecl cycles_scene_object_set_visibility(ccl::Session* session_i
  * Set object shader
  * \ingroup ccycles_object
  */
-CCL_CAPI void __cdecl cycles_scene_object_set_shader(ccl::Session* session_id, ccl::Object*, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_scene_object_set_shader(ccl::Session* session_id, ccl::Object*, ccl::Shader* shader_id);
 /**
  * Set is_shadow_catcher flag for object
  * \ingroup ccycles_object
@@ -354,16 +327,6 @@ CCL_CAPI void __cdecl cycles_scene_object_set_is_shadowcatcher(ccl::Session* ses
  * \ingroup ccycles_object
  */
 CCL_CAPI void __cdecl cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id, ccl::Object*, bool mesh_light_no_cast_shadow);
-/**
- * Set cutout flag for object. This object is used for cutout/clipping.
- * \ingroup ccycles_object
- */
-CCL_CAPI void __cdecl cycles_scene_object_set_cutout(ccl::Session* session_id, ccl::Object*, bool cutout);
-/**
- * Set ignore_cutout flag for object. Ignore cutout object.
- * \ingroup ccycles_object
- */
-CCL_CAPI void __cdecl cycles_scene_object_set_ignore_cutout(ccl::Session* session_id, ccl::Object*, bool ignore_cutout);
 /**
  * Tag object for update
  * \ingroup ccycles_object
@@ -415,11 +378,6 @@ CCL_CAPI void __cdecl cycles_integrator_set_ao_additive_factor(ccl::Session* ses
  * \todo split for caustics_reflective and caustics_refractive.
  */
 CCL_CAPI void __cdecl cycles_integrator_set_no_caustics(ccl::Session* session_id, bool no_caustics);
-/** Set to true if shadows shouldn't be traced.
- */
-CCL_CAPI void __cdecl cycles_integrator_set_no_shadows(ccl::Session* session_id, bool no_shadows);
-/** Set the amount of mesh light samples. */
-CCL_CAPI void __cdecl cycles_integrator_set_mesh_light_samples(ccl::Session* session_id, int mesh_light_samples);
 /** Set the maximum amount of diffuse bounces. */
 CCL_CAPI void __cdecl cycles_integrator_set_max_diffuse_bounce(ccl::Session* session_id, int max_diffuse_bounce);
 /** Set the maximum amount of glossy bounces. */
@@ -436,12 +394,10 @@ CCL_CAPI void __cdecl cycles_integrator_set_transparent_min_bounce(ccl::Session*
 CCL_CAPI void __cdecl cycles_integrator_set_aa_samples(ccl::Session* session_id, int aa_samples);
 /** Set the glossiness filter. */
 CCL_CAPI void __cdecl cycles_integrator_set_filter_glossy(ccl::Session* session_id, float filter_glossy);
-/** Set integrator method to use (path, branched path).*/
-CCL_CAPI void __cdecl cycles_integrator_set_method(ccl::Session* session_id, int method);
 /** Set to true if all lights should be directly sampled. */
-CCL_CAPI void __cdecl cycles_integrator_set_sample_all_lights_direct(ccl::Session* session_id, bool sample_all_lights_direct);
+CCL_CAPI void __cdecl cycles_integrator_set_use_direct_light(ccl::Session* session_id, bool use_direct_light);
 /** Set to true if all lights should be indirectly sampled. */
-CCL_CAPI void __cdecl cycles_integrator_set_sample_all_lights_indirect(ccl::Session* session_id, bool sample_all_lights_indirect);
+CCL_CAPI void __cdecl cycles_integrator_set_use_indirect_light(ccl::Session* session_id, bool use_indirect_light);
 CCL_CAPI void __cdecl cycles_integrator_set_volume_step_rate(ccl::Session* session_id, float volume_step_rate);
 CCL_CAPI void __cdecl cycles_integrator_set_volume_max_steps(ccl::Session* session_id, int volume_max_steps);
 CCL_CAPI void __cdecl cycles_integrator_set_caustics_reflective(ccl::Session *session_id, bool caustics_reflective);
@@ -578,17 +534,12 @@ CCL_CAPI ccl::SessionParams* __cdecl cycles_session_params_create(unsigned int d
 
 CCL_CAPI void __cdecl cycles_session_params_set_device(ccl::SessionParams* session_params_id, unsigned int device);
 CCL_CAPI void __cdecl cycles_session_params_set_background(ccl::SessionParams* session_params_id, unsigned int background);
-CCL_CAPI void __cdecl cycles_session_params_set_progressive_refine(ccl::SessionParams* session_params_id, unsigned int progressive_refine);
 CCL_CAPI void __cdecl cycles_session_params_set_output_path(ccl::SessionParams* session_params_id, const char *output_path);
-CCL_CAPI void __cdecl cycles_session_params_set_progressive(ccl::SessionParams* session_params_id, unsigned int progressive);
 CCL_CAPI void __cdecl cycles_session_params_set_experimental(ccl::SessionParams* session_params_id, unsigned int experimental);
 CCL_CAPI void __cdecl cycles_session_params_set_samples(ccl::SessionParams* session_params_id, int samples);
 CCL_CAPI void __cdecl cycles_session_params_set_tile_size(ccl::SessionParams* session_params_id, unsigned int tile_size);
 CCL_CAPI void __cdecl cycles_session_params_set_tile_order(ccl::SessionParams* session_params_id, unsigned int tile_order);
-CCL_CAPI void __cdecl cycles_session_params_set_start_resolution(ccl::SessionParams* session_params_id, int start_resolution);
 CCL_CAPI void __cdecl cycles_session_params_set_threads(ccl::SessionParams* session_params_id, unsigned int threads);
-CCL_CAPI void __cdecl cycles_session_params_set_display_buffer_linear(ccl::SessionParams* session_params_id, unsigned int display_buffer_linear);
-CCL_CAPI void __cdecl cycles_session_params_set_skip_linear_to_srgb_conversion(ccl::SessionParams* session_params_id, unsigned int skip_linear_to_srgb_conversion);
 CCL_CAPI void __cdecl cycles_session_params_set_cancel_timeout(ccl::SessionParams* session_params_id, double cancel_timeout);
 CCL_CAPI void __cdecl cycles_session_params_set_reset_timeout(ccl::SessionParams* session_params_id, double reset_timeout);
 CCL_CAPI void __cdecl cycles_session_params_set_text_timeout(ccl::SessionParams* session_params_id, double text_timeout);
@@ -608,9 +559,9 @@ CCL_CAPI void __cdecl cycles_scene_unlock(ccl::Session* session_id);
 
 /* Mesh geometry API */
 CCL_CAPI void __cdecl cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* mesh, float *verts, unsigned int vcount);
-CCL_CAPI void __cdecl cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* mesh, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth);
-CCL_CAPI void __cdecl cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* mesh, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth);
-CCL_CAPI void __cdecl cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* mesh, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth);
+CCL_CAPI void __cdecl cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* mesh, int *faces, unsigned int fcount, ccl::Shader *shader_id, unsigned int smooth);
+CCL_CAPI void __cdecl cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* mesh, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, ccl::Shader *shader_id, unsigned int smooth);
+CCL_CAPI void __cdecl cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* mesh, unsigned int v0, unsigned int v1, unsigned int v2, ccl::Shader *shader_id, unsigned int smooth);
 CCL_CAPI void __cdecl cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* mesh, float *uvs, unsigned int uvcount, const char *uvmap_name);
 CCL_CAPI void __cdecl cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* mesh, float *vnormals, unsigned int vnormalcount);
 CCL_CAPI void __cdecl cycles_mesh_set_vertex_colors(ccl::Session* session_id, ccl::Geometry* mesh, float *vcolors, unsigned int vcolorcount);
@@ -619,7 +570,7 @@ CCL_CAPI void __cdecl cycles_geometry_clear(ccl::Session* session_id, ccl::Geome
 CCL_CAPI void __cdecl cycles_mesh_reserve(ccl::Session* session_id, ccl::Geometry* mesh, unsigned vcount, unsigned fcount);
 CCL_CAPI void __cdecl cycles_mesh_resize(ccl::Session* session_id, ccl::Geometry* mesh, unsigned vcount, unsigned fcount);
 CCL_CAPI void __cdecl cycles_geometry_tag_rebuild(ccl::Session* session_id, ccl::Geometry* geo);
-CCL_CAPI void __cdecl cycles_geometry_set_shader(ccl::Session* session_id, ccl::Geometry* mesh, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_geometry_set_shader(ccl::Session* session_id, ccl::Geometry* mesh, ccl::Shader *shader_id);
 CCL_CAPI void __cdecl cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* mesh, const char* uvmap_name);
 
 /* Shader API */
@@ -724,19 +675,18 @@ CCL_CAPI int __cdecl cycles_shader_node_count(ccl::Shader *shader);
 CCL_CAPI ccl::ShaderNode *__cdecl cycles_shader_node_get(ccl::Shader *shader, int idx);
 CCL_CAPI bool __cdecl cycles_shadernode_get_name(ccl::ShaderNode *shn, void *strholder);
 CCL_CAPI bool __cdecl cycles_shader_get_name(ccl::Shader* shader, void* stringholder);
-CCL_CAPI void __cdecl cycles_scene_tag_shader(ccl::Session* session_id, unsigned int shader_id, bool use);
-CCL_CAPI unsigned int __cdecl cycles_scene_add_shader(ccl::Session* session_id, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_scene_tag_shader(ccl::Session* session_id, ccl::Shader *shader_id, bool use);
 /** Set shader_id as default surface shader for session_id.
  * Note that shader_id is the ID for the shader specific to this scene.
  *
  * The correct ID can be found with cycles_scene_shader_id. The ID is also
  * returned from cycles_scene_add_shader.
  */
-CCL_CAPI void __cdecl cycles_scene_set_default_surface_shader(ccl::Session* session_id, unsigned int shader_id);
+CCL_CAPI void __cdecl cycles_scene_set_default_surface_shader(ccl::Session* session_id, ccl::Shader *shader_id);
 /**
  * Return the current default surface shader id for session_id.
  */
-CCL_CAPI unsigned int __cdecl cycles_scene_get_default_surface_shader(ccl::Session* session_id);
+CCL_CAPI ccl::Shader *__cdecl cycles_scene_get_default_surface_shader(ccl::Session* session_id);
 CCL_CAPI unsigned int __cdecl cycles_scene_shader_id(ccl::Session* session_id, unsigned int shader_id);
 CCL_CAPI ccl::ShaderNode *__cdecl cycles_add_shader_node(ccl::Shader *shader, const char *node_name);
 CCL_CAPI void __cdecl cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value);
@@ -759,9 +709,9 @@ CCL_CAPI void __cdecl cycles_shadernode_set_member_float_img(ccl::Session* sessi
 CCL_CAPI void __cdecl cycles_shadernode_set_member_byte_img(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, unsigned char* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels);
 
 CCL_CAPI void __cdecl cycles_shader_set_name(ccl::Shader* shader, const char* name);
-CCL_CAPI void __cdecl cycles_shader_set_use_mis(ccl::Session* session_id, unsigned int shader_id, unsigned int use_mis);
-CCL_CAPI void __cdecl cycles_shader_set_use_transparent_shadow(ccl::Session* session_id, unsigned int shader_id, unsigned int use_transparent_shadow);
-CCL_CAPI void __cdecl cycles_shader_set_heterogeneous_volume(ccl::Session* session_id, unsigned int shader_id, unsigned int heterogeneous_volume);
+CCL_CAPI void __cdecl cycles_shader_set_use_mis(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int use_mis);
+CCL_CAPI void __cdecl cycles_shader_set_use_transparent_shadow(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int use_transparent_shadow);
+CCL_CAPI void __cdecl cycles_shader_set_heterogeneous_volume(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int heterogeneous_volume);
 CCL_CAPI void __cdecl cycles_shader_new_graph(ccl::Shader* shader);
 
 CCL_CAPI void __cdecl cycles_shader_connect_nodes(ccl::Shader *shader_id, ccl::ShaderNode *from_id, const char *from, ccl::ShaderNode *to_id, const char *to);
@@ -780,24 +730,24 @@ enum class light_type: unsigned int {
 	Triangle,
 };
 
-CCL_CAPI unsigned int __cdecl cycles_create_light(ccl::Session* session_id, unsigned int light_shader_id);
-CCL_CAPI void __cdecl cycles_light_set_type(ccl::Session* session_id, unsigned int light_id, light_type type);
-CCL_CAPI void __cdecl cycles_light_set_angle(ccl::Session* session_id, unsigned int light_id, float angle);
-CCL_CAPI void __cdecl cycles_light_set_spot_angle(ccl::Session* session_id, unsigned int light_id, float spot_angle);
-CCL_CAPI void __cdecl cycles_light_set_spot_smooth(ccl::Session* session_id, unsigned int light_id, float spot_smooth);
-CCL_CAPI void __cdecl cycles_light_set_cast_shadow(ccl::Session* session_id, unsigned int light_id, unsigned int cast_shadow);
-CCL_CAPI void __cdecl cycles_light_set_use_mis(ccl::Session* session_id, unsigned int light_id, unsigned int use_mis);
-CCL_CAPI void __cdecl cycles_light_set_samples(ccl::Session* session_id, unsigned int light_id, unsigned int samples);
-CCL_CAPI void __cdecl cycles_light_set_max_bounces(ccl::Session* session_id, unsigned int light_id, unsigned int max_bounces);
-CCL_CAPI void __cdecl cycles_light_set_map_resolution(ccl::Session* session_id, unsigned int light_id, unsigned int map_resolution);
-CCL_CAPI void __cdecl cycles_light_set_sizeu(ccl::Session* session_id, unsigned int light_id, float sizeu);
-CCL_CAPI void __cdecl cycles_light_set_sizev(ccl::Session* session_id, unsigned int light_id, float sizev);
-CCL_CAPI void __cdecl cycles_light_set_axisu(ccl::Session* session_id, unsigned int light_id, float axisux, float axisuy, float axisuz);
-CCL_CAPI void __cdecl cycles_light_set_axisv(ccl::Session* session_id, unsigned int light_id, float axisvx, float axisvy, float axisvz);
-CCL_CAPI void __cdecl cycles_light_set_size(ccl::Session* session_id, unsigned int light_id, float size);
-CCL_CAPI void __cdecl cycles_light_set_dir(ccl::Session* session_id, unsigned int light_id, float dirx, float diry, float dirz);
-CCL_CAPI void __cdecl cycles_light_set_co(ccl::Session* session_id, unsigned int light_id, float cox, float coy, float coz);
-CCL_CAPI void __cdecl cycles_light_tag_update(ccl::Session* session_id, unsigned int light_id);
+CCL_CAPI ccl::Light *__cdecl cycles_create_light(ccl::Session* session_id, ccl::Shader *light_shader_id);
+CCL_CAPI void __cdecl cycles_light_set_type(ccl::Session *session_id, ccl::Light *light_id, light_type type);
+CCL_CAPI void __cdecl cycles_light_set_angle(ccl::Session *session_id, ccl::Light *light_id, float angle);
+CCL_CAPI void __cdecl cycles_light_set_spot_angle(ccl::Session *session_id, ccl::Light *light_id, float spot_angle);
+CCL_CAPI void __cdecl cycles_light_set_spot_smooth(ccl::Session *session_id, ccl::Light *light_id, float spot_smooth);
+CCL_CAPI void __cdecl cycles_light_set_cast_shadow(ccl::Session *session_id, ccl::Light *light_id, unsigned int cast_shadow);
+CCL_CAPI void __cdecl cycles_light_set_use_mis(ccl::Session *session_id, ccl::Light *light_id, unsigned int use_mis);
+CCL_CAPI void __cdecl cycles_light_set_samples(ccl::Session *session_id, ccl::Light *light_id, unsigned int samples);
+CCL_CAPI void __cdecl cycles_light_set_max_bounces(ccl::Session *session_id, ccl::Light *light_id, unsigned int max_bounces);
+CCL_CAPI void __cdecl cycles_light_set_map_resolution(ccl::Session *session_id, ccl::Light *light_id, unsigned int map_resolution);
+CCL_CAPI void __cdecl cycles_light_set_sizeu(ccl::Session *session_id, ccl::Light *light_id, float sizeu);
+CCL_CAPI void __cdecl cycles_light_set_sizev(ccl::Session *session_id, ccl::Light *light_id, float sizev);
+CCL_CAPI void __cdecl cycles_light_set_axisu(ccl::Session *session_id, ccl::Light *light_id, float axisux, float axisuy, float axisuz);
+CCL_CAPI void __cdecl cycles_light_set_axisv(ccl::Session *session_id, ccl::Light *light_id, float axisvx, float axisvy, float axisvz);
+CCL_CAPI void __cdecl cycles_light_set_size(ccl::Session *session_id, ccl::Light *light_id, float size);
+CCL_CAPI void __cdecl cycles_light_set_dir(ccl::Session *session_id, ccl::Light *light_id, float dirx, float diry, float dirz);
+CCL_CAPI void __cdecl cycles_light_set_co(ccl::Session *session_id, ccl::Light *light_id, float cox, float coy, float coz);
+CCL_CAPI void __cdecl cycles_light_tag_update(ccl::Session* session_id, ccl::Light *light_id);
 
 CCL_CAPI void __cdecl cycles_film_set_exposure(ccl::Session* session_id, float exposure);
 CCL_CAPI void __cdecl cycles_film_set_filter(ccl::Session* session_id, unsigned int filter_type, float filter_width);

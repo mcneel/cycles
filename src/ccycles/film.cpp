@@ -41,6 +41,7 @@ void cycles_film_set_use_sample_clamp(ccl::Session* session_id, bool use_sample_
 	CCScene* csce = nullptr;
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
+		assert(false);
 		//sce->film->use_sample_clamp = use_sample_clamp;
 	}
 }

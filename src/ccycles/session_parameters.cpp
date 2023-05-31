@@ -56,23 +56,13 @@ void cycles_session_params_set_background(ccl::SessionParams* session_params_id,
 	}
 }
 
-void cycles_session_params_set_progressive_refine(ccl::SessionParams* session_params_id, unsigned int progressive_refine)
-{
-		// TODO: XXXX no longer available
-	//SESSION_PARAM_BOOL(session_params_id, progressive_refine)
-}
 void cycles_session_params_set_output_path(ccl::SessionParams* session_params_id, const char *output_path)
 {
+	assert(false);
 	/*if (session_params_id < session_params.size()) {
 		session_params[session_params_id].output_path = std::string(output_path);
 		logger.logit("Set output_path to: ", session_params[session_params_id].output_path);
 	}*/
-}
-
-void cycles_session_params_set_progressive(ccl::SessionParams* session_params_id, unsigned int progressive)
-{
-		// TODO: XXXX no longer available
-	//SESSION_PARAM_BOOL(session_params_id, progressive)
 }
 
 void cycles_session_params_set_experimental(ccl::SessionParams* session_params_id, unsigned int experimental)
@@ -98,14 +88,9 @@ void cycles_session_params_set_tile_size(ccl::SessionParams* session_params_id, 
 
 void cycles_session_params_set_tile_order(ccl::SessionParams* session_params_id, unsigned int tile_order)
 {
+	assert(false);
 		// TODO: XXXX no longer exists
 	//SESSION_PARAM_CAST(session_params_id, ccl::TileOrder, tile_order);
-}
-
-void cycles_session_params_set_start_resolution(ccl::SessionParams* session_params_id, int start_resolution)
-{
-		// TODO: XXXX no longer exists
-	//SESSION_PARAM(session_params_id, start_resolution);
 }
 
 void cycles_session_params_set_threads(ccl::SessionParams* session_params_id, unsigned int threads)
@@ -114,27 +99,21 @@ void cycles_session_params_set_threads(ccl::SessionParams* session_params_id, un
 		(*search)->threads = threads;
 	}
 }
-void cycles_session_params_set_display_buffer_linear(ccl::SessionParams* session_params_id, unsigned int display_buffer_linear)
-{
-		// TODO: XXXX no longer exists
-	//SESSION_PARAM_BOOL(session_params_id, display_buffer_linear)
-}
-void cycles_session_params_set_skip_linear_to_srgb_conversion(ccl::SessionParams* session_params_id, unsigned int skip_linear_to_srgb_conversion)
-{
-	// SESSION_PARAM_BOOL(session_params_id, skip_linear_to_srgb_conversion)
-}
 void cycles_session_params_set_cancel_timeout(ccl::SessionParams* session_params_id, double cancel_timeout)
 {
+	assert(false);
 		// TODO: XXXX no longer exists
 	//SESSION_PARAM(session_params_id, cancel_timeout);
 }
 void cycles_session_params_set_reset_timeout(ccl::SessionParams* session_params_id, double reset_timeout)
 {
+	assert(false);
 		// TODO: XXXX no longer exists
 	//SESSION_PARAM(session_params_id, reset_timeout);
 }
 void cycles_session_params_set_text_timeout(ccl::SessionParams* session_params_id, double text_timeout)
 {
+	assert(false);
 		// TODO: XXXX no longer exists
 	//SESSION_PARAM(session_params_id, text_timeout);
 }

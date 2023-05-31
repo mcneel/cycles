@@ -86,17 +86,6 @@ int cycles_device_num(int i) {
 		return -1;
 }
 
-bool cycles_device_advanced_shading(int i) {
-#if 0
-	if (i >= 0 && i < devices.size())
-		return devices[i].advanced_shading;
-	else if(MULTIDEVICEIDX(i) >= 0 && MULTIDEVICEIDX(i) < multi_devices.size())
-		return multi_devices[MULTIDEVICEIDX(i)].advanced_shading;
-	else
-#endif
-		return false;
-}
-
 bool cycles_device_display_device(int i) {
 	if (i >= 0 && i < devices.size())
 		return devices[i].display_device;

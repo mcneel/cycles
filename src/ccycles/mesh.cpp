@@ -23,16 +23,17 @@ limitations under the License.
 
 using namespace OIIO;
 
-ccl::Geometry* cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shader_id)
+ccl::Geometry *cycles_scene_add_mesh(ccl::Session *session_id, ccl::Shader *shader_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
 		ccl::Geometry* mesh = sce->create_node<ccl::Mesh>();
 
-		// TODO: XXXX revisit shader handling
-		//ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
-		//mesh->get_used_shaders().push_back_slow(sce->default_surface);
+		if (shader_id == nullptr)
+			shader_id = sce->default_surface;
+
+		mesh->get_used_shaders().push_back_slow(shader_id);
 
 		logger.logit("Add mesh ", sce->geometry.size() - 1, " in scene ", session_id, " using default surface shader ", shader_id);
 
@@ -42,28 +43,39 @@ ccl::Geometry* cycles_scene_add_mesh(ccl::Session* session_id, unsigned int shad
 	return nullptr;
 }
 
-void cycles_geometry_set_shader(ccl::Session* session_id, ccl::Geometry*, unsigned int shader_id)
+void cycles_geometry_set_shader(ccl::Session *session_id, ccl::Geometry *mesh_id, ccl::Shader *shader_id)
 {
-    // TODO: XXXX revisit mesh handling
-    /*
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Mesh* me = sce->meshes[mesh_id];
-		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
 
-		me->used_shaders.push_back(sh);
-		int idx = (int)me->used_shaders.size() - 1;
+		ccl::array<ccl::Node *>& used_shaders = mesh_id->get_used_shaders();
 
-		me->shader.resize(me->triangles.size());
-		for (int i = 0; i < me->triangles.size(); i++) {
-			me->shader[i] = idx;
+		int idx = -1; 
+		for (int i = 0; i < used_shaders.size(); i++) {
+			ccl::Node *node = used_shaders[i];
+			if (node == shader_id) {
+				idx = i;
+				break;
+			}
 		}
 
-		sh->tag_update(sce);
-		sh->tag_used(sce);
-		sce->light_manager->tag_update(sce);
+		if (idx == -1) {
+			idx = (int)used_shaders.size();
+			used_shaders.push_back_slow(shader_id);
+		}
+
+		ccl::Mesh *mesh = dynamic_cast<ccl::Mesh *>(mesh_id);
+		assert(mesh);
+
+		mesh->get_shader().resize(mesh->get_triangles().size());
+		for (int i = 0; i < mesh->get_triangles().size(); i++) {
+			mesh->get_shader()[i] = idx;
+		}
+
+		shader_id->tag_update(sce);
+		shader_id->tag_used(sce);
+		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL); // Is UPDATE_ALL correct here?
 	}
-    */
 }
 
 void cycles_geometry_clear(ccl::Session* session_id, ccl::Geometry* geometry)
@@ -177,7 +189,7 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 	}
 }
 
-void cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* geometry, int *faces, unsigned int fcount, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_tris(ccl::Session *session_id, ccl::Geometry *geometry, int *faces, unsigned int fcount, ccl::Shader *shader_id, unsigned int smooth)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
@@ -213,8 +225,10 @@ void cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* geometry, int
 	}
 }
 
-void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, ccl::Shader *shader_id, unsigned int smooth)
 {
+	assert(false);
+
 	#if OLD_NOT_USED
 	ASSERT(geometry);
 
@@ -244,7 +258,7 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 	#endif
 }
 
-void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int v0, unsigned int v1, unsigned int v2, unsigned int shader_id, unsigned int smooth)
+void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int v0, unsigned int v1, unsigned int v2, ccl::Shader *shader_id, unsigned int smooth)
 {
 	ASSERT(geometry);
 
@@ -257,7 +271,7 @@ void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 
 		if (mesh)
 		{
-			mesh->add_triangle((int)v0, (int)v1, (int)v2, shader_id, smooth == 1);
+			mesh->add_triangle((int)v0, (int)v1, (int)v2, shader_id->id, smooth == 1);
 		}
 	}
 }

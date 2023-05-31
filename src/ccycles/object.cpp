@@ -77,20 +77,37 @@ void cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* o
 	}
 }
 
-void cycles_scene_object_set_shader(ccl::Session* session_id, ccl::Object* object, unsigned int shader_id)
+void cycles_scene_object_set_shader(ccl::Session *session_id,
+									ccl::Object *object,
+									ccl::Shader *shader_id)
 {
 	ASSERT(object);
 
-    // TODO: XXXX revisit shader assignment to objects
-    // Needed for our approach to block instance shading
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		ccl::Shader* sh = find_shader_in_scene(sce, shader_id);
-		// TODO: XXXX shader stuff appears to have moved to ccl::Geometry... ob->shader = sh;
-		sh->tag_update(sce);
-		sh->tag_used(sce);
-		object->tag_update(sce);
-		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
+		ccl::Geometry* geometry = object->get_geometry();
+
+		bool already_exists = false;
+
+		ccl::array<ccl::Node *> used_shaders = geometry->get_used_shaders();
+		for (ccl::Node* node : used_shaders)
+		{
+			if (node == shader_id) {
+				already_exists = true;
+				break;
+			}
+		}
+
+		if (!already_exists)
+		{
+			used_shaders.push_back_slow(shader_id);
+			geometry->set_used_shaders(used_shaders);
+
+			shader_id->tag_update(sce);
+			shader_id->tag_used(sce);
+			object->tag_update(sce);
+			sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
+		}
 	}
 }
 
@@ -118,36 +135,6 @@ void cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id,
 	}
 }
 
-void cycles_scene_object_set_cutout(ccl::Session* session_id, ccl::Object* object, bool cutout)
-{
-	ASSERT(object);
-
-	// TODO: XXXX port cutouts (or reimplement)
-
-	/*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->use_cutout = cutout;
-		ob->tag_update(sce);
-	}*/
-}
-
-void cycles_scene_object_set_ignore_cutout(ccl::Session* session_id, ccl::Object* object, bool ignore_cutout)
-{
-	ASSERT(object);
-
-	// TODO: XXXX port cutouts (or reimplement)
-
-	/*
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Object* ob = sce->objects[object_id];
-		ob->ignore_cutout = ignore_cutout;
-		ob->tag_update(sce);
-	}*/
-}
-
 static void _cycles_scene_object_set_transform(ccl::Session* session_id, ccl::Object* object, unsigned int transform_type,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
@@ -161,13 +148,10 @@ static void _cycles_scene_object_set_transform(ccl::Session* session_id, ccl::Ob
 		case 0:
 			object->set_tfm(mat);
 			break;
-        // TODO: XXXX port OCS frame from old integration
-        /*
 		case 1:
-			ob->ocs_frame = transform_inverse(mat);
-			ob->use_ocs_frame = mat != ccl::transform_identity();
+			object->set_ocs_frame(transform_inverse(mat));
+			object->set_use_ocs_frame(mat != ccl::transform_identity());
 			break;
-        */
 		}
 		object->tag_update(sce);
 	}

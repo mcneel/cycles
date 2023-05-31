@@ -104,6 +104,9 @@ NODE_DEFINE(Object)
 
   SOCKET_STRING(lightgroup, "Light Group", ustring());
 
+  SOCKET_BOOLEAN(use_ocs_frame, "Use OCS Frame", false);
+  SOCKET_TRANSFORM(ocs_frame, "OCS Frame", transform_identity());
+
   return type;
 }
 
@@ -425,6 +428,8 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
 
   kobject.tfm = tfm;
   kobject.itfm = itfm;
+  kobject.ocs_frame = ob->ocs_frame;
+  kobject.use_ocs_frame = ob->use_ocs_frame;
   kobject.volume_density = object_volume_density(tfm, geom);
   kobject.color[0] = color.x;
   kobject.color[1] = color.y;
