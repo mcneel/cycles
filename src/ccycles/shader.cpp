@@ -762,21 +762,23 @@ void cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* memb
 				}
 			}
 			else if (mname == "is_linear") {
-				assert(false);
-				//imgtex->is_linear = value;
+				ustring colspace;
+				_set_colorspace(colspace, value ? 0 : 1);
+				imgtex->set_colorspace(colspace);
 			}
 			// TODO: XXXX port over alternate_tiles support from old Cycles integration
 			else if (mname == "alternate_tiles") {
-				assert(false);
-				//imgtex->alternate_tiles = value;
+				imgtex->set_alternate_tiles(value);
 			}
 		}
 		else if (shntype == "environment_texture")
 		{
-			/*ccl::EnvironmentTextureNode* envtex = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
+			ccl::EnvironmentTextureNode* envtex = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
 			if (mname == "is_linear") {
-				envtex->is_linear = value;
-			}*/
+				ustring colspace;
+				_set_colorspace(colspace, value ? 0 : 1);
+				envtex->set_colorspace(colspace);
+			}
 		}
 		else if (shntype == "rhino_texture_coordinate")
 		{
