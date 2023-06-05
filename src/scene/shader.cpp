@@ -723,6 +723,8 @@ uint ShaderManager::get_kernel_features(Scene *scene)
     kernel_features |= KERNEL_FEATURE_OSL;
   }
 
+  kernel_features |= KERNEL_FEATURE_CLIPPING_PLANES;
+
   return kernel_features;
 }
 
