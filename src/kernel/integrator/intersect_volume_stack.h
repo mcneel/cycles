@@ -61,10 +61,10 @@ ccl_device void integrator_volume_stack_update_for_subsurface(KernelGlobals kg,
          scene_intersect_volume(kg, &volume_ray, &isect, visibility)) {
     shader_setup_from_ray(kg, stack_sd, &volume_ray, &isect);
 
-    if (path_clip_ray(kg, state, stack_sd, &volume_ray))
-        continue;
+    bool clipped = path_clip_ray(kg, state, stack_sd, &volume_ray);
 
-    volume_stack_enter_exit(kg, state, stack_sd);
+    if (!clipped)
+      volume_stack_enter_exit(kg, state, stack_sd);
 
     /* Move ray forward. */
     volume_ray.tmin = intersection_t_offset(isect.t);
@@ -177,41 +177,42 @@ ccl_device void integrator_volume_stack_init(KernelGlobals kg, IntegratorState s
 
     shader_setup_from_ray(kg, stack_sd, &volume_ray, &isect);
 
-    if (path_clip_ray(kg, state, stack_sd, &volume_ray))
-        continue;
+    bool clipped = path_clip_ray(kg, state, stack_sd, &volume_ray);
 
-    if (stack_sd->flag & SD_BACKFACING) {
-      /* If ray exited the volume and never entered to that volume
-       * it means that camera is inside such a volume.
-       */
-      bool need_add = true;
-      for (int i = 0; i < enclosed_index && need_add; ++i) {
+    if (!clipped) {
+      if (stack_sd->flag & SD_BACKFACING) {
         /* If ray exited the volume and never entered to that volume
          * it means that camera is inside such a volume.
          */
-        if (enclosed_volumes[i] == stack_sd->object) {
-          need_add = false;
+        bool need_add = true;
+        for (int i = 0; i < enclosed_index && need_add; ++i) {
+          /* If ray exited the volume and never entered to that volume
+           * it means that camera is inside such a volume.
+           */
+          if (enclosed_volumes[i] == stack_sd->object) {
+            need_add = false;
+          }
+        }
+        for (int i = 0; i < stack_index && need_add; ++i) {
+          /* Don't add intersections twice. */
+          VolumeStack entry = integrator_state_read_volume_stack(state, i);
+          if (entry.object == stack_sd->object) {
+            need_add = false;
+            break;
+          }
+        }
+        if (need_add) {
+          const VolumeStack new_entry = {stack_sd->object, stack_sd->shader};
+          integrator_state_write_volume_stack(state, stack_index, new_entry);
+          ++stack_index;
         }
       }
-      for (int i = 0; i < stack_index && need_add; ++i) {
-        /* Don't add intersections twice. */
-        VolumeStack entry = integrator_state_read_volume_stack(state, i);
-        if (entry.object == stack_sd->object) {
-          need_add = false;
-          break;
-        }
+      else {
+        /* If ray from camera enters the volume, this volume shouldn't
+         * be added to the stack on exit.
+         */
+        enclosed_volumes[enclosed_index++] = stack_sd->object;
       }
-      if (need_add) {
-        const VolumeStack new_entry = {stack_sd->object, stack_sd->shader};
-        integrator_state_write_volume_stack(state, stack_index, new_entry);
-        ++stack_index;
-      }
-    }
-    else {
-      /* If ray from camera enters the volume, this volume shouldn't
-       * be added to the stack on exit.
-       */
-      enclosed_volumes[enclosed_index++] = stack_sd->object;
     }
 
     /* Move ray forward. */
