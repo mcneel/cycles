@@ -32,6 +32,7 @@ ccl_device_forceinline bool integrate_surface_shader_setup(KernelGlobals kg,
   shader_setup_from_ray(kg, sd, &ray, &isect);
 
   if (path_clip_ray(kg, state, sd, &ray)) {
+      integrator_state_write_ray(kg, state, &ray);
       return false;
   }
 
@@ -595,12 +596,10 @@ ccl_device bool integrate_surface(KernelGlobals kg,
 
   /* Setup shader data. */
   ShaderData sd;
-  const bool b = integrate_surface_shader_setup(kg, state, &sd);
-
-  if (!b)
+  if (!integrate_surface_shader_setup(kg, state, &sd))
   {
-      //Ray is clipped by a clipping plane
-      return false;
+    /* Ray is clipped by a clipping plane. Return true to continue tracing ray. */
+    return true;
   }
 
   PROFILING_SHADER(sd.object, sd.shader);
