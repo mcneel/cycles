@@ -1409,7 +1409,7 @@ void cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char*
 		if (socket.flags & ccl::SocketType::INTERNAL) {
 			continue;
 		}
-		if (ccl::string_iequals(socket.name.string(), sockname)) {
+		if (ccl::string_iequals(socket.ui_name.string(), sockname)) {
 			shnode_id->set(socket, f3);
 			break;
 		}
