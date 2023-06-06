@@ -83,32 +83,46 @@ void cycles_scene_object_set_shader(ccl::Session *session_id,
 {
 	ASSERT(object);
 
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::Geometry* geometry = object->get_geometry();
+	ccl::Scene* sce = session_id->scene;
+	ccl::Geometry* geometry = object->get_geometry();
+	object->set_shader(shader_id);
 
-		bool already_exists = false;
+	bool already_exists = false;
 
-		ccl::array<ccl::Node *> used_shaders = geometry->get_used_shaders();
-		for (ccl::Node* node : used_shaders)
-		{
-			if (node == shader_id) {
-				already_exists = true;
-				break;
-			}
+	int shid = 0;
+	ccl::array<ccl::Node *> used_shaders = geometry->get_used_shaders();
+	for (ccl::Node* node : used_shaders)
+	{
+		if (node == shader_id) {
+			already_exists = true;
+			break;
 		}
-
-		if (!already_exists)
-		{
-			used_shaders.push_back_slow(shader_id);
-			geometry->set_used_shaders(used_shaders);
-
-			shader_id->tag_update(sce);
-			shader_id->tag_used(sce);
-			object->tag_update(sce);
-			sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
-		}
+		shid++;
 	}
+
+	if (!already_exists)
+	{
+		used_shaders.push_back_slow(shader_id);
+		geometry->set_used_shaders(used_shaders);
+
+		shader_id->tag_update(sce);
+		shader_id->tag_used(sce);
+		object->tag_update(sce);
+		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
+		shid = used_shaders.size() - 1;
+	}
+
+	if (geometry->is_mesh())
+	{
+		ccl::Mesh *mesh = static_cast<ccl::Mesh *>(geometry);
+		auto shids = mesh->get_shader();
+		for (int i = 0; i < shids.size(); i++)
+		{
+			shids[i] = shid;
+		}
+		mesh->set_shader(shids);
+	}
+
 }
 
 void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object* object, bool is_shadowcatcher)

@@ -124,10 +124,6 @@ ccl_device_inline void shader_setup_from_ray(KernelGlobals kg,
 #endif
   }
 
-#ifdef __INSTANCING__
-  sd->object = (isect->object == PRIM_NONE) ? kernel_tex_fetch(__prim_object, isect->prim) : isect->object;
-#endif
-
 #ifdef __RAY_DIFFERENTIALS__
   /* differentials */
   sd->dP = differential_transfer_compact(ray->dP, ray->D, ray->dD, sd->ray_length);
