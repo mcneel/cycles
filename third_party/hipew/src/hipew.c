@@ -401,16 +401,16 @@ static int hipewHipInit(void)
   HIP_LIBRARY_FIND_CHECKED(hipGraphicsGLRegisterBuffer);
   HIP_LIBRARY_FIND_CHECKED(hipGLGetDevices);
 #endif
-  HIP_LIBRARY_FIND_CHECKED(hiprtcGetErrorString);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcAddNameExpression);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcCompileProgram);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcCreateProgram);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcDestroyProgram);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcGetLoweredName);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcGetProgramLog);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcGetProgramLogSize);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcGetCode);
-  HIP_LIBRARY_FIND_CHECKED(hiprtcGetCodeSize);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcGetErrorString);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcAddNameExpression);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcCompileProgram);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcCreateProgram);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcDestroyProgram);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcGetLoweredName);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcGetProgramLog);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcGetProgramLogSize);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcGetCode);
+  //HIP_LIBRARY_FIND_CHECKED(hiprtcGetCodeSize);
   result = HIPEW_SUCCESS;
   return result;
 }

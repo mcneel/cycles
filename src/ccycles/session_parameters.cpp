@@ -86,13 +86,6 @@ void cycles_session_params_set_tile_size(ccl::SessionParams* session_params_id, 
 	}
 }
 
-void cycles_session_params_set_tile_order(ccl::SessionParams* session_params_id, unsigned int tile_order)
-{
-	assert(false);
-		// TODO: XXXX no longer exists
-	//SESSION_PARAM_CAST(session_params_id, ccl::TileOrder, tile_order);
-}
-
 void cycles_session_params_set_threads(ccl::SessionParams* session_params_id, unsigned int threads)
 {
 	if (auto search = session_params.find(session_params_id); search != session_params.end()) {

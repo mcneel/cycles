@@ -67,55 +67,6 @@ private:
 	unsigned int m_nVDE;
 };
 
-#ifdef _WIN32
-
-static
-void render_crash_translator(unsigned int eCode, EXCEPTION_POINTERS*)
-{
-	throw CyclesRenderCrashException(eCode);
-}
-#else
-typedef void(__cdecl *_se_translator_function)(int, struct __siginfo *, void*);
-
-static void render_crash_translator(int sig, siginfo_t *siginfo, void *context)
-{
-	throw CyclesRenderCrashException(siginfo->si_code);
-}
-#endif
-
-class RenderCrashTranslatorHelper
-{
-private:
-	const _se_translator_function old_SE_translator;
-public:
-	RenderCrashTranslatorHelper(_se_translator_function new_SE_translator) noexcept
-#ifdef _WIN32
-		: old_SE_translator{ _set_se_translator(new_SE_translator) } {}
-#else
-		: old_SE_translator{ nullptr } {
-#ifdef ENABLE_MAC_CRASHHANDLING
-		struct sigaction sa;
-		sa.sa_flags = SA_SIGINFO;
-		sigemptyset(&sa.sa_mask);
-		sa.sa_sigaction = new_SE_translator;
-		sigaction(SIGSEGV, &sa, nullptr);
-#endif
-	}
-#endif
-#ifdef _WIN32
-	~RenderCrashTranslatorHelper() noexcept { _set_se_translator(old_SE_translator); }
-#else
-	~RenderCrashTranslatorHelper() noexcept {
-#ifdef ENABLE_MAC_CRASHHANDLING
-		struct sigaction sa;
-		sa.sa_flags = SA_SIGINFO;
-		sa.sa_handler = SIG_DFL;
-		sigaction(SIGSEGV, &sa, nullptr);
-#endif
-	}
-#endif
-};
-
 /* Find pointers for CCSession and ccl::Session. Return false if either fails. */
 bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session)
 {
@@ -590,8 +541,6 @@ void cycles_session_add_pass(ccl::Session *session_id, int pass_id)
 
 int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned int height, unsigned int samples, unsigned int full_x, unsigned int full_y, unsigned int full_width, unsigned int full_height )
 {
-	RenderCrashTranslatorHelper render_crash_helper(render_crash_translator);
-
 	int rc = 0;
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
