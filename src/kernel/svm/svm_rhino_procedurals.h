@@ -1946,8 +1946,8 @@ ccl_device float2 world_to_vertical_cross_cubemap(float3 n)
 {
   float2 st = make_float2(0.0f, 0.0f);
 
-  const float uI[6] = {2.0 / 3.0, 0.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0};
-  const float vI[6] = {2.0 / 4.0, 2.0 / 4.0, 1.0 / 4.0, 3.0 / 4.0, 2.0 / 4.0, 0.0};
+  const float uI[6] = {2.0f / 3.0f, 0.0f, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f};
+  const float vI[6] = {2.0f / 4.0f, 2.0f / 4.0f, 1.0f / 4.0f, 3.0f / 4.0f, 2.0f / 4.0f, 0.0f};
 
   float2 uva[6] = {make_float2(-n.z, -n.y),
                    make_float2(n.z, -n.y),
@@ -2073,8 +2073,8 @@ ccl_device float2 world_to_horizontal_cross_cubemap(float3 n)
 {
   float2 st = make_float2(0.0f, 0.0f);
 
-  const float uI[6] = {2.0 / 4.0, 0.0, 1.0 / 4.0, 1.0 / 4.0, 1.0 / 4.0, 3.0 / 4.0};
-  const float vI[6] = {1.0 / 3.0, 1.0 / 3.0, 0.0, 2.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0};
+  const float uI[6] = {2.0f / 4.0f, 0.0f, 1.0f / 4.0f, 1.0f / 4.0f, 1.0f / 4.0f, 3.0f / 4.0f};
+  const float vI[6] = {1.0f / 3.0f, 1.0f / 3.0f, 0.0f, 2.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f};
 
   float2 uva[6] = {make_float2(-n.z, -n.y),
                    make_float2(n.z, -n.y),

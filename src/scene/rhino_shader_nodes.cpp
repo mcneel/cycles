@@ -1,4 +1,5 @@
 #include "scene/rhino_shader_nodes.h"
+#include <atomic>
 #include "scene/svm.h"
 
 CCL_NAMESPACE_BEGIN

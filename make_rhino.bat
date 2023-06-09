@@ -35,8 +35,19 @@ set BUILD_ONEAPI_CMD= ^
 	-DOCLOC_INSTALL_DIR=%OCLOC% ^
 	-DMSVC_REDIST_DIR=%MSVC_REDIST_DIR%
 
-if not "%ARG1%" == "all" (
-	set BUILD_ONEAPI_CMD=""
+if not "%ARG1%" == "oneapi" (
+	if not "%ARG1%" == "all" (
+		set BUILD_ONEAPI_CMD=""
+	)
+)
+
+set BUILD_HIP_CMD= ^
+	-DWITH_CYCLES_DEVICE_HIP=ON
+	
+if not "%ARG1%" == "hip" (
+	if not "%ARG1%" == "all" (
+		set BUILD_HIP_CMD=""
+	)
 )
 
 if "%COMMAND%" == "" (
@@ -48,9 +59,9 @@ if "%COMMAND%" == "release" (
 	-DWITH_CYCLES_ALEMBIC=OFF ^
 	-DWITH_CYCLES_USD=OFF ^
 	-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF ^
-	-DWITH_CYCLES_DEVICE_HIP=OFF ^
 	%BUILD_CUDA_CMD% ^
 	%BUILD_ONEAPI_CMD% ^
+	%BUILD_HIP_CMD% ^
 	&& cd %BUILD_DIR% && cmake --build . --target install --config Release
 	
 ) else if "%COMMAND%" == "debug" (
@@ -58,9 +69,11 @@ if "%COMMAND%" == "release" (
 	-DWITH_CYCLES_ALEMBIC=OFF ^
 	-DWITH_CYCLES_USD=OFF ^
 	-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF ^
-	-DWITH_CYCLES_DEVICE_HIP=OFF ^
+	-DWITH_CYCLES_CUDA_BINARIES=OFF ^
+	-DWITH_CYCLES_DEVICE_OPTIX=OFF ^
 	%BUILD_CUDA_CMD% ^
 	%BUILD_ONEAPI_CMD% ^
+	%BUILD_HIP_CMD% ^
 	&& cd %BUILD_DIR% && cmake --build . --target install --config Debug
 	
 ) else if "%COMMAND%" == "clean" (
