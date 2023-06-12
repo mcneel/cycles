@@ -73,8 +73,6 @@ limitations under the License.
 //extern LOGGER_FUNC_CB logger_func;
 extern std::vector<LOGGER_FUNC_CB> loggers;
 
-extern std::ostream& operator<<(std::ostream& out, shadernode_type const &snt);
-
 /* Simple class to help with debug logging. */
 class Logger {
 public:

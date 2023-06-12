@@ -84,7 +84,160 @@ bool cycles_shadernode_get_name(ccl::ShaderNode* shn, void* strholder)
 {
 	if (shn && strholder) {
 		StringHolder *holder = (StringHolder *)strholder;
-		std::string name{shn->type->name};
+		std::string name{shn->type->name.c_str()};
+
+		holder->thestring = name;
+
+		return true;
+	}
+
+	return false;
+}
+
+int cycles_shadernode_get_socketcount(ccl::NodeType* shn, int input_output)
+{
+	int count = 0;
+	// 0 = input
+	if (input_output == 0) {
+		for (const ccl::SocketType &socket : shn->inputs) {
+			if (socket.type == ccl::SocketType::UNDEFINED) {
+				continue;
+			}
+			if (socket.flags & ccl::SocketType::INTERNAL) {
+				continue;
+			}
+			count++;
+		}
+	}
+	else {
+		for (const ccl::SocketType &socket : shn->outputs) {
+			if (socket.type == ccl::SocketType::UNDEFINED) {
+				continue;
+			}
+			if (socket.flags & ccl::SocketType::INTERNAL) {
+				continue;
+			}
+			count++;
+		}
+	
+	}
+
+	return count;
+}
+
+const ccl::SocketType *cycles_shadernode_get_sockettype(ccl::NodeType* shn, int idx, int input_output)
+{
+	int count = 0;
+	// 0 = input
+	if (input_output == 0) {
+		for (const ccl::SocketType &socket : shn->inputs) {
+			if (socket.type == ccl::SocketType::UNDEFINED) {
+				continue;
+			}
+			if (socket.flags & ccl::SocketType::INTERNAL) {
+				continue;
+			}
+			if (idx == count) {
+				return &socket;
+			}
+			count++;
+		}
+	}
+	else {
+		for (const ccl::SocketType &socket : shn->outputs) {
+			if (socket.type == ccl::SocketType::UNDEFINED) {
+				continue;
+			}
+			if (socket.flags & ccl::SocketType::INTERNAL) {
+				continue;
+			}
+			if (idx == count) {
+				return &socket;
+			}
+			count++;
+		}
+	}
+
+	return nullptr;
+}
+
+bool cycles_sockettype_get_internal_name(ccl::SocketType* sock, void *strholder)
+{
+	if (sock && strholder) {
+		StringHolder *holder = (StringHolder *)strholder;
+		std::string name{sock->name.c_str()};
+
+		holder->thestring = name;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool cycles_sockettype_get_ui_name(ccl::SocketType* sock, void *strholder)
+{
+	if (sock && strholder) {
+		StringHolder *holder = (StringHolder *)strholder;
+		std::string name{sock->ui_name.c_str()};
+
+		holder->thestring = name;
+
+		return true;
+	}
+
+	return false;
+}
+
+int cycles_sockettype_get_type(ccl::SocketType* sock)
+{
+	if (sock) {
+		return sock->type;
+	}
+
+	return -1;
+}
+
+int cycles_get_shadernodetype_count()
+{
+	int count = 0;
+	auto &all_types = ccl::NodeType::types();
+	for (const auto [name, nodetype] : all_types) {
+		std::string nodename{name};
+		if (std::string::npos != nodename.find("convert")) {
+			continue;
+		}
+		if (nodetype.type == ccl::NodeType::SHADER) {
+			count++;
+		}
+	}
+	return count;
+}
+
+const ccl::NodeType* cycles_get_shadernodetype(int idx)
+{
+	int count = 0;
+	auto &all_types = ccl::NodeType::types();
+	for (const auto [name, nodetype] : all_types) {
+		std::string nodename{name};
+		if (std::string::npos != nodename.find("convert")) {
+			continue;
+		}
+		if (nodetype.type == ccl::NodeType::SHADER) {
+			if (count == idx) {
+				return &all_types[name];
+			}
+			count++;
+		}
+	}
+	return nullptr;
+}
+
+bool cycles_nodetype_get_name(ccl::NodeType* nt, void *strholder)
+{
+	if (nt && strholder) {
+		StringHolder *holder = (StringHolder *)strholder;
+		std::string name{nt->name.c_str()};
 
 		holder->thestring = name;
 
@@ -98,7 +251,7 @@ bool cycles_shader_get_name(ccl::Shader* sh, void* strholder)
 {
 	if (sh && strholder) {
 		StringHolder *holder = (StringHolder *)strholder;
-		std::string name{sh->name};
+		std::string name{sh->name.c_str()};
 
 		holder->thestring = name;
 
@@ -234,87 +387,6 @@ void _set_mapping_node(ccl::MappingNode* node, int transform_type, float x, floa
 
 void cycles_shadernode_texmapping_set_transformation(ccl::ShaderNode* shnode, int transform_type, float x, float y, float z)
 {
-#if LEGACY_SHADERS
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
-	if (shnode) {
-		std::string tp{ "UNKNOWN" };
-		switch (transform_type) {
-		case 0:
-			tp = "TRANSLATION";
-			break;
-		case 1:
-			tp = "ROTATION";
-			break;
-		case 2:
-			tp = "SCALE";
-			break;
-		}
-		switch (shn_type) {
-		case shadernode_type::MAPPING:
-		{
-			ccl::MappingNode* node = dynamic_cast<ccl::MappingNode*>(shnode);
-			_set_mapping_node(node, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::ENVIRONMENT_TEXTURE:
-		{
-			ccl::EnvironmentTextureNode* node = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::IMAGE_TEXTURE:
-		{
-			ccl::ImageTextureNode* node = dynamic_cast<ccl::ImageTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::GRADIENT_TEXTURE:
-		{
-			ccl::GradientTextureNode* node = dynamic_cast<ccl::GradientTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::WAVE_TEXTURE:
-		{
-			ccl::WaveTextureNode* node = dynamic_cast<ccl::WaveTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::VORONOI_TEXTURE:
-		{
-			ccl::VoronoiTextureNode* node = dynamic_cast<ccl::VoronoiTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::MUSGRAVE_TEXTURE:
-		{
-			ccl::MusgraveTextureNode* node = dynamic_cast<ccl::MusgraveTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::BRICK_TEXTURE:
-		{
-			ccl::BrickTextureNode* node = dynamic_cast<ccl::BrickTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::MAGIC_TEXTURE:
-		{
-			ccl::MagicTextureNode* node = dynamic_cast<ccl::MagicTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		case shadernode_type::NOISE_TEXTURE:
-		{
-			ccl::NoiseTextureNode* node = dynamic_cast<ccl::NoiseTextureNode*>(shnode);
-			_set_texture_mapping_transformation(node->tex_mapping, transform_type, x, y, z);
-		}
-		break;
-		default:
-			break;
-		}
-	}
-#endif
 }
 
 void _set_texmapping_mapping(ccl::TextureMapping& tex_mapping, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z)
@@ -642,87 +714,6 @@ CCImage* get_ccimage(std::string imgname, T* img, unsigned int width, unsigned i
 	return nimg;
 #endif
 	return nullptr;
-}
-
-void cycles_shadernode_set_member_float_img(ccl::ShaderNode* shnode, const char* member_name, const char* img_name, float* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
-{
-	assert(false);
-	// TODO: XXXX reimplement image/env texture setting
-	/*
-	CCScene* csce = nullptr;
-	ccl::Scene* sce = nullptr;
-	if (scene_find(session_id, &csce, &sce)) {
-
-		auto mname = std::string{ member_name };
-		auto imname = std::string{ img_name };
-
-		ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
-		if (shnode) {
-			switch (shn_type) {
-			case shadernode_type::IMAGE_TEXTURE:
-			{
-				CCImage* nimg = get_ccimage<float>(imname, img, width, height, depth, channels, true, session_id);
-				ccl::ImageTextureNode* imtex = dynamic_cast<ccl::ImageTextureNode*>(shnode);
-				imtex->builtin_data = nimg;
-				imtex->filename = nimg->filename;
-				sce->image_manager->tag_reload_image(imname);
-			}
-			break;
-			case shadernode_type::ENVIRONMENT_TEXTURE:
-			{
-				CCImage* nimg = get_ccimage<float>(imname, img, width, height, depth, channels, true, session_id);
-				ccl::EnvironmentTextureNode* envtex = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
-				envtex->builtin_data = nimg;
-				envtex->filename = nimg->filename;
-				sce->image_manager->tag_reload_image(imname);
-			}
-			break;
-			default:
-				break;
-			}
-		}
-	}
-	*/
-}
-
-void cycles_shadernode_set_member_byte_img(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id, shadernode_type shn_type, const char* member_name, const char* img_name, unsigned char* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels)
-{
-	assert(false);
-	// TODO: XXXX reimplement image/env texture setting
-	/*
-	CCScene* csce = nullptr;
-	ccl::Scene* sce = nullptr;
-	if (scene_find(session_id, &csce, &sce)) {
-
-		auto mname = std::string{ member_name };
-		auto imname = std::string{ img_name };
-		ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
-		if (shnode) {
-			switch (shn_type) {
-			case shadernode_type::IMAGE_TEXTURE:
-			{
-				CCImage* nimg = get_ccimage<unsigned char>(imname, img, width, height, depth, channels, false, session_id);
-				ccl::ImageTextureNode* imtex = dynamic_cast<ccl::ImageTextureNode*>(shnode);
-				imtex->builtin_data = nimg;
-				imtex->filename = nimg->filename;
-				sce->image_manager->tag_reload_image(imname);
-			}
-			break;
-			case shadernode_type::ENVIRONMENT_TEXTURE:
-			{
-				CCImage* nimg = get_ccimage<unsigned char>(imname, img, width, height, depth, channels, false, session_id);
-				ccl::EnvironmentTextureNode* envtex = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
-				envtex->builtin_data = nimg;
-				envtex->filename = nimg->filename;
-				sce->image_manager->tag_reload_image(imname);
-			}
-			break;
-			default:
-				break;
-			}
-		}
-	}
-	*/
 }
 
 void cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* member_name, bool value)
@@ -1357,8 +1348,8 @@ Set an integer attribute with given name to value. shader_id is the global shade
 */
 void cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value)
 {
+	bool set = false;
 	std::string sockname{attribute_name};
-	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
 			continue;
@@ -1368,9 +1359,52 @@ void cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char*
 		}
 		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, value);
+			set = true;
 			break;
 		}
 	}
+	assert(set);
+}
+
+void cycles_shadernode_set_attribute_bool(ccl::ShaderNode* shnode_id, const char* attribute_name, bool value)
+{
+	bool set = false;
+	std::string sockname{attribute_name};
+	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
+		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
+			continue;
+		}
+		if (socket.flags & ccl::SocketType::INTERNAL) {
+			continue;
+		}
+		if (ccl::string_iequals(socket.name.string(), sockname)) {
+			shnode_id->set(socket, value);
+			set = true;
+			break;
+		}
+	}
+	assert(set);
+}
+
+void cycles_shadernode_set_attribute_string(ccl::ShaderNode* shnode_id, const char* attribute_name, const char* value)
+{
+	bool set = false;
+	std::string sockname{attribute_name};
+	ustring val{value};
+	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
+		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
+			continue;
+		}
+		if (socket.flags & ccl::SocketType::INTERNAL) {
+			continue;
+		}
+		if (ccl::string_iequals(socket.name.string(), sockname)) {
+			shnode_id->set(socket, val);
+			set = true;
+			break;
+		}
+	}
+	assert(set);
 }
 
 /*
@@ -1378,8 +1412,8 @@ void cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char*
 */
 void cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const char* attribute_name, float value)
 {
+	bool set = false;
 	std::string sockname{attribute_name};
-	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
 			continue;
@@ -1389,9 +1423,11 @@ void cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const cha
 		}
 		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, value);
+			set = true;
 			break;
 		}
 	}
+	assert(set);
 }
 
 /*
@@ -1399,9 +1435,9 @@ Set a vector of floats attribute with given name to x, y and z. shader_id is the
 */
 void cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char* attribute_name, float x, float y, float z)
 {
+	bool set = false;
 	ccl::float3 f3 = ccl::make_float3(x, y, z);
 	std::string sockname{attribute_name};
-	ccl::ShaderInput* inp = shnode_id->input(attribute_name);
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
 			continue;
@@ -1409,11 +1445,13 @@ void cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char*
 		if (socket.flags & ccl::SocketType::INTERNAL) {
 			continue;
 		}
-		if (ccl::string_iequals(socket.ui_name.string(), sockname)) {
+		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, f3);
+			set = true;
 			break;
 		}
 	}
+	assert(set);
 }
 
 void cycles_shader_connect_nodes(ccl::Shader *shader_id,
