@@ -12,7 +12,6 @@ set ARG1=%2
 set OPTIX="C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.3.0"
 set LEVELZERO_INC="..\lib\win64_vc15\level-zero\include"
 set LEVELZERO_LIB="..\lib\win64_vc15\level-zero\lib"
-set OCLOC="C:\ProgramData\Intel\ocloc_win_dgpu_101.3802"
 set MSVC_REDIST_DIR="C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Redist/MSVC/14.29.30133"
 set WINDOWS_KITS_DIR="C:/Program Files (x86)/Windows Kits/10"
 
