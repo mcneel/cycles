@@ -279,6 +279,10 @@ ImageParams ImageTextureNode::image_params() const
 
 void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
 {
+  tiles.clear();
+  tiles.push_back_slow(1001);
+  return;
+#if DONTUSEUVTILING
   /* Box projection computes its own UVs that always lie in the
    * 1001 tile, so there's no point in loading any others. */
   if (projection == NODE_IMAGE_PROJ_BOX) {
@@ -337,6 +341,7 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
     }
   }
   tiles.steal_data(new_tiles);
+#endif
 }
 
 void ImageTextureNode::attributes(Shader *shader, AttributeRequestSet *attributes)
@@ -4200,7 +4205,7 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
       }
       else {
         int attr = compiler.attribute(ATTR_STD_GENERATED);
-        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
       }
     }
   }
@@ -4217,7 +4222,8 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
     }
     else {
       int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
-      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
+      //compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
     }
   }
 

@@ -302,9 +302,6 @@ void cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* geometry, floa
 				f2.y = uvs[i + 1];
 				fdata[j] = f2;
 			}
-
-			//ALB: IT looks like all meshes are triangles in CyclesX
-			//me->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 		}
 	}
 }
