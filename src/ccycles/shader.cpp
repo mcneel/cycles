@@ -1460,6 +1460,9 @@ void cycles_shader_connect_nodes(ccl::Shader *shader_id,
 								 ccl::ShaderNode *to_id,
 								 const char *to)
 {
+	assert(shader_id);
+	assert(from_id);
+	assert(to_id);
 	if (shader_id && from_id && to_id)
 		shader_id->graph->connect(from_id->output(from), to_id->input(to));
 }
