@@ -283,7 +283,7 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
   tiles.clear();
   tiles.push_back_slow(1001);
   return;
-#if DONTUSEUVTILING
+#if DONTUSEUVTILINGYET
   /* Box projection computes its own UVs that always lie in the
    * 1001 tile, so there's no point in loading any others. */
   if (projection == NODE_IMAGE_PROJ_BOX) {
