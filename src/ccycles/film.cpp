@@ -55,3 +55,11 @@ void cycles_film_tag_update(ccl::Session* session_id)
 	}
 }
 
+void cycles_film_set_use_approximate_shadow_catcher(ccl::Session* session, bool use_approximate_shadow_catcher)
+{
+	ccl::Scene *sce = nullptr;
+	if (scene_find(session, &sce)) {
+		sce->film->set_use_approximate_shadow_catcher(use_approximate_shadow_catcher);
+	}
+}
+

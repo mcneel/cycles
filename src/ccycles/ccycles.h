@@ -767,6 +767,7 @@ CCL_CAPI void CDECL cycles_film_set_exposure(ccl::Session* session_id, float exp
 CCL_CAPI void CDECL cycles_film_set_filter(ccl::Session* session_id, unsigned int filter_type, float filter_width);
 CCL_CAPI void CDECL cycles_film_set_use_sample_clamp(ccl::Session* session_id, bool use_sample_clamp);
 CCL_CAPI void CDECL cycles_film_tag_update(ccl::Session* session_id);
+CCL_CAPI void CDECL cycles_film_set_use_approximate_shadow_catcher(ccl::Session *session, bool use_approximate_shadow_catcher);
 
 CCL_CAPI void CDECL cycles_f4_add(ccl::float4 a, ccl::float4 b, ccl::float4& res);
 CCL_CAPI void CDECL cycles_f4_sub(ccl::float4 a, ccl::float4 b, ccl::float4& res);
