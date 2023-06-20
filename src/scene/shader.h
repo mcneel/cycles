@@ -226,6 +226,13 @@ class ShaderManager {
 
   void init_xyz_transforms();
 
+  void set_rhino_perlin_noise_table(const vector<float> &perlin_noise_table);
+  void set_rhino_impulse_noise_table(const vector<float> &impulse_noise_table);
+  void set_rhino_vc_noise_table(const vector<float> &vc_noise_table);
+  void set_rhino_aaltonen_noise_table(const vector<float> &aaltonen_noise_table);
+  void set_rhino_dots_dot_data_table(const vector<float> &dot_data_table);
+  void set_rhino_dots_tree_data_table(const vector<float> &tree_data_table);
+
  protected:
   ShaderManager();
 
@@ -258,6 +265,19 @@ class ShaderManager {
   float3 rec709_to_g;
   float3 rec709_to_b;
   bool is_rec709;
+
+  static vector<float> rhino_perlin_noise_table;
+  static vector<float> rhino_impulse_noise_table;
+  static vector<float> rhino_vc_noise_table;
+  static vector<float> rhino_aaltonen_noise_table;
+  static vector<float> rhino_dots_tree_data_table;
+  static vector<float> rhino_dots_dot_data_table;
+  size_t rhino_perlin_noise_table_offset;
+  size_t rhino_impulse_noise_table_offset;
+  size_t rhino_vc_noise_table_offset;
+  size_t rhino_aaltonen_noise_table_offset;
+  size_t rhino_dots_tree_data_table_offset;
+  size_t rhino_dots_dot_data_table_offset;
 };
 
 CCL_NAMESPACE_END

@@ -452,6 +452,11 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 		graph->connect(shader_node->output("BSDF"), out->input("Surface"));
 		default_surface_shader->set_graph(graph);
 		default_surface_shader->tag_update(scene);
+
+		session->scene->shader_manager->set_rhino_perlin_noise_table(ccycles_rhino_perlin_noise_table);
+		session->scene->shader_manager->set_rhino_impulse_noise_table(ccycles_rhino_impulse_noise_table);
+		session->scene->shader_manager->set_rhino_vc_noise_table(ccycles_rhino_vc_noise_table);
+		session->scene->shader_manager->set_rhino_aaltonen_noise_table(ccycles_rhino_aaltonen_noise_table);
 	}
 }
 

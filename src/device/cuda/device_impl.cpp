@@ -649,7 +649,8 @@ void CUDADevice::const_copy_to(const char *name, void *host, size_t size)
   size_t bytes;
 
   cuda_assert(cuModuleGetGlobal(&mem, &bytes, cuModule, "kernel_params"));
-  assert(bytes == sizeof(KernelParamsCUDA));
+  size_t kpcuda = sizeof(KernelParamsCUDA);
+  assert(bytes == kpcuda);
 
   /* Update data storage pointers in launch parameters. */
 #  define KERNEL_DATA_ARRAY(data_type, data_name) \
