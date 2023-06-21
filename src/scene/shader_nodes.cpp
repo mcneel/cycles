@@ -4178,13 +4178,13 @@ void RhinoTextureCoordinateNode::decal_setup(ShaderOutput *out,
   uint encoded = compiler.encode_uchar4(compiler.stack_assign_if_linked(decalforward_out),
                                         compiler.stack_assign_if_linked(decalusage_out));
   compiler.add_node(texco_node, texcoord, compiler.stack_assign(out), encoded);
-  Transform ob_itfm = transform_inverse(ob_tfm);
-  compiler.add_node(ob_tfm.x);
-  compiler.add_node(ob_tfm.y);
-  compiler.add_node(ob_tfm.z);
-  compiler.add_node(ob_itfm.x);
-  compiler.add_node(ob_itfm.y);
-  compiler.add_node(ob_itfm.z);
+  //Transform ob_itfm = transform_inverse(ob_tfm);
+  //compiler.add_node(ob_tfm.x);
+  //compiler.add_node(ob_tfm.y);
+  //compiler.add_node(ob_tfm.z);
+  //compiler.add_node(ob_itfm.x);
+  //compiler.add_node(ob_itfm.y);
+  //compiler.add_node(ob_itfm.z);
   compiler.add_node(pxyz.x);
   compiler.add_node(pxyz.y);
   compiler.add_node(pxyz.z);
