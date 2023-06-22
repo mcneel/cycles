@@ -17,7 +17,7 @@ $dependencies = (Get-ChildItem -Recurse -Path $cycles_lib_dir -Include "OpenColo
 
 Push-Location $cwd
 
-.\make_rhino.bat $buildConfig.ToLower()
+.\make_rhino.bat $buildConfig.ToLower() all
 
 Pop-Location
 
