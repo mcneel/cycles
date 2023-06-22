@@ -18,7 +18,7 @@ set WINDOWS_KITS_DIR="C:/Program Files (x86)/Windows Kits/10"
 set BUILD_CUDA_CMD= ^
 	-DWITH_CYCLES_CUDA_BINARIES=ON ^
 	-DWITH_CYCLES_DEVICE_OPTIX=ON ^
-	-DCYCLES_CUDA_BINARIES_ARCH=compute_52 ^
+	-DCYCLES_CUDA_BINARIES_ARCH="sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;compute_75" ^
 	-DOPTIX_ROOT_DIR=%OPTIX%
 
 if not "%ARG1%" == "cuda" (
@@ -44,7 +44,7 @@ if not "%ARG1%" == "oneapi" (
 
 set BUILD_HIP_CMD= ^
 	-DWITH_CYCLES_DEVICE_HIP=ON
-	
+
 if not "%ARG1%" == "hip" (
 	if not "%ARG1%" == "all" (
 		set BUILD_HIP_CMD=""
@@ -66,7 +66,7 @@ if "%COMMAND%" == "release" (
 	%BUILD_ONEAPI_CMD% ^
 	%BUILD_HIP_CMD% ^
 	&& cd %BUILD_DIR% && cmake --build . --target install --config Release
-	
+
 ) else if "%COMMAND%" == "debug" (
 	cmake -B %BUILD_DIR% ^
 	-DWITH_CYCLES_ALEMBIC=OFF ^
@@ -78,7 +78,7 @@ if "%COMMAND%" == "release" (
 	%BUILD_ONEAPI_CMD% ^
 	%BUILD_HIP_CMD% ^
 	&& cd %BUILD_DIR% && cmake --build . --target install --config Debug
-	
+
 ) else if "%COMMAND%" == "clean" (
 	cd %BUILD_DIR% && cmake --build . --target install --config Clean
 ) else if "%COMMAND%" == "test" (
@@ -91,7 +91,7 @@ if "%COMMAND%" == "release" (
   echo Command "%COMMAND%" unknown
 )
 
-if %BUILDING_ONEAPI% == "Yes" ( 
+if %BUILDING_ONEAPI% == "Yes" (
   echo **************************************************************************************************************
   echo NOTE: If you got compile errors like "error C2338: DPCPP does not support C++ version earlier than C++17.",  *
   echo then do the following: Add the /Zc:__cplusplus compiler option to the cycles_device.vcxproj compiler options *
