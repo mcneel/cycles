@@ -192,16 +192,20 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 	public:
 		typedef std::function<void(const std::string &)> LogFunction;
 
-		CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *passes, LogFunction log);
+		CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes,
+							LogFunction log);
 		virtual ~CCyclesOutputDriver();
 
 		virtual void write_render_tile(const Tile &tile) override;
 		virtual bool update_render_tile(const Tile & /* tile */) override;
 
 	protected:
+		bool write_or_update_render_tile(const Tile &tile);
+
 		LogFunction log_;
 
-		std::vector<std::unique_ptr<CCyclesPassOutput>> *passes;
+		std::vector<std::vector<float>> tile_passes;
+		std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes;
 };
 
 class CCyclesDisplayDriver : public ccl::DisplayDriver {

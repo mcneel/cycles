@@ -528,6 +528,7 @@ CCL_CAPI void CDECL cycles_session_end_run(ccl::Session* session_id);
 /* session progress access. */
 CCL_CAPI void CDECL cycles_progress_reset(ccl::Session* session_id);
 CCL_CAPI int CDECL cycles_progress_get_sample(ccl::Session* session_id);
+CCL_CAPI int CDECL cycles_progress_get_rendered_tiles(ccl::Session *session_id);
 CCL_CAPI void CDECL cycles_progress_get_time(ccl::Session* session_id, double* total_time, double* sample_time);
 CCL_CAPI void CDECL cycles_tilemanager_get_sample_info(ccl::Session* session_id, unsigned int* samples, unsigned int* total_samples);
 CCL_CAPI void CDECL cycles_progress_get_progress(ccl::Session* session_id, float* progress);
