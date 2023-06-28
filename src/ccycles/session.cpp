@@ -207,9 +207,9 @@ std::vector<float> &CCyclesPassOutput::pixels()
 }
 
 
-CCyclesOutputDriver::CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *passes,
+CCyclesOutputDriver::CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes,
 										 CCyclesOutputDriver::LogFunction log)
-	: passes(passes), log_(log)
+	: full_passes(full_passes), log_(log)
 {
 }
 
@@ -217,67 +217,110 @@ CCyclesOutputDriver::~CCyclesOutputDriver()
 {
 }
 
-void CCyclesOutputDriver::write_render_tile(const Tile &tile)
+bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 {
-	if (passes == nullptr)
-		return;
+	if (full_passes == nullptr)
+		return false;
 
-	log_(string_printf(
-		"Handling tile layer %s, size %d %d", tile.layer.c_str(), tile.size.x, tile.size.y));
+	bool doing_tiles = !(tile.size == tile.full_size);
 
-	for (auto &pass : *passes) {
-		pass->lock();
+	if (doing_tiles) {
+		tile_passes.resize(full_passes->size());
 
-		PassInfo pass_info = Pass::get_info(pass->get_pass_type());
+		for (int i = 0; i < tile_passes.size(); i++) {
+			auto &tile_pass = tile_passes[i];
 
-		const int width = tile.size.x;
-		const int height = tile.size.y;
-		pass->set_width(width);
-		pass->set_height(height);
-		pass->pixels().resize(width * height * pass_info.num_components);
+			ccl::PassType pass_type = (*full_passes)[i]->get_pass_type();
 
-		if (!tile.get_pass_pixels(pass_type_as_string(pass->get_pass_type()),
-								  pass_info.num_components,
-								  pass->pixels().data())) {
-			log_("Failed to read render pass pixels");
+			PassInfo pass_info = Pass::get_info(pass_type);
+
+			const int width = tile.size.x;
+			const int height = tile.size.y;
+			const int tile_size = width * height * pass_info.num_components;
+
+			if (tile_pass.size() < tile_size) {
+				tile_pass.resize(width * height * pass_info.num_components);
+			}
+
+			if (!tile.get_pass_pixels(
+					pass_type_as_string(pass_type), pass_info.num_components, tile_pass.data())) {
+				log_("Failed to read render pass pixels");
+				return false;
+			}
 		}
 
-		pass->unlock();
+		for (int i = 0; i < tile_passes.size(); i++) {
+			auto &tile_pass = tile_passes[i];
+			auto &full_pass = (*full_passes)[i];
+
+			full_pass->lock();
+
+			PassInfo pass_info = Pass::get_info(full_pass->get_pass_type());
+
+			const int pixel_stride = pass_info.num_components;
+			const int pixel_stride_bytes = pixel_stride * sizeof(float);
+
+			const int tile_width = tile.size.x;
+			const int tile_height = tile.size.y;
+			const int tile_stride = tile_width * pixel_stride;
+			const float *tile_buffer = tile_pass.data();
+
+			const int full_width = tile.full_size.x;
+			const int full_height = tile.full_size.y;
+			const int full_stride = full_width * pixel_stride;
+
+			full_pass->set_width(full_width);
+			full_pass->set_height(full_height);
+			full_pass->pixels().resize(full_height * full_stride);
+
+			const float *full_buffer = full_pass->pixels().data() + tile.offset.y * full_stride +
+									   tile.offset.x * pixel_stride;
+
+			for (int row = 0; row < tile_height; row++) {
+				memcpy((void *)(full_buffer + row * full_stride),
+					   (void *)(tile_buffer + row * tile_stride),
+					   tile_stride * sizeof(float));
+			}
+
+			full_pass->unlock();
+		}
 	}
+	else {
+		for (auto &pass : *full_passes) {
+			pass->lock();
+
+			PassInfo pass_info = Pass::get_info(pass->get_pass_type());
+
+			const int width = tile.full_size.x;
+			const int height = tile.full_size.y;
+			pass->set_width(width);
+			pass->set_height(height);
+			pass->pixels().resize(width * height * pass_info.num_components);
+
+			if (!tile.get_pass_pixels(pass_type_as_string(pass->get_pass_type()),
+									  pass_info.num_components,
+									  pass->pixels().data())) {
+				log_("Failed to read render pass pixels");
+				pass->unlock();
+
+				return false;
+			}
+
+			pass->unlock();
+		}
+	}
+
+	return true;
+}
+
+void CCyclesOutputDriver::write_render_tile(const Tile &tile)
+{
+	write_or_update_render_tile(tile);
 }
 
 bool CCyclesOutputDriver::update_render_tile(const Tile &tile)
 {
-	if (passes == nullptr)
-		return false;
-
-	bool rc = true;
-
-	log_(string_printf(
-		"Handling tile layer %s, size %d %d", tile.layer.c_str(), tile.size.x, tile.size.y));
-
-	for (auto &pass : *passes) {
-		pass->lock();
-
-		PassInfo pass_info = Pass::get_info(pass->get_pass_type());
-
-		const int width = tile.size.x;
-		const int height = tile.size.y;
-		pass->set_width(width);
-		pass->set_height(height);
-		pass->pixels().resize(width * height * pass_info.num_components);
-
-		if (!tile.get_pass_pixels(pass_type_as_string(pass->get_pass_type()),
-								  pass_info.num_components,
-								  pass->pixels().data())) {
-			log_("Failed to read render pass pixels");
-			rc = false;
-		}
-
-		pass->unlock();
-	}
-
-	return rc;
+	return write_or_update_render_tile(tile);
 }
 
 CCyclesDisplayDriver::CCyclesDisplayDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *passes,
@@ -475,8 +518,8 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 
 	// TODO: XXXX these are hardcoded params/sceneparams
 	session->params = *params;
-	session->params.tile_size = 2048;
-	session->params.use_auto_tile = true;
+	session->params.tile_size = 512;
+	session->params.use_auto_tile = false;
 	session->params.experimental = true;
 	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 	session->params.use_resolution_divider = false;
@@ -848,6 +891,16 @@ int cycles_progress_get_sample(ccl::Session* session_id)
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		return session->progress.get_current_sample();
+	}
+	return INT_MIN;
+}
+
+int cycles_progress_get_rendered_tiles(ccl::Session *session_id)
+{
+	CCSession *ccsess = nullptr;
+	ccl::Session *session = nullptr;
+	if (session_find(session_id, &ccsess, &session)) {
+		return session->progress.get_rendered_tiles();
 	}
 	return INT_MIN;
 }
