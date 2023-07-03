@@ -1467,6 +1467,15 @@ void cycles_shader_connect_nodes(ccl::Shader *shader_id,
 		shader_id->graph->connect(from_id->output(from), to_id->input(to));
 }
 
+void cycles_shader_disconnect_node(ccl::Shader *shader_id,
+								  ccl::ShaderNode *from_id,
+								  const char *from)
+{
+	assert(shader_id);
+	assert(from_id);
+	if (shader_id && from_id)
+		shader_id->graph->disconnect(from_id->input(from));
+}
 
 
 class GammaLUT
