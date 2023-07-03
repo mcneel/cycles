@@ -730,6 +730,7 @@ CCL_CAPI void CDECL cycles_shader_set_heterogeneous_volume(ccl::Session* session
 CCL_CAPI void CDECL cycles_shader_new_graph(ccl::Shader* shader);
 
 CCL_CAPI void CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id, ccl::ShaderNode *from_id, const char *from, ccl::ShaderNode *to_id, const char *to);
+CCL_CAPI void CDECL cycles_shader_disconnect_node(ccl::Shader *shader_id, ccl::ShaderNode *from_id, const char *from);
 
 /***** LIGHTS ****/
 
