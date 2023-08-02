@@ -21,6 +21,9 @@ ccl::Light *cycles_create_light(ccl::Session* session_id, ccl::Shader *light_sha
 	ccl::Light* l = new ccl::Light();
 	l->set_angle(0.009180f); // use default value as in Blender UI (0.526deg)
 	l->set_shader(light_shader_id);
+	l->set_use_camera(false);
+	l->set_use_glossy(false);
+	l->set_use_transmission(false);
 	session_id->scene->lights.push_back(l);
 	return l;
 }
