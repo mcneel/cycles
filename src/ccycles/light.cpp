@@ -29,87 +29,89 @@ ccl::Light *cycles_create_light(ccl::Session* session_id, ccl::Shader *light_sha
 }
 
 /* type = 0: point, 1: sun, 2: background, 3: area, 4: spot, 5: triangle. */
-void cycles_light_set_type(ccl::Session *session_id, ccl::Light *light_id, light_type type)
+void cycles_light_set_type(ccl::Session *session_id, ccl::Light *light, light_type type)
 {
-	light_id->set_light_type((ccl::LightType)type);
+	ccl::LightType ltype = (ccl::LightType)type;
+	light->set_light_type(ltype);
+	light->set_use_glossy(ltype == ccl::LIGHT_AREA);
 }
 
-void cycles_light_set_cast_shadow(ccl::Session *session_id, ccl::Light *light_id, unsigned int cast_shadow)
+void cycles_light_set_cast_shadow(ccl::Session *session_id, ccl::Light *light, unsigned int cast_shadow)
 {
-	light_id->set_cast_shadow(cast_shadow == 1);
+	light->set_cast_shadow(cast_shadow == 1);
 }
 
-void cycles_light_set_use_mis(ccl::Session *session_id, ccl::Light *light_id, unsigned int use_mis)
+void cycles_light_set_use_mis(ccl::Session *session_id, ccl::Light *light, unsigned int use_mis)
 {
-	light_id->set_use_mis(use_mis == 1);
+	light->set_use_mis(use_mis == 1);
 }
 
-void cycles_light_set_samples(ccl::Session *session_id, ccl::Light *light_id, unsigned int samples)
+void cycles_light_set_samples(ccl::Session *session_id, ccl::Light *light, unsigned int samples)
 {
-	light_id->set_max_bounces((int)samples);
+	light->set_max_bounces((int)samples);
 }
 
-void cycles_light_set_max_bounces(ccl::Session *session_id, ccl::Light *light_id, unsigned int max_bounces)
+void cycles_light_set_max_bounces(ccl::Session *session_id, ccl::Light *light, unsigned int max_bounces)
 {
-	light_id->set_max_bounces(max_bounces);
+	light->set_max_bounces(max_bounces);
 }
 
-void cycles_light_set_map_resolution(ccl::Session *session_id, ccl::Light *light_id, unsigned int map_resolution)
+void cycles_light_set_map_resolution(ccl::Session *session_id, ccl::Light *light, unsigned int map_resolution)
 {
-	light_id->set_map_resolution(map_resolution);
+	light->set_map_resolution(map_resolution);
 }
 
-void cycles_light_set_angle(ccl::Session *session_id, ccl::Light *light_id, float angle)
+void cycles_light_set_angle(ccl::Session *session_id, ccl::Light *light, float angle)
 {
-	light_id->set_angle(angle);
+	light->set_angle(angle);
 }
 
-void cycles_light_set_spot_angle(ccl::Session *session_id, ccl::Light *light_id, float spot_angle)
+void cycles_light_set_spot_angle(ccl::Session *session_id, ccl::Light *light, float spot_angle)
 {
-	light_id->set_spot_angle(spot_angle);
+	light->set_spot_angle(spot_angle);
 }
 
-void cycles_light_set_spot_smooth(ccl::Session *session_id, ccl::Light *light_id, float spot_smooth)
+void cycles_light_set_spot_smooth(ccl::Session *session_id, ccl::Light *light, float spot_smooth)
 {
-	light_id->set_spot_smooth(spot_smooth);
+	light->set_spot_smooth(spot_smooth);
 }
 
-void cycles_light_set_sizeu(ccl::Session *session_id, ccl::Light *light_id, float sizeu)
+void cycles_light_set_sizeu(ccl::Session *session_id, ccl::Light *light, float sizeu)
 {
-	light_id->set_sizeu(sizeu);
+	light->set_sizeu(sizeu);
 }
 
-void cycles_light_set_sizev(ccl::Session *session_id, ccl::Light *light_id, float sizev)
+void cycles_light_set_sizev(ccl::Session *session_id, ccl::Light *light, float sizev)
 {
-	light_id->set_sizev(sizev);
+	light->set_sizev(sizev);
 }
 
-void cycles_light_set_axisu(ccl::Session *session_id, ccl::Light *light_id, float axisux, float axisuy, float axisuz)
+void cycles_light_set_axisu(ccl::Session *session_id, ccl::Light *light, float axisux, float axisuy, float axisuz)
 {
-	light_id->set_axisu(ccl::make_float3(axisux, axisuy, axisuz));
+	light->set_axisu(ccl::make_float3(axisux, axisuy, axisuz));
 }
 
-void cycles_light_set_axisv(ccl::Session *session_id, ccl::Light *light_id, float axisvx, float axisvy, float axisvz)
+void cycles_light_set_axisv(ccl::Session *session_id, ccl::Light *light, float axisvx, float axisvy, float axisvz)
 {
-	light_id->set_axisv(ccl::make_float3(axisvx, axisvy, axisvz));
+	light->set_axisv(ccl::make_float3(axisvx, axisvy, axisvz));
 }
 
-void cycles_light_set_size(ccl::Session *session_id, ccl::Light *light_id, float size)
+void cycles_light_set_size(ccl::Session *session_id, ccl::Light *light, float size)
 {
-	light_id->set_size(size);
+	light->set_size(size);
 }
 
-void cycles_light_set_dir(ccl::Session *session_id, ccl::Light *light_id, float dirx, float diry, float dirz)
+void cycles_light_set_dir(ccl::Session *session_id, ccl::Light *light, float dirx, float diry, float dirz)
 {
-	light_id->set_dir(ccl::make_float3(dirx, diry, dirz));
+	light->set_dir(ccl::make_float3(dirx, diry, dirz));
 }
 
-void cycles_light_set_co(ccl::Session *session_id, ccl::Light *light_id, float cox, float coy, float coz)
+void cycles_light_set_co(ccl::Session *session_id, ccl::Light *light, float cox, float coy, float coz)
 {
-	light_id->set_co(ccl::make_float3(cox, coy, coz));
+	light->set_co(ccl::make_float3(cox, coy, coz));
 }
 
-void cycles_light_tag_update(ccl::Session *session_id, ccl::Light *light_id)
+void cycles_light_tag_update(ccl::Session *session_id, ccl::Light *light)
 {
-	light_id->tag_update(session_id->scene);
+	light->tag_update(session_id->scene);
 }
