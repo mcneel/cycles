@@ -387,6 +387,8 @@ void _set_mapping_node(ccl::MappingNode* node, int transform_type, float x, floa
 
 void cycles_shadernode_texmapping_set_transformation(ccl::ShaderNode* shnode, int transform_type, float x, float y, float z)
 {
+	ccl::TextureNode *texnode = dynamic_cast<ccl::TextureNode *>(shnode);
+	_set_texture_mapping_transformation(texnode->tex_mapping, transform_type, x, y, z);
 }
 
 void _set_texmapping_mapping(ccl::TextureMapping& tex_mapping, ccl::TextureMapping::Mapping x, ccl::TextureMapping::Mapping y, ccl::TextureMapping::Mapping z)
