@@ -1171,10 +1171,26 @@ void ShaderGraph::dump_graph(const char *filename)
     if (node->inputs.size()) {
       fprintf(fd, "{");
       foreach (ShaderInput *socket, node->inputs) {
+        string val = "";
+        if(socket->type() == SocketType::FLOAT)
+        {
+          float _val = ((Node *)socket->parent)->get_float(socket->socket_type);
+          val = string_printf("%f", _val);
+        }
+        if(socket->type() == SocketType::BOOLEAN)
+        {
+          int _val = ((Node *)socket->parent)->get_bool(socket->socket_type) ? 1 : 0;
+          val = string_printf("%d", _val);
+        }
+        if(socket->type() == SocketType::INT)
+        {
+          int _val = ((Node *)socket->parent)->get_int(socket->socket_type);
+          val = string_printf("%d", _val);
+        }
         if (socket != node->inputs[0]) {
           fprintf(fd, "|");
         }
-        fprintf(fd, "<IN_%p>%s", socket, socket->name().c_str());
+        fprintf(fd, "<IN_%p>%s %s", socket, socket->name().c_str(), val.c_str());
       }
       fprintf(fd, "}|");
     }
