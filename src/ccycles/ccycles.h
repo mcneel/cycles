@@ -704,7 +704,7 @@ CCL_CAPI void CDECL cycles_scene_set_default_surface_shader(ccl::Session* sessio
  */
 CCL_CAPI ccl::Shader *CDECL cycles_scene_get_default_surface_shader(ccl::Session* session_id);
 CCL_CAPI unsigned int CDECL cycles_scene_shader_id(ccl::Session* session_id, unsigned int shader_id);
-CCL_CAPI ccl::ShaderNode *CDECL cycles_add_shader_node(ccl::Shader *shader, const char *node_name);
+CCL_CAPI ccl::ShaderNode *CDECL cycles_add_shader_node(ccl::Shader *shader, const char *node_name, const char *name);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_bool(ccl::ShaderNode* shnode_id, const char* attribute_name, bool value);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_string(ccl::ShaderNode* shnode_id, const char* attribute_name, const char* value);
@@ -723,6 +723,7 @@ CCL_CAPI void CDECL cycles_shadernode_set_member_vec(ccl::ShaderNode* shnode, co
 CCL_CAPI void CDECL cycles_shadernode_set_member_string(ccl::ShaderNode* shnode_id, const char* member_name, const char* value);
 CCL_CAPI void CDECL cycles_shadernode_set_member_vec4_at_index(ccl::ShaderNode* shnode, const char* member_name, float x, float y, float z, float w, int index);
 
+CCL_CAPI void CDECL cycles_shader_dump_graph(ccl::Shader* shader, const char* name);
 CCL_CAPI void CDECL cycles_shader_set_name(ccl::Shader* shader, const char* name);
 CCL_CAPI void CDECL cycles_shader_set_use_mis(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int use_mis);
 CCL_CAPI void CDECL cycles_shader_set_use_transparent_shadow(ccl::Session* session_id, ccl::Shader *shader_id, unsigned int use_transparent_shadow);

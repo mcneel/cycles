@@ -119,7 +119,7 @@ int cycles_shadernode_get_socketcount(ccl::NodeType* shn, int input_output)
 			}
 			count++;
 		}
-	
+
 	}
 
 	return count;
@@ -293,6 +293,10 @@ void cycles_shader_new_graph(ccl::Shader* shader)
 	shader->set_graph(new ccl::ShaderGraph());
 }
 
+void cycles_shader_dump_graph(ccl::Shader* shader, const char* filename)
+{
+	shader->graph->dump_graph(filename);
+}
 
 void cycles_shader_set_name(ccl::Shader* shader, const char* _name)
 {
@@ -320,14 +324,15 @@ void cycles_shader_set_heterogeneous_volume(ccl::Session* session_id, ccl::Shade
 		shader_id->set_heterogeneous_volume(heterogeneous_volume == 1);
 }
 
-ccl::ShaderNode *cycles_add_shader_node(ccl::Shader *shader_id, const char *node_name)
+ccl::ShaderNode *cycles_add_shader_node(ccl::Shader *shader_id, const char *node_type_name, const char* name)
 {
-	const ccl::NodeType *node_type = ccl::NodeType::find(ustring(node_name));
+	const ccl::NodeType *node_type = ccl::NodeType::find(ustring(node_type_name));
 	ccl::ShaderNode *node = (ccl::ShaderNode *)node_type->create(node_type);
 
 	assert(node);
 
 	if (node) {
+		node->name = ustring(name);
 		node->set_owner(shader_id->graph);
 		shader_id->graph->add(node);
 	}
