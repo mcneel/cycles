@@ -1251,6 +1251,7 @@ void ShaderGraph::dump_graph(const char *filename)
   fprintf(fd, "rankdir=LR\n");
   fprintf(fd, "splines=false\n");
   const ccl::NodeType *math_node_type = ccl::NodeType::find(ustring("math"));
+  const ccl::NodeType *value_node_type = ccl::NodeType::find(ustring("value"));
 
   foreach (ShaderNode *node, nodes) {
     fprintf(fd, "// NODE: %p\n", node);
@@ -1285,6 +1286,9 @@ void ShaderGraph::dump_graph(const char *filename)
     if (node->is_a(math_node_type)) {
       MathNode *mnode = dynamic_cast<MathNode *>(node);
       nodename = string_printf("%s (%s)", node->name.c_str(), math_node_operation(mnode));
+    } else if (node->is_a(value_node_type)){
+      ValueNode *vnode = dynamic_cast<ValueNode *>(node);
+      nodename = string_printf("%s (%f)", node->name.c_str(), vnode->get_value());
     }
     fprintf(fd, "%s", nodename.c_str());
     if (node->bump == SHADER_BUMP_CENTER) {
