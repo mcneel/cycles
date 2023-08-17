@@ -1151,6 +1151,92 @@ int ShaderGraph::get_num_closures()
   return num_closures;
 }
 
+const char* math_node_operation(MathNode* mnode)
+{
+  switch (mnode->get_math_type()) {
+    case NODE_MATH_ADD:
+      return "+";
+    case NODE_MATH_SUBTRACT:
+      return "-";
+    case NODE_MATH_MULTIPLY:
+      return "*";
+    case NODE_MATH_DIVIDE:
+      return "/";
+    case NODE_MATH_SINE:
+      return "sin";
+    case NODE_MATH_COSINE:
+      return "cos";
+    case NODE_MATH_TANGENT:
+      return "tan";
+    case NODE_MATH_ARCSINE:
+      return "arcsin";
+    case NODE_MATH_ARCCOSINE:
+      return "arccos";
+    case NODE_MATH_ARCTANGENT:
+      return "arctan";
+    case NODE_MATH_POWER:
+      return "**";
+    case NODE_MATH_LOGARITHM:
+      return "log";
+    case NODE_MATH_MINIMUM:
+      return "min";
+    case NODE_MATH_MAXIMUM:
+      return "max";
+    case NODE_MATH_ROUND:
+      return "round";
+    case NODE_MATH_LESS_THAN:
+      return "<";
+    case NODE_MATH_GREATER_THAN:
+      return ">";
+    case NODE_MATH_MODULO:
+      return "%";
+    case NODE_MATH_ABSOLUTE:
+      return "||";
+    case NODE_MATH_ARCTAN2:
+      return "arctan2";
+    case NODE_MATH_FLOOR:
+      return "floor";
+    case NODE_MATH_CEIL:
+      return "ceil";
+    case NODE_MATH_FRACTION:
+      return "fract";
+    case NODE_MATH_SQRT:
+      return "sqrt";
+    case NODE_MATH_INV_SQRT:
+      return "inv_sqrt";
+    case NODE_MATH_SIGN:
+      return "+-";
+    case NODE_MATH_EXPONENT:
+      return "exp";
+    case NODE_MATH_RADIANS:
+      return "rad";
+    case NODE_MATH_DEGREES:
+      return "deg";
+    case NODE_MATH_SINH:
+      return "sinh";
+    case NODE_MATH_COSH:
+      return "cosh";
+    case NODE_MATH_TANH:
+      return "tanh";
+    case NODE_MATH_TRUNC:
+      return "trunc";
+    case NODE_MATH_SNAP:
+      return "snap";
+    case NODE_MATH_WRAP:
+      return "wrap";
+    case NODE_MATH_COMPARE:
+      return "==";
+    case NODE_MATH_MULTIPLY_ADD:
+      return "*+";
+    case NODE_MATH_PINGPONG:
+      return "pingpong";
+    case NODE_MATH_SMOOTH_MIN:
+      return "smoothmin";
+    case NODE_MATH_SMOOTH_MAX:
+      return "smoothmax";
+  }
+}
+
 void ShaderGraph::dump_graph(const char *filename)
 {
   FILE *fd = fopen(filename, "w");
@@ -1164,6 +1250,7 @@ void ShaderGraph::dump_graph(const char *filename)
   fprintf(fd, "ranksep=1.5\n");
   fprintf(fd, "rankdir=LR\n");
   fprintf(fd, "splines=false\n");
+  const ccl::NodeType *math_node_type = ccl::NodeType::find(ustring("math"));
 
   foreach (ShaderNode *node, nodes) {
     fprintf(fd, "// NODE: %p\n", node);
@@ -1194,7 +1281,12 @@ void ShaderGraph::dump_graph(const char *filename)
       }
       fprintf(fd, "}|");
     }
-    fprintf(fd, "%s", node->name.c_str());
+    std::string nodename = node->name.c_str();
+    if (node->is_a(math_node_type)) {
+      MathNode *mnode = dynamic_cast<MathNode *>(node);
+      nodename = string_printf("%s (%s)", node->name.c_str(), math_node_operation(mnode));
+    }
+    fprintf(fd, "%s", nodename.c_str());
     if (node->bump == SHADER_BUMP_CENTER) {
       fprintf(fd, " (bump:center)");
     }
