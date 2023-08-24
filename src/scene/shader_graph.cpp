@@ -1185,9 +1185,9 @@ const char* math_node_operation(MathNode* mnode)
     case NODE_MATH_ROUND:
       return "round";
     case NODE_MATH_LESS_THAN:
-      return "<";
+      return "&lt;";
     case NODE_MATH_GREATER_THAN:
-      return ">";
+      return "&gt;";
     case NODE_MATH_MODULO:
       return "%";
     case NODE_MATH_ABSOLUTE:
