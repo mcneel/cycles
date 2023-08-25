@@ -222,7 +222,31 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 	if (full_passes == nullptr)
 		return false;
 
+#if 0
 	bool doing_tiles = !(tile.size == tile.full_size);
+	const int width = tile.size.x;
+	const int height = tile.size.y;
+	vector<float> pixels(width * height * 4);
+	if (tile.get_pass_pixels("combined", 4, pixels.data())) {
+		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
+		fs::path save_path = "/Users/nathan/check_cycles_output.png";
+		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
+		unique_ptr<ImageOutput> image_output(ImageOutput::create("png"));
+		ImageSpec spec(width, height, 4, TypeDesc::FLOAT);
+		if(nullptr != image_output &&image_output->open(save_path.string(), spec))
+		{
+			ImageBuf image_buffer(spec,
+				pixels.data(),
+				AutoStride,
+				width * 4 * sizeof(float),
+				AutoStride);
+			/* Write to disk and close */
+			image_buffer.set_write_format(TypeDesc::FLOAT);
+			image_buffer.write(image_output.get());
+			image_output->close();
+		}
+	}
+#endif
 
 	if (doing_tiles) {
 		tile_passes.resize(full_passes->size());
