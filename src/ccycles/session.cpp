@@ -222,8 +222,8 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 	if (full_passes == nullptr)
 		return false;
 
-#if 0
 	bool doing_tiles = !(tile.size == tile.full_size);
+#if 0
 	const int width = tile.size.x;
 	const int height = tile.size.y;
 	vector<float> pixels(width * height * 4);
