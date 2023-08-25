@@ -1151,6 +1151,25 @@ int ShaderGraph::get_num_closures()
   return num_closures;
 }
 
+std::string vector_string(ShaderInput* socket)
+{
+  auto socket_type = socket->type();
+    switch(socket_type) {
+    case SocketType::COLOR:
+    case SocketType::COLOR2:
+    case SocketType::VECTOR:
+    case SocketType::POINT:
+    case SocketType::NORMAL:
+    case SocketType::POINT2:
+    {
+          float3 _val = ((Node *)socket->parent)->get_float3(socket->socket_type);
+          return string_printf("(%f, %f, %f)", _val.x, _val.y, _val.z);
+    }
+    default:
+      return "";
+    }
+}
+
 const char* math_node_operation(MathNode* mnode)
 {
   switch (mnode->get_math_type()) {
@@ -1252,6 +1271,7 @@ void ShaderGraph::dump_graph(const char *filename)
   fprintf(fd, "splines=false\n");
   const ccl::NodeType *math_node_type = ccl::NodeType::find(ustring("math"));
   const ccl::NodeType *value_node_type = ccl::NodeType::find(ustring("value"));
+  const ccl::NodeType *color_node_type = ccl::NodeType::find(ustring("color"));
 
   foreach (ShaderNode *node, nodes) {
     fprintf(fd, "// NODE: %p\n", node);
@@ -1259,7 +1279,7 @@ void ShaderGraph::dump_graph(const char *filename)
     if (node->inputs.size()) {
       fprintf(fd, "{");
       foreach (ShaderInput *socket, node->inputs) {
-        string val = "";
+        string val = vector_string(socket);
         if(socket->type() == SocketType::FLOAT)
         {
           float _val = ((Node *)socket->parent)->get_float(socket->socket_type);
@@ -1289,6 +1309,10 @@ void ShaderGraph::dump_graph(const char *filename)
     } else if (node->is_a(value_node_type)){
       ValueNode *vnode = dynamic_cast<ValueNode *>(node);
       nodename = string_printf("%s (%f)", node->name.c_str(), vnode->get_value());
+    } else if (node->is_a(color_node_type)){
+      ColorNode *cnode = dynamic_cast<ColorNode *>(node);
+      float3 color = cnode->get_value();
+      nodename = string_printf("%s (%f, %f, %f)", node->name.c_str(), color.x, color.y, color.z);
     }
     fprintf(fd, "%s", nodename.c_str());
     if (node->bump == SHADER_BUMP_CENTER) {
