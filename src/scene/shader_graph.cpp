@@ -1272,6 +1272,7 @@ void ShaderGraph::dump_graph(const char *filename)
   const ccl::NodeType *math_node_type = ccl::NodeType::find(ustring("math"));
   const ccl::NodeType *value_node_type = ccl::NodeType::find(ustring("value"));
   const ccl::NodeType *color_node_type = ccl::NodeType::find(ustring("color"));
+  const ccl::NodeType *imtex_node_type = ccl::NodeType::find(ustring("image_texture"));
 
   foreach (ShaderNode *node, nodes) {
     fprintf(fd, "// NODE: %p\n", node);
@@ -1295,34 +1296,45 @@ void ShaderGraph::dump_graph(const char *filename)
           int _val = ((Node *)socket->parent)->get_int(socket->socket_type);
           val = string_printf("%d", _val);
         }
+        if(socket->type() == SocketType::STRING)
+        {
+          auto _val = ((Node *)socket->parent)->get_string(socket->socket_type);
+          val = string_printf("%s", _val.c_str());
+        }
         if (socket != node->inputs[0]) {
           fprintf(fd, "|");
         }
-        fprintf(fd, "<IN_%p>%s %s", socket, socket->name().c_str(), val.c_str());
+        fprintf(fd, "<IN_%p>%s&#92;n%s", socket, socket->name().c_str(), val.c_str());
       }
       fprintf(fd, "}|");
     }
     std::string nodename = node->name.c_str();
     if (node->is_a(math_node_type)) {
       MathNode *mnode = dynamic_cast<MathNode *>(node);
-      nodename = string_printf("%s (%s)", node->name.c_str(), math_node_operation(mnode));
+      nodename = string_printf("%s&#92;n(%s)", node->name.c_str(), math_node_operation(mnode));
     } else if (node->is_a(value_node_type)){
       ValueNode *vnode = dynamic_cast<ValueNode *>(node);
-      nodename = string_printf("%s (%f)", node->name.c_str(), vnode->get_value());
+      nodename = string_printf("%s&#92;n(%f)", node->name.c_str(), vnode->get_value());
     } else if (node->is_a(color_node_type)){
       ColorNode *cnode = dynamic_cast<ColorNode *>(node);
       float3 color = cnode->get_value();
-      nodename = string_printf("%s (%f, %f, %f)", node->name.c_str(), color.x, color.y, color.z);
+      nodename = string_printf("%s&#92;n(%f, %f, %f)", node->name.c_str(), color.x, color.y, color.z);
+    } else if (node->is_a(imtex_node_type)) {
+      ImageTextureNode *imtexnode = dynamic_cast<ImageTextureNode *>(node);
+      auto color_space = imtexnode->get_colorspace();
+      auto filename = imtexnode->get_filename();
+      nodename = string_printf("%s&#92;n(%s)&#92;n%s", node->name.c_str(), color_space.c_str(), filename.c_str());
     }
+    string_replace(nodename, " ", "&#92; ");
     fprintf(fd, "%s", nodename.c_str());
     if (node->bump == SHADER_BUMP_CENTER) {
-      fprintf(fd, " (bump:center)");
+      fprintf(fd, "&#92; (bump:center)");
     }
     else if (node->bump == SHADER_BUMP_DX) {
-      fprintf(fd, " (bump:dx)");
+      fprintf(fd, "&#92; (bump:dx)");
     }
     else if (node->bump == SHADER_BUMP_DY) {
-      fprintf(fd, " (bump:dy)");
+      fprintf(fd, "&#92; (bump:dy)");
     }
     if (node->outputs.size()) {
       fprintf(fd, "|{");
