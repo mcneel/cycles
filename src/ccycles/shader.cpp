@@ -42,13 +42,15 @@ ccl::ShaderNode* _shader_node_find(ccl::Session* session_id, unsigned int shader
 	return nullptr;
 }
 
-void _set_colorspace(ustring& colorspace, int value)
+ustring _get_colorspace(int value)
 {
 	if (value == 0) {
-		colorspace = ccl::u_colorspace_raw;
+		std::cout << "setting to " << ccl::u_colorspace_raw << std::endl;
+		return ccl::u_colorspace_raw;
 	}
 	else {
-		colorspace = ccl::u_colorspace_auto;
+		std::cout << "setting to " << ccl::u_colorspace_auto << std::endl;
+		return ccl::u_colorspace_auto;
 	}
 }
 
@@ -593,9 +595,7 @@ void cycles_shadernode_set_enum(ccl::ShaderNode* shnode, const char* enum_name, 
 		{
 			ccl::EnvironmentTextureNode* node = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
 			if (ename == "color_space") {
-				ustring colspace;
-				_set_colorspace(colspace, value);
-				node->set_colorspace(colspace);
+				node->set_colorspace(_get_colorspace(value));
 			}
 			else if (ename == "projection") {
 				node->set_projection((ccl::NodeEnvironmentProjection)value);
@@ -608,9 +608,7 @@ void cycles_shadernode_set_enum(ccl::ShaderNode* shnode, const char* enum_name, 
 		{
 			ccl::ImageTextureNode* node = dynamic_cast<ccl::ImageTextureNode*>(shnode);
 			if (ename == "color_space") {
-				ustring colspace;
-				_set_colorspace(colspace, value);
-				node->set_colorspace(colspace);
+				node->set_colorspace(_get_colorspace(value));
 			}
 			else if (ename == "projection") {
 				node->set_projection((ccl::NodeImageProjection)value);
@@ -760,9 +758,7 @@ void cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* memb
 				}
 			}
 			else if (mname == "is_linear") {
-				ustring colspace;
-				_set_colorspace(colspace, value ? 0 : 1);
-				imgtex->set_colorspace(colspace);
+				imgtex->set_colorspace(_get_colorspace(value ? 0 : 1));
 			}
 			// TODO: XXXX port over alternate_tiles support from old Cycles integration
 			else if (mname == "alternate_tiles") {
@@ -773,9 +769,7 @@ void cycles_shadernode_set_member_bool(ccl::ShaderNode* shnode, const char* memb
 		{
 			ccl::EnvironmentTextureNode* envtex = dynamic_cast<ccl::EnvironmentTextureNode*>(shnode);
 			if (mname == "is_linear") {
-				ustring colspace;
-				_set_colorspace(colspace, value ? 0 : 1);
-				envtex->set_colorspace(colspace);
+				envtex->set_colorspace(_get_colorspace(value ? 0 : 1));
 			}
 		}
 		else if (shntype == "rhino_texture_coordinate")
