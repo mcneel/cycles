@@ -123,6 +123,7 @@ class PassAccessor {
   DECLARE_PASS_ACCESSOR(depth)
   DECLARE_PASS_ACCESSOR(mist)
   DECLARE_PASS_ACCESSOR(sample_count)
+  DECLARE_PASS_ACCESSOR(transparent_background_sample_count)
   DECLARE_PASS_ACCESSOR(float)
 
   /* Float3 passes. */

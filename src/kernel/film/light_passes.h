@@ -280,8 +280,21 @@ ccl_device_forceinline void film_write_shadow_catcher_bounce_data(
   /* Since the split is done, the sample does not contribute to the matte, so accumulate it as
    * transparency to the matte. */
   const Spectrum throughput = INTEGRATOR_STATE(state, path, throughput);
-  film_write_pass_float(buffer + kernel_data.film.pass_shadow_catcher_matte + 3,
-                        average(throughput));
+  const float transparent = average(throughput);
+  film_write_pass_float(buffer + kernel_data.film.pass_shadow_catcher_matte + 3, transparent);
+
+  // 2023-09-01 David E.
+  // If we end up writing a fully transparent pixel it means we are rendering with a transparent
+  // background. In order to properly calculate the final pixel color we need to record how many
+  // times we have sampled a transparent background. If we don't do this, every time we sample a
+  // transparent background it will darken the final pixel color due to this pixel color being
+  // (0.0f, 0.0f, 0.0f). See the function 'film_get_scale_and_scale_exposure' which will
+  // incorporate this value when calculating how much the final pixel will be scaled.
+  // Fixes RH-75422.
+  if (transparent >= 1.0f && kernel_data.film.pass_transparent_background_sample_count != PASS_UNUSED) {
+    atomic_fetch_and_add_uint32(
+        (ccl_global uint *)(buffer) + kernel_data.film.pass_transparent_background_sample_count, 1);
+  }
 }
 
 #endif /* __SHADOW_CATCHER__ */
@@ -545,6 +558,20 @@ ccl_device_inline void film_write_transparent(KernelGlobals kg,
 {
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
     film_write_pass_float(buffer + kernel_data.film.pass_combined + 3, transparent);
+
+    // 2023-09-01 David E.
+    // If we end up writing a fully transparent pixel it means we are rendering with a transparent
+    // background. In order to properly calculate the final pixel color we need to record how many
+    // times we have sampled a transparent background. If we don't do this, every time we sample a
+    // transparent background it will darken the final pixel color due to this pixel color being
+    // (0.0f, 0.0f, 0.0f). See the function 'film_get_scale_and_scale_exposure' which will
+	// incorporate this value when calculating how much the final pixel will be scaled.
+    // Fixes RH-75422.
+    if (transparent == 1.0f && kernel_data.film.pass_transparent_background_sample_count != PASS_UNUSED)
+    {
+      atomic_fetch_and_add_uint32(
+          (ccl_global uint *)(buffer) + kernel_data.film.pass_transparent_background_sample_count, 1);
+    }
   }
 
   film_write_shadow_catcher_transparent_only(kg, path_flag, transparent, buffer);

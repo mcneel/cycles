@@ -89,6 +89,7 @@ void PassAccessorGPU::run_film_convert_kernels(DeviceKernel kernel,
 DEFINE_PASS_ACCESSOR(depth, DEPTH);
 DEFINE_PASS_ACCESSOR(mist, MIST);
 DEFINE_PASS_ACCESSOR(sample_count, SAMPLE_COUNT);
+DEFINE_PASS_ACCESSOR(transparent_background_sample_count, TRANSPARENT_BACKGROUND_SAMPLE_COUNT);
 DEFINE_PASS_ACCESSOR(float, FLOAT);
 
 /* Float3 passes. */

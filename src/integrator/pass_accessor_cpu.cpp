@@ -110,6 +110,7 @@ inline void PassAccessorCPU::run_get_pass_kernel_processor_half_rgba(
 DEFINE_PASS_ACCESSOR(depth)
 DEFINE_PASS_ACCESSOR(mist)
 DEFINE_PASS_ACCESSOR(sample_count)
+DEFINE_PASS_ACCESSOR(transparent_background_sample_count)
 DEFINE_PASS_ACCESSOR(float)
 
 /* Float3 passes. */

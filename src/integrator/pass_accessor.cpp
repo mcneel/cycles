@@ -150,6 +150,9 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
     else if (type == PASS_SAMPLE_COUNT) {
       get_pass_sample_count(render_buffers, buffer_params, destination);
     }
+    else if (type == PASS_TRANSPARENT_BACKGROUND_SAMPLE_COUNT) {
+      get_pass_transparent_background_sample_count(render_buffers, buffer_params, destination);
+    }
     else {
       get_pass_float(render_buffers, buffer_params, destination);
     }
@@ -244,6 +247,7 @@ void PassAccessor::init_kernel_film_convert(KernelFilmConvert *kfilm_convert,
 
   kfilm_convert->pass_combined = buffer_params.get_pass_offset(PASS_COMBINED);
   kfilm_convert->pass_sample_count = buffer_params.get_pass_offset(PASS_SAMPLE_COUNT);
+  kfilm_convert->pass_transparent_background_sample_count = buffer_params.get_pass_offset(PASS_TRANSPARENT_BACKGROUND_SAMPLE_COUNT);
   kfilm_convert->pass_adaptive_aux_buffer = buffer_params.get_pass_offset(
       PASS_ADAPTIVE_AUX_BUFFER);
   kfilm_convert->pass_motion_weight = buffer_params.get_pass_offset(PASS_MOTION_WEIGHT);

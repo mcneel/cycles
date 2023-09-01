@@ -284,6 +284,7 @@ void KERNEL_FUNCTION_FULL_NAME(cryptomatte_postprocess)(const KernelGlobalsCPU *
 KERNEL_FILM_CONVERT_FUNCTION(depth, true)
 KERNEL_FILM_CONVERT_FUNCTION(mist, true)
 KERNEL_FILM_CONVERT_FUNCTION(sample_count, true)
+KERNEL_FILM_CONVERT_FUNCTION(transparent_background_sample_count, true)
 KERNEL_FILM_CONVERT_FUNCTION(float, true)
 
 KERNEL_FILM_CONVERT_FUNCTION(light_path, false)
