@@ -19,14 +19,8 @@ limitations under the License.
 /* Find pointers for CCScene and ccl::Scene. Return false if either fails. */
 bool scene_find(ccl::Session* sid, ccl::Scene** sce)
 {
-	CCSession *ccsess = nullptr;
-	ccl::Session *session = nullptr;
-	if (session_find(sid, &ccsess, &session))
-	{
-		(*sce) = session->scene;
-		return *sce != nullptr;
-	}
-	return false;
+	(*sce) = sid->scene;
+	return *sce != nullptr;
 }
 
 

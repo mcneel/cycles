@@ -155,6 +155,8 @@ class ObjectManager {
   ObjectManager();
   ~ObjectManager();
 
+  void prune(Scene* scene);
+
   void device_update_clipping_planes(Device* device,
       DeviceScene* dscene,
       Scene* scene,

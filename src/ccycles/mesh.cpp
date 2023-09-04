@@ -23,10 +23,10 @@ limitations under the License.
 
 using namespace OIIO;
 
-ccl::Geometry *cycles_scene_add_mesh(ccl::Session *session_id, ccl::Shader *shader_id)
+ccl::Geometry *cycles_scene_add_mesh(ccl::Session *session, ccl::Shader *shader_id)
 {
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce))
+	ccl::Scene* sce = session->scene;
+	if(sce)
 	{
 		ccl::Geometry* mesh = sce->create_node<ccl::Mesh>();
 
@@ -35,7 +35,7 @@ ccl::Geometry *cycles_scene_add_mesh(ccl::Session *session_id, ccl::Shader *shad
 
 		mesh->get_used_shaders().push_back_slow(shader_id);
 
-		logger.logit("Add mesh ", sce->geometry.size() - 1, " in scene ", session_id, " using default surface shader ", shader_id);
+		logger.logit("Add mesh ", sce->geometry.size() - 1, " in scene ", session, " using default surface shader ", shader_id);
 
 		return mesh;
 	}
@@ -43,10 +43,10 @@ ccl::Geometry *cycles_scene_add_mesh(ccl::Session *session_id, ccl::Shader *shad
 	return nullptr;
 }
 
-void cycles_geometry_set_shader(ccl::Session *session_id, ccl::Geometry *mesh_id, ccl::Shader *shader_id)
+void cycles_geometry_set_shader(ccl::Session *session, ccl::Geometry *mesh_id, ccl::Shader *shader_id)
 {
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
+	ccl::Scene* sce = session->scene;
+	if(sce) {
 
 		ccl::array<ccl::Node *>& used_shaders = mesh_id->get_used_shaders();
 
@@ -78,14 +78,16 @@ void cycles_geometry_set_shader(ccl::Session *session_id, ccl::Geometry *mesh_id
 	}
 }
 
-void cycles_geometry_clear(ccl::Session* session_id, ccl::Geometry* geometry)
+void cycles_geometry_clear(ccl::Session* session, ccl::Geometry* geometry)
 {
 	ASSERT(geometry);
 
-	if (geometry)
+	#if 0
+	if (geometry && session->scene)
 	{
-		geometry->clear();
+		session->scene->delete_node(geometry);
 	}
+	#endif
 }
 
 void cycles_geometry_tag_rebuild(ccl::Session* session_id, ccl::Geometry* geometry)

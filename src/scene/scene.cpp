@@ -246,6 +246,9 @@ void Scene::device_update(Device *device_, Progress &progress)
     }
   });
 
+  object_manager->prune(this);
+  geometry_manager->prune(this);
+
   /* The order of updates is important, because there's dependencies between
    * the different managers, using data computed by previous managers.
    *

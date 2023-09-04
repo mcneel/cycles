@@ -18,8 +18,8 @@ limitations under the License.
 
 ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
 {
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	ccl::Scene* sce = session_id->scene;
+	if(sce) 
 	{
 		auto ob = sce->create_node<ccl::Object>();
 
@@ -37,13 +37,24 @@ ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
 	return nullptr;
 }
 
+void cycles_scene_object_delete(ccl::Session* session, ccl::Object* obj)
+{
+	#if 0
+	ccl::Scene* sce = session->scene;
+	if(sce)
+	{
+		sce->delete_node(obj);
+	}
+	#endif
+}
+
 void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* object, ccl::Geometry* geometry)
 {
 	ASSERT(object);
 	ASSERT(geometry);
 
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	ccl::Scene* sce = session_id->scene;
+	if(sce) 
 	{
 		object->set_geometry(geometry);
 		object->tag_update(sce);

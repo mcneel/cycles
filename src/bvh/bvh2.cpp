@@ -424,6 +424,7 @@ void BVH2::refit_primitives(int start, int end, BoundBox &bbox, uint &visibility
       else {
         /* Triangles. */
         const Mesh *mesh = static_cast<const Mesh *>(ob->get_geometry());
+        if(mesh->triangles.size() == 0) continue; // jK HACK
         int prim_offset = (params.top_level) ? mesh->prim_offset : 0;
         Mesh::Triangle triangle = mesh->get_triangle(pidx - prim_offset);
         const float3 *vpos = &mesh->verts[0];

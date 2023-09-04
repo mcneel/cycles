@@ -391,6 +391,20 @@ ObjectManager::~ObjectManager()
 {
 }
 
+void ObjectManager::prune(Scene* scene)
+{
+	vector<Object*> obs_to_prune;
+	for(Object* ob: scene->objects) {
+		if(static_cast<Mesh *>(ob->geometry)->triangles.size() == 0) {
+			obs_to_prune.push_back(ob);
+		}
+	}
+
+	for(Object* ob: obs_to_prune) {
+		scene->delete_node(ob);
+	}
+}
+
 static float object_volume_density(const Transform &tfm, Geometry *geom)
 {
   if (geom->geometry_type == Geometry::VOLUME) {
