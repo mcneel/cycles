@@ -6,7 +6,7 @@
 #  * Make sure Docker Desktop is running
 #  * Use a terminal to build a Docker image: 'docker build -f DockerfileHIP -t ubuntu-cycles-hip-build .'
 #  * After that, run the Docker image in a container while mounting your Rhino repository root:
-#    'docker run -it -v D:/dev/mcneel/rhino-8.x-cyclesx:/rhino/rhino-8.x-cyclesx ubuntu-cycles-hip-build'
+#    'docker run -it -v D:/dev/mcneel/rhino-8.x:/rhino/rhino-8.x ubuntu-cycles-hip-build'
 #  * The .fatbin files should en up in the cycles/cycles/install/lib directory
 
 FROM ubuntu:latest
@@ -24,4 +24,4 @@ RUN wget https://repo.radeon.com/amdgpu-install/5.5.1/ubuntu/jammy/amdgpu-instal
 RUN apt-get install -y ./amdgpu-install_5.5.50501-1_all.deb
 RUN amdgpu-install -y --no-dkms --usecase=rocm
 
-CMD ["bash", "-c", "cd /rhino/rhino-8.x-cyclesx/src4/rhino4/Plug-ins/RDK/cycles/cycles && ./make_hip.sh Debug"]
+CMD ["bash", "-c", "cd /rhino/rhino-8.x/src4/rhino4/Plug-ins/RDK/cycles/cycles && ./make_hip.sh Debug"]

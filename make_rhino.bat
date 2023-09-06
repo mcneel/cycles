@@ -21,8 +21,7 @@ REM    debug cuda     # Build .PTX files
 REM    debug cudabin  # Build all CUDA binaries
 REM    debug oneapi   # Build with OneAPI support
 REM    debug hip      # Build with HIP support
-REM    debug all      # Build with support for all devices (+ .PTX files)
-REM    debug allbin   # Build with support for all devices (+ all CUDA binaries)
+REM    debug all      # Build with support for all devices (+ .PTX files and all CUDA binaries)
 
 set BUILD_CUDA_CMD= ^
 	-DWITH_CYCLES_CUDA_BINARIES=ON ^
@@ -31,9 +30,7 @@ set BUILD_CUDA_CMD= ^
 	-DOPTIX_ROOT_DIR=%OPTIX%
 
 if not "%ARG1%" == "cuda" (
-	if not "%ARG1%" == "all" (
-	  set BUILD_CUDA_CMD=""
-	)
+	set BUILD_CUDA_CMD=""
 )
 
 set BUILD_CUDABIN_CMD= ^
@@ -43,7 +40,7 @@ set BUILD_CUDABIN_CMD= ^
 	-DOPTIX_ROOT_DIR=%OPTIX%
 	
 if not "%ARG1%" == "cudabin" (
-	if not "%ARG1%" == "allbin" (
+	if not "%ARG1%" == "all" (
 		set BUILD_CUDABIN_CMD=""
 	)
 )

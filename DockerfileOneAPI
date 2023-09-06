@@ -6,7 +6,7 @@
 #  * Make sure Docker Desktop is running
 #  * Use a terminal to build a Docker image: 'docker build -f DockerfileOneAPI -t ubuntu-cycles-oneapi-build .'
 #  * After that, run the Docker image in a container while mounting your Rhino repository root:
-#    'docker run -it -v D:/dev/mcneel/rhino-8.x-cyclesx:/rhino/rhino-8.x-cyclesx ubuntu-cycles-oneapi-build'
+#    'docker run -it -v D:/dev/mcneel/rhino-8.x:/rhino/rhino-8.x ubuntu-cycles-oneapi-build'
 
 FROM ubuntu:latest
 
@@ -18,6 +18,6 @@ RUN apt-get install -y git
 RUN apt-get install -y python3
 RUN apt-get install -y xorg-dev
 
-CMD ["bash", "-c", "cd /rhino/rhino-8.x-cyclesx/src4/rhino4/Plug-ins/RDK/cycles/cycles && ./make_oneapi.sh Debug"]
+CMD ["bash", "-c", "cd /rhino/rhino-8.x/src4/rhino4/Plug-ins/RDK/cycles/cycles && ./make_oneapi.sh Debug"]
 
 # && ./make_oneapi.sh Debug
