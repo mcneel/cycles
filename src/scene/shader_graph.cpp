@@ -7,6 +7,7 @@
 #include "scene/scene.h"
 #include "scene/shader.h"
 #include "scene/shader_nodes.h"
+#include "scene/rhino_shader_nodes.h"
 
 #include "util/algorithm.h"
 #include "util/foreach.h"
@@ -1170,6 +1171,53 @@ std::string vector_string(ShaderInput* socket)
     }
 }
 
+const char* env_projection(EnvironmentTextureNode* envtex)
+{
+	auto projection = envtex->get_projection();
+	switch(projection) {
+  		case NODE_ENVIRONMENT_EQUIRECTANGULAR:
+			return "equirectangular";
+  		case NODE_ENVIRONMENT_MIRROR_BALL:
+			return "mirrorball";
+		default:
+			return "...";
+	}
+}
+
+#if 0
+const char* rhenv_projection(RhinoEnvironmentTextureNode* envtex)
+{
+	auto projection = envtex->get_projection();
+	switch(projection) {
+  		case RHINO_NODE_ENVIRONMENT_EQUIRECTANGULAR:
+			return "equirectangular";
+  		case RHINO_NODE_ENVIRONMENT_MIRROR_BALL:
+			return "mirrorball";
+  		case RHINO_NODE_ENVIRONMENT_WALLPAPER:
+			return "wallpaper";
+  		case RHINO_NODE_ENVIRONMENT_EMAP:
+			return "emap";
+  		case RHINO_NODE_ENVIRONMENT_BOX:
+			return "box";
+  		case RHINO_NODE_ENVIRONMENT_LIGHT_PROBE:
+			return "lightprobe";
+		case RHINO_NODE_ENVIRONMENT_CUBEMAP:
+			return "cubemap";
+  		case RHINO_NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL:
+			return "cubemapH";
+  		case RHINO_NODE_ENVIRONMENT_CUBEMAP_VERTICAL:
+			return "cubemapV";
+  		case RHINO_NODE_ENVIRONMENT_HEMISPHERICAL:
+			return "hemispherical";
+  		case RHINO_NODE_ENVIRONMENT_SPHERICAL:
+			return "spherical";
+		default:
+			return "...";
+	}
+}
+#endif
+
+
 const char* math_node_operation(MathNode* mnode)
 {
   switch (mnode->get_math_type()) {
@@ -1253,6 +1301,8 @@ const char* math_node_operation(MathNode* mnode)
       return "smoothmin";
     case NODE_MATH_SMOOTH_MAX:
       return "smoothmax";
+	default:
+      return "...";
   }
 }
 
@@ -1273,6 +1323,8 @@ void ShaderGraph::dump_graph(const char *filename)
   const ccl::NodeType *value_node_type = ccl::NodeType::find(ustring("value"));
   const ccl::NodeType *color_node_type = ccl::NodeType::find(ustring("color"));
   const ccl::NodeType *imtex_node_type = ccl::NodeType::find(ustring("image_texture"));
+  const ccl::NodeType *envtex_node_type = ccl::NodeType::find(ustring("environment_texture"));
+  const ccl::NodeType *rhenvtex_node_type = ccl::NodeType::find(ustring("rhino_environment_texture"));
 
   foreach (ShaderNode *node, nodes) {
     fprintf(fd, "// NODE: %p\n", node);
@@ -1324,7 +1376,22 @@ void ShaderGraph::dump_graph(const char *filename)
       auto color_space = imtexnode->get_colorspace();
       auto filename = imtexnode->get_filename();
       nodename = string_printf("%s&#92;n(%s)&#92;n%s", node->name.c_str(), color_space.c_str(), filename.c_str());
+    } else if (node->is_a(envtex_node_type)) {
+      EnvironmentTextureNode *envtexnode = dynamic_cast<EnvironmentTextureNode *>(node);
+      auto color_space = envtexnode->get_colorspace();
+	  auto projection = env_projection(envtexnode);
+      auto filename = envtexnode->get_filename();
+      nodename = string_printf("%s&#92;n(%s &#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, filename.c_str());
     }
+	#if 0
+	else if (node->is_a(rhenvtex_node_type)) {
+      RhinoEnvironmentTextureNode *rhenvtex_node = dynamic_cast<RhinoEnvironmentTextureNode *>(node);
+      auto color_space = rhenvtex_node->get_colorspace();
+	  auto projection = rhenv_projection(rhenvtex_node);
+      auto filename = rhenvtex_node->get_filename();
+      nodename = string_printf("%s&#92;n(%s &#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, filename.c_str());
+    }
+	#endif
     string_replace(nodename, " ", "&#92; ");
     fprintf(fd, "%s", nodename.c_str());
     if (node->bump == SHADER_BUMP_CENTER) {

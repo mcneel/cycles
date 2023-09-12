@@ -123,28 +123,18 @@ void cycles_scene_reset(ccl::Session* session_id)
 	}
 }
 
-bool cycles_scene_try_lock(ccl::Session* session_id)
+bool cycles_scene_try_lock(ccl::Session* session)
 {
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		return sce->mutex.try_lock();
-	}
-	return false;
+	return session->scene->mutex.try_lock();
 }
 
-void cycles_scene_lock(ccl::Session* session_id)
+void cycles_scene_lock(ccl::Session* session)
 {
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->mutex.lock();
-	}
+	session->scene->mutex.lock();
 }
 
-void cycles_scene_unlock(ccl::Session* session_id)
+void cycles_scene_unlock(ccl::Session* session)
 {
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->mutex.unlock();
-	}
+	session->scene->mutex.unlock();
 }
 
