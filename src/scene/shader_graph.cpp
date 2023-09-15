@@ -1179,44 +1179,28 @@ const char* env_projection(EnvironmentTextureNode* envtex)
 			return "equirectangular";
   		case NODE_ENVIRONMENT_MIRROR_BALL:
 			return "mirrorball";
-		default:
-			return "...";
-	}
-}
-
-#if 0
-const char* rhenv_projection(RhinoEnvironmentTextureNode* envtex)
-{
-	auto projection = envtex->get_projection();
-	switch(projection) {
-  		case RHINO_NODE_ENVIRONMENT_EQUIRECTANGULAR:
-			return "equirectangular";
-  		case RHINO_NODE_ENVIRONMENT_MIRROR_BALL:
-			return "mirrorball";
-  		case RHINO_NODE_ENVIRONMENT_WALLPAPER:
+  		case NODE_ENVIRONMENT_WALLPAPER:
 			return "wallpaper";
-  		case RHINO_NODE_ENVIRONMENT_EMAP:
+  		case NODE_ENVIRONMENT_EMAP:
 			return "emap";
-  		case RHINO_NODE_ENVIRONMENT_BOX:
+  		case NODE_ENVIRONMENT_BOX:
 			return "box";
-  		case RHINO_NODE_ENVIRONMENT_LIGHT_PROBE:
+  		case NODE_ENVIRONMENT_LIGHT_PROBE:
 			return "lightprobe";
-		case RHINO_NODE_ENVIRONMENT_CUBEMAP:
+		case NODE_ENVIRONMENT_CUBEMAP:
 			return "cubemap";
-  		case RHINO_NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL:
+  		case NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL:
 			return "cubemapH";
-  		case RHINO_NODE_ENVIRONMENT_CUBEMAP_VERTICAL:
+  		case NODE_ENVIRONMENT_CUBEMAP_VERTICAL:
 			return "cubemapV";
-  		case RHINO_NODE_ENVIRONMENT_HEMISPHERICAL:
+  		case NODE_ENVIRONMENT_HEMISPHERICAL:
 			return "hemispherical";
-  		case RHINO_NODE_ENVIRONMENT_SPHERICAL:
+  		case NODE_ENVIRONMENT_SPHERICAL:
 			return "spherical";
 		default:
 			return "...";
 	}
 }
-#endif
-
 
 const char* math_node_operation(MathNode* mnode)
 {
@@ -1381,17 +1365,8 @@ void ShaderGraph::dump_graph(const char *filename)
       auto color_space = envtexnode->get_colorspace();
 	  auto projection = env_projection(envtexnode);
       auto filename = envtexnode->get_filename();
-      nodename = string_printf("%s&#92;n(%s &#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, filename.c_str());
+      nodename = string_printf("%s&#92;n(%s&#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, filename.c_str());
     }
-	#if 0
-	else if (node->is_a(rhenvtex_node_type)) {
-      RhinoEnvironmentTextureNode *rhenvtex_node = dynamic_cast<RhinoEnvironmentTextureNode *>(node);
-      auto color_space = rhenvtex_node->get_colorspace();
-	  auto projection = rhenv_projection(rhenvtex_node);
-      auto filename = rhenvtex_node->get_filename();
-      nodename = string_printf("%s&#92;n(%s &#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, filename.c_str());
-    }
-	#endif
     string_replace(nodename, " ", "&#92; ");
     fprintf(fd, "%s", nodename.c_str());
     if (node->bump == SHADER_BUMP_CENTER) {
