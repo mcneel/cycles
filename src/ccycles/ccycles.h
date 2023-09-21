@@ -26,10 +26,16 @@ limitations under the License.
 #ifndef CDECL
 #define CDECL __cdecl
 #endif
+#ifndef UTFCHAR
+#define UTFCHAR wchar_t
+#endif
 #else
 #define CCL_CAPI
 #ifndef CDECL
 #define CDECL
+#endif
+#ifndef UTFCHAR
+#define UTFCHAR char
 #endif
 #endif
 
@@ -707,7 +713,7 @@ CCL_CAPI unsigned int CDECL cycles_scene_shader_id(ccl::Session* session_id, uns
 CCL_CAPI ccl::ShaderNode *CDECL cycles_add_shader_node(ccl::Shader *shader, const char *node_name, const char *name);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_bool(ccl::ShaderNode* shnode_id, const char* attribute_name, bool value);
-CCL_CAPI void CDECL cycles_shadernode_set_attribute_string(ccl::ShaderNode* shnode_id, const char* attribute_name, const char* value);
+CCL_CAPI void CDECL cycles_shadernode_set_attribute_string(ccl::ShaderNode* shnode_id, const UTFCHAR* attribute_name, const UTFCHAR* value);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_float(ccl::ShaderNode* shnode_id, const char* attribute_name, float value);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_vec(ccl::ShaderNode* shnode_id, const char* attribute_name, float x, float y, float z);
 CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode* shnode_id, const char* enum_name, int value);

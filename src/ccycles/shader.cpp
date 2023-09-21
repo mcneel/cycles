@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+#ifdef WIN32
+#include <codecvt>
+#endif
+
 #include "internal_types.h"
 
 #include "util/param.h"
@@ -1387,11 +1391,26 @@ void cycles_shadernode_set_attribute_bool(ccl::ShaderNode* shnode_id, const char
 	assert(set);
 }
 
-void cycles_shadernode_set_attribute_string(ccl::ShaderNode* shnode_id, const char* attribute_name, const char* value)
+#ifdef WIN32
+std::string ws2s(std::wstring source)
+{
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	std::string narrow = converter.to_bytes(source);
+
+	return narrow;
+}
+#else
+#	define ws2s(x) std::string(x)
+#endif
+void cycles_shadernode_set_attribute_string(ccl::ShaderNode* shnode_id, const UTFCHAR* attribute_name, const UTFCHAR* value)
 {
 	bool set = false;
-	std::string sockname{attribute_name};
-	ustring val{value};
+	std::string sockname = ws2s(attribute_name);
+	std::string nval = ws2s(value);
+#ifndef WIN32
+	#undef ws2s
+#endif
+	ustring val{nval};
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
 			continue;
