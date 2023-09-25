@@ -121,7 +121,9 @@ void device_cuda_info(vector<DeviceInfo> &devices)
 
     int major;
     cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, num);
-    if (major < 3) {
+    int minor;
+    cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, num);
+    if (major <= 3 && minor <=7) {
       VLOG_INFO << "Ignoring device \"" << name
                 << "\", this graphics card is no longer supported.";
       continue;

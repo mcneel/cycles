@@ -245,15 +245,6 @@ public:
 	ccl::SceneParams scene_params;
 	ccl::Session* session = nullptr;
 
-	/* The status update handler for ccl::Session update callback.
-	 */
-	void status_update(void);
-	/* The test cancel handler for ccl::Session cancellation test
-	 */
-	void test_cancel(void);
-
-	void display_update(int sample);
-
 	int width{ 0 };
 	int height{ 0 };
 
@@ -268,8 +259,11 @@ public:
 	bool size_has_changed();
 
 	~CCSession() {
-		delete session;
-		session = nullptr;
+		if(session != nullptr)
+		{
+			delete session;
+			session = nullptr;
+		}
 	}
 
 private:

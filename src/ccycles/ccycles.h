@@ -108,36 +108,6 @@ public:
 typedef void(CDECL *LOGGER_FUNC_CB)(const char* msg);
 
 /**
- * Status update function signature. Used to register a status
- * update callback function with CCycles using cycles_session_set_update_callback
- * \ingroup ccycles ccycles_session
- */
-typedef void(CDECL *STATUS_UPDATE_CB)(ccl::Session* session_id);
-
-/**
- * Test cancel function signature. Used to test for cancel condition
- * test callback function with CCycles using cycles_session_set_cancel_callback
- * \ingroup ccycles ccycles_session
- */
-typedef void(CDECL *TEST_CANCEL_CB)(ccl::Session* session_id);
-
-/**
- * Render tile update or write function signature. Used to register a render tile
- * update callback function with CCycles using cycles_session_set_write_tile_callback or
- * cycles_session_set_update_tile_callback
- * \ingroup ccycles ccycles_session
- */
-typedef void(CDECL *RENDER_TILE_CB)(ccl::Session* session_id, unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int sample, unsigned int depth, int passtype, float* pixels, int pixlen);
-
-/**
- * Pixel buffer from DisplayBuffer update function signature.
- * Set update function to CCycles using cycles_session_set_display_update_callback
- * \ingroup ccycles ccycles_session
- */
-typedef void(CDECL *DISPLAY_UPDATE_CB)(ccl::Session* session_id, unsigned int sample);
-
-
-/**
  * Initialise Cycles by querying available devices.
  * \ingroup ccycles
  */
@@ -489,87 +459,6 @@ CCL_CAPI void CDECL cycles_camera_set_fisheye_fov(ccl::Session* session_id, floa
 /** Set the lens for fisheye camera. */
 CCL_CAPI void CDECL cycles_camera_set_fisheye_lens(ccl::Session* session_id, float fisheye_lens);
 
-/** Create a new session for scene id. */
-CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* session_params_id);
-
-/** Reset session. */
-CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned int height, unsigned int samples, unsigned int full_x, unsigned int full_y, unsigned int full_width, unsigned int full_height );
-
-CCL_CAPI void CDECL cycles_session_add_pass(ccl::Session* session_id, int pass_id);
-CCL_CAPI void CDECL cycles_session_clear_passes(ccl::Session* session_id);
-
-/** Set the status update callback for session. */
-CCL_CAPI void CDECL cycles_session_set_update_callback(ccl::Session* session_id, void(*update)(unsigned int sid));
-/** Set the test cancel callback for session. */
-CCL_CAPI void CDECL cycles_session_set_cancel_callback(ccl::Session* session_id, void(*cancel)(unsigned int sid));
-/** Set the render tile update callback for session. */
-CCL_CAPI void CDECL cycles_session_set_update_tile_callback(ccl::Session* session_id, RENDER_TILE_CB update_tile_cb);
-/** Set the render tile write callback for session. */
-CCL_CAPI void CDECL cycles_session_set_write_tile_callback(ccl::Session* session_id, RENDER_TILE_CB write_tile_cb);
-/** Set the display update callback for session. */
-CCL_CAPI void CDECL cycles_session_set_display_update_callback(ccl::Session* session_id, DISPLAY_UPDATE_CB display_update_cb);
-/** Cancel session with cancel_message for log. */
-CCL_CAPI void CDECL cycles_session_cancel(ccl::Session* session_id, const char *cancel_message);
-/** Start given session render process. */
-CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id);
-/** Wait for session render process to finish or cancel. */
-CCL_CAPI void CDECL cycles_session_wait(ccl::Session* session_id);
-/** Pause (true) or un-pause (false) a render session. */
-CCL_CAPI void CDECL cycles_session_set_pause(ccl::Session* session_id, bool pause);
-/** True if session is paused. */
-CCL_CAPI bool CDECL cycles_session_is_paused(ccl::Session* session_id);
-/** Set session samples to render. */
-CCL_CAPI void CDECL cycles_session_set_samples(ccl::Session* session_id, int samples);
-/** Clear resources for session. */
-CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id);
-CCL_CAPI void CDECL cycles_session_get_float_buffer(ccl::Session* session_id, int passtype, float** pixels);
-CCL_CAPI void CDECL cycles_session_retain_float_buffer(
-	ccl::Session *session_id, int passtype, int width, int height, float **pixels);
-CCL_CAPI void CDECL cycles_session_release_float_buffer(ccl::Session *session_id, int passtype);
-	/** Get pixel data buffer pointer. */
-CCL_CAPI int CDECL cycles_session_sample(ccl::Session* session_id);
-CCL_CAPI void CDECL cycles_session_end_run(ccl::Session* session_id);
-
-
-/* session progress access. */
-CCL_CAPI void CDECL cycles_progress_reset(ccl::Session* session_id);
-CCL_CAPI int CDECL cycles_progress_get_sample(ccl::Session* session_id);
-CCL_CAPI int CDECL cycles_progress_get_rendered_tiles(ccl::Session *session_id);
-CCL_CAPI void CDECL cycles_progress_get_time(ccl::Session* session_id, double* total_time, double* sample_time);
-CCL_CAPI void CDECL cycles_tilemanager_get_sample_info(ccl::Session* session_id, unsigned int* samples, unsigned int* total_samples);
-CCL_CAPI void CDECL cycles_progress_get_progress(ccl::Session* session_id, float* progress);
-CCL_CAPI bool CDECL cycles_progress_get_status(ccl::Session* session_id, void* strholder);
-CCL_CAPI bool CDECL cycles_progress_get_substatus(ccl::Session* session_id, void* strholder);
-CCL_CAPI void* CDECL cycles_string_holder_new();
-CCL_CAPI const char* CDECL cycles_string_holder_get(void* strholder);
-CCL_CAPI void CDECL cycles_string_holder_delete(void* strholder);
-
-CCL_CAPI ccl::SessionParams* CDECL cycles_session_params_create(unsigned int device);
-
-CCL_CAPI void CDECL cycles_session_params_set_device(ccl::SessionParams* session_params_id, unsigned int device);
-CCL_CAPI void CDECL cycles_session_params_set_background(ccl::SessionParams* session_params_id, unsigned int background);
-CCL_CAPI void CDECL cycles_session_params_set_output_path(ccl::SessionParams* session_params_id, const char *output_path);
-CCL_CAPI void CDECL cycles_session_params_set_experimental(ccl::SessionParams* session_params_id, unsigned int experimental);
-CCL_CAPI void CDECL cycles_session_params_set_samples(ccl::SessionParams* session_params_id, int samples);
-CCL_CAPI void CDECL cycles_session_params_set_tile_size(ccl::SessionParams* session_params_id, unsigned int tile_size);
-CCL_CAPI void CDECL cycles_session_params_set_threads(ccl::SessionParams* session_params_id, unsigned int threads);
-CCL_CAPI void CDECL cycles_session_params_set_cancel_timeout(ccl::SessionParams* session_params_id, double cancel_timeout);
-CCL_CAPI void CDECL cycles_session_params_set_reset_timeout(ccl::SessionParams* session_params_id, double reset_timeout);
-CCL_CAPI void CDECL cycles_session_params_set_text_timeout(ccl::SessionParams* session_params_id, double text_timeout);
-CCL_CAPI void CDECL cycles_session_params_set_shadingsystem(ccl::SessionParams* session_params_id, unsigned int shadingsystem);
-CCL_CAPI void CDECL cycles_session_params_set_pixel_size(ccl::SessionParams* session_params_id, unsigned int pixel_size);
-
-/* Create a new scene for specified device. */
-CCL_CAPI unsigned int CDECL cycles_scene_create(unsigned int scene_params_id, ccl::Session* session_id);
-CCL_CAPI void CDECL cycles_scene_set_background_shader(ccl::Session* session_id, ccl::Shader* shader_id);
-CCL_CAPI ccl::Shader* CDECL cycles_scene_get_background_shader(ccl::Session* session_id);
-CCL_CAPI void CDECL cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent);
-CCL_CAPI void CDECL cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag);
-CCL_CAPI void CDECL cycles_scene_reset(ccl::Session* session_id);
-CCL_CAPI bool CDECL cycles_scene_try_lock(ccl::Session* session_id);
-CCL_CAPI void CDECL cycles_scene_lock(ccl::Session* session_id);
-CCL_CAPI void CDECL cycles_scene_unlock(ccl::Session* session_id);
-
 /* Mesh geometry API */
 CCL_CAPI void CDECL cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* mesh, float *verts, unsigned int vcount);
 CCL_CAPI void CDECL cycles_mesh_set_tris(ccl::Session* session_id, ccl::Geometry* mesh, int *faces, unsigned int fcount, ccl::Shader *shader_id, unsigned int smooth);
@@ -698,17 +587,6 @@ CCL_CAPI int CDECL cycles_sockettype_get_type(ccl::SocketType *sock);
 CCL_CAPI const ccl::SocketType* CDECL cycles_shadernode_get_sockettype(ccl::NodeType* shn, int idx , int input_output);
 CCL_CAPI int CDECL cycles_shadernode_get_socketcount(ccl::NodeType *shn, int input_output);
 
-/** Set shader_id as default surface shader for session_id.
- * Note that shader_id is the ID for the shader specific to this scene.
- *
- * The correct ID can be found with cycles_scene_shader_id. The ID is also
- * returned from cycles_scene_add_shader.
- */
-CCL_CAPI void CDECL cycles_scene_set_default_surface_shader(ccl::Session* session_id, ccl::Shader *shader_id);
-/**
- * Return the current default surface shader id for session_id.
- */
-CCL_CAPI ccl::Shader *CDECL cycles_scene_get_default_surface_shader(ccl::Session* session_id);
 CCL_CAPI unsigned int CDECL cycles_scene_shader_id(ccl::Session* session_id, unsigned int shader_id);
 CCL_CAPI ccl::ShaderNode *CDECL cycles_add_shader_node(ccl::Shader *shader, const char *node_name, const char *name);
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_int(ccl::ShaderNode* shnode_id, const char* attribute_name, int value);

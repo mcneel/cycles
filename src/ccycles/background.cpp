@@ -16,33 +16,6 @@ limitations under the License.
 
 #include "internal_types.h"
 
-/* Set shader_id as default background shader for session_id.
- * Note that shader_id is the ID for the shader specific to this scene.
- * 
- * The correct ID can be found with cycles_scene_shader_id. The ID is also
- * returned from cycles_scene_add_shader.
- */
-void cycles_scene_set_background_shader(ccl::Session *session_id, ccl::Shader *shader_id)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->default_background = shader_id;
-		sce->background->set_shader(shader_id);
-		sce->background->set_use_shader(true);
-		sce->background->tag_update(sce);
-		logger.logit("Scene ", session_id, " set background shader ", shader_id);
-	}
-}
-
-ccl::Shader* cycles_scene_get_background_shader(ccl::Session* session_id)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		return sce->default_background;
-	}
-	return nullptr;
-}
-
 void cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent)
 {
 	ccl::Scene* sce = nullptr;

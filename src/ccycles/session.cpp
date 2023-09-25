@@ -41,16 +41,6 @@ using namespace ccl;
 /* Hold all created sessions. */
 std::unordered_set<CCSession*> sessions;
 
-/* Four vectors to hold registered callback functions.
- * For each created session a corresponding idx into these
- * vectors will exist, but in the case no callback
- * was registered the value for idx will be nullptr.
- */
-std::vector<STATUS_UPDATE_CB> status_cbs;
-std::vector<TEST_CANCEL_CB> cancel_cbs;
-std::vector<RENDER_TILE_CB> update_cbs;
-std::vector<RENDER_TILE_CB> write_cbs;
-std::vector<DISPLAY_UPDATE_CB> display_update_cbs;
 std::unordered_map<ccl::Session*, ccl::vector<ccl::Pass>*> passes_vec;
 
 static ccl::thread_mutex session_mutex;
@@ -81,41 +71,6 @@ bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session)
 	return false;
 }
 
-/* Wrap status update callback. */
-void CCSession::status_update(void) {
-	assert(false);
-	#if 0
-	TODO: XXXX
-	if (status_cbs[this->id] != nullptr) {
-		status_cbs[this->id](this->id);
-	}
-	#endif
-}
-
-/* Wrap status update callback. */
-void CCSession::test_cancel(void) {
-	assert(false);
-	#if 0
-	TODO: XXXX
-	if (cancel_cbs[this->id] != nullptr) {
-		cancel_cbs[this->id](this->id);
-	}
-	#endif
-}
-
-/* Wrapper callback for display update stuff. When this is called one pass has been conducted. */
-void CCSession::display_update(int sample)
-{
-	assert(false);
-	#if 0
-	TODO: XXXX
-	if (size_has_changed()) return;
-	if (display_update_cbs[this->id] != nullptr) {
-		display_update_cbs[this->id](this->id, sample);
-	}
-	#endif
-}
-
 /**
  * Clean up resources acquired during this run of Cycles.
  */
@@ -125,20 +80,16 @@ void _cleanup_sessions()
 		if (se == nullptr) continue;
 
 		{
-			delete se->session;
-			se->session = nullptr;
+			if(se->session) {
+				delete se->session;
+				se->session = nullptr;
+			}
 		}
 		delete se;
 	}
 
 	sessions.clear();
 	session_params.clear();
-
-	status_cbs.clear();
-	cancel_cbs.clear();
-	update_cbs.clear();
-	write_cbs.clear();
-	update_cbs.clear();
 }
 
 CCSession* CCSession::create(int width, int height, unsigned int buffer_stride) {
@@ -527,7 +478,11 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	}
 }
 
-ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* session_params_id)
 {
 	ccl::thread_scoped_lock lock(session_mutex);
 
@@ -556,17 +511,12 @@ ccl::Session* cycles_session_create(ccl::SessionParams* session_params_id)
 
 	sessions.insert(session);
 	csesid = (unsigned int)(sessions.size() - 1);
-	status_cbs.push_back(nullptr);
-	cancel_cbs.push_back(nullptr);
-	update_cbs.push_back(nullptr);
-	write_cbs.push_back(nullptr);
-	display_update_cbs.push_back(nullptr);
 	passes_vec.insert(std::make_pair(session->session, new ccl::vector<ccl::Pass>()));
 
 	return session->session;
 }
 
-void cycles_session_destroy(ccl::Session* session_id)
+CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -576,7 +526,7 @@ void cycles_session_destroy(ccl::Session* session_id)
 	}
 }
 
-void cycles_session_clear_passes(ccl::Session* session_id)
+CCL_CAPI void CDECL cycles_session_clear_passes(ccl::Session* session_id)
 {
 	ccl::vector<ccl::Pass*>& passes = session_id->scene->passes;
 	for (ccl::Pass *pass : passes) {
@@ -592,7 +542,7 @@ void cycles_session_clear_passes(ccl::Session* session_id)
 	}
 }
 
-void cycles_session_add_pass(ccl::Session *session_id, int pass_id)
+CCL_CAPI void CDECL cycles_session_add_pass(ccl::Session *session_id, int pass_id)
 {
 	ccl::PassType passtype = (ccl::PassType)pass_id;
 
@@ -611,7 +561,7 @@ void cycles_session_add_pass(ccl::Session *session_id, int pass_id)
 }
 
 
-int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned int height, unsigned int samples, unsigned int full_x, unsigned int full_y, unsigned int full_width, unsigned int full_height )
+CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned int height, unsigned int samples, unsigned int full_x, unsigned int full_y, unsigned int full_width, unsigned int full_height )
 {
 	int rc = 0;
 	CCSession* ccsess = nullptr;
@@ -650,108 +600,7 @@ int cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned 
 	return rc;
 }
 
-void cycles_session_set_update_callback(ccl::Session* session_id, void(*update)(unsigned int sid))
-{
-	assert(false);
-	#if 0
-  TODO: XXXX
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		CCSession* se = sessions[session_id];
-		status_cbs[session_id] = update;
-		if (update != nullptr) {
-			session->progress.set_update_callback(function_bind<void>(&CCSession::status_update, se));
-		}
-		else {
-			session->progress.set_update_callback(nullptr);
-		}
-		logger.logit("Set status update callback for session ", session_id);
-	}
-	#endif
-}
-
-void cycles_session_set_cancel_callback(ccl::Session* session_id, void(*cancel)(unsigned int sid))
-{
-	assert(false);
-  /*
-  TODO: XXXX
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		CCSession* se = sessions[session_id];
-		cancel_cbs[session_id] = cancel;
-		if (cancel != nullptr) {
-			session->progress.set_cancel_callback(function_bind<void>(&CCSession::test_cancel, se));
-		}
-		else {
-			session->progress.set_cancel_callback(nullptr);
-		}
-		logger.logit("Set status cancel callback for session ", session_id);
-	}
-	*/
-}
-
-void cycles_session_set_update_tile_callback(ccl::Session* session_id, RENDER_TILE_CB update_tile_cb)
-{
-	assert(false);
-  /*
-  TODO: XXXX
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		update_cbs[session_id] = update_tile_cb;
-		if (update_tile_cb != nullptr) {
-			//session->update_render_tile_cb = function_bind<void>(&CCSession::update_render_tile, ccsess, std::placeholders::_1, std::placeholders::_2);
-		}
-		else {
-			//session->update_render_tile_cb = nullptr;
-		}
-		logger.logit("Set render tile update callback for session ", session_id);
-	}
-	*/
-}
-
-void cycles_session_set_write_tile_callback(ccl::Session* session_id, RENDER_TILE_CB write_tile_cb)
-{
-	assert(false);
-#if 0
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		write_cbs[session_id] = write_tile_cb;
-		if (write_tile_cb != nullptr) {
-			session->write_render_tile_cb = function_bind<void>(&CCSession::write_render_tile, ccsess, std::placeholders::_1);
-		}
-		else {
-			session->write_render_tile_cb = nullptr;
-		}
-		logger.logit("Set render tile write callback for session ", session_id);
-	}
-#endif
-}
-
-void cycles_session_set_display_update_callback(ccl::Session* session_id, DISPLAY_UPDATE_CB display_update_cb)
-{
-	assert(false);
-#if 0
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		CCSession* se = sessions[session_id];
-		display_update_cbs[session_id] = display_update_cb;
-		if (display_update_cb != nullptr) {
-			session->display_update_cb = function_bind<void>(&CCSession::display_update, ccsess, std::placeholders::_1);
-		}
-		else {
-			session->display_update_cb = nullptr;
-		}
-		logger.logit("Set display update callback for session ", session_id);
-	}
-#endif
-}
-
-void cycles_session_cancel(ccl::Session* session_id, const char *cancel_message)
+CCL_CAPI void CDECL cycles_session_cancel(ccl::Session* session_id, const char *cancel_message)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -761,7 +610,7 @@ void cycles_session_cancel(ccl::Session* session_id, const char *cancel_message)
 	}
 }
 
-void cycles_session_start(ccl::Session* session_id)
+CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -771,42 +620,7 @@ void cycles_session_start(ccl::Session* session_id)
 	}
 }
 
-void cycles_session_end_run(ccl::Session* session_id)
-{
-	// TODO: XXXX I don't think we need to do anything here anymore.
-}
-
-
-int cycles_session_sample(ccl::Session* session_id)
-{
-	assert(false);
-		// TODO: XXXX revisit rendering. check output driver
-		/*
-	RenderCrashTranslatorHelper render_crash_helper(render_crash_translator);
-
-	try {
-		int rc = -1;
-		CCSession* ccsess = nullptr;
-		ccl::Session* session = nullptr;
-		if (session_find(session_id, &ccsess, &session)) {
-			logger.logit("Starting session ", session_id);
-			rc = session->sample();
-		}
-		return rc;
-	}
-	catch (CyclesRenderCrashException)
-	{
-		return -13;
-	}
-	catch (...)
-	{
-		return -13;
-	}
-		*/
-	return 1;
-}
-
-void cycles_session_wait(ccl::Session* session_id)
+CCL_CAPI void CDECL cycles_session_wait(ccl::Session* session_id)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -816,7 +630,7 @@ void cycles_session_wait(ccl::Session* session_id)
 	}
 }
 
-void cycles_session_set_pause(ccl::Session* session_id, bool pause)
+CCL_CAPI void CDECL cycles_session_set_pause(ccl::Session* session_id, bool pause)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -825,7 +639,7 @@ void cycles_session_set_pause(ccl::Session* session_id, bool pause)
 	}
 }
 
-void cycles_session_set_samples(ccl::Session* session_id, int samples)
+CCL_CAPI void CDECL cycles_session_set_samples(ccl::Session* session_id, int samples)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -834,37 +648,7 @@ void cycles_session_set_samples(ccl::Session* session_id, int samples)
 	}
 }
 
-void cycles_session_get_buffer_info(ccl::Session* session_id, unsigned int* buffer_size, unsigned int* buffer_stride)
-{
-	*buffer_size = 0;
-	*buffer_stride = 0;
-}
-
-float* cycles_session_get_buffer(ccl::Session* session_id)
-{
-	return nullptr;
-}
-
-void cycles_session_copy_buffer(ccl::Session* session_id, float* pixel_buffer)
-{
-}
-
-void cycles_session_get_float_buffer(ccl::Session* session_id, int passtype, float** pixels)
-{
-	assert(false);
-	//CCSession* ccsess = nullptr;
-	//ccl::Session* session = nullptr;
-	//if (session_find(session_id, &ccsess, &session)) {
-	//	if (ccsess)
-	//	{
-	//		ccsess->pixels_mutex.lock();
-	//		*pixels = ccsess->pixels.data();
-	//		ccsess->pixels_mutex.unlock();
-	//	}
-	//}
-}
-
-void cycles_session_retain_float_buffer(
+CCL_CAPI void CDECL cycles_session_retain_float_buffer(
 	ccl::Session *session_id, int passtype, int width, int height, float **pixels)
 {
 	CCSession *ccsess = nullptr;
@@ -883,7 +667,7 @@ void cycles_session_retain_float_buffer(
 	}
 }
 
-void cycles_session_release_float_buffer(ccl::Session *session_id,
+CCL_CAPI void CDECL cycles_session_release_float_buffer(ccl::Session *session_id,
 										 int passtype)
 {
 	CCSession *ccsess = nullptr;
@@ -900,7 +684,7 @@ void cycles_session_release_float_buffer(ccl::Session *session_id,
 	}
 }
 
-void cycles_progress_reset(ccl::Session *session_id)
+CCL_CAPI void CDECL cycles_progress_reset(ccl::Session *session_id)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -909,7 +693,7 @@ void cycles_progress_reset(ccl::Session *session_id)
 	}
 }
 
-int cycles_progress_get_sample(ccl::Session* session_id)
+CCL_CAPI int CDECL cycles_progress_get_sample(ccl::Session* session_id)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -919,7 +703,7 @@ int cycles_progress_get_sample(ccl::Session* session_id)
 	return INT_MIN;
 }
 
-int cycles_progress_get_rendered_tiles(ccl::Session *session_id)
+CCL_CAPI int CDECL cycles_progress_get_rendered_tiles(ccl::Session *session_id)
 {
 	CCSession *ccsess = nullptr;
 	ccl::Session *session = nullptr;
@@ -929,7 +713,7 @@ int cycles_progress_get_rendered_tiles(ccl::Session *session_id)
 	return INT_MIN;
 }
 
-void cycles_progress_get_time(ccl::Session* session_id, double *total_time, double* sample_time)
+CCL_CAPI void CDECL cycles_progress_get_time(ccl::Session* session_id, double *total_time, double* sample_time)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -938,22 +722,8 @@ void cycles_progress_get_time(ccl::Session* session_id, double *total_time, doub
 	}
 }
 
-void cycles_tilemanager_get_sample_info(ccl::Session* session_id, unsigned int* samples, unsigned int* total_samples)
-{
-	assert(false);
-		// TODO: XXXX revisit rendering and sampling
-		/*
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		*samples = session->tile_manager.state.sample + 1;
-		*total_samples = session->tile_manager.num_samples;
-	}
-		*/
-}
-
 /* Get cycles render progress. Note that progress will be clamped to 1.0f. */
-void cycles_progress_get_progress(ccl::Session* session_id, float* progress)
+CCL_CAPI void CDECL cycles_progress_get_progress(ccl::Session* session_id, float* progress)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -963,19 +733,19 @@ void cycles_progress_get_progress(ccl::Session* session_id, float* progress)
 	}
 }
 
-void* cycles_string_holder_new()
+CCL_CAPI void* CDECL cycles_string_holder_new()
 {
 	return new StringHolder();
 }
 
-void cycles_string_holder_delete(void* strholder)
+CCL_CAPI void CDECL cycles_string_holder_delete(void* strholder)
 {
 	StringHolder* holder = (StringHolder*)strholder;
 	delete holder;
 	holder = nullptr;
 }
 
-const char* cycles_string_holder_get(void* strholder)
+CCL_CAPI const char* CDECL cycles_string_holder_get(void* strholder)
 {
 	StringHolder* holder = (StringHolder*)strholder;
 	if(holder!=nullptr) {
@@ -984,7 +754,7 @@ const char* cycles_string_holder_get(void* strholder)
 	return "";
 }
 
-bool cycles_progress_get_status(ccl::Session* session_id, void* strholder)
+CCL_CAPI bool CDECL cycles_progress_get_status(ccl::Session* session_id, void* strholder)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -998,7 +768,7 @@ bool cycles_progress_get_status(ccl::Session* session_id, void* strholder)
 	return false;
 }
 
-bool cycles_progress_get_substatus(ccl::Session* session_id, void* strholder)
+CCL_CAPI bool CDECL cycles_progress_get_substatus(ccl::Session* session_id, void* strholder)
 {
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
@@ -1011,3 +781,7 @@ bool cycles_progress_get_substatus(ccl::Session* session_id, void* strholder)
 
 	return false;
 }
+
+#ifdef __cplusplus
+}
+#endif
