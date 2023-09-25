@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+#include "internal_types.h"
+
 #ifdef WIN32
 #include <codecvt>
 #endif
-
-#include "internal_types.h"
 
 #include "util/param.h"
 
