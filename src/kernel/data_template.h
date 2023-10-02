@@ -111,7 +111,8 @@ KERNEL_STRUCT_MEMBER(film, int, pass_cryptomatte)
 /* Adaptive sampling. */
 KERNEL_STRUCT_MEMBER(film, int, pass_adaptive_aux_buffer)
 KERNEL_STRUCT_MEMBER(film, int, pass_sample_count)
-KERNEL_STRUCT_MEMBER(film, int, pass_transparent_background_sample_count)
+KERNEL_STRUCT_MEMBER(film, int, pass_shadow_catcher_matte_sample_count)
+KERNEL_STRUCT_MEMBER(film, int, pass_shadow_catcher_background_sample_count)
 /* Mist. */
 KERNEL_STRUCT_MEMBER(film, int, pass_mist)
 KERNEL_STRUCT_MEMBER(film, float, mist_start)

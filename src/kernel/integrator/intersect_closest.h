@@ -86,7 +86,7 @@ ccl_device_forceinline void integrator_split_shadow_catcher(
   /* Test if we hit a shadow catcher object, and potentially split the path to continue tracing two
    * paths from here. */
   const int object_flags = intersection_get_object_flags(kg, isect);
-  if (!kernel_shadow_catcher_is_path_split_bounce(kg, state, object_flags)) {
+  if (!kernel_shadow_catcher_is_path_split_bounce(kg, state, isect, object_flags)) {
     return;
   }
 

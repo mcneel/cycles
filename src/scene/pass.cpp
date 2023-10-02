@@ -80,7 +80,8 @@ const NodeEnum *Pass::get_type_enum()
     pass_type_enum.insert("aov_value", PASS_AOV_VALUE);
     pass_type_enum.insert("adaptive_aux_buffer", PASS_ADAPTIVE_AUX_BUFFER);
     pass_type_enum.insert("sample_count", PASS_SAMPLE_COUNT);
-    pass_type_enum.insert("transparent_background_sample_count", PASS_TRANSPARENT_BACKGROUND_SAMPLE_COUNT);
+    pass_type_enum.insert("shadow_catcher_matte_sample_count", PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT);
+    pass_type_enum.insert("shadow_catcher_background_sample_count", PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
     pass_type_enum.insert("diffuse_color", PASS_DIFFUSE_COLOR);
     pass_type_enum.insert("glossy_color", PASS_GLOSSY_COLOR);
     pass_type_enum.insert("transmission_color", PASS_TRANSMISSION_COLOR);
@@ -318,7 +319,8 @@ PassInfo Pass::get_info(const PassType type, const bool include_albedo, const bo
       pass_info.num_components = 4;
       break;
     case PASS_SAMPLE_COUNT:
-    case PASS_TRANSPARENT_BACKGROUND_SAMPLE_COUNT:
+    case PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT:
+    case PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT:
       pass_info.num_components = 1;
       pass_info.use_exposure = false;
       break;

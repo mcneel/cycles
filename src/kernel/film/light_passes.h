@@ -234,6 +234,17 @@ ccl_device bool film_write_shadow_catcher_transparent(KernelGlobals kg,
     /* NOTE: Accumulate the combined pass and to the samples count pass, so that the adaptive
      * sampling is based on how noisy the combined pass is as if there were no catchers in the
      * scene. */
+
+    // 2023-09-01 David E.
+    // Here we record that we have written a matte sample that is not fully transparent.
+    // If fully transparent, we would just be dividing with an additional sample thus
+    // making the final pixel darker.
+    if (transparent < 1.0f &&
+        kernel_data.film.pass_shadow_catcher_matte_sample_count != PASS_UNUSED) {
+      atomic_fetch_and_add_uint32((ccl_global uint *)(buffer) +
+                                      kernel_data.film.pass_shadow_catcher_matte_sample_count,
+                                  1);
+    }
   }
 
   /* Shadow catcher pass. */
@@ -282,19 +293,6 @@ ccl_device_forceinline void film_write_shadow_catcher_bounce_data(
   const Spectrum throughput = INTEGRATOR_STATE(state, path, throughput);
   const float transparent = average(throughput);
   film_write_pass_float(buffer + kernel_data.film.pass_shadow_catcher_matte + 3, transparent);
-
-  // 2023-09-01 David E.
-  // If we end up writing a fully transparent pixel it means we are rendering with a transparent
-  // background. In order to properly calculate the final pixel color we need to record how many
-  // times we have sampled a transparent background. If we don't do this, every time we sample a
-  // transparent background it will darken the final pixel color due to this pixel color being
-  // (0.0f, 0.0f, 0.0f). See the function 'film_get_scale_and_scale_exposure' which will
-  // incorporate this value when calculating how much the final pixel will be scaled.
-  // Fixes RH-75422.
-  if (transparent >= 1.0f && kernel_data.film.pass_transparent_background_sample_count != PASS_UNUSED) {
-    atomic_fetch_and_add_uint32(
-        (ccl_global uint *)(buffer) + kernel_data.film.pass_transparent_background_sample_count, 1);
-  }
 }
 
 #endif /* __SHADOW_CATCHER__ */
@@ -439,6 +437,16 @@ ccl_device_inline void film_write_emission_or_background_pass(
   /* Single write call for GPU coherence. */
   if (pass_offset != PASS_UNUSED) {
     film_write_pass_spectrum(buffer + pass_offset, contribution);
+
+    // 2023-09-28 David E.
+    // The background pass needs its own sample counter in order to scale the pixels
+    // the appropriate amount and to correctly compose the background pass with the
+    // matte pass when doing shadow catching.
+    // Fixes RH-75422.
+    if (pass == kernel_data.film.pass_background) {
+      atomic_fetch_and_add_uint32(
+          (ccl_global uint *)(buffer) + kernel_data.film.pass_shadow_catcher_background_sample_count, 1);
+    }
   }
 #endif /* __PASSES__ */
 }
@@ -558,20 +566,6 @@ ccl_device_inline void film_write_transparent(KernelGlobals kg,
 {
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
     film_write_pass_float(buffer + kernel_data.film.pass_combined + 3, transparent);
-
-    // 2023-09-01 David E.
-    // If we end up writing a fully transparent pixel it means we are rendering with a transparent
-    // background. In order to properly calculate the final pixel color we need to record how many
-    // times we have sampled a transparent background. If we don't do this, every time we sample a
-    // transparent background it will darken the final pixel color due to this pixel color being
-    // (0.0f, 0.0f, 0.0f). See the function 'film_get_scale_and_scale_exposure' which will
-	// incorporate this value when calculating how much the final pixel will be scaled.
-    // Fixes RH-75422.
-    if (transparent == 1.0f && kernel_data.film.pass_transparent_background_sample_count != PASS_UNUSED)
-    {
-      atomic_fetch_and_add_uint32(
-          (ccl_global uint *)(buffer) + kernel_data.film.pass_transparent_background_sample_count, 1);
-    }
   }
 
   film_write_shadow_catcher_transparent_only(kg, path_flag, transparent, buffer);

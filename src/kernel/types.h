@@ -384,7 +384,8 @@ typedef enum PassType {
   PASS_AOV_VALUE,
   PASS_ADAPTIVE_AUX_BUFFER,
   PASS_SAMPLE_COUNT,
-  PASS_TRANSPARENT_BACKGROUND_SAMPLE_COUNT,
+  PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT,
+  PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT,
   PASS_DIFFUSE_COLOR,
   PASS_GLOSSY_COLOR,
   PASS_TRANSMISSION_COLOR,
@@ -1132,7 +1133,8 @@ typedef struct KernelFilmConvert {
 
   int pass_combined;
   int pass_sample_count;
-  int pass_transparent_background_sample_count;
+  int pass_shadow_catcher_matte_sample_count;
+  int pass_shadow_catcher_background_sample_count;
   int pass_adaptive_aux_buffer;
   int pass_motion_weight;
   int pass_shadow_catcher;
@@ -1158,7 +1160,9 @@ typedef struct KernelFilmConvert {
   int is_denoised;
 
   /* Padding. */
-  //int pad1;
+  int pad1;
+  int pad2;
+  int pad3;
 } KernelFilmConvert;
 static_assert_align(KernelFilmConvert, 16);
 
@@ -1552,7 +1556,8 @@ typedef enum DeviceKernel : int {
   DECLARE_FILM_CONVERT_KERNEL(DEPTH),
   DECLARE_FILM_CONVERT_KERNEL(MIST),
   DECLARE_FILM_CONVERT_KERNEL(SAMPLE_COUNT),
-  DECLARE_FILM_CONVERT_KERNEL(TRANSPARENT_BACKGROUND_SAMPLE_COUNT),
+  DECLARE_FILM_CONVERT_KERNEL(SHADOW_CATCHER_MATTE_SAMPLE_COUNT),
+  DECLARE_FILM_CONVERT_KERNEL(SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT),
   DECLARE_FILM_CONVERT_KERNEL(FLOAT),
   DECLARE_FILM_CONVERT_KERNEL(LIGHT_PATH),
   DECLARE_FILM_CONVERT_KERNEL(FLOAT3),
