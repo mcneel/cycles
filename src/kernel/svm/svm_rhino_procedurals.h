@@ -197,7 +197,154 @@ ccl_device float noise_weight(float t)
   return t * t * t * (10.0f + t * (6.0f * t - 15.0f));
 }
 
-ccl_device float noise(KernelGlobals kg, float x, float y, float z)
+ccl_device float noise1(KernelGlobals kg, float x, float y, float z)
+{
+  float cx = floorf(x);
+  float cy = floorf(y);
+  float cz = floorf(z);
+
+  float dx = x - cx;
+  float dy = y - cy;
+  float dz = z - cz;
+
+  int ix = int(cx) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+  int iy = int(cy) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+  int iz = int(cz) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+
+  int h0 = perlin_noise(kg, ix);
+  int h1 = perlin_noise(kg, ix + 1);
+  int h00 = perlin_noise(kg, h0 + iy) + iz;
+  int h01 = perlin_noise(kg, h1 + iy) + iz;
+  int h10 = perlin_noise(kg, h0 + iy + 1) + iz;
+  int h11 = perlin_noise(kg, h1 + iy + 1) + iz;
+
+  int h000 = perlin_noise(kg, h00) & 15;
+  int h001 = perlin_noise(kg, h01) & 15;
+  int h010 = perlin_noise(kg, h10) & 15;
+  int h011 = perlin_noise(kg, h11) & 15;
+  int h100 = perlin_noise(kg, h00 + 1) & 15;
+  int h101 = perlin_noise(kg, h01 + 1) & 15;
+  int h110 = perlin_noise(kg, h10 + 1) & 15;
+  int h111 = perlin_noise(kg, h11 + 1) & 15;
+
+  float w000 = gradient(h000, dx, dy, dz);
+  float w100 = gradient(h001, dx - 1, dy, dz);
+  float w010 = gradient(h010, dx, dy - 1, dz);
+  float w110 = gradient(h011, dx - 1, dy - 1, dz);
+  float w001 = gradient(h100, dx, dy, dz - 1);
+  float w101 = gradient(h101, dx - 1, dy, dz - 1);
+  float w011 = gradient(h110, dx, dy - 1, dz - 1);
+  float w111 = gradient(h111, dx - 1, dy - 1, dz - 1);
+
+  float wx = noise_weight(dx);
+  float wy = noise_weight(dy);
+  float wz = noise_weight(dz);
+
+  float y0 = w000 + wx * (w100 - w000 + wy * (w110 - w010 + w000 - w100)) + wy * (w010 - w000);
+  float y1 = w001 + wx * (w101 - w001 + wy * (w111 - w011 + w001 - w101)) + wy * (w011 - w001);
+
+  return y0 + wz * (y1 - y0);
+}
+
+ccl_device float noise2(KernelGlobals kg, float x, float y, float z)
+{
+  float cx = floorf(x);
+  float cy = floorf(y);
+  float cz = floorf(z);
+
+  float dx = x - cx;
+  float dy = y - cy;
+  float dz = z - cz;
+
+  int ix = int(cx) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+  int iy = int(cy) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+  int iz = int(cz) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+
+  int h0 = perlin_noise(kg, ix);
+  int h1 = perlin_noise(kg, ix + 1);
+  int h00 = perlin_noise(kg, h0 + iy) + iz;
+  int h01 = perlin_noise(kg, h1 + iy) + iz;
+  int h10 = perlin_noise(kg, h0 + iy + 1) + iz;
+  int h11 = perlin_noise(kg, h1 + iy + 1) + iz;
+
+  int h000 = perlin_noise(kg, h00) & 15;
+  int h001 = perlin_noise(kg, h01) & 15;
+  int h010 = perlin_noise(kg, h10) & 15;
+  int h011 = perlin_noise(kg, h11) & 15;
+  int h100 = perlin_noise(kg, h00 + 1) & 15;
+  int h101 = perlin_noise(kg, h01 + 1) & 15;
+  int h110 = perlin_noise(kg, h10 + 1) & 15;
+  int h111 = perlin_noise(kg, h11 + 1) & 15;
+
+  float w000 = gradient(h000, dx, dy, dz);
+  float w100 = gradient(h001, dx - 1, dy, dz);
+  float w010 = gradient(h010, dx, dy - 1, dz);
+  float w110 = gradient(h011, dx - 1, dy - 1, dz);
+  float w001 = gradient(h100, dx, dy, dz - 1);
+  float w101 = gradient(h101, dx - 1, dy, dz - 1);
+  float w011 = gradient(h110, dx, dy - 1, dz - 1);
+  float w111 = gradient(h111, dx - 1, dy - 1, dz - 1);
+
+  float wx = noise_weight(dx);
+  float wy = noise_weight(dy);
+  float wz = noise_weight(dz);
+
+  float y0 = w000 + wx * (w100 - w000 + wy * (w110 - w010 + w000 - w100)) + wy * (w010 - w000);
+  float y1 = w001 + wx * (w101 - w001 + wy * (w111 - w011 + w001 - w101)) + wy * (w011 - w001);
+
+  return y0 + wz * (y1 - y0);
+}
+
+ccl_device float noise3(KernelGlobals kg, float x, float y, float z)
+{
+  float cx = floorf(x);
+  float cy = floorf(y);
+  float cz = floorf(z);
+
+  float dx = x - cx;
+  float dy = y - cy;
+  float dz = z - cz;
+
+  int ix = int(cx) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+  int iy = int(cy) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+  int iz = int(cz) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
+
+  int h0 = perlin_noise(kg, ix);
+  int h1 = perlin_noise(kg, ix + 1);
+  int h00 = perlin_noise(kg, h0 + iy) + iz;
+  int h01 = perlin_noise(kg, h1 + iy) + iz;
+  int h10 = perlin_noise(kg, h0 + iy + 1) + iz;
+  int h11 = perlin_noise(kg, h1 + iy + 1) + iz;
+
+  int h000 = perlin_noise(kg, h00) & 15;
+  int h001 = perlin_noise(kg, h01) & 15;
+  int h010 = perlin_noise(kg, h10) & 15;
+  int h011 = perlin_noise(kg, h11) & 15;
+  int h100 = perlin_noise(kg, h00 + 1) & 15;
+  int h101 = perlin_noise(kg, h01 + 1) & 15;
+  int h110 = perlin_noise(kg, h10 + 1) & 15;
+  int h111 = perlin_noise(kg, h11 + 1) & 15;
+
+  float w000 = gradient(h000, dx, dy, dz);
+  float w100 = gradient(h001, dx - 1, dy, dz);
+  float w010 = gradient(h010, dx, dy - 1, dz);
+  float w110 = gradient(h011, dx - 1, dy - 1, dz);
+  float w001 = gradient(h100, dx, dy, dz - 1);
+  float w101 = gradient(h101, dx - 1, dy, dz - 1);
+  float w011 = gradient(h110, dx, dy - 1, dz - 1);
+  float w111 = gradient(h111, dx - 1, dy - 1, dz - 1);
+
+  float wx = noise_weight(dx);
+  float wy = noise_weight(dy);
+  float wz = noise_weight(dz);
+
+  float y0 = w000 + wx * (w100 - w000 + wy * (w110 - w010 + w000 - w100)) + wy * (w010 - w000);
+  float y1 = w001 + wx * (w101 - w001 + wy * (w111 - w011 + w001 - w101)) + wy * (w011 - w001);
+
+  return y0 + wz * (y1 - y0);
+}
+
+ccl_device float noise4(KernelGlobals kg, float x, float y, float z)
 {
   float cx = floorf(x);
   float cy = floorf(y);
@@ -701,13 +848,13 @@ ccl_device float4 noise_texture(KernelGlobals kg,
 
     switch (noise_type) {
       case RHINO_NOISE_PERLIN:
-        value = noise(kg, x, y, z);
+        value = noise1(kg, x, y, z);
         break;
       case RHINO_NOISE_VALUE_NOISE:
         value = value_noise(kg, x, y, z);
         break;
       case RHINO_NOISE_PERLIN_PLUS_VALUE:
-        value = 0.5f * value_noise(kg, x, y, z) + 0.5f * noise(kg, x, y, z);
+        value = 0.5f * value_noise(kg, x, y, z) + 0.5f * noise2(kg, x, y, z);
         break;
       case RHINO_NOISE_SIMPLEX:
         value = simplex_noise(x, y, z);
@@ -1368,13 +1515,12 @@ ccl_device void svm_rhino_node_exposure_texture(
         stack, out_alpha_offset, out_color.w);
 }
 
-#ifndef __KERNEL_METAL_MACOS__
 ccl_device float fbm(KernelGlobals kg, float3 P, bool is_turbulent, float omega, int maxOctaves)
 {
   float sum = 0.0f, lambda = 1.0f, o = 1.0f;
   for (int i = 0; i < maxOctaves; ++i) {
     float3 lambda_p = lambda * P;
-    float noise_value = noise(kg, lambda_p.x, lambda_p.y, lambda_p.z);
+    float noise_value = noise3(kg, lambda_p.x, lambda_p.y, lambda_p.z);
 
     if (is_turbulent)
       noise_value = fabsf(noise_value);
@@ -1386,7 +1532,6 @@ ccl_device float fbm(KernelGlobals kg, float3 P, bool is_turbulent, float omega,
 
   return sum;
 }
-#endif
 
 ccl_device float4 fbm_texture(KernelGlobals kg,
                               float3 uvw,
@@ -1397,16 +1542,12 @@ ccl_device float4 fbm_texture(KernelGlobals kg,
                               float gain,
                               float roughness)
 {
-#ifdef __KERNEL_METAL_MACOS__
-	return make_float4(0.0f, 0.0f, 0.0f, 1.0f);
-#else
   float t = fabsf(fbm(kg, uvw, is_turbulent, roughness, max_octaves) * gain);
 
   float4 color_out = mix(color1, color2, t);
   color_out = clamp(color_out, make_float4(0.0f, 0.0f, 0.0f, 0.0f), make_float4(1.0f, 1.0f, 1.0f, 1.0f));
 
   return color_out;
-#endif
 }
 
 ccl_device void svm_rhino_node_fbm_texture(
@@ -2360,9 +2501,6 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
                                         float color1_sat,
                                         float color2_sat)
 {
-#ifdef __KERNEL_METAL_MACOS__
-	return make_float4(0.0f, 0.0f, 0.0f, 1.0f);
-#else
   float totalValue = 0.0f;
   float freq = 1.0f;
   float weight = noise_amount;
@@ -2370,7 +2508,7 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
     float x = uvw.x * freq + float(o);
     float y = uvw.y * freq + float(o) * 2.0f;
     float z = uvw.z * freq - float(o);
-    float value = noise(kg, x * size, y * size, z * size);
+    float value = noise4(kg, x * size, y * size, z * size);
     totalValue += weight * value;
     freq *= 2.17f;
     weight *= 0.5f;
@@ -2424,7 +2562,6 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
   float3 colOut = startColor * (1.0f - tweenValue) + endColor * tweenValue;
 
   return make_float4(colOut.x, colOut.y, colOut.z, 1.0f);
-#endif
 }
 
 ccl_device void svm_rhino_node_perlin_marble_texture(
