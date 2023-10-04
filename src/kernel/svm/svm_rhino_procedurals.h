@@ -1368,6 +1368,7 @@ ccl_device void svm_rhino_node_exposure_texture(
         stack, out_alpha_offset, out_color.w);
 }
 
+#ifndef __KERNEL_METAL_MACOS__
 ccl_device float fbm(KernelGlobals kg, float3 P, bool is_turbulent, float omega, int maxOctaves)
 {
   float sum = 0.0f, lambda = 1.0f, o = 1.0f;
@@ -1385,6 +1386,7 @@ ccl_device float fbm(KernelGlobals kg, float3 P, bool is_turbulent, float omega,
 
   return sum;
 }
+#endif
 
 ccl_device float4 fbm_texture(KernelGlobals kg,
                               float3 uvw,
@@ -1395,12 +1397,16 @@ ccl_device float4 fbm_texture(KernelGlobals kg,
                               float gain,
                               float roughness)
 {
+#ifdef __KERNEL_METAL_MACOS__
+	return make_float4(0.0f, 0.0f, 0.0f, 1.0f);
+#else
   float t = fabsf(fbm(kg, uvw, is_turbulent, roughness, max_octaves) * gain);
 
   float4 color_out = mix(color1, color2, t);
   color_out = clamp(color_out, make_float4(0.0f, 0.0f, 0.0f, 0.0f), make_float4(1.0f, 1.0f, 1.0f, 1.0f));
 
   return color_out;
+#endif
 }
 
 ccl_device void svm_rhino_node_fbm_texture(
@@ -2354,6 +2360,9 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
                                         float color1_sat,
                                         float color2_sat)
 {
+#ifdef __KERNEL_METAL_MACOS__
+	return make_float4(0.0f, 0.0f, 0.0f, 1.0f);
+#else
   float totalValue = 0.0f;
   float freq = 1.0f;
   float weight = noise_amount;
@@ -2415,6 +2424,7 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
   float3 colOut = startColor * (1.0f - tweenValue) + endColor * tweenValue;
 
   return make_float4(colOut.x, colOut.y, colOut.z, 1.0f);
+#endif
 }
 
 ccl_device void svm_rhino_node_perlin_marble_texture(
