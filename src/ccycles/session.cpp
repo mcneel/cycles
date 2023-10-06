@@ -610,6 +610,11 @@ CCL_CAPI void CDECL cycles_session_cancel(ccl::Session* session_id, const char *
 	}
 }
 
+CCL_CAPI void CDECL cycles_session_quickcancel(ccl::Session* sessionPtr)
+{
+	sessionPtr->cancel(true);
+}
+
 CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 {
 	CCSession* ccsess = nullptr;
