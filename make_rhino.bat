@@ -75,7 +75,7 @@ if "%COMMAND%" == "" (
 
 if "%COMMAND%" == "release" (
 	set BUILDING=Yes
-	set CONFIG=Release
+	set CONFIG=RelWithDebInfo
 ) else if "%COMMAND%" == "debug" (
 	set BUILDING=Yes
 	set CONFIG=Debug
@@ -103,12 +103,4 @@ if "%BUILDING%" == "Yes" (
 	%PYTHON% src/cmake/make_format.py
 ) else (
   echo Command "%COMMAND%" unknown
-)
-
-if %BUILDING_ONEAPI% == "Yes" (
-  echo **************************************************************************************************************
-  echo NOTE: If you got compile errors like "error C2338: DPCPP does not support C++ version earlier than C++17.",  *
-  echo then do the following: Add the /Zc:__cplusplus compiler option to the cycles_device.vcxproj compiler options *
-  echo to force the compiler to set the correct value to the macro.                                                 *
-  echo **************************************************************************************************************
 )
