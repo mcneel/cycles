@@ -484,6 +484,7 @@ if(WITH_CYCLES_CUDA_BINARIES)
       set(cuda_flags ${cuda_flags} --ptxas-options="-v")
     endif()
 
+# add -G and -O0 when creating a debug build
     set(_cuda_nvcc_args
           -arch=${arch}
           ${CUDA_NVCC_FLAGS}
