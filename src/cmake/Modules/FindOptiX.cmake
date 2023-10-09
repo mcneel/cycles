@@ -10,10 +10,18 @@
 #                     This can also be an environment variable.
 #  OPTIX_FOUND, If false, do not try to use OptiX.
 
+
+IF(NOT $ENV{OPTIX_ROOT_DIR} STREQUAL "")
+  SET(OPTIX_ROOT_DIR $ENV{OPTIX_ROOT_DIR})
+ENDIF()
+
+message(${OPTIX_ROOT_DIR})
+
 # If OPTIX_ROOT_DIR was defined in the environment, use it.
 IF(NOT OPTIX_ROOT_DIR AND NOT $ENV{OPTIX_ROOT_DIR} STREQUAL "")
   SET(OPTIX_ROOT_DIR $ENV{OPTIX_ROOT_DIR})
 ENDIF()
+
 
 SET(_optix_SEARCH_DIRS
   ${OPTIX_ROOT_DIR}
