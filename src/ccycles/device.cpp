@@ -16,6 +16,24 @@ limitations under the License.
 
 #include "internal_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+CCL_CAPI unsigned int CDECL cycles_number_devices_by_type(ccl::DeviceType device_type)
+{
+	int i{ 0 };
+	for (auto di : devices) {
+		if (di.type == device_type) i++;
+	}
+
+	return i;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
 unsigned int cycles_number_devices() {
 	return (unsigned int)devices.size();
 }
@@ -24,15 +42,6 @@ unsigned int cycles_number_multidevices() {
 	return (unsigned int)multi_devices.size();
 }
 
-CCL_CAPI unsigned int CDECL cycles_number_devices_by_type(unsigned int device_type)
-{
-	int i{ 0 };
-	for (auto di : devices) {
-		if (di.type == (ccl::DeviceType)device_type) i++;
-	}
-
-	return i;
-}
 
 unsigned int cycles_number_multi_subdevices(int i) {
 	if (MULTIDEVICEIDX(i) >= 0 && MULTIDEVICEIDX(i) < multi_devices.size())

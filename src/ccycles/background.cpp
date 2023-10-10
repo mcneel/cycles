@@ -16,6 +16,10 @@ limitations under the License.
 
 #include "internal_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 CCL_CAPI void CDECL cycles_scene_set_background_transparent(ccl::Session* session_id, bool transparent)
 {
 	ccl::Scene* sce = nullptr;
@@ -35,3 +39,8 @@ CCL_CAPI void CDECL cycles_scene_set_background_visibility(ccl::Session* session
 		logger.logit("Scene ", session_id, " set background path ray visibility ", path_ray_flag);
 	}
 }
+
+#ifdef __cplusplus
+}
+#endif
+
