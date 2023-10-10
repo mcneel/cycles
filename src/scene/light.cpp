@@ -531,10 +531,8 @@ void LightManager::device_update_tree(Device *,
     int mesh_num_triangles = static_cast<int>(mesh->num_triangles());
 
     for (int i = 0; i < mesh_num_triangles; i++) {
-      //int shader_index = mesh->get_shader()[i];
-      Shader* shader = object->get_shader();/* (shader_index < mesh->get_used_shaders().size()) ?
-                           static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;*/
+      Shader *shader = object->get_shader(); // take object shader instead of prim shader, Rhino specific
+
 
       if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         light_prims.emplace_back(scene, i, object_id);
