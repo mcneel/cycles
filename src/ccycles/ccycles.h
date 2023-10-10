@@ -201,9 +201,6 @@ CCL_CAPI unsigned int CDECL cycles_number_multi_subdevices(int i);
  */
 CCL_CAPI unsigned int CDECL cycles_get_multidevice_subdevice_id(int i, int j);
 
-/* Query number of available CUDA devices. */
-CCL_CAPI unsigned int CDECL cycles_number_devices_by_type(ccl::DeviceType device_type);
-
 /* Query name of a device. */
 CCL_CAPI const char* CDECL cycles_device_description(int i);
 

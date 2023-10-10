@@ -24,11 +24,11 @@ unsigned int cycles_number_multidevices() {
 	return (unsigned int)multi_devices.size();
 }
 
-unsigned int cycles_number_devices_by_type(ccl::DeviceType device_type)
+CCL_CAPI unsigned int CDECL cycles_number_devices_by_type(unsigned int device_type)
 {
 	int i{ 0 };
 	for (auto di : devices) {
-		if (di.type == device_type) i++;
+		if (di.type == (ccl::DeviceType)device_type) i++;
 	}
 
 	return i;

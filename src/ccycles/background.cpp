@@ -16,17 +16,17 @@ limitations under the License.
 
 #include "internal_types.h"
 
-void cycles_scene_set_background_transparent(ccl::Session* session_id, unsigned int transparent)
+CCL_CAPI void CDECL cycles_scene_set_background_transparent(ccl::Session* session_id, bool transparent)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->background->set_transparent(transparent == 1);
+		sce->background->set_transparent(transparent);
 		sce->background->tag_update(sce);
 		logger.logit("Scene ", session_id, " set background transparent", transparent);
 	}
 }
 
-void cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag)
+CCL_CAPI void CDECL cycles_scene_set_background_visibility(ccl::Session* session_id, unsigned int path_ray_flag)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
