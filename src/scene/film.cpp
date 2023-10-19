@@ -514,8 +514,6 @@ void Film::update_passes(Scene *scene, bool add_sample_count_pass)
     if (!Pass::contains(scene->passes, PASS_SAMPLE_COUNT)) {
       add_auto_pass(scene, PASS_SAMPLE_COUNT);
     }
-    add_auto_pass(scene, PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT);
-    add_auto_pass(scene, PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
   }
 
   /* Create passes needed for denoising. */
@@ -541,12 +539,8 @@ void Film::update_passes(Scene *scene, bool add_sample_count_pass)
     if (need_background) {
       add_auto_pass(scene, PASS_BACKGROUND);
 
-      if (!Pass::contains(scene->passes, PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT)) {
-        add_auto_pass(scene, PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT);
-      }
-      if (!Pass::contains(scene->passes, PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT)) {
-        add_auto_pass(scene, PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
-      }
+      add_auto_pass(scene, PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT);
+      add_auto_pass(scene, PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
     }
   }
   else if (Pass::contains(scene->passes, PASS_SHADOW_CATCHER)) {
