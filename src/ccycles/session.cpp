@@ -41,8 +41,6 @@ using namespace ccl;
 /* Hold all created sessions. */
 std::unordered_set<CCSession*> sessions;
 
-std::unordered_map<ccl::Session*, ccl::vector<ccl::Pass>*> passes_vec;
-
 static ccl::thread_mutex session_mutex;
 
 class CyclesRenderCrashException : std::exception
@@ -174,7 +172,7 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 		return false;
 
 	bool doing_tiles = !(tile.size == tile.full_size);
-#if 0
+#if 1
 	const int width = tile.size.x;
 	const int height = tile.size.y;
 	vector<float> pixels(width * height * 4);
@@ -511,7 +509,6 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* session_p
 
 	sessions.insert(session);
 	csesid = (unsigned int)(sessions.size() - 1);
-	passes_vec.insert(std::make_pair(session->session, new ccl::vector<ccl::Pass>()));
 
 	return session->session;
 }
