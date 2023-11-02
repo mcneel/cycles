@@ -194,7 +194,7 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
   kfilm->pass_denoising_albedo = PASS_UNUSED;
   kfilm->pass_denoising_depth = PASS_UNUSED;
   kfilm->pass_sample_count = PASS_UNUSED;
-  kfilm->pass_shadow_catcher_matte_sample_count = PASS_UNUSED;
+  kfilm->pass_shadow_catcher_transparent_sample_count = PASS_UNUSED;
   kfilm->pass_shadow_catcher_background_sample_count = PASS_UNUSED;
   kfilm->pass_adaptive_aux_buffer = PASS_UNUSED;
   kfilm->pass_shadow_catcher = PASS_UNUSED;
@@ -371,8 +371,8 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
       case PASS_SAMPLE_COUNT:
         kfilm->pass_sample_count = kfilm->pass_stride;
         break;
-      case PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT:
-        kfilm->pass_shadow_catcher_matte_sample_count = kfilm->pass_stride;
+      case PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT:
+        kfilm->pass_shadow_catcher_transparent_sample_count = kfilm->pass_stride;
         break;
       case PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT:
         kfilm->pass_shadow_catcher_background_sample_count = kfilm->pass_stride;
@@ -538,10 +538,10 @@ void Film::update_passes(Scene *scene, bool add_sample_count_pass)
 
     if (need_background) {
       add_auto_pass(scene, PASS_BACKGROUND);
-
-      add_auto_pass(scene, PASS_SHADOW_CATCHER_MATTE_SAMPLE_COUNT);
-      add_auto_pass(scene, PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
     }
+
+    add_auto_pass(scene, PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT);
+    add_auto_pass(scene, PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
   }
   else if (Pass::contains(scene->passes, PASS_SHADOW_CATCHER)) {
     add_auto_pass(scene, PASS_SHADOW_CATCHER);

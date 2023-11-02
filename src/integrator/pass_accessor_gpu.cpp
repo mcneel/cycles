@@ -89,7 +89,7 @@ void PassAccessorGPU::run_film_convert_kernels(DeviceKernel kernel,
 DEFINE_PASS_ACCESSOR(depth, DEPTH);
 DEFINE_PASS_ACCESSOR(mist, MIST);
 DEFINE_PASS_ACCESSOR(sample_count, SAMPLE_COUNT);
-DEFINE_PASS_ACCESSOR(shadow_catcher_matte_sample_count, SHADOW_CATCHER_MATTE_SAMPLE_COUNT);
+DEFINE_PASS_ACCESSOR(shadow_catcher_transparent_sample_count, SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT);
 DEFINE_PASS_ACCESSOR(shadow_catcher_background_sample_count, SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
 DEFINE_PASS_ACCESSOR(float, FLOAT);
 

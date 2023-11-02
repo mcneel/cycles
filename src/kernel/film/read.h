@@ -43,7 +43,7 @@ ccl_device_inline float film_get_scale_exposure(ccl_global const KernelFilmConve
                                                 ccl_global const float *ccl_restrict buffer)
 {
   if (kfilm_convert->pass_sample_count == PASS_UNUSED &&
-      kfilm_convert->pass_shadow_catcher_matte_sample_count == PASS_UNUSED) {
+      kfilm_convert->pass_shadow_catcher_transparent_sample_count == PASS_UNUSED) {
     return kfilm_convert->scale_exposure;
   }
 
@@ -57,9 +57,9 @@ ccl_device_inline float film_get_scale_exposure(ccl_global const KernelFilmConve
     sample_count = (uint)floorf(1.0f/kfilm_convert->scale + 0.5f);
   }
 
-  if (kfilm_convert->pass_shadow_catcher_matte_sample_count != PASS_UNUSED) {
+  if (kfilm_convert->pass_shadow_catcher_transparent_sample_count != PASS_UNUSED) {
     sample_count = *(
-        (ccl_global const uint *)(buffer + kfilm_convert->pass_shadow_catcher_matte_sample_count));
+        (ccl_global const uint *)(buffer + kfilm_convert->pass_shadow_catcher_transparent_sample_count));
   }
 
   const float scale = 1.0f / max(sample_count, 1u);
@@ -79,7 +79,8 @@ ccl_device_inline bool film_get_scale_and_scale_exposure(
     ccl_private float *ccl_restrict background_scale_exposure)
 {
   if (kfilm_convert->pass_sample_count == PASS_UNUSED &&
-      kfilm_convert->pass_shadow_catcher_matte_sample_count == PASS_UNUSED &&
+      kfilm_convert->pass_shadow_catcher_transparent_sample_count == PASS_UNUSED &&
+      kfilm_convert->pass_shadow_catcher_sample_count == PASS_UNUSED &&
       kfilm_convert->pass_shadow_catcher_background_sample_count == PASS_UNUSED) {
     *scale = kfilm_convert->scale;
     *scale_exposure = kfilm_convert->scale_exposure;
@@ -109,16 +110,31 @@ ccl_device_inline bool film_get_scale_and_scale_exposure(
 
   float local_scale_exposure = *scale;
   float local_background_scale_exposure = *scale;
-  if (kfilm_convert->pass_shadow_catcher_matte_sample_count != PASS_UNUSED &&
+  if (kfilm_convert->pass_shadow_catcher_transparent_sample_count != PASS_UNUSED &&
+      kfilm_convert->pass_shadow_catcher_sample_count != PASS_UNUSED &&
       kfilm_convert->pass_shadow_catcher_background_sample_count != PASS_UNUSED)
   {
-    const uint shadow_catcher_matte_sample_count = *(
-        (ccl_global const uint *)(buffer + kfilm_convert->pass_shadow_catcher_matte_sample_count));
-    local_scale_exposure = 1.0f / max(shadow_catcher_matte_sample_count, 1u);
+    // Stores how many times we've sampled a transparent background on the matte path.
+    const uint shadow_catcher_transparent_sample_count = *(
+        (ccl_global const uint *)(buffer + kfilm_convert->pass_shadow_catcher_transparent_sample_count));
 
+    // Stores how many times we've sampled a shadow catcher.
+    const float shadow_catcher_sample_count = *(buffer + kfilm_convert->pass_shadow_catcher_sample_count);
+
+    // Here we start with the total sample count and subtract the amount of times we've hit the shadow
+    // catcher and the amount of times we've sampled a transparent background. The resulting value is
+    // the amount of actual times we've written to the matte pass. Scaling the matte result with this
+    // scale value will get us the correct color for the matte pixel.
+    local_scale_exposure = 1.0f / max(sample_count - (uint)shadow_catcher_sample_count -
+                                          shadow_catcher_transparent_sample_count,
+                                      1u);
+
+    // Stores how many times we've sampled the background as a result of seeing through a shadow catcher.
     const uint shadow_catcher_background_sample_count = *(
         (ccl_global const uint *)(buffer +
                                   kfilm_convert->pass_shadow_catcher_background_sample_count));
+
+    // We want to scale the background pass with this value to get the correct background color.
     local_background_scale_exposure = 1.0f / max(shadow_catcher_background_sample_count, 1u);
   }
 
@@ -191,7 +207,7 @@ ccl_device_inline void film_get_pass_pixel_sample_count(
   pixel[0] = __float_as_uint(f) * kfilm_convert->scale;
 }
 
-ccl_device_inline void film_get_pass_pixel_shadow_catcher_matte_sample_count(
+ccl_device_inline void film_get_pass_pixel_shadow_catcher_transparent_sample_count(
     ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
     ccl_global const float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
