@@ -157,8 +157,9 @@ std::vector<float> &CCyclesPassOutput::pixels()
 
 
 CCyclesOutputDriver::CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes,
-										 CCyclesOutputDriver::LogFunction log)
-	: full_passes(full_passes), log_(log)
+										 CCyclesOutputDriver::LogFunction log,
+										 ccl::SessionParams session_params)
+	: full_passes(full_passes), log_(log), session_params_(session_params)
 {
 }
 
@@ -399,7 +400,7 @@ static void log_print(const std::string& msg)
 #endif
 }
 
-static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyclesPassOutput>> *passes)
+static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyclesPassOutput>> *passes, ccl::SessionParams session_params)
 {
 	ccl::Camera *cam = session->scene->camera;
 	cam->set_full_height(512);
@@ -408,7 +409,7 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	cam->need_flags_update = true;
 	cam->update(session->scene);
 
-	session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print));
+	session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print, session_params));
 	//session->set_display_driver(std::make_unique<CCyclesDisplayDriver>(passes, log_print));
 
 	ccl::Scene *scene = session->scene;
@@ -505,7 +506,7 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* session_p
 
 	session->session = new ccl::Session(session->params, session->scene_params);
 
-	prep_session(session->session, &session->passes);
+	prep_session(session->session, &session->passes, session->params);
 
 	sessions.insert(session);
 	csesid = (unsigned int)(sessions.size() - 1);
