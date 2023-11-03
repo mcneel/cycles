@@ -157,8 +157,9 @@ std::vector<float> &CCyclesPassOutput::pixels()
 
 
 CCyclesOutputDriver::CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes,
-										 CCyclesOutputDriver::LogFunction log)
-	: full_passes(full_passes), log_(log)
+										 CCyclesOutputDriver::LogFunction log,
+										 CCSession* ccsession)
+	: full_passes(full_passes), log_(log), ccsession_(ccsession)
 {
 }
 
@@ -264,12 +265,12 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 
 			PassInfo pass_info = Pass::get_info(pass->get_pass_type());
 
-			const int width = tile.full_size.x;
-			const int height = tile.full_size.y;
-			pass->set_width(width);
-			pass->set_height(height);
-			pass->pixels().resize(width * height * pass_info.num_components);
+			const int target_width = tile.full_size.x;
+			const int target_height = tile.full_size.y;
+			pass->set_width(target_width);
+			pass->set_height(target_height);
 
+			pass->pixels().resize(target_width * target_height * pass_info.num_components);
 			if (!tile.get_pass_pixels(pass_type_as_string(pass->get_pass_type()),
 									  pass_info.num_components,
 									  pass->pixels().data())) {
@@ -277,6 +278,38 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 				pass->unlock();
 
 				return false;
+			}
+
+			if(ccsession_->params.pixel_size>1) {
+				const int ps = ccsession_->params.pixel_size;
+				const int source_width = target_width / ps;
+				const int source_height = target_height / ps;
+				const int stride = pass_info.num_components;
+
+				float *pixeldata = pass->pixels().data();
+
+				int target_x, target_y = 0;
+				for (int y = source_height - 1; y >= 0; y--)
+				{
+					for (int x = source_width - 1; x >= 0; x--)
+					{
+						target_x = x * ps;
+						target_y = y * ps;
+						const int source_idx = y * source_width * stride + x * stride;
+						for (int extend_x = target_x; extend_x < target_x + ps; extend_x++)
+						{
+							for (int extend_y = target_y; extend_y < target_y + ps; extend_y++)
+							{
+								const int target_idx = extend_y * target_width * stride +
+													   extend_x * stride;
+								for (int i = 0; i < stride; i++)
+								{
+									pixeldata[target_idx + i] = pixeldata[source_idx + i];
+								}
+							}
+						}
+					}
+				}
 			}
 
 			pass->unlock();
@@ -399,7 +432,7 @@ static void log_print(const std::string& msg)
 #endif
 }
 
-static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyclesPassOutput>> *passes)
+static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyclesPassOutput>> *passes, CCSession* ccsession)
 {
 	ccl::Camera *cam = session->scene->camera;
 	cam->set_full_height(512);
@@ -408,8 +441,7 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	cam->need_flags_update = true;
 	cam->update(session->scene);
 
-	session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print));
-	//session->set_display_driver(std::make_unique<CCyclesDisplayDriver>(passes, log_print));
+	session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print, ccsession));
 
 	ccl::Scene *scene = session->scene;
 	ccl::Integrator *integrator = scene->integrator;
@@ -505,7 +537,7 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* session_p
 
 	session->session = new ccl::Session(session->params, session->scene_params);
 
-	prep_session(session->session, &session->passes);
+	prep_session(session->session, &session->passes, session);
 
 	sessions.insert(session);
 	csesid = (unsigned int)(sessions.size() - 1);
@@ -550,15 +582,15 @@ CCL_CAPI void CDECL cycles_session_add_pass(ccl::Session *session_id, int pass_i
 	ccl::Session *session = nullptr;
 	CCSession *ccsess = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
-		std::unique_ptr<CCyclesPassOutput> pass = std::make_unique<CCyclesPassOutput>();
-		pass->set_pass_type(passtype);
+		std::unique_ptr<CCyclesPassOutput> outputpass = std::make_unique<CCyclesPassOutput>();
+		outputpass->set_pass_type(passtype);
 
-		ccsess->passes.push_back(std::move(pass));
+		ccsess->passes.push_back(std::move(outputpass));
 	}
 }
 
 
-CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned int height, unsigned int samples, unsigned int full_x, unsigned int full_y, unsigned int full_width, unsigned int full_height )
+CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, int width, int height, int samples, int full_x, int full_y, int full_width, int full_height, int pixel_size)
 {
 	int rc = 0;
 	CCSession* ccsess = nullptr;
@@ -574,6 +606,7 @@ CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, unsigned int w
 			ccsess->buffer_params.height = height;
 
 			ccsess->params.samples = samples;
+			ccsess->params.pixel_size = pixel_size;
 
 			// TODO: XXXX remove temporary camera adjustment
 			//ccl::Camera *cam = session->scene->camera;

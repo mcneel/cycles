@@ -70,6 +70,8 @@ limitations under the License.
 		(puthere) = devices[id]; \
 	}
 
+class CCSession;
+
 //extern LOGGER_FUNC_CB logger_func;
 extern std::vector<LOGGER_FUNC_CB> loggers;
 
@@ -193,7 +195,8 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 		typedef std::function<void(const std::string &)> LogFunction;
 
 		CCyclesOutputDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes,
-							LogFunction log);
+							LogFunction log,
+							CCSession* ccsession);
 		virtual ~CCyclesOutputDriver();
 
 		virtual void write_render_tile(const Tile &tile) override;
@@ -203,6 +206,8 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 		bool write_or_update_render_tile(const Tile &tile);
 
 		LogFunction log_;
+
+		CCSession* ccsession_;
 
 		std::vector<std::vector<float>> tile_passes;
 		std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes;
