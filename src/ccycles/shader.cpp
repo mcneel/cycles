@@ -49,11 +49,11 @@ ccl::ShaderNode* _shader_node_find(ccl::Session* session_id, unsigned int shader
 ustring _get_colorspace(int value)
 {
 	if (value == 0) {
-		std::cout << "setting to " << ccl::u_colorspace_raw << std::endl;
+		//std::cout << "setting to " << ccl::u_colorspace_raw << std::endl;
 		return ccl::u_colorspace_raw;
 	}
 	else {
-		std::cout << "setting to " << ccl::u_colorspace_auto << std::endl;
+		//std::cout << "setting to " << ccl::u_colorspace_auto << std::endl;
 		return ccl::u_colorspace_auto;
 	}
 }
