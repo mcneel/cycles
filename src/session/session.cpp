@@ -382,6 +382,10 @@ RenderWork Session::run_update_for_next_iteration()
       tile_params.full_width = buffer_params_.full_width;
       tile_params.full_height = buffer_params_.full_height;
 
+      tile_params.session_full_width = buffer_params_.session_full_width;
+      tile_params.session_full_height = buffer_params_.session_full_height;
+      tile_params.session_pixel_size = buffer_params_.session_pixel_size;
+
       tile_params.update_offset_stride();
 
       path_trace_->reset(buffer_params_, tile_params, did_reset);

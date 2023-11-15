@@ -468,7 +468,7 @@ CCL_CAPI void CDECL cycles_session_add_pass(ccl::Session *session_id, int pass_i
 }
 
 
-CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned int height, unsigned int samples, unsigned int full_x, unsigned int full_y, unsigned int full_width, unsigned int full_height )
+CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, unsigned int width, unsigned int height, unsigned int samples, unsigned int full_x, unsigned int full_y, unsigned int full_width, unsigned int full_height, unsigned int pixel_size)
 {
 	int rc = 0;
 	CCSession* ccsess = nullptr;
@@ -482,6 +482,9 @@ CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, unsigned int w
 			ccsess->buffer_params.full_height = full_height;
 			ccsess->buffer_params.width = width;
 			ccsess->buffer_params.height = height;
+			ccsess->buffer_params.session_full_width = width;
+			ccsess->buffer_params.session_full_height = height;
+			ccsess->buffer_params.session_pixel_size = pixel_size;
 
 			ccsess->params.samples = samples;
 

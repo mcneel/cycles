@@ -314,6 +314,10 @@ static BufferParams scale_buffer_params(const BufferParams &params, int resoluti
   scaled_params.full_width = max(1, params.full_width / resolution_divider);
   scaled_params.full_height = max(1, params.full_height / resolution_divider);
 
+  scaled_params.session_full_width = params.session_full_width;
+  scaled_params.session_full_height = params.session_full_height;
+  scaled_params.session_pixel_size = params.session_pixel_size;
+
   scaled_params.update_offset_stride();
 
   return scaled_params;

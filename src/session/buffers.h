@@ -86,6 +86,11 @@ class BufferParams : public Node {
   int full_width = 0;
   int full_height = 0;
 
+  /* Resolution requested for session, including pixel size. */
+  int session_full_width = 0;
+  int session_full_height = 0;
+  int session_pixel_size = 1;
+
   /* Runtime fields, only valid after `update_passes()` or `update_offset_stride()`. */
   int offset = -1, stride = -1;
 
