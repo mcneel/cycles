@@ -98,7 +98,7 @@ CCL_CAPI void CDECL cycles_session_params_set_shadingsystem(ccl::SessionParams* 
 CCL_CAPI void CDECL cycles_session_params_set_pixel_size(ccl::SessionParams* session_params_id, unsigned int pixel_size)
 {
 	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
-		(*search)->pixel_size = (ccl::ShadingSystem)pixel_size;
+		(*search)->pixel_size = pixel_size;
 	}
 }
 
