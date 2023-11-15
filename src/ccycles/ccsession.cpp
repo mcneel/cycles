@@ -418,11 +418,11 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 extern "C" {
 #endif
 
-CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* session_params_id)
+CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_parameters)
 {
 	ccl::thread_scoped_lock lock(session_mutex);
 
-	ccl::SessionParams *params = (*(session_params.find(session_params_id)));
+	ccl::SessionParams *params = (*(session_params.find(_session_parameters)));
 	if (params == nullptr)
 		return nullptr;
 
@@ -457,6 +457,10 @@ CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		sessions.erase(ccsess);
+		if (auto search = session_params.find(&ccsess->params); search != session_params.end()) {
+			session_params.erase(*search);
+			delete *search;
+		}
 		delete ccsess;
 	}
 }
