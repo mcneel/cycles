@@ -173,13 +173,13 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 		return false;
 
 	bool doing_tiles = !(tile.size == tile.full_size);
-#if 1
+#if 0
 	const int width = tile.size.x;
 	const int height = tile.size.y;
 	vector<float> pixels(width * height * 4);
 	if (tile.get_pass_pixels("combined", 4, pixels.data())) {
 		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
-		fs::path save_path = "/Users/nathan/check_cycles_output.png";
+		fs::path save_path = "C:/Users/jesterKing/check_cycles_output.png";
 		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
 		unique_ptr<ImageOutput> image_output(ImageOutput::create("png"));
 		ImageSpec spec(width, height, 4, TypeDesc::FLOAT);
@@ -327,100 +327,6 @@ void CCyclesOutputDriver::write_render_tile(const Tile &tile)
 bool CCyclesOutputDriver::update_render_tile(const Tile &tile)
 {
 	return write_or_update_render_tile(tile);
-}
-
-CCyclesDisplayDriver::CCyclesDisplayDriver(std::vector<std::unique_ptr<CCyclesPassOutput>> *passes,
-										   CCyclesDisplayDriver::LogFunction log)
-	: passes(passes)
-	, log_(log)
-{
-}
-
-CCyclesDisplayDriver::~CCyclesDisplayDriver()
-{
-}
-
-void CCyclesDisplayDriver::next_tile_begin()
-{
-	int a = 0;
-}
-
-bool CCyclesDisplayDriver::update_begin(const Params &params, int width, int height)
-{
-	size_t pixel_count = width * height;
-	pixels_half4.resize(pixel_count);
-
-	return true;
-}
-
-void CCyclesDisplayDriver::update_end()
-{
-	if (passes == nullptr)
-		return;
-
-	for (auto &pass : *passes) {
-
-		if (pass->get_pass_type() == PASS_COMBINED) {
-			pass->lock();
-
-			std::vector<float> &pixels = pass->pixels();
-
-			pixels.resize(pixels_half4.size() * 4);
-
-			for (int i = 0, p = 0; i < pixels_half4.size(); i++) {
-				pixels[p++] = half_to_float_image(pixels_half4[i].x);
-				pixels[p++] = half_to_float_image(pixels_half4[i].y);
-				pixels[p++] = half_to_float_image(pixels_half4[i].z);
-				pixels[p++] = half_to_float_image(pixels_half4[i].w);
-			}
-
-			pass->unlock();
-		}
-	}
-}
-
-ccl::half4 *CCyclesDisplayDriver::map_texture_buffer()
-{
-	return pixels_half4.data();
-}
-
-void CCyclesDisplayDriver::unmap_texture_buffer()
-{
-	int a = 0;
-}
-
-void CCyclesDisplayDriver::clear()
-{
-	static ccl::half halfzero = float_to_half_image(0.0f);
-	static ccl::half halfone = float_to_half_image(1.0f);
-
-	for (int i = 0; i < pixels_half4.size(); i++) {
-		pixels_half4[i].x = halfzero;
-		pixels_half4[i].y = halfzero;
-		pixels_half4[i].z = halfzero;
-		pixels_half4[i].w = halfone;
-	}
-}
-
-void CCyclesDisplayDriver::draw(const Params &params)
-{
-	int a = 0;
-}
-
-CCyclesDisplayDriver::GraphicsInterop CCyclesDisplayDriver::graphics_interop_get()
-{
-	int a = 0;
-	return GraphicsInterop();
-}
-
-void CCyclesDisplayDriver::graphics_interop_activate()
-{
-	int a = 0;
-}
-
-void CCyclesDisplayDriver::graphics_interop_deactivate()
-{
-	int a = 0;
 }
 
 static void log_print(const std::string& msg)
