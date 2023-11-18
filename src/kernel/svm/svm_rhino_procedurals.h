@@ -2629,11 +2629,13 @@ ccl_device float4 physical_sky_texture(float3 uvw,
   // This gives you the view direction into space.
   float3 vSkyDir = equirect_to_world(make_float2(uvw.x, uvw.y));
 
-  // Need to swap and flip y and z so that projection matches OpenGL's...this is so that
-  // the same code in the shader can be used here pretty much interchangeably.
+  // need to swap x and negative z, and set x negative
+  // so we can reuse the original rhino procedural code pretty
+  // much as is, yet ensure that the texture is oriented correctly.
   float tmp = vSkyDir.y;
-  vSkyDir.y = vSkyDir.z;
-  vSkyDir.z = -tmp;
+  vSkyDir.y = -vSkyDir.z;
+  vSkyDir.z = tmp;
+  vSkyDir.x = -vSkyDir.x;
 
   float4 color_out = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
 
