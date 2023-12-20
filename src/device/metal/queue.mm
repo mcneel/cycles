@@ -610,9 +610,15 @@ bool MetalDeviceQueue::enqueue(DeviceKernel kernel,
         for (id<MTLFunctionLog> log in logs) {
           NSLog(@"%@", log);
         }
+        // Close command encoder properly on error. If this isn't done then
+        // switching away from Raytraced will cause a separate Metal related
+        // thread to crash.
+        close_compute_encoder();
       }
       else if (command_buffer.error) {
         metal_device_->set_error(string("CommandBuffer Failed: ") + [kernel_name UTF8String]);
+        // See comment in previous if-block.
+        close_compute_encoder();
       }
     }
   }];
