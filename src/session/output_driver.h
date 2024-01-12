@@ -27,8 +27,9 @@ class OutputDriver {
          const int2 size,
          const int2 full_size,
          const string_view layer,
-         const string_view view)
-        : offset(offset), size(size), full_size(full_size), layer(layer), view(view)
+         const string_view view,
+         const int resolution_divider)
+        : offset(offset), size(size), full_size(full_size), layer(layer), view(view), resolution_divider(resolution_divider)
     {
     }
     virtual ~Tile() = default;
@@ -38,6 +39,7 @@ class OutputDriver {
     const int2 full_size;
     const string layer;
     const string view;
+    const int resolution_divider;
 
     virtual bool get_pass_pixels(const string_view pass_name,
                                  const int num_channels,

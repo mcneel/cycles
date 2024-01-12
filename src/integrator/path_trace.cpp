@@ -1096,6 +1096,11 @@ int2 PathTrace::get_render_size() const
   return tile_manager_.get_size();
 }
 
+int PathTrace::get_resolution_divider() const
+{
+  return render_state_.resolution_divider;
+}
+
 const BufferParams &PathTrace::get_render_tile_params() const
 {
   if (full_frame_state_.render_buffers) {

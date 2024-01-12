@@ -280,8 +280,11 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 				return false;
 			}
 
-			if(ccsession_->params.pixel_size>1) {
-				const int ps = ccsession_->params.pixel_size;
+			if(tile.resolution_divider>1 || ccsession_->params.pixel_size>1) {
+				const int ps =
+					tile.resolution_divider > ccsession_->params.pixel_size ?
+						  tile.resolution_divider
+						: ccsession_->params.pixel_size;
 				const int source_width = target_width / ps;
 				const int source_height = target_height / ps;
 				const int stride = pass_info.num_components;
@@ -321,7 +324,8 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 
 void CCyclesOutputDriver::write_render_tile(const Tile &tile)
 {
-	write_or_update_render_tile(tile);
+	// no implementation needed
+	// only update_render_tile is useful for RhinoCycles
 }
 
 bool CCyclesOutputDriver::update_render_tile(const Tile &tile)
@@ -437,7 +441,6 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 	session->params.use_auto_tile = false;
 	session->params.experimental = true;
 	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
-	session->params.use_resolution_divider = false;
 
 	session->scene_params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 

@@ -163,6 +163,7 @@ class PathTrace {
   int2 get_render_tile_size() const;
   int2 get_render_tile_offset() const;
   int2 get_render_size() const;
+  int get_resolution_divider() const;
 
   /* Get buffer parameters of the current tile.
    *

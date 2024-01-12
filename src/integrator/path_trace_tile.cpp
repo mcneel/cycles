@@ -17,7 +17,8 @@ PathTraceTile::PathTraceTile(PathTrace &path_trace)
                          path_trace.get_render_tile_size(),
                          path_trace.get_render_size(),
                          path_trace.get_render_tile_params().layer,
-                         path_trace.get_render_tile_params().view),
+                         path_trace.get_render_tile_params().view,
+                         path_trace.get_resolution_divider()),
       path_trace_(path_trace),
       copied_from_device_(false)
 {

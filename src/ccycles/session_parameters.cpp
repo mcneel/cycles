@@ -102,6 +102,13 @@ CCL_CAPI void CDECL cycles_session_params_set_pixel_size(ccl::SessionParams* ses
 	}
 }
 
+CCL_CAPI void CDECL cycles_session_params_set_use_resolution_divider(ccl::SessionParams* session_params_id, bool use_resolution_divider)
+{
+	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+		(*search)->use_resolution_divider = use_resolution_divider;
+	}
+}
+
 #ifdef __cplusplus
 }
 #endif
