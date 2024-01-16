@@ -150,6 +150,16 @@ void CCyclesPassOutput::set_height(int height)
 	m_height = height;
 }
 
+int CCyclesPassOutput::get_pixel_size() const
+{
+	return m_pixel_size;
+}
+
+void CCyclesPassOutput::set_pixel_size(int pixel_size)
+{
+	m_pixel_size = pixel_size;
+}
+
 std::vector<float> &CCyclesPassOutput::pixels()
 {
 	return m_pixels;
@@ -269,6 +279,7 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 			const int target_height = tile.full_size.y;
 			pass->set_width(target_width);
 			pass->set_height(target_height);
+			pass->set_pixel_size(tile.resolution_divider);
 
 			pass->pixels().resize(target_width * target_height * pass_info.num_components);
 			if (!tile.get_pass_pixels(pass_type_as_string(pass->get_pass_type()),
@@ -280,38 +291,28 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 				return false;
 			}
 
-			if(tile.resolution_divider>1 || ccsession_->params.pixel_size>1) {
+			/* In case we have pixel_size > 1 we need to move data so that we get
+			 * pixels in top-left quadrant.
+			 */
+			if(tile.resolution_divider > ccsession_->params.pixel_size
+				|| ccsession_->params.pixel_size > 1) {
 				const int ps =
-					tile.resolution_divider > ccsession_->params.pixel_size ?
-						  tile.resolution_divider
-						: ccsession_->params.pixel_size;
+					tile.resolution_divider > ccsession_->params.pixel_size
+					? tile.resolution_divider
+					: ccsession_->params.pixel_size;
 				const int source_width = target_width / ps;
 				const int source_height = target_height / ps;
 				const int stride = pass_info.num_components;
 
 				float *pixeldata = pass->pixels().data();
 
-				int target_x, target_y = 0;
+				const int source_scanline_width = source_width * stride;
+				const int target_scanline_width = target_width * stride;
 				for (int y = source_height - 1; y >= 0; y--)
 				{
-					for (int x = source_width - 1; x >= 0; x--)
-					{
-						target_x = x * ps;
-						target_y = y * ps;
-						const int source_idx = y * source_width * stride + x * stride;
-						for (int extend_x = target_x; extend_x < target_x + ps; extend_x++)
-						{
-							for (int extend_y = target_y; extend_y < target_y + ps; extend_y++)
-							{
-								const int target_idx = extend_y * target_width * stride +
-													   extend_x * stride;
-								for (int i = 0; i < stride; i++)
-								{
-									pixeldata[target_idx + i] = pixeldata[source_idx + i];
-								}
-							}
-						}
-					}
+						const int source_idx = y * source_scanline_width;
+						const int target_idx = y * target_scanline_width;
+						memcpy(pixeldata + target_idx, pixeldata + source_idx, source_scanline_width*sizeof(float));
 				}
 			}
 
@@ -597,7 +598,7 @@ CCL_CAPI void CDECL cycles_session_set_samples(ccl::Session* session_id, int sam
 }
 
 CCL_CAPI void CDECL cycles_session_retain_float_buffer(
-	ccl::Session *session_id, int passtype, int width, int height, float **pixels)
+	ccl::Session *session_id, int passtype, int width, int height, float **pixels, int* pixel_size)
 {
 	CCSession *ccsess = nullptr;
 	ccl::Session *session = nullptr;
@@ -608,6 +609,7 @@ CCL_CAPI void CDECL cycles_session_retain_float_buffer(
 					height == pass->get_height()) {
 					pass->lock();
 					*pixels = pass->pixels().data();
+					*pixel_size = pass->get_pixel_size();
 					break;
 				}
 			}
