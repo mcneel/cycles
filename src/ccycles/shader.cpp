@@ -314,6 +314,16 @@ CCL_CAPI void CDECL cycles_shader_set_name(ccl::Shader *shader, const char *_nam
 	shader->name = _name;
 }
 
+CCL_CAPI void CDECL cycles_shader_set_pass_id(ccl::Shader *shader, int pass_id)
+{
+	shader->set_pass_id(pass_id);
+}
+
+CCL_CAPI int CDECL cycles_shader_get_pass_id(ccl::Shader *shader)
+{
+	return shader->get_pass_id();
+}
+
 CCL_CAPI void CDECL cycles_shader_set_use_mis(ccl::Session *session_id,
 							   ccl::Shader *shader_id,
 							   unsigned int use_mis)
