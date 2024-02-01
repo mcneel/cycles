@@ -177,60 +177,6 @@ CCL_CAPI unsigned int CDECL cycles_new_client();
  */
 CCL_CAPI void CDECL cycles_release_client();
 
-/**
- * Query number of available devices.
- * \ingroup ccycles
- */
-CCL_CAPI unsigned int CDECL cycles_number_devices();
-
-/**
- * Query number of available (created) multi-devices.
- * \ingroup ccycles
- */
-CCL_CAPI unsigned int CDECL cycles_number_multidevices();
-
-/**
- * Query number of devices in multi-device
- * \ingroup ccycles
- */
-CCL_CAPI unsigned int CDECL cycles_number_multi_subdevices(int i);
-
-/**
- * Query the index of the sub-device in the global device list.
- * \ingroup ccycles
- */
-CCL_CAPI unsigned int CDECL cycles_get_multidevice_subdevice_id(int i, int j);
-
-/* Query name of a device. */
-CCL_CAPI const char* CDECL cycles_device_description(int i);
-
-/* Query capabilities of all devices found. */
-CCL_CAPI const char* CDECL cycles_device_capabilities();
-
-/* Query ID of a device. */
-CCL_CAPI const char* CDECL cycles_device_id(int i);
-
-/* Query the index of a device. The index is the nth for the type the device is of. */
-CCL_CAPI int CDECL cycles_device_num(int i);
-
-/* Query if device is used as display device. */
-CCL_CAPI bool CDECL cycles_device_display_device(int i);
-
-/* Create or get multi device. Return value is index of multi-device in multi-device vector.*/
-CCL_CAPI int CDECL cycles_create_multidevice(int count, int* idx);
-
-/** Query device type.
- * \param i device ID.
- * \returns device type
- * \retval 0 None
- * \retval 1 CPU
- * \retval 2 OPENCL
- * \retval 3 CUDA
- * \retval 4 NETWORK
- * \retval 5 MULTI
- */
-CCL_CAPI unsigned int CDECL cycles_device_type(int i);
-
 /* Create scene parameters, to be used when creating a new scene. */
 CCL_CAPI unsigned int CDECL cycles_scene_params_create(unsigned int shadingsystem, unsigned int bvh_type, unsigned int use_bvh_spatial_split, int bvh_layout, unsigned int persistent_data);
 
