@@ -1206,13 +1206,13 @@ const char* math_node_operation(MathNode* mnode)
 {
   switch (mnode->get_math_type()) {
     case NODE_MATH_ADD:
-      return "+";
+      return "add";
     case NODE_MATH_SUBTRACT:
-      return "-";
+      return "sub";
     case NODE_MATH_MULTIPLY:
-      return "*";
+      return "mul";
     case NODE_MATH_DIVIDE:
-      return "/";
+      return "div";
     case NODE_MATH_SINE:
       return "sin";
     case NODE_MATH_COSINE:
@@ -1226,7 +1226,7 @@ const char* math_node_operation(MathNode* mnode)
     case NODE_MATH_ARCTANGENT:
       return "arctan";
     case NODE_MATH_POWER:
-      return "**";
+      return "pow";
     case NODE_MATH_LOGARITHM:
       return "log";
     case NODE_MATH_MINIMUM:
@@ -1240,9 +1240,9 @@ const char* math_node_operation(MathNode* mnode)
     case NODE_MATH_GREATER_THAN:
       return "&gt;";
     case NODE_MATH_MODULO:
-      return "%";
+      return "mod";
     case NODE_MATH_ABSOLUTE:
-      return "||";
+      return "abs";
     case NODE_MATH_ARCTAN2:
       return "arctan2";
     case NODE_MATH_FLOOR:
@@ -1256,7 +1256,7 @@ const char* math_node_operation(MathNode* mnode)
     case NODE_MATH_INV_SQRT:
       return "inv_sqrt";
     case NODE_MATH_SIGN:
-      return "+-";
+      return "sgn";
     case NODE_MATH_EXPONENT:
       return "exp";
     case NODE_MATH_RADIANS:
@@ -1276,9 +1276,9 @@ const char* math_node_operation(MathNode* mnode)
     case NODE_MATH_WRAP:
       return "wrap";
     case NODE_MATH_COMPARE:
-      return "==";
+      return "comp";
     case NODE_MATH_MULTIPLY_ADD:
-      return "*+";
+      return "muladd";
     case NODE_MATH_PINGPONG:
       return "pingpong";
     case NODE_MATH_SMOOTH_MIN:
