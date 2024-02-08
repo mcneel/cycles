@@ -365,6 +365,12 @@ CCL_CAPI ccl::ShaderNode* CDECL cycles_add_shader_node(ccl::Shader *shader_id,
 		node->name = ustring(name);
 		node->set_owner(shader_id->graph);
 		shader_id->graph->add(node);
+
+		if(ustring(node_type_name) == ustring("tangent")) {
+			ccl::TangentNode *tangent = dynamic_cast<ccl::TangentNode *>(node);
+			tangent->set_direction_type(ccl::NodeTangentDirectionType::NODE_TANGENT_UVMAP);
+			tangent->set_attribute(ustring("uvmap1"));
+		}
 	}
 
 	return node;
