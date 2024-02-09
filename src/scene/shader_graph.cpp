@@ -1310,9 +1310,24 @@ void ShaderGraph::dump_graph(const char *filename)
   const ccl::NodeType *envtex_node_type = ccl::NodeType::find(ustring("environment_texture"));
   const ccl::NodeType *rhenvtex_node_type = ccl::NodeType::find(ustring("rhino_environment_texture"));
 
+  ustring fillcolor = ustring("grey96");
+
   foreach (ShaderNode *node, nodes) {
+    fillcolor = ustring("grey96");
+    if (node->is_a(math_node_type)) {
+      fillcolor = ustring("rosybrown2");
+    }
+    else if(node->is_a(imtex_node_type)) {
+      fillcolor = ustring("skyblue3");
+    }
+    else if(node->is_a(rhenvtex_node_type) || node->is_a(envtex_node_type)) {
+      fillcolor = ustring("springgreen3");
+    }
+    else if(node->is_a(value_node_type)) {
+      fillcolor = ustring("tan3");
+    }
     fprintf(fd, "// NODE: %p\n", node);
-    fprintf(fd, "\"%p\" [shape=record,label=\"{", node);
+    fprintf(fd, "\"%p\" [shape=record,style=filled,fillcolor=%s,label=\"{", node, fillcolor.c_str());
     if (node->inputs.size()) {
       fprintf(fd, "{");
       foreach (ShaderInput *socket, node->inputs) {
