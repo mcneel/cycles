@@ -26,6 +26,6 @@ RUN amdgpu-install -y --no-dkms --usecase=rocm
 
 RUN apt-get install -y dos2unix
 
-#CMD ["bash", "-c", "cd /rhino/rhino-8.x/src4/rhino4/Plug-ins/RDK/cycles/cycles && dos2unix make_hip.sh && ./make_hip.sh Release"]
+CMD ["bash", "-c", "cd /rhino/rhino-8.x/src4/rhino4/Plug-ins/RDK/cycles/cycles && dos2unix make_hip.sh && ./make_hip.sh Release"]
 
-ENTRYPOINT [ "bash" ]
+#ENTRYPOINT [ "bash" ]
