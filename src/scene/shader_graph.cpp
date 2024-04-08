@@ -1173,33 +1173,33 @@ std::string vector_string(ShaderInput* socket)
 
 const char* env_projection(EnvironmentTextureNode* envtex)
 {
-	auto projection = envtex->get_projection();
-	switch(projection) {
-  		case NODE_ENVIRONMENT_EQUIRECTANGULAR:
-			return "equirectangular";
-  		case NODE_ENVIRONMENT_MIRROR_BALL:
-			return "mirrorball";
-  		case NODE_ENVIRONMENT_WALLPAPER:
-			return "wallpaper";
-  		case NODE_ENVIRONMENT_EMAP:
-			return "emap";
-  		case NODE_ENVIRONMENT_BOX:
-			return "box";
-  		case NODE_ENVIRONMENT_LIGHT_PROBE:
-			return "lightprobe";
-		case NODE_ENVIRONMENT_CUBEMAP:
-			return "cubemap";
-  		case NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL:
-			return "cubemapH";
-  		case NODE_ENVIRONMENT_CUBEMAP_VERTICAL:
-			return "cubemapV";
-  		case NODE_ENVIRONMENT_HEMISPHERICAL:
-			return "hemispherical";
-  		case NODE_ENVIRONMENT_SPHERICAL:
-			return "spherical";
-		default:
-			return "...";
-	}
+  auto projection = envtex->get_projection();
+  switch(projection) {
+    case NODE_ENVIRONMENT_EQUIRECTANGULAR:
+      return "equirectangular";
+    case NODE_ENVIRONMENT_MIRROR_BALL:
+      return "mirrorball";
+    case NODE_ENVIRONMENT_WALLPAPER:
+      return "wallpaper";
+    case NODE_ENVIRONMENT_EMAP:
+      return "emap";
+    case NODE_ENVIRONMENT_BOX:
+      return "box";
+    case NODE_ENVIRONMENT_LIGHT_PROBE:
+      return "lightprobe";
+    case NODE_ENVIRONMENT_CUBEMAP:
+      return "cubemap";
+    case NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL:
+      return "cubemapH";
+    case NODE_ENVIRONMENT_CUBEMAP_VERTICAL:
+      return "cubemapV";
+    case NODE_ENVIRONMENT_HEMISPHERICAL:
+      return "hemispherical";
+    case NODE_ENVIRONMENT_SPHERICAL:
+      return "spherical";
+    default:
+      return "...";
+  }
 }
 
 const char* math_node_operation(MathNode* mnode)
@@ -1285,7 +1285,7 @@ const char* math_node_operation(MathNode* mnode)
       return "smoothmin";
     case NODE_MATH_SMOOTH_MAX:
       return "smoothmax";
-	default:
+    default:
       return "...";
   }
 }
@@ -1359,6 +1359,8 @@ void ShaderGraph::dump_graph(const char *filename)
       }
       fprintf(fd, "}|");
     }
+    std::string from = std::string("\\");
+    std::string to = std::string("-");
     std::string nodename = node->name.c_str();
     if (node->is_a(math_node_type)) {
       MathNode *mnode = dynamic_cast<MathNode *>(node);
@@ -1374,13 +1376,25 @@ void ShaderGraph::dump_graph(const char *filename)
       ImageTextureNode *imtexnode = dynamic_cast<ImageTextureNode *>(node);
       auto color_space = imtexnode->get_colorspace();
       auto filename = imtexnode->get_filename();
-      nodename = string_printf("%s&#92;n(%s)&#92;n%s", node->name.c_str(), color_space.c_str(), filename.c_str());
+      auto sfilename = std::string(filename.string());
+      size_t startpos = 0;
+      while ((startpos = sfilename.find(from, startpos)) != std::string::npos) {
+        sfilename.replace(startpos, from.length(), to);
+        startpos += to.length();
+      }
+      nodename = string_printf("%s&#92;n(%s)&#92;n%s", node->name.c_str(), color_space.c_str(), sfilename.c_str());
     } else if (node->is_a(envtex_node_type)) {
       EnvironmentTextureNode *envtexnode = dynamic_cast<EnvironmentTextureNode *>(node);
       auto color_space = envtexnode->get_colorspace();
-	  auto projection = env_projection(envtexnode);
+      auto projection = env_projection(envtexnode);
       auto filename = envtexnode->get_filename();
-      nodename = string_printf("%s&#92;n(%s&#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, filename.c_str());
+      auto sfilename = std::string(filename.string());
+      size_t startpos = 0;
+      while ((startpos = sfilename.find(from, startpos)) != std::string::npos) {
+        sfilename.replace(startpos, from.length(), to);
+        startpos += to.length();
+      }
+      nodename = string_printf("%s&#92;n(%s&#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, sfilename.c_str());
     }
     string_replace(nodename, " ", "&#92; ");
     fprintf(fd, "%s", nodename.c_str());

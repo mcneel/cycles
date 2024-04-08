@@ -357,8 +357,11 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	ccl::Scene *scene = session->scene;
 	ccl::Integrator *integrator = scene->integrator;
 
+	integrator->set_use_light_tree(true);
+	integrator->set_light_sampling_threshold(0.01f);
 	integrator->set_use_adaptive_sampling(true);
-	integrator->set_adaptive_threshold(0.001f);
+	integrator->set_adaptive_min_samples(1);
+	integrator->set_adaptive_threshold(0.01f);
 	integrator->set_denoiser_type(ccl::DENOISER_NONE);
 	integrator->set_guiding_distribution_type(ccl::GUIDING_TYPE_DIRECTIONAL_QUAD_TREE);
 
