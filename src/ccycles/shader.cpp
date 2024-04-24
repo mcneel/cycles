@@ -864,6 +864,11 @@ CCL_CAPI void CDECL cycles_shadernode_set_member_bool(ccl::ShaderNode *shnode,
 			if (mname == "useminmax")
 				node->set_tex_mapping_use_minmax(value);
 		}
+		else if (shntype == "vector_rotate") {
+			ccl::VectorRotateNode* node = dynamic_cast<ccl::VectorRotateNode*>(shnode);
+			if (mname == "invert")
+				node->set_invert(value);
+		}
 		else {
 			assert(false);
 		}
