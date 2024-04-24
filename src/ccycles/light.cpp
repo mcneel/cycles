@@ -23,7 +23,7 @@ ccl::Light *cycles_create_light(ccl::Session* session_id, ccl::Shader *light_sha
 	l->set_shader(light_shader_id);
 	l->set_use_camera(false);
 	l->set_use_glossy(false);
-	l->set_use_transmission(false);
+	l->set_use_transmission(true);
 	session_id->scene->lights.push_back(l);
 	return l;
 }
@@ -33,7 +33,7 @@ void cycles_light_set_type(ccl::Session *session_id, ccl::Light *light, light_ty
 {
 	ccl::LightType ltype = (ccl::LightType)type;
 	light->set_light_type(ltype);
-	light->set_use_glossy(ltype == ccl::LIGHT_AREA);
+	light->set_use_glossy(ltype == ccl::LIGHT_AREA || ltype == ccl::LIGHT_DISTANT);
 }
 
 void cycles_light_set_cast_shadow(ccl::Session *session_id, ccl::Light *light, unsigned int cast_shadow)
