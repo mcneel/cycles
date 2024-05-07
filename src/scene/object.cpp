@@ -606,6 +606,7 @@ void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dsce
   /* On MetalRT, primitive / curve segment offsets can't be baked at BVH build time. Intersection
    * handlers need to apply the offset manually. */
   uint *object_prim_offset = dscene->object_prim_offset.alloc(scene->objects.size());
+  uint object_count = scene->objects.size();
   foreach (Object *ob, scene->objects) {
     uint32_t prim_offset = 0;
     if (Geometry *const geom = ob->geometry) {
@@ -617,7 +618,14 @@ void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dsce
       }
     }
     uint obj_index = ob->get_device_index();
-    object_prim_offset[obj_index] = prim_offset;
+
+    // jK: sometimes we get crashes here in RhinoCycles.
+    // Make sure we don't access out of bounds.
+    if(obj_index >= 0 && obj_index < object_count)
+    {
+      object_prim_offset[obj_index] = prim_offset;
+    }
+
   }
 
   dscene->object_prim_offset.copy_to_device();
@@ -748,7 +756,11 @@ void ObjectManager::device_update(Device *device,
 
     int index = 0;
     foreach (Object *object, scene->objects) {
-      object->index = index++;
+      // jK: attempt to fix OOB crashes. Increase only for objects with
+      // geometry that have triangles
+      if(static_cast<Mesh *>(object->geometry)->triangles.size() > 0) {
+        object->index = index++;
+      }
 
       /* this is a bit too broad, however a bigger refactor might be needed to properly separate
        * update each type of data (transform, flags, etc.) */
