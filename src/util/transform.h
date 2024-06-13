@@ -213,6 +213,29 @@ ccl_device_inline Transform operator*(const Transform a, const Transform b)
 }
 #endif
 
+ccl_device_inline Transform transform_clear_scale(const Transform &tfm)
+{
+  Transform ntfm = tfm;
+
+  float3 col0 = normalize(make_float3(ntfm.x.x, ntfm.y.x, ntfm.z.x));
+  float3 col1 = normalize(make_float3(ntfm.x.y, ntfm.y.y, ntfm.z.y));
+  float3 col2 = normalize(make_float3(ntfm.x.z, ntfm.y.z, ntfm.z.z));
+
+  ntfm.x.x = col0.x;
+  ntfm.y.x = col0.y;
+  ntfm.z.x = col0.z;
+
+  ntfm.x.y = col1.x;
+  ntfm.y.y = col1.y;
+  ntfm.z.y = col1.z;
+
+  ntfm.x.z = col2.x;
+  ntfm.y.z = col2.y;
+  ntfm.z.z = col2.z;
+
+  return ntfm;
+}
+
 #ifndef __KERNEL_GPU__
 
 ccl_device_inline Transform transform_zero()
@@ -354,17 +377,6 @@ ccl_device_inline bool transform_negative_scale(const Transform &tfm)
   float3 c2 = transform_get_column(&tfm, 2);
 
   return (dot(cross(c0, c1), c2) < 0.0f);
-}
-
-ccl_device_inline Transform transform_clear_scale(const Transform &tfm)
-{
-  Transform ntfm = tfm;
-
-  transform_set_column(&ntfm, 0, normalize(transform_get_column(&ntfm, 0)));
-  transform_set_column(&ntfm, 1, normalize(transform_get_column(&ntfm, 1)));
-  transform_set_column(&ntfm, 2, normalize(transform_get_column(&ntfm, 2)));
-
-  return ntfm;
 }
 
 ccl_device_inline Transform transform_empty()

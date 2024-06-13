@@ -9,7 +9,7 @@ set PYTHON=python
 set COMMAND=%1
 set ARG1=%2
 
-set OPTIX="C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.3.0"
+set OPTIX="C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.6.0"
 set LEVELZERO_INC="..\lib\win64_vc15\level-zero\include"
 set LEVELZERO_LIB="..\lib\win64_vc15\level-zero\lib"
 set MSVC_REDIST_DIR="C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Redist/MSVC/14.29.30133"
