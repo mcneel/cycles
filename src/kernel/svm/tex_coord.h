@@ -561,7 +561,7 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
         if (sd->object != OBJECT_NONE) {
           Transform tfm = object_fetch_transform(kg, sd->object, OBJECT_INVERSE_TRANSFORM);
           if (has_ocs)
-            tfm = transform_clear_scale(tfm);
+            tfm = transform_clear_scale(&tfm);
           data = transform_point(&tfm, data);
         }
       }
@@ -571,7 +571,7 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
         tfm.y = read_node_float(kg, &offset);
         tfm.z = read_node_float(kg, &offset);
         if (has_ocs)
-          tfm = transform_clear_scale(tfm);
+          tfm = transform_clear_scale(&tfm);
         data = transform_point(&tfm, data);
       }
       break;

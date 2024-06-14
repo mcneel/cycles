@@ -213,9 +213,9 @@ ccl_device_inline Transform operator*(const Transform a, const Transform b)
 }
 #endif
 
-ccl_device_inline Transform transform_clear_scale(const Transform &tfm)
+ccl_device_inline Transform transform_clear_scale(ccl_private const Transform* tfm)
 {
-  Transform ntfm = tfm;
+  Transform ntfm = *tfm;
 
   float3 col0 = normalize(make_float3(ntfm.x.x, ntfm.y.x, ntfm.z.x));
   float3 col1 = normalize(make_float3(ntfm.x.y, ntfm.y.y, ntfm.z.y));
