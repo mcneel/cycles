@@ -74,6 +74,7 @@ class Object : public Node {
 
   NODE_SOCKET_API(bool, use_ocs_frame)
   NODE_SOCKET_API(Transform, ocs_frame) /* OCS frame for controlling WCS and WCS Box. */
+  NODE_SOCKET_API(Transform, ocs_frame_normal) /* OCS frame for controlling WCS and WCS Box normal. */
 
   /* Set during device update. */
   bool intersects_volume;

@@ -174,7 +174,9 @@ static void _cycles_scene_object_set_transform(ccl::Session* session_id, ccl::Ob
 			object->set_tfm(mat);
 			break;
 		case 1:
-			object->set_ocs_frame(transform_inverse(mat));
+			ccl::Transform ocs_inverse = transform_inverse(mat);
+			object->set_ocs_frame(ocs_inverse);
+			object->set_ocs_frame_normal(transform_transposed_inverse(ocs_inverse));
 			object->set_use_ocs_frame(mat != ccl::transform_identity());
 			break;
 		}

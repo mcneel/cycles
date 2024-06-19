@@ -16,6 +16,9 @@ ccl_device_inline void wcs_box_coord(KernelGlobals kg, ccl_private ShaderData *s
   if (sd->object != OBJECT_NONE && kernel_data_fetch(objects, sd->object).use_ocs_frame) {
     Transform tfm = kernel_data_fetch(objects, sd->object).ocs_frame;
     *data = transform_point(&tfm, *data);
+
+    tfm = kernel_data_fetch(objects, sd->object).ocs_frame_normal;
+    N = transform_direction(&tfm, N);
   }
 
   int side0 = 0;
@@ -554,8 +557,6 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
       data = sd->P;
       if (sd->object != OBJECT_NONE && kernel_data_fetch(objects, sd->object).use_ocs_frame) {
         has_ocs = true;
-        Transform tfm = kernel_data_fetch(objects, sd->object).ocs_frame;
-        data = transform_point(&tfm, data);
       }
       if (node.w == 0) {
         if (sd->object != OBJECT_NONE) {
@@ -572,6 +573,11 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
         tfm.z = read_node_float(kg, &offset);
         if (has_ocs)
           tfm = transform_clear_scale(&tfm);
+        data = transform_point(&tfm, data);
+      }
+      if (has_ocs)
+      {
+        Transform tfm = kernel_data_fetch(objects, sd->object).ocs_frame;
         data = transform_point(&tfm, data);
       }
       break;
