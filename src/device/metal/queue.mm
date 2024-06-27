@@ -464,6 +464,7 @@ bool MetalDeviceQueue::enqueue(DeviceKernel kernel,
   const MetalKernelPipeline *metal_kernel_pso = MetalDeviceKernels::get_best_pipeline(
       metal_device_, kernel);
   if (!metal_kernel_pso) {
+    printf("No MetalKernelPipeline for %s\n", device_kernel_as_string(kernel));
     metal_device_->set_error(
         string_printf("No MetalKernelPipeline for %s\n", device_kernel_as_string(kernel)));
     return false;
@@ -598,7 +599,7 @@ bool MetalDeviceQueue::enqueue(DeviceKernel kernel,
     /* Enhanced command buffer errors are only available in 11.0+ */
     if (@available(macos 11.0, *)) {
       if (command_buffer.status == MTLCommandBufferStatusError && command_buffer.error != nil) {
-        metal_device_->set_error(string("CommandBuffer Failed: ") + [kernel_name UTF8String]);
+        metal_device_->set_error(string("CommandBuffer Failed1: ") + [kernel_name UTF8String] +"\n\t" + [command_buffer.error.localizedDescription UTF8String] + "\n\t" + [command_buffer.error.localizedFailureReason UTF8String]);
         NSArray<id<MTLCommandBufferEncoderInfo>> *encoderInfos = [command_buffer.error.userInfo
             valueForKey:MTLCommandBufferEncoderInfoErrorKey];
         if (encoderInfos != nil) {
@@ -616,7 +617,7 @@ bool MetalDeviceQueue::enqueue(DeviceKernel kernel,
         close_compute_encoder();
       }
       else if (command_buffer.error) {
-        metal_device_->set_error(string("CommandBuffer Failed: ") + [kernel_name UTF8String]);
+        metal_device_->set_error(string("CommandBuffer Failed2: ") + [kernel_name UTF8String]);
         // See comment in previous if-block.
         close_compute_encoder();
       }

@@ -515,6 +515,7 @@ void MetalKernelPipeline::compile()
 
           error_str = string_printf(
               "Error getting intersection function \"%s\": %s", function_name, errors.c_str());
+          metal_printf("%s\n", error_str.c_str());
           break;
         }
 
@@ -695,6 +696,7 @@ void MetalKernelPipeline::compile()
                                                             error:&error];
       const char *err = error ? [[error localizedDescription] UTF8String] : nullptr;
       error_str = err ? err : "nil";
+	  metal_printf("..--> %s\n", err ? err : "..");
     }
     else {
       /* TODO / MetalRT workaround:
@@ -738,6 +740,8 @@ void MetalKernelPipeline::compile()
                                                       [[error localizedDescription] UTF8String] :
                                                       nullptr;
                                 error_str = err ? err : "nil";
+
+								metal_printf("x--> %s\n", err ? err : "--");
 
                                 compilation_finished = true;
                               }];

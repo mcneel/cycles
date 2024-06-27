@@ -14,7 +14,7 @@
 
 #  include "util/thread.h"
 
-#  define metal_printf VLOG(4) << string_printf
+#  define metal_printf printf
 
 CCL_NAMESPACE_BEGIN
 
