@@ -24,7 +24,7 @@ CCL_NAMESPACE_BEGIN
 #define INV_TWO_PI 0.15915494309190f
 #define SQRT_PI 1.77245385090552f
 
-ccl_device_inline float get_float_from_f2(float2 f2, int index)
+ccl_device_forceinline float get_float_from_f2(float2 f2, int index)
 {
   if(index == 1)
     return f2.y;
@@ -32,7 +32,7 @@ ccl_device_inline float get_float_from_f2(float2 f2, int index)
   return f2.x;
 }
 
-ccl_device_inline float get_float_from_f3(float3 f3, int index)
+ccl_device_forceinline float get_float_from_f3(float3 f3, int index)
 {
   if(index == 1)
     return f3.y;
@@ -42,7 +42,7 @@ ccl_device_inline float get_float_from_f3(float3 f3, int index)
   return f3.x;
 }
 
-ccl_device_inline float get_float_from_f4(float4 f4, int index)
+ccl_device_forceinline float get_float_from_f4(float4 f4, int index)
 {
   if(index == 1)
     return f4.y;
@@ -54,7 +54,7 @@ ccl_device_inline float get_float_from_f4(float4 f4, int index)
   return f4.x;
 }
 
-ccl_device_inline float3 set_float_in_f3(float3 f3, int index, float v)
+ccl_device_forceinline float3 set_float_in_f3(float3 f3, int index, float v)
 {
   if(index == 0)
     f3.x = v;
@@ -66,7 +66,7 @@ ccl_device_inline float3 set_float_in_f3(float3 f3, int index, float v)
   return f3;
 }
 
-ccl_device_inline bool is_odd(int x)
+ccl_device_forceinline bool is_odd(int x)
 {
   return (x & 1) == 1;
 }
@@ -124,7 +124,7 @@ ccl_device void svm_rhino_node_checker_texture(
 
 /* Noise */
 
-ccl_device float bias_func(float x, float b)
+ccl_device_forceinline float bias_func(float x, float b)
 {
   float smallv = 1e-6f;
   if (b < smallv)
@@ -141,7 +141,7 @@ ccl_device float bias_func(float x, float b)
   return powf(x, div);
 }
 
-ccl_device float gain_func(float x, float gain)
+ccl_device_forceinline float gain_func(float x, float gain)
 {
   gain = 1.0f - gain;
 
@@ -156,7 +156,7 @@ ccl_device float gain_func(float x, float gain)
   return 1.0f - (bias * 0.5f);
 }
 
-ccl_device int perlin_noise(KernelGlobals kg, int x)
+ccl_device_forceinline int perlin_noise(KernelGlobals kg, int x)
 {
   int perlin_noise_value = (int)kernel_data_fetch(lookup_table,
                                                  kernel_data.tables.rhino_perlin_noise_offset + x);
@@ -164,7 +164,7 @@ ccl_device int perlin_noise(KernelGlobals kg, int x)
   return perlin_noise_value;
 }
 
-ccl_device float gradient(int h, float dx, float dy, float dz)
+ccl_device_forceinline float gradient(int h, float dx, float dy, float dz)
 {
   if (bool(h & 1)) {
     if (bool(h & 2)) {
@@ -192,12 +192,12 @@ ccl_device float gradient(int h, float dx, float dy, float dz)
   }
 }
 
-ccl_device float noise_weight(float t)
+ccl_device_forceinline float noise_weight(float t)
 {
   return t * t * t * (10.0f + t * (6.0f * t - 15.0f));
 }
 
-ccl_device float noise1(KernelGlobals kg, float x, float y, float z)
+ccl_device_forceinline float noise(KernelGlobals kg, float x, float y, float z)
 {
   float cx = floorf(x);
   float cy = floorf(y);
@@ -246,154 +246,7 @@ ccl_device float noise1(KernelGlobals kg, float x, float y, float z)
   return y0 + wz * (y1 - y0);
 }
 
-ccl_device float noise2(KernelGlobals kg, float x, float y, float z)
-{
-  float cx = floorf(x);
-  float cy = floorf(y);
-  float cz = floorf(z);
-
-  float dx = x - cx;
-  float dy = y - cy;
-  float dz = z - cz;
-
-  int ix = int(cx) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-  int iy = int(cy) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-  int iz = int(cz) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-
-  int h0 = perlin_noise(kg, ix);
-  int h1 = perlin_noise(kg, ix + 1);
-  int h00 = perlin_noise(kg, h0 + iy) + iz;
-  int h01 = perlin_noise(kg, h1 + iy) + iz;
-  int h10 = perlin_noise(kg, h0 + iy + 1) + iz;
-  int h11 = perlin_noise(kg, h1 + iy + 1) + iz;
-
-  int h000 = perlin_noise(kg, h00) & 15;
-  int h001 = perlin_noise(kg, h01) & 15;
-  int h010 = perlin_noise(kg, h10) & 15;
-  int h011 = perlin_noise(kg, h11) & 15;
-  int h100 = perlin_noise(kg, h00 + 1) & 15;
-  int h101 = perlin_noise(kg, h01 + 1) & 15;
-  int h110 = perlin_noise(kg, h10 + 1) & 15;
-  int h111 = perlin_noise(kg, h11 + 1) & 15;
-
-  float w000 = gradient(h000, dx, dy, dz);
-  float w100 = gradient(h001, dx - 1, dy, dz);
-  float w010 = gradient(h010, dx, dy - 1, dz);
-  float w110 = gradient(h011, dx - 1, dy - 1, dz);
-  float w001 = gradient(h100, dx, dy, dz - 1);
-  float w101 = gradient(h101, dx - 1, dy, dz - 1);
-  float w011 = gradient(h110, dx, dy - 1, dz - 1);
-  float w111 = gradient(h111, dx - 1, dy - 1, dz - 1);
-
-  float wx = noise_weight(dx);
-  float wy = noise_weight(dy);
-  float wz = noise_weight(dz);
-
-  float y0 = w000 + wx * (w100 - w000 + wy * (w110 - w010 + w000 - w100)) + wy * (w010 - w000);
-  float y1 = w001 + wx * (w101 - w001 + wy * (w111 - w011 + w001 - w101)) + wy * (w011 - w001);
-
-  return y0 + wz * (y1 - y0);
-}
-
-ccl_device float noise3(KernelGlobals kg, float x, float y, float z)
-{
-  float cx = floorf(x);
-  float cy = floorf(y);
-  float cz = floorf(z);
-
-  float dx = x - cx;
-  float dy = y - cy;
-  float dz = z - cz;
-
-  int ix = int(cx) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-  int iy = int(cy) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-  int iz = int(cz) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-
-  int h0 = perlin_noise(kg, ix);
-  int h1 = perlin_noise(kg, ix + 1);
-  int h00 = perlin_noise(kg, h0 + iy) + iz;
-  int h01 = perlin_noise(kg, h1 + iy) + iz;
-  int h10 = perlin_noise(kg, h0 + iy + 1) + iz;
-  int h11 = perlin_noise(kg, h1 + iy + 1) + iz;
-
-  int h000 = perlin_noise(kg, h00) & 15;
-  int h001 = perlin_noise(kg, h01) & 15;
-  int h010 = perlin_noise(kg, h10) & 15;
-  int h011 = perlin_noise(kg, h11) & 15;
-  int h100 = perlin_noise(kg, h00 + 1) & 15;
-  int h101 = perlin_noise(kg, h01 + 1) & 15;
-  int h110 = perlin_noise(kg, h10 + 1) & 15;
-  int h111 = perlin_noise(kg, h11 + 1) & 15;
-
-  float w000 = gradient(h000, dx, dy, dz);
-  float w100 = gradient(h001, dx - 1, dy, dz);
-  float w010 = gradient(h010, dx, dy - 1, dz);
-  float w110 = gradient(h011, dx - 1, dy - 1, dz);
-  float w001 = gradient(h100, dx, dy, dz - 1);
-  float w101 = gradient(h101, dx - 1, dy, dz - 1);
-  float w011 = gradient(h110, dx, dy - 1, dz - 1);
-  float w111 = gradient(h111, dx - 1, dy - 1, dz - 1);
-
-  float wx = noise_weight(dx);
-  float wy = noise_weight(dy);
-  float wz = noise_weight(dz);
-
-  float y0 = w000 + wx * (w100 - w000 + wy * (w110 - w010 + w000 - w100)) + wy * (w010 - w000);
-  float y1 = w001 + wx * (w101 - w001 + wy * (w111 - w011 + w001 - w101)) + wy * (w011 - w001);
-
-  return y0 + wz * (y1 - y0);
-}
-
-ccl_device float noise4(KernelGlobals kg, float x, float y, float z)
-{
-  float cx = floorf(x);
-  float cy = floorf(y);
-  float cz = floorf(z);
-
-  float dx = x - cx;
-  float dy = y - cy;
-  float dz = z - cz;
-
-  int ix = int(cx) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-  int iy = int(cy) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-  int iz = int(cz) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1);
-
-  int h0 = perlin_noise(kg, ix);
-  int h1 = perlin_noise(kg, ix + 1);
-  int h00 = perlin_noise(kg, h0 + iy) + iz;
-  int h01 = perlin_noise(kg, h1 + iy) + iz;
-  int h10 = perlin_noise(kg, h0 + iy + 1) + iz;
-  int h11 = perlin_noise(kg, h1 + iy + 1) + iz;
-
-  int h000 = perlin_noise(kg, h00) & 15;
-  int h001 = perlin_noise(kg, h01) & 15;
-  int h010 = perlin_noise(kg, h10) & 15;
-  int h011 = perlin_noise(kg, h11) & 15;
-  int h100 = perlin_noise(kg, h00 + 1) & 15;
-  int h101 = perlin_noise(kg, h01 + 1) & 15;
-  int h110 = perlin_noise(kg, h10 + 1) & 15;
-  int h111 = perlin_noise(kg, h11 + 1) & 15;
-
-  float w000 = gradient(h000, dx, dy, dz);
-  float w100 = gradient(h001, dx - 1, dy, dz);
-  float w010 = gradient(h010, dx, dy - 1, dz);
-  float w110 = gradient(h011, dx - 1, dy - 1, dz);
-  float w001 = gradient(h100, dx, dy, dz - 1);
-  float w101 = gradient(h101, dx - 1, dy, dz - 1);
-  float w011 = gradient(h110, dx, dy - 1, dz - 1);
-  float w111 = gradient(h111, dx - 1, dy - 1, dz - 1);
-
-  float wx = noise_weight(dx);
-  float wy = noise_weight(dy);
-  float wz = noise_weight(dz);
-
-  float y0 = w000 + wx * (w100 - w000 + wy * (w110 - w010 + w000 - w100)) + wy * (w010 - w000);
-  float y1 = w001 + wx * (w101 - w001 + wy * (w111 - w011 + w001 - w101)) + wy * (w011 - w001);
-
-  return y0 + wz * (y1 - y0);
-}
-
-ccl_device float value_noise(KernelGlobals kg, float x, float y, float z)
+ccl_device_forceinline float value_noise(KernelGlobals kg, float x, float y, float z)
 {
   float cx = floorf(x);
   float cy = floorf(y);
@@ -442,24 +295,24 @@ ccl_device float value_noise(KernelGlobals kg, float x, float y, float z)
   return prn0XX * wx + prn1XX * (1.0f - wx);
 }
 
-ccl_device int B(int n, int b)
+ccl_device_forceinline int B2(int n, int b)
 {
   return (n >> b) & 1;
 }
 
-ccl_device int B(int i, int j, int k, int b)
+ccl_device_forceinline int B4(int i, int j, int k, int b)
 {
   int SimplexT[8] = {0x15, 0x38, 0x32, 0x2c, 0x0d, 0x13, 0x07, 0x2a};
-  return SimplexT[(B(i, b) << 2) | (B(j, b) << 1) | B(k, b)];
+  return SimplexT[(B2(i, b) << 2) | (B2(j, b) << 1) | B2(k, b)];
 }
 
-ccl_device int shuffle(int i, int j, int k)
+ccl_device_forceinline int shuffle(int i, int j, int k)
 {
-  return B(i, j, k, 0) + B(j, k, i, 1) + B(k, i, j, 2) + B(i, j, k, 3) + B(j, k, i, 4) +
-         B(k, i, j, 5) + B(i, j, k, 6) + B(j, k, i, 7);
+  return B4(i, j, k, 0) + B4(j, k, i, 1) + B4(k, i, j, 2) + B4(i, j, k, 3) + B4(j, k, i, 4) +
+         B4(k, i, j, 5) + B4(i, j, k, 6) + B4(j, k, i, 7);
 }
 
-ccl_device float K(int a, float u, float v, float w, int i, int j, int k, int3 a_vec)
+ccl_device_forceinline float K(int a, float u, float v, float w, int i, int j, int k, int3 a_vec)
 {
   float s = float(a_vec.x + a_vec.y+ a_vec.z) / 6.0f;
   float x = u - float(a_vec.x) + s;
@@ -483,7 +336,7 @@ ccl_device float K(int a, float u, float v, float w, int i, int j, int k, int3 a
   return 8.0f * t * t * (p + (b == 0 ? q + r : (b2 == 0 ? q : r)));
 }
 
-ccl_device_inline int3 roll_int3(int3 a, int idx)
+ccl_device_forceinline int3 roll_int3(int3 a, int idx)
 {
   if(idx == 0)
     a.x++;
@@ -494,7 +347,7 @@ ccl_device_inline int3 roll_int3(int3 a, int idx)
   return a;
 }
 
-ccl_device_inline float simplex_noise(float x, float y, float z)
+ccl_device_forceinline float simplex_noise(float x, float y, float z)
 {
   float s = (x + y + z) / 3.0f;
   int i = int(floorf(x + s));
@@ -528,7 +381,7 @@ ccl_device_inline float simplex_noise(float x, float y, float z)
 #define VCNPERM(kg, x) perlin_noise((kg), (x) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1))
 #define VCNINDEX(kg, ix, iy, iz) VCNPERM((kg), (ix) + VCNPERM((kg), (iy) + VCNPERM((kg), iz)))
 
-ccl_device_inline float4 impulse_noise(KernelGlobals kg, int x)
+ccl_device_forceinline float4 impulse_noise(KernelGlobals kg, int x)
 {
   float4 noise = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
   noise.x = kernel_data_fetch(lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
@@ -539,7 +392,7 @@ ccl_device_inline float4 impulse_noise(KernelGlobals kg, int x)
   return noise;
 }
 
-ccl_device_inline float catrom2(float d)
+ccl_device_forceinline float catrom2(float d)
 {
 #define SAMPRATE 100 /* table entries per unit distance */
 
@@ -558,7 +411,7 @@ ccl_device_inline float catrom2(float d)
   return x;
 }
 
-ccl_device float sparse_convolution_noise(KernelGlobals kg, float x, float y, float z)
+ccl_device_forceinline float sparse_convolution_noise(KernelGlobals kg, float x, float y, float z)
 {
   int ix = int(floorf(x));
   int iy = int(floorf(y));
@@ -593,14 +446,14 @@ ccl_device float sparse_convolution_noise(KernelGlobals kg, float x, float y, fl
   return sum / float(SCNNIMPULSES);
 }
 
-ccl_device float vc_noise(KernelGlobals kg, int x)
+ccl_device_forceinline float vc_noise(KernelGlobals kg, int x)
 {
   float noise = kernel_data_fetch(lookup_table, kernel_data.tables.rhino_vc_noise_offset + x);
 
   return noise;
 }
 
-ccl_device float lattice_convolution_noise(KernelGlobals kg, float x, float y, float z)
+ccl_device_forceinline float lattice_convolution_noise(KernelGlobals kg, float x, float y, float z)
 {
   int ix = int(floorf(x));
   int iy = int(floorf(y));
@@ -632,48 +485,48 @@ ccl_device float lattice_convolution_noise(KernelGlobals kg, float x, float y, f
   return sum;
 }
 
-ccl_device_inline float WHN_frand(int seed)
+ccl_device_forceinline float WHN_frand(int seed)
 {
   seed = seed << (13 ^ seed);
   return (1.0f - float(int(seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) /
                      1073741824.0f);
 }
 
-ccl_device_inline float WHN_rand3a(int x, int y, int z)
+ccl_device_forceinline float WHN_rand3a(int x, int y, int z)
 {
   return WHN_frand(67 * x + 59 * y + 71 * z);
 }
-ccl_device_inline float WHN_rand3b(int x, int y, int z)
+ccl_device_forceinline float WHN_rand3b(int x, int y, int z)
 {
   return WHN_frand(73 * x + 79 * y + 83 * z);
 }
-ccl_device_inline float WHN_rand3c(int x, int y, int z)
+ccl_device_forceinline float WHN_rand3c(int x, int y, int z)
 {
   return WHN_frand(89 * x + 97 * y + 101 * z);
 }
-ccl_device_inline float WHN_rand3d(int x, int y, int z)
+ccl_device_forceinline float WHN_rand3d(int x, int y, int z)
 {
   return WHN_frand(103 * x + 107 * y + 109 * z);
 }
 
-ccl_device_inline float WHN_hpoly1(float t)
+ccl_device_forceinline float WHN_hpoly1(float t)
 {
   return ((2.0f * t - 3.0f) * t * t + 1.0f);
 }
-ccl_device_inline float WHN_hpoly2(float t)
+ccl_device_forceinline float WHN_hpoly2(float t)
 {
   return (-2.0f * t + 3.0f) * t * t;
 }
-ccl_device_inline float WHN_hpoly3(float t)
+ccl_device_forceinline float WHN_hpoly3(float t)
 {
   return ((t - 2.0f) * t + 1.0f) * t;
 }
-ccl_device_inline float WHN_hpoly4(float t)
+ccl_device_forceinline float WHN_hpoly4(float t)
 {
   return (t - 1.0f) * t * t;
 }
 
-ccl_device_inline float4 WHN_rand(int i, int3 xlim[2])
+ccl_device_forceinline float4 WHN_rand(int i, int3 xlim[2])
 {
   float4 f;
 
@@ -685,7 +538,7 @@ ccl_device_inline float4 WHN_rand(int i, int3 xlim[2])
   return f;
 }
 
-ccl_device_inline float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
+ccl_device_forceinline float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
 {
   float4 f;
 
@@ -705,7 +558,7 @@ ccl_device_inline float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
   return f;
 }
 
-ccl_device float4 WHN_interpolate_nonrecursive(int3 xlim[2], float3 pXarg)
+ccl_device_forceinline float4 WHN_interpolate_nonrecursive(int3 xlim[2], float3 pXarg)
 {
   float4 f0 = WHN_rand(0, xlim);
   float4 f1 = WHN_rand(1, xlim);
@@ -730,7 +583,7 @@ ccl_device float4 WHN_interpolate_nonrecursive(int3 xlim[2], float3 pXarg)
   return WHN_hpoly(2, pXarg, fff0, fff1);
 }
 
-ccl_device float wards_hermite_noise(float x, float y, float z)
+ccl_device_forceinline float wards_hermite_noise(float x, float y, float z)
 {
   float3 uvw = make_float3(x, y, z);
 
@@ -745,14 +598,14 @@ ccl_device float wards_hermite_noise(float x, float y, float z)
   return f.w;
 }
 
-ccl_device int aaltonen_value(KernelGlobals kg, int x)
+ccl_device_forceinline int aaltonen_value(KernelGlobals kg, int x)
 {
   float value = kernel_data_fetch(lookup_table, kernel_data.tables.rhino_aaltonen_noise_offset + x);
 
   return int(value);
 }
 
-ccl_device float aaltonen_noise(KernelGlobals kg, float x, float y, float z)
+ccl_device_forceinline float aaltonen_noise(KernelGlobals kg, float x, float y, float z)
 {
   // clang-format off
   float ANsquaredRadius[16] = {
@@ -828,7 +681,7 @@ ccl_device float4 noise_texture(KernelGlobals kg,
                                 float amplitude_multiplier,
                                 float clamp_min,
                                 float clamp_max,
-                                bool scale_to_clamp,
+                                bool physical_sky_scale_to_clamp,
                                 bool inverse,
                                 float gain)
 {
@@ -848,13 +701,13 @@ ccl_device float4 noise_texture(KernelGlobals kg,
 
     switch (noise_type) {
       case RHINO_NOISE_PERLIN:
-        value = noise1(kg, x, y, z);
+        value = noise(kg, x, y, z);
         break;
       case RHINO_NOISE_VALUE_NOISE:
         value = value_noise(kg, x, y, z);
         break;
       case RHINO_NOISE_PERLIN_PLUS_VALUE:
-        value = 0.5f * value_noise(kg, x, y, z) + 0.5f * noise2(kg, x, y, z);
+        value = 0.5f * value_noise(kg, x, y, z) + 0.5f * noise(kg, x, y, z);
         break;
       case RHINO_NOISE_SIMPLEX:
         value = simplex_noise(x, y, z);
@@ -897,7 +750,7 @@ ccl_device float4 noise_texture(KernelGlobals kg,
   if (total_value <= clamp_min)
     total_value = clamp_min;
 
-  if (scale_to_clamp) {
+  if (physical_sky_scale_to_clamp) {
     if (clamp_max - clamp_min != 0.0f) {
       total_value = -1.0f + 2.0f * (total_value - clamp_min) / (clamp_max - clamp_min);
     }
@@ -946,7 +799,7 @@ ccl_device void svm_rhino_node_noise_texture(
   float amplitude_multiplier = __uint_as_float(data1.x);
   float clamp_min = __uint_as_float(data1.y);
   float clamp_max = __uint_as_float(data1.z);
-  bool scale_to_clamp = (bool)data1.w;
+  bool physical_sky_scale_to_clamp = (bool)data1.w;
   bool inverse = (bool)data2.x;
   float gain = __uint_as_float(data2.y);
 
@@ -961,7 +814,7 @@ ccl_device void svm_rhino_node_noise_texture(
                                    amplitude_multiplier,
                                    clamp_min,
                                    clamp_max,
-                                   scale_to_clamp,
+                                   physical_sky_scale_to_clamp,
                                    inverse,
                                    gain);
 
@@ -1520,7 +1373,7 @@ ccl_device float fbm(KernelGlobals kg, float3 P, bool is_turbulent, float omega,
   float sum = 0.0f, lambda = 1.0f, o = 1.0f;
   for (int i = 0; i < maxOctaves; ++i) {
     float3 lambda_p = lambda * P;
-    float noise_value = noise3(kg, lambda_p.x, lambda_p.y, lambda_p.z);
+    float noise_value = noise(kg, lambda_p.x, lambda_p.y, lambda_p.z);
 
     if (is_turbulent)
       noise_value = fabsf(noise_value);
@@ -2508,7 +2361,7 @@ ccl_device float4 perlin_marble_texture(KernelGlobals kg,
     float x = uvw.x * freq + float(o);
     float y = uvw.y * freq + float(o) * 2.0f;
     float z = uvw.z * freq - float(o);
-    float value = noise4(kg, x * size, y * size, z * size);
+    float value = noise(kg, x * size, y * size, z * size);
     totalValue += weight * value;
     freq *= 2.17f;
     weight *= 0.5f;
@@ -2598,7 +2451,7 @@ ccl_device void svm_rhino_node_perlin_marble_texture(
     stack_store_float(stack, out_alpha_offset, out_color.w);
 }
 
-ccl_device float scale(float fCos)
+ccl_device float physical_sky_scale(float fCos)
 {
   float x = 1.0f - fCos;
   return 0.25f * expf(-0.00287f + x * (0.459f + x * (3.83f + x * (-6.80f + x * 5.25f))));
@@ -2686,7 +2539,7 @@ ccl_device float4 physical_sky_texture(float3 uvw,
   // Calculate the ray's starting position, then calculate its scattering offset
   float Depth = expf(-fScaleOverScaleDepth * 1.0e-6f);
   float StartAngle = dot(vRay, normalize(vGroundPos));
-  float StartOffset = Depth * scale(StartAngle);
+  float StartOffset = Depth * physical_sky_scale(StartAngle);
 
   // Initialize the scattering variables
   float SampleLength = t / fSamples;
@@ -2706,7 +2559,7 @@ ccl_device float4 physical_sky_texture(float3 uvw,
     float Depth2 = expf(fScaleOverScaleDepth * (fInnerRadius - Height));
     float LightAngle = dot(vLightDir, vPoint);
     float CameraAngle = dot(vRay, vPoint);
-    float Scatter = StartOffset + Depth2 * (scale(LightAngle) - scale(CameraAngle));
+    float Scatter = StartOffset + Depth2 * (physical_sky_scale(LightAngle) - physical_sky_scale(CameraAngle));
     float3 vAttenuate = make_float3(
         expf(-Scatter * MScatter.x), expf(-Scatter * MScatter.y), expf(-Scatter * MScatter.z));
 
@@ -2880,10 +2733,10 @@ ccl_device float3 gamma_adjust(float3 color, float gamma)
 }
 
 ccl_device float4 texture_adjustment_texture(float4 color,
-                 bool grayscale,
+                 bool grayphysical_sky_scale,
                  bool invert,
                  bool clamp,
-                 bool scale_to_clamp,
+                 bool physical_sky_scale_to_clamp,
                  float multiplier,
                  float clamp_min,
                  float clamp_max,
@@ -2912,7 +2765,7 @@ ccl_device float4 texture_adjustment_texture(float4 color,
     if (b < clamp_min)
       b = clamp_min;
 
-    if (scale_to_clamp)
+    if (physical_sky_scale_to_clamp)
       b = (b - clamp_min) / (clamp_max - clamp_min);
   }
 
@@ -2958,7 +2811,7 @@ ccl_device float4 texture_adjustment_texture(float4 color,
     }
   }
 
-  if (grayscale) {
+  if (grayphysical_sky_scale) {
     float luminance = Luminance(make_float3(color.x, color.y, color.z));
     rgb = make_float3(luminance, luminance, luminance);
     color.x = rgb.x;
@@ -2987,10 +2840,10 @@ ccl_device void svm_rhino_node_texture_adjustment_texture(
   uint4 data1 = read_node(kg, offset);
   uint4 data2 = read_node(kg, offset);
 
-  bool grayscale = (bool)data0.x;
+  bool grayphysical_sky_scale = (bool)data0.x;
   bool invert = (bool)data0.y;
   bool clamp = (bool)data0.z;
-  bool scale_to_clamp = (bool)data0.w;
+  bool physical_sky_scale_to_clamp = (bool)data0.w;
   float multiplier = __uint_as_float(data1.x);
   float clamp_min = __uint_as_float(data1.y);
   float clamp_max = __uint_as_float(data1.z);
@@ -3001,10 +2854,10 @@ ccl_device void svm_rhino_node_texture_adjustment_texture(
   bool is_hdr = (bool)data2.w;
 
   float4 out_color = texture_adjustment_texture(make_float4(color.x, color.y, color.z, 1.0f),
-                                                grayscale,
+                                                grayphysical_sky_scale,
                                                 invert,
                                                 clamp,
-                                                scale_to_clamp,
+                                                physical_sky_scale_to_clamp,
                                                 multiplier,
                                                 clamp_min,
                                                 clamp_max,
