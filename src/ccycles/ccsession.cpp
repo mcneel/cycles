@@ -242,7 +242,7 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 			PassInfo pass_info = Pass::get_info(full_pass->get_pass_type());
 
 			const int pixel_stride = pass_info.num_components;
-			const int pixel_stride_bytes = pixel_stride * sizeof(float);
+			//const int pixel_stride_bytes = pixel_stride * sizeof(float);
 
 			const int tile_width = tile.size.x;
 			const int tile_height = tile.size.y;
@@ -435,8 +435,8 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 	if (params == nullptr)
 		return nullptr;
 
-	int csesid{ -1 };
-	int hid{ 0 };
+	//int csesid{ -1 };
+	//int hid{ 0 };
 
 	CCSession* session = CCSession::create(10, 10, 4);
 
@@ -454,7 +454,7 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 	prep_session(session->session, &session->passes, session);
 
 	sessions.insert(session);
-	csesid = (unsigned int)(sessions.size() - 1);
+	//csesid = (unsigned int)(sessions.size() - 1);
 
 	return session->session;
 }

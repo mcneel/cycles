@@ -68,9 +68,6 @@ class DeviceScene {
   device_vector<int> prim_object;
   device_vector<float2> prim_time;
 
-  /* Clipping planes float4 contains a,b,c,d to plane equation ax+by+cz+d. */
-  device_vector<float4> clipping_planes;
-
   /* mesh */
   device_vector<packed_float3> tri_verts;
   device_vector<uint> tri_shader;
@@ -136,6 +133,12 @@ class DeviceScene {
 
   /* IES lights */
   device_vector<float> ies_lights;
+
+  /* Clipping planes float4 contains a,b,c,d to plane equation ax+by+cz+d. */
+  device_vector<float4> clipping_planes;
+
+  /* Rhino decals */
+  device_vector<KernelDecal> decals;
 
   KernelData data;
 

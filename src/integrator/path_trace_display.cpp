@@ -9,7 +9,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-PathTraceDisplay::PathTraceDisplay(unique_ptr<DisplayDriver> driver) : driver_(move(driver))
+PathTraceDisplay::PathTraceDisplay(unique_ptr<DisplayDriver> driver) : driver_(std::move(driver))
 {
 }
 

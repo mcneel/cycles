@@ -50,7 +50,7 @@ void cycles_geometry_set_shader(ccl::Session *session, ccl::Geometry *mesh_id, c
 
 		ccl::array<ccl::Node *>& used_shaders = mesh_id->get_used_shaders();
 
-		int idx = -1; 
+		int idx = -1;
 		for (int i = 0; i < used_shaders.size(); i++) {
 			ccl::Node *node = used_shaders[i];
 			if (node == shader_id) {
@@ -503,7 +503,7 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 	ccl::AttributeSet& attributes = mesh->attributes;
 	ccl::Attribute *attr;
 	ustring name = ustring(std::string(uvmap_name.c_str()) + std::string(".tangent"));
-	auto uvattr = attributes.find(ccl::ATTR_STD_UV);
+	//auto uvattr = attributes.find(ccl::ATTR_STD_UV);
 	attr = attributes.add(ccl::ATTR_STD_UV_TANGENT, name);
 
 	ccl::float3 *tangent = attr->data_float3();

@@ -213,7 +213,7 @@ CCL_CAPI int CDECL cycles_get_shadernodetype_count()
 {
 	int count = 0;
 	auto &all_types = ccl::NodeType::types();
-	for (const auto [name, nodetype] : all_types) {
+	for (const auto& [name, nodetype] : all_types) {
 		std::string nodename{name};
 		if (std::string::npos != nodename.find("convert")) {
 			continue;
@@ -229,7 +229,7 @@ CCL_CAPI const ccl::NodeType* CDECL cycles_get_shadernodetype(int idx)
 {
 	int count = 0;
 	auto &all_types = ccl::NodeType::types();
-	for (const auto [name, nodetype] : all_types) {
+	for (const auto& [name, nodetype] : all_types) {
 		std::string nodename{name};
 		if (std::string::npos != nodename.find("convert")) {
 			continue;
@@ -1352,7 +1352,6 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_int(ccl::ShaderNode *shnode_
 										 const char *attribute_name,
 										 int value)
 {
-	bool set = false;
 	std::string sockname{attribute_name};
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
@@ -1363,18 +1362,15 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_int(ccl::ShaderNode *shnode_
 		}
 		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, value);
-			set = true;
 			break;
 		}
 	}
-	assert(set);
 }
 
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_bool(ccl::ShaderNode *shnode_id,
 										  const char *attribute_name,
 										  bool value)
 {
-	bool set = false;
 	std::string sockname{attribute_name};
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
@@ -1385,11 +1381,9 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_bool(ccl::ShaderNode *shnode
 		}
 		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, value);
-			set = true;
 			break;
 		}
 	}
-	assert(set);
 }
 
 #ifdef __cplusplus
@@ -1416,7 +1410,6 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_string(ccl::ShaderNode *shno
 											const UTFCHAR *attribute_name,
 											const UTFCHAR *value)
 {
-	bool set = false;
 	std::string sockname = ws2s(attribute_name);
 	std::string nval = ws2s(value);
 #ifndef WIN32
@@ -1432,11 +1425,9 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_string(ccl::ShaderNode *shno
 		}
 		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, val);
-			set = true;
 			break;
 		}
 	}
-	assert(set);
 }
 
 /*
@@ -1446,7 +1437,6 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_float(ccl::ShaderNode *shnod
 										   const char *attribute_name,
 										   float value)
 {
-	bool set = false;
 	std::string sockname{attribute_name};
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
 		if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED) {
@@ -1457,11 +1447,9 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_float(ccl::ShaderNode *shnod
 		}
 		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, value);
-			set = true;
 			break;
 		}
 	}
-	assert(set);
 }
 
 /*
@@ -1470,7 +1458,6 @@ Set a vector of floats attribute with given name to x, y and z. shader_id is the
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_vec(
 	ccl::ShaderNode *shnode_id, const char *attribute_name, float x, float y, float z)
 {
-	bool set = false;
 	ccl::float3 f3 = ccl::make_float3(x, y, z);
 	std::string sockname{attribute_name};
 	for (const ccl::SocketType &socket : shnode_id->type->inputs) {
@@ -1482,11 +1469,9 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_vec(
 		}
 		if (ccl::string_iequals(socket.name.string(), sockname)) {
 			shnode_id->set(socket, f3);
-			set = true;
 			break;
 		}
 	}
-	assert(set);
 }
 
 CCL_CAPI bool CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id,

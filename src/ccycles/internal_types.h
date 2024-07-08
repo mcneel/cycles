@@ -27,9 +27,11 @@ limitations under the License.
 #include <string>
 #include <functional>
 
+#ifdef WIN32
 #pragma warning ( push )
 
 #pragma warning ( disable : 4244 )
+#endif
 
 #include "scene/background.h"
 #include "scene/camera.h"
@@ -55,7 +57,9 @@ limitations under the License.
 #include "util/string.h"
 #include "util/thread.h"
 
+#ifdef WIN32
 #pragma warning ( pop )
+#endif
 
 #include "ccycles.h"
 
@@ -209,12 +213,11 @@ class CCyclesOutputDriver : public ccl::OutputDriver {
 	protected:
 		bool write_or_update_render_tile(const Tile &tile);
 
+		std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes;
 		LogFunction log_;
-
 		CCSession* ccsession_;
 
 		std::vector<std::vector<float>> tile_passes;
-		std::vector<std::unique_ptr<CCyclesPassOutput>> *full_passes;
 };
 
 class CCyclesDisplayDriver : public ccl::DisplayDriver {

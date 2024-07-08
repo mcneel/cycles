@@ -82,7 +82,8 @@ DeviceScene::DeviceScene(Device *device)
       lookup_table(device, "lookup_table", MEM_GLOBAL),
       sample_pattern_lut(device, "sample_pattern_lut", MEM_GLOBAL),
       ies_lights(device, "ies", MEM_GLOBAL),
-      clipping_planes(device, "clipping_planes", MEM_GLOBAL)
+      clipping_planes(device, "clipping_planes", MEM_GLOBAL),
+      decals(device, "decals", MEM_GLOBAL)
 {
   memset((void *)&data, 0, sizeof(data));
 }

@@ -106,6 +106,7 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
         break;
       }
       case SocketType::COLOR:
+      case SocketType::COLOR2:
       case SocketType::VECTOR:
       case SocketType::POINT:
       case SocketType::NORMAL: {
@@ -293,6 +294,7 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
         break;
       }
       case SocketType::COLOR:
+      case SocketType::COLOR2:
       case SocketType::VECTOR:
       case SocketType::POINT:
       case SocketType::NORMAL: {

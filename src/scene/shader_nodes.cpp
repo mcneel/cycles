@@ -2287,7 +2287,7 @@ void ConvertNode::compile(SVMCompiler &compiler)
       /* color to float */
       compiler.add_node(
           NODE_CONVERT, NODE_CONVERT_CF, compiler.stack_assign(in), compiler.stack_assign(out));
-    else 
+    else
     if (from == SocketType::COLOR2)
       /* color to float */
       compiler.add_node(
