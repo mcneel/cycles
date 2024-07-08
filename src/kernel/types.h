@@ -1458,6 +1458,46 @@ typedef struct KernelShader {
 } KernelShader;
 static_assert_align(KernelShader, 16);
 
+/* Rhino decals */
+
+typedef enum DecalType {
+  DECAL_BOX,
+  DECAL_SPHERE,
+  DECAL_CYLINDER,
+  DECAL_UV
+} DecalType;
+
+typedef struct KernelDecal {
+  DecalType type;
+  /* decal origin */
+  float4 decal_origin;
+  /* decal across vector */
+  float4 decal_across;
+  /* decal up vector */
+  float4 decal_up;
+
+  /* Pxyz transform to map ShaderData->P to normalized mapping primitive */
+  Transform pxyz;
+  /* Nxyz transform to map ShaderData->N to normalized mapping primitive */
+  Transform nxyz;
+  /* UVW transform to map point to UV(W) space*/
+  Transform uvw;
+  /* Sweep used in spherical and tubular projections t. */
+  float horizontal_sweep_start;
+  float horizontal_sweep_end;
+  float vertical_sweep_start;
+  float vertical_sweep_end;
+
+  /* Height used in tubular, radius in spherical and tubular projections. */
+  float height;
+  float radius;
+  /* Projection used by decal: both, forward or backward */
+  NodeImageDecalProjection decal_projection;
+  short pad;
+
+} KernelDecal;
+static_assert_align(KernelDecal, 16);
+
 /* Patches */
 
 #define PATCH_MAX_CONTROL_VERTS 16
