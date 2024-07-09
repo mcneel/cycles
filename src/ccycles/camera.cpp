@@ -16,7 +16,11 @@ limitations under the License.
 
 #include "internal_types.h"
 
-void cycles_camera_set_size(ccl::Session* session_id, unsigned int width, unsigned int height)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+CCL_CAPI void CDECL cycles_camera_set_size(ccl::Session* session_id, unsigned int width, unsigned int height)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -28,7 +32,7 @@ void cycles_camera_set_size(ccl::Session* session_id, unsigned int width, unsign
 	}
 }
 
-unsigned int cycles_camera_get_width(ccl::Session* session_id)
+CCL_CAPI unsigned int CDECL cycles_camera_get_width(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -38,7 +42,7 @@ unsigned int cycles_camera_get_width(ccl::Session* session_id)
 	return 0;
 }
 
-unsigned int cycles_camera_get_height(ccl::Session* session_id)
+CCL_CAPI unsigned int CDECL cycles_camera_get_height(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -48,7 +52,7 @@ unsigned int cycles_camera_get_height(ccl::Session* session_id)
 	return 0;
 }
 
-void cycles_camera_set_type(ccl::Session* session_id, camera_type type)
+CCL_CAPI void CDECL cycles_camera_set_type(ccl::Session* session_id, camera_type type)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -56,7 +60,7 @@ void cycles_camera_set_type(ccl::Session* session_id, camera_type type)
 	}
 }
 
-void cycles_camera_set_panorama_type(ccl::Session* session_id, panorama_type type)
+CCL_CAPI void CDECL cycles_camera_set_panorama_type(ccl::Session* session_id, panorama_type type)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -64,7 +68,7 @@ void cycles_camera_set_panorama_type(ccl::Session* session_id, panorama_type typ
 	}
 }
 
-void cycles_camera_set_matrix(ccl::Session* session_id,
+CCL_CAPI void CDECL cycles_camera_set_matrix(ccl::Session* session_id,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -77,7 +81,7 @@ void cycles_camera_set_matrix(ccl::Session* session_id,
 	}
 }
 
-void cycles_camera_compute_auto_viewplane(ccl::Session* session_id)
+CCL_CAPI void CDECL cycles_camera_compute_auto_viewplane(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -85,7 +89,7 @@ void cycles_camera_compute_auto_viewplane(ccl::Session* session_id)
 	}
 }
 
-void cycles_camera_set_viewplane(ccl::Session* session_id, float left, float right, float top, float bottom)
+CCL_CAPI void CDECL cycles_camera_set_viewplane(ccl::Session* session_id, float left, float right, float top, float bottom)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -97,7 +101,7 @@ void cycles_camera_set_viewplane(ccl::Session* session_id, float left, float rig
 
 }
 
-void cycles_camera_update(ccl::Session* session_id)
+CCL_CAPI void CDECL cycles_camera_update(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -105,7 +109,7 @@ void cycles_camera_update(ccl::Session* session_id)
 
 		// 2023-05-22 David E. (RH-74901)
 		// NOTE: This is a hack. I'm calling tag_modified() here
-		// because otherwise the updated camera will get ignored in 
+		// because otherwise the updated camera will get ignored in
 		// Scene::update_kernel_features() due to need_update() returning
 		// false. It seems like camera->update(...) should not get called
 		// while we're rendering with CyclesX. Instead, we should be
@@ -120,7 +124,7 @@ void cycles_camera_update(ccl::Session* session_id)
 	}
 }
 
-void cycles_camera_set_fov(ccl::Session* session_id, float fov)
+CCL_CAPI void CDECL cycles_camera_set_fov(ccl::Session* session_id, float fov)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -128,7 +132,7 @@ void cycles_camera_set_fov(ccl::Session* session_id, float fov)
 	}
 }
 
-void cycles_camera_set_sensor_width(ccl::Session* session_id, float sensor_width)
+CCL_CAPI void CDECL cycles_camera_set_sensor_width(ccl::Session* session_id, float sensor_width)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -136,7 +140,7 @@ void cycles_camera_set_sensor_width(ccl::Session* session_id, float sensor_width
 	}
 }
 
-void cycles_camera_set_sensor_height(ccl::Session* session_id, float sensor_height)
+CCL_CAPI void CDECL cycles_camera_set_sensor_height(ccl::Session* session_id, float sensor_height)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -144,7 +148,7 @@ void cycles_camera_set_sensor_height(ccl::Session* session_id, float sensor_heig
 	}
 }
 
-void cycles_camera_set_nearclip(ccl::Session* session_id, float nearclip)
+CCL_CAPI void CDECL cycles_camera_set_nearclip(ccl::Session* session_id, float nearclip)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -152,7 +156,7 @@ void cycles_camera_set_nearclip(ccl::Session* session_id, float nearclip)
 	}
 }
 
-void cycles_camera_set_farclip(ccl::Session* session_id, float farclip)
+CCL_CAPI void CDECL cycles_camera_set_farclip(ccl::Session* session_id, float farclip)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -160,7 +164,7 @@ void cycles_camera_set_farclip(ccl::Session* session_id, float farclip)
 	}
 }
 
-void cycles_camera_set_aperturesize(ccl::Session* session_id, float aperturesize)
+CCL_CAPI void CDECL cycles_camera_set_aperturesize(ccl::Session* session_id, float aperturesize)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -168,7 +172,7 @@ void cycles_camera_set_aperturesize(ccl::Session* session_id, float aperturesize
 	}
 }
 
-void cycles_camera_set_aperture_ratio(ccl::Session* session_id, float aperture_ratio)
+CCL_CAPI void CDECL cycles_camera_set_aperture_ratio(ccl::Session* session_id, float aperture_ratio)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -176,7 +180,7 @@ void cycles_camera_set_aperture_ratio(ccl::Session* session_id, float aperture_r
 	}
 }
 
-void cycles_camera_set_blades(ccl::Session* session_id, unsigned int blades)
+CCL_CAPI void CDECL cycles_camera_set_blades(ccl::Session* session_id, unsigned int blades)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -184,7 +188,7 @@ void cycles_camera_set_blades(ccl::Session* session_id, unsigned int blades)
 	}
 }
 
-void cycles_camera_set_bladesrotation(ccl::Session* session_id, float bladesrotation)
+CCL_CAPI void CDECL cycles_camera_set_bladesrotation(ccl::Session* session_id, float bladesrotation)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -192,7 +196,7 @@ void cycles_camera_set_bladesrotation(ccl::Session* session_id, float bladesrota
 	}
 }
 
-void cycles_camera_set_focaldistance(ccl::Session* session_id, float focaldistance)
+CCL_CAPI void CDECL cycles_camera_set_focaldistance(ccl::Session* session_id, float focaldistance)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -200,7 +204,7 @@ void cycles_camera_set_focaldistance(ccl::Session* session_id, float focaldistan
 	}
 }
 
-void cycles_camera_set_shuttertime(ccl::Session* session_id, float shuttertime)
+CCL_CAPI void CDECL cycles_camera_set_shuttertime(ccl::Session* session_id, float shuttertime)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -208,7 +212,7 @@ void cycles_camera_set_shuttertime(ccl::Session* session_id, float shuttertime)
 	}
 }
 
-void cycles_camera_set_fisheye_fov(ccl::Session* session_id, float fisheye_fov)
+CCL_CAPI void CDECL cycles_camera_set_fisheye_fov(ccl::Session* session_id, float fisheye_fov)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -216,10 +220,14 @@ void cycles_camera_set_fisheye_fov(ccl::Session* session_id, float fisheye_fov)
 	}
 }
 
-void cycles_camera_set_fisheye_lens(ccl::Session* session_id, float fisheye_lens)
+CCL_CAPI void CDECL cycles_camera_set_fisheye_lens(ccl::Session* session_id, float fisheye_lens)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		sce->camera->set_fisheye_lens(fisheye_lens);
 	}
 }
+
+#ifdef __cplusplus
+}
+#endif

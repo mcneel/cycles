@@ -264,54 +264,6 @@ enum class panorama_type : unsigned int {
 	FISHEYE_EQUISOLID
 };
 
-/** Set the size/resolution of the camera. This equals to pixel resolution. */
-CCL_CAPI void CDECL cycles_camera_set_size(ccl::Session* session_id, unsigned int width, unsigned int height);
-/** Get the camera width. */
-CCL_CAPI unsigned int CDECL cycles_camera_get_width(ccl::Session* session_id);
-/** Get the camera height. */
-CCL_CAPI unsigned int CDECL cycles_camera_get_height(ccl::Session* session_id);
-/** Set the camera type. */
-CCL_CAPI void CDECL cycles_camera_set_type(ccl::Session* session_id, camera_type type);
-/** Set the camera panorama type. */
-CCL_CAPI void CDECL cycles_camera_set_panorama_type(ccl::Session* session_id, panorama_type type);
-/** Set the transformation matrix for the camera. */
-CCL_CAPI void CDECL cycles_camera_set_matrix(ccl::Session* session_id,
-	float a, float b, float c, float d,
-	float e, float f, float g, float h,
-	float i, float j, float k, float l
-	);
-/** Compute the auto viewplane for scene camera. */
-CCL_CAPI void CDECL cycles_camera_compute_auto_viewplane(ccl::Session* session_id);
-/** Set viewplane for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_viewplane(ccl::Session* session_id, float left, float right, float top, float bottom);
-/** Update camera. Should be called after changing settings on a scene camera. */
-CCL_CAPI void CDECL cycles_camera_update(ccl::Session* session_id);
-/** Set the Field of View for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_fov(ccl::Session* session_id, float fov);
-/** Set the sensor width for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_sensor_width(ccl::Session* session_id, float sensor_width);
-/** Set the sensor height for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_sensor_height(ccl::Session* session_id, float sensor_height);
-/** Set the near clip for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_nearclip(ccl::Session* session_id, float nearclip);
-/** Set the far clip for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_farclip(ccl::Session* session_id, float farclip);
-/** Set the aperture size for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_aperturesize(ccl::Session* session_id, float aperturesize);
-/** Set the aperture ratio for anamorphic lens bokeh. */
-CCL_CAPI void CDECL cycles_camera_set_aperture_ratio(ccl::Session* session_id, float aperture_ratio);
-/** Set camera blades count. */
-CCL_CAPI void CDECL cycles_camera_set_blades(ccl::Session* session_id, unsigned int blades);
-/** Set camera blade rotation. */
-CCL_CAPI void CDECL cycles_camera_set_bladesrotation(ccl::Session* session_id, float bladesrotation);
-/** Set the focal distance for scene camera. */
-CCL_CAPI void CDECL cycles_camera_set_focaldistance(ccl::Session* session_id, float focaldistance);
-/** Set the shutter time for scene camera. Used mainly with motion blur aspect of rendering process. */
-CCL_CAPI void CDECL cycles_camera_set_shuttertime(ccl::Session* session_id, float shuttertime);
-/** Set the field of view for fisheye camera. */
-CCL_CAPI void CDECL cycles_camera_set_fisheye_fov(ccl::Session* session_id, float fisheye_fov);
-/** Set the lens for fisheye camera. */
-CCL_CAPI void CDECL cycles_camera_set_fisheye_lens(ccl::Session* session_id, float fisheye_lens);
 
 /* Mesh geometry API */
 CCL_CAPI void CDECL cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* mesh, float *verts, unsigned int vcount);
