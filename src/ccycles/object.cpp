@@ -16,10 +16,15 @@ limitations under the License.
 
 #include "internal_types.h"
 
-ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+CCL_CAPI ccl::Object* CDECL cycles_scene_add_object(ccl::Session* session_id)
 {
 	ccl::Scene* sce = session_id->scene;
-	if(sce) 
+	if(sce)
 	{
 		auto ob = sce->create_node<ccl::Object>();
 
@@ -37,7 +42,7 @@ ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
 	return nullptr;
 }
 
-void cycles_scene_object_delete(ccl::Session* session, ccl::Object* obj)
+CCL_CAPI void CDECL cycles_scene_object_delete(ccl::Session* session, ccl::Object* obj)
 {
 	#if 0
 	ccl::Scene* sce = session->scene;
@@ -48,13 +53,13 @@ void cycles_scene_object_delete(ccl::Session* session, ccl::Object* obj)
 	#endif
 }
 
-void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* object, ccl::Geometry* geometry)
+CCL_CAPI void CDECL cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* object, ccl::Geometry* geometry)
 {
 	ASSERT(object);
 	ASSERT(geometry);
 
 	ccl::Scene* sce = session_id->scene;
-	if(sce) 
+	if(sce)
 	{
 		object->set_geometry(geometry);
 		object->tag_update(sce);
@@ -63,24 +68,24 @@ void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* obj
 	}
 }
 
-void cycles_object_tag_update(ccl::Session* session_id, ccl::Object* object)
+CCL_CAPI void CDECL cycles_object_tag_update(ccl::Session* session_id, ccl::Object* object)
 {
 	ASSERT(object);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
 	}
 }
 
-void cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* object, unsigned int visibility)
+CCL_CAPI void CDECL cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* object, unsigned int visibility)
 {
 	ASSERT(object);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		object->set_visibility(visibility);
 		object->tag_update(sce);
@@ -88,7 +93,7 @@ void cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* o
 	}
 }
 
-void cycles_scene_object_set_shader(ccl::Session *session_id,
+CCL_CAPI void CDECL cycles_scene_object_set_shader(ccl::Session *session_id,
 									ccl::Object *object,
 									ccl::Shader *shader_id)
 {
@@ -136,7 +141,7 @@ void cycles_scene_object_set_shader(ccl::Session *session_id,
 
 }
 
-void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object* object, bool is_shadowcatcher)
+CCL_CAPI void CDECL cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object* object, bool is_shadowcatcher)
 {
 	ASSERT(object);
 
@@ -148,7 +153,7 @@ void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Obj
 	}
 }
 
-void cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id, ccl::Object* object, bool mesh_light_no_cast_shadow)
+CCL_CAPI void CDECL cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id, ccl::Object* object, bool mesh_light_no_cast_shadow)
 {
 	ASSERT(object);
 
@@ -184,7 +189,7 @@ static void _cycles_scene_object_set_transform(ccl::Session* session_id, ccl::Ob
 	}
 }
 
-void cycles_scene_object_set_matrix(ccl::Session* session_id, ccl::Object* object,
+CCL_CAPI void CDECL cycles_scene_object_set_matrix(ccl::Session* session_id, ccl::Object* object,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -198,7 +203,7 @@ void cycles_scene_object_set_matrix(ccl::Session* session_id, ccl::Object* objec
 		i, j, k, l);
 }
 
-void cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object* object,
+CCL_CAPI void CDECL cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object* object,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -213,18 +218,18 @@ void cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object* ob
 }
 
 
-void cycles_object_set_pass_id(ccl::Session* session_id, ccl::Object* object, int pass_id)
+CCL_CAPI void CDECL cycles_object_set_pass_id(ccl::Session* session_id, ccl::Object* object, int pass_id)
 {
 	ASSERT(object);
 
 	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) 
+	if(scene_find(session_id, &sce))
 	{
 		object->set_pass_id(pass_id);
 	}
 }
 
-void cycles_object_set_random_id(ccl::Session* session_id, ccl::Object* object, unsigned int random_id)
+CCL_CAPI void CDECL cycles_object_set_random_id(ccl::Session* session_id, ccl::Object* object, unsigned int random_id)
 {
 	ASSERT(object);
 
@@ -234,7 +239,7 @@ void cycles_object_set_random_id(ccl::Session* session_id, ccl::Object* object, 
 	}
 }
 
-void cycles_scene_clear_clipping_planes(ccl::Session* session_id)
+CCL_CAPI void CDECL cycles_scene_clear_clipping_planes(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -243,7 +248,7 @@ void cycles_scene_clear_clipping_planes(ccl::Session* session_id)
 	}
 }
 
-unsigned int cycles_scene_add_clipping_plane(ccl::Session* session_id, float a, float b, float c, float d)
+CCL_CAPI unsigned int CDECL cycles_scene_add_clipping_plane(ccl::Session* session_id, float a, float b, float c, float d)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -260,12 +265,7 @@ unsigned int cycles_scene_add_clipping_plane(ccl::Session* session_id, float a, 
 	return UINT_MAX;
 }
 
-void cycles_scene_discard_clipping_plane(ccl::Session* session_id, unsigned int cp_id)
-{
-	cycles_scene_set_clipping_plane(session_id, cp_id, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
-}
-
-void cycles_scene_set_clipping_plane(ccl::Session* session_id, unsigned int cp_id, float a, float b, float c, float d)
+CCL_CAPI void CDECL cycles_scene_set_clipping_plane(ccl::Session* session_id, unsigned int cp_id, float a, float b, float c, float d)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -277,3 +277,12 @@ void cycles_scene_set_clipping_plane(ccl::Session* session_id, unsigned int cp_i
 		sce->object_manager->need_clipping_plane_update = true;
 	}
 }
+
+CCL_CAPI void CDECL cycles_scene_discard_clipping_plane(ccl::Session* session_id, unsigned int cp_id)
+{
+	cycles_scene_set_clipping_plane(session_id, cp_id, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
+}
+
+#ifdef __cplusplus
+}
+#endif
