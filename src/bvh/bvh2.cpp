@@ -595,7 +595,7 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
     if (bvh->pack.leaf_nodes.size()) {
       int4 *leaf_nodes_offset = &bvh->pack.leaf_nodes[0];
       size_t leaf_nodes_offset_size = bvh->pack.leaf_nodes.size();
-      for (size_t i = 0, j = 0; i < leaf_nodes_offset_size; i += BVH_NODE_LEAF_SIZE, j++) {
+      for (size_t i = 0; i < leaf_nodes_offset_size; i += BVH_NODE_LEAF_SIZE) {
         int4 data = leaf_nodes_offset[i];
         data.x += prim_offset;
         data.y += prim_offset;
@@ -611,7 +611,7 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
       int4 *bvh_nodes = &bvh->pack.nodes[0];
       size_t bvh_nodes_size = bvh->pack.nodes.size();
 
-      for (size_t i = 0, j = 0; i < bvh_nodes_size; j++) {
+      for (size_t i = 0; i < bvh_nodes_size; ) {
         size_t nsize, nsize_bbox;
         if (bvh_nodes[i].x & PATH_RAY_NODE_UNALIGNED) {
           nsize = BVH_UNALIGNED_NODE_SIZE;

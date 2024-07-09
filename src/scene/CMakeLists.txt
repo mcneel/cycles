@@ -15,6 +15,7 @@ set(SRC
   camera.cpp
   colorspace.cpp
   constant_fold.cpp
+  decal.cpp
   film.cpp
   geometry.cpp
   hair.cpp
@@ -56,6 +57,7 @@ set(SRC_HEADERS
   camera.h
   colorspace.h
   constant_fold.h
+  decal.h
   film.h
   geometry.h
   hair.h

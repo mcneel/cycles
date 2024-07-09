@@ -169,6 +169,7 @@ void Scene::free_memory(bool final)
   procedurals.clear();
   passes.clear();
   clipping_planes.clear();
+  decals.clear();
 
   if (device) {
     camera->device_free(device, dscene, this);
@@ -222,6 +223,7 @@ void Scene::free_memory(bool final)
     delete bake_manager;
     delete update_stats;
     delete procedural_manager;
+    delete decal_manager;
     delete dscene;
   }
 }

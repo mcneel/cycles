@@ -6,6 +6,7 @@
 
 #include "bvh/params.h"
 
+#include "scene/decal.h"
 #include "scene/film.h"
 #include "scene/image.h"
 #include "scene/shader.h"
@@ -231,6 +232,7 @@ class Scene : public NodeOwner {
   vector<Pass *> passes;
   vector<Procedural *> procedurals;
   vector<float4> clipping_planes;
+  vector<Decal *> decals;
 
   /* data managers */
   ImageManager *image_manager;
@@ -241,6 +243,7 @@ class Scene : public NodeOwner {
   ParticleSystemManager *particle_system_manager;
   BakeManager *bake_manager;
   ProceduralManager *procedural_manager;
+  DecalManager *decal_manager;
 
   /* default shaders */
   Shader *default_surface;
@@ -387,6 +390,8 @@ template<> AlembicProcedural *Scene::create_node<AlembicProcedural>();
 
 template<> Pass *Scene::create_node<Pass>();
 
+template<> Decal *Scene::create_node<Decal>();
+
 template<> void Scene::delete_node_impl(Light *node);
 
 template<> void Scene::delete_node_impl(Mesh *node);
@@ -411,6 +416,8 @@ template<> void Scene::delete_node_impl(AlembicProcedural *node);
 
 template<> void Scene::delete_node_impl(Pass *node);
 
+template<> void Scene::delete_node_impl(Decal *node);
+
 template<> void Scene::delete_nodes(const set<Light *> &nodes, const NodeOwner *owner);
 
 template<> void Scene::delete_nodes(const set<Geometry *> &nodes, const NodeOwner *owner);
@@ -424,6 +431,8 @@ template<> void Scene::delete_nodes(const set<Shader *> &nodes, const NodeOwner 
 template<> void Scene::delete_nodes(const set<Procedural *> &nodes, const NodeOwner *owner);
 
 template<> void Scene::delete_nodes(const set<Pass *> &nodes, const NodeOwner *owner);
+
+template<> void Scene::delete_nodes(const set<Decal *> &nodes, const NodeOwner *owner);
 
 CCL_NAMESPACE_END
 

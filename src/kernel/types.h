@@ -1694,6 +1694,8 @@ enum KernelFeatureFlag : uint32_t {
 
   /* Clipping planes. */
   KERNEL_FEATURE_CLIPPING_PLANES = (1U << 27U),
+  /* Clipping planes. */
+  KERNEL_FEATURE_DECALS = (1U << 28U),
 };
 
 /* Shader node feature mask, to specialize shader evaluation for kernels. */

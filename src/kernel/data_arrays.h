@@ -15,9 +15,6 @@ KERNEL_DATA_ARRAY(uint, prim_object)
 KERNEL_DATA_ARRAY(uint, object_node)
 KERNEL_DATA_ARRAY(float2, prim_time)
 
-/* clipping planes */
-KERNEL_DATA_ARRAY(float4, clipping_planes)
-
 /* objects */
 KERNEL_DATA_ARRAY(KernelObject, objects)
 KERNEL_DATA_ARRAY(Transform, object_motion_pass)
@@ -88,5 +85,11 @@ KERNEL_DATA_ARRAY(TextureInfo, texture_info)
 
 /* ies lights */
 KERNEL_DATA_ARRAY(float, ies)
+
+/* clipping planes */
+KERNEL_DATA_ARRAY(float4, clipping_planes)
+
+/* decals */
+KERNEL_DATA_ARRAY(KernelDecal, decals)
 
 #undef KERNEL_DATA_ARRAY
