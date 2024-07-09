@@ -108,62 +108,6 @@ public:
 typedef void(CDECL *LOGGER_FUNC_CB)(const char* msg);
 
 /**
- * Initialise Cycles by querying available devices.
- * \ingroup ccycles
- */
-CCL_CAPI void CDECL cycles_initialise(unsigned int mask = ccl::DEVICE_MASK_ALL);
-
-/**
- * Initialise paths for Cycles to look in (pre-compiled kernels, cached kernels, kernel code)
- * \ingroup ccycles
- */
-CCL_CAPI void CDECL cycles_path_init(const char* path, const char* user_path);
-
-/**
- * Set an environment variable for Cycles
- * \ingroup ccycles
- */
-CCL_CAPI void CDECL cycles_putenv(const char* var, const char* val);
-
-/**
- * Set the CPU kernel type to use. 1 is split, 0 is regular.
- * \ingroup ccycles
- */
-CCL_CAPI void CDECL cycles_debug_set_cpu_kernel(unsigned int state);
-
-/**
- * Pass 1 to allow QBVH usage in CPU kernel.
- * \ingroup ccycles
- */
-CCL_CAPI void CDECL cycles_debug_set_cpu_allow_qbvh(unsigned int state);
-
-/**
- * Set the CUDA kernel type to use. 1 is split, 0 is regular.
- * \ingroup ccycles
- */
-CCL_CAPI void CDECL cycles_debug_set_cuda_kernel(unsigned int state);
-
-/**
- * Clean up everything, we're done.
- * \ingroup ccycles
- * \todo Add session specific cleanup, so we don't accidently delete sessions that are in progress.
- */
-CCL_CAPI void CDECL cycles_shutdown();
-
-/**
- * Add a logger function. This will be called only in debug builds.
- * \ingroup ccycles
- */
-CCL_CAPI void CDECL cycles_set_logger(LOGGER_FUNC_CB logger_func_);
-
-/**
- * Set to true if logger output should be sent to std::cout as well.
- *
- * Note that this is global to the logger.
- */
-CCL_CAPI void CDECL cycles_log_to_stdout(int tostdout);
-
-/**
  * Create a new client.
  *
  * This is mainly used for determining what logger functions belong to which client and session.
@@ -417,22 +361,8 @@ CCL_CAPI void CDECL cycles_film_set_use_sample_clamp(ccl::Session* session_id, b
 CCL_CAPI void CDECL cycles_film_tag_update(ccl::Session* session_id);
 CCL_CAPI void CDECL cycles_film_set_use_approximate_shadow_catcher(ccl::Session *session, bool use_approximate_shadow_catcher);
 
-CCL_CAPI void CDECL cycles_f4_add(ccl::float4 a, ccl::float4 b, ccl::float4& res);
-CCL_CAPI void CDECL cycles_f4_sub(ccl::float4 a, ccl::float4 b, ccl::float4& res);
-CCL_CAPI void CDECL cycles_f4_mul(ccl::float4 a, ccl::float4 b, ccl::float4& res);
-CCL_CAPI void CDECL cycles_f4_div(ccl::float4 a, ccl::float4 b, ccl::float4& res);
-
-CCL_CAPI void CDECL cycles_tfm_inverse(const ccl::Transform& t, ccl::Transform& res);
-CCL_CAPI void CDECL cycles_tfm_lookat(const ccl::float3& position, const ccl::float3& look, const ccl::float3& up, ccl::Transform& res);
-CCL_CAPI void CDECL cycles_tfm_rotate_around_axis(float angle, const ccl::float3& axis, ccl::Transform& res);
-
 CCL_CAPI void CDECL cycles_apply_gamma_to_byte_buffer(unsigned char* rgba_buffer, size_t size_in_bytes, float gamma);
 CCL_CAPI void CDECL cycles_apply_gamma_to_float_buffer(float* rgba_buffer, size_t size_in_bytes, float gamma);
-
-CCL_CAPI void CDECL cycles_set_rhino_perlin_noise_table(int* data, unsigned int count);
-CCL_CAPI void CDECL cycles_set_rhino_impulse_noise_table(float* data, unsigned int count);
-CCL_CAPI void CDECL cycles_set_rhino_vc_noise_table(float* data, unsigned int count);
-CCL_CAPI void CDECL cycles_set_rhino_aaltonen_noise_table(const int* data, unsigned int count);
 
 #ifdef __cplusplus
 }

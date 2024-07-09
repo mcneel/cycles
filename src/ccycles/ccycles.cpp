@@ -43,6 +43,10 @@ Logger logger;
 
 std::vector<LOGGER_FUNC_CB> loggers;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void cycles_path_init(const char* path, const char* user_path)
 {
 	ccl::path_init(std::string(path), std::string(user_path));
@@ -228,3 +232,7 @@ void cycles_set_rhino_aaltonen_noise_table(const int* data, unsigned int count)
 		ccycles_rhino_aaltonen_noise_table[i] = (float)data[i];
 	}
 }
+
+#ifdef __cplusplus
+}
+#endif
