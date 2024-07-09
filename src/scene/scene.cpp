@@ -854,6 +854,16 @@ template<> Pass *Scene::create_node<Pass>()
   return node;
 }
 
+template<> Decal *Scene::create_node<Decal>()
+{
+  Decal *node = new Decal();
+  node->set_owner(this);
+  decals.push_back(node);
+  decal_manager->tag_update(this);
+  return node;
+
+}
+
 template<typename T> void delete_node_from_array(vector<T> &nodes, T node)
 {
   for (size_t i = 0; i < nodes.size(); ++i) {
@@ -951,6 +961,12 @@ template<> void Scene::delete_node_impl(Pass *node)
   film->tag_modified();
 }
 
+template<> void Scene::delete_node_impl(Decal *node)
+{
+  delete_node_from_array(decals, node);
+  decal_manager->tag_update(this);
+}
+
 template<typename T>
 static void remove_nodes_in_set(const set<T *> &nodes_set,
                                 vector<T *> &nodes_array,
@@ -1018,6 +1034,12 @@ template<> void Scene::delete_nodes(const set<Pass *> &nodes, const NodeOwner *o
 {
   remove_nodes_in_set(nodes, passes, owner);
   film->tag_modified();
+}
+
+template<> void Scene::delete_nodes(const set<Decal *> &nodes, const NodeOwner *owner)
+{
+  remove_nodes_in_set(nodes, decals, owner);
+  decal_manager->tag_update(this);
 }
 
 CCL_NAMESPACE_END
