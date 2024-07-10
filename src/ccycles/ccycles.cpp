@@ -47,12 +47,12 @@ std::vector<LOGGER_FUNC_CB> loggers;
 extern "C" {
 #endif
 
-void cycles_path_init(const char* path, const char* user_path)
+CCL_CAPI void CDECL cycles_path_init(const char* path, const char* user_path)
 {
 	ccl::path_init(std::string(path), std::string(user_path));
 }
 
-void cycles_putenv(const char* var, const char* val)
+CCL_CAPI void CDECL cycles_putenv(const char* var, const char* val)
 {
 #if defined(_WIN32)
 	_putenv_s(var, val);
@@ -61,7 +61,7 @@ void cycles_putenv(const char* var, const char* val)
 #endif
 }
 
-void cycles_initialise(unsigned int mask)
+CCL_CAPI void CDECL cycles_initialise(unsigned int mask)
 {
 	if (!initialised) {
 		devices.clear();
@@ -71,7 +71,7 @@ void cycles_initialise(unsigned int mask)
 	}
 }
 
-void cycles_debug_set_cpu_allow_qbvh(unsigned int state)
+CCL_CAPI void CDECL cycles_debug_set_cpu_allow_qbvh(unsigned int state)
 {
 	assert(false);
     // TODO: XXXX no quad bvh
@@ -79,7 +79,7 @@ void cycles_debug_set_cpu_allow_qbvh(unsigned int state)
 	ccl::DebugFlags().cpu.bvh_layout = bvh_layout;
 }
 
-void cycles_shutdown()
+CCL_CAPI void CDECL cycles_shutdown()
 {
 	if (!initialised) {
 		return;
@@ -90,16 +90,16 @@ void cycles_shutdown()
 	_cleanup_sessions();
 }
 
-void cycles_log_to_stdout(int tostdout)
+CCL_CAPI void CDECL cycles_log_to_stdout(int tostdout)
 {
 	logger.tostdout = tostdout == 1;
 }
 
-void cycles_set_logger(LOGGER_FUNC_CB logger_func_)
+CCL_CAPI void CDECL cycles_set_logger(LOGGER_FUNC_CB logger_func_)
 {
 }
 
-void cycles_f4_add(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
+CCL_CAPI void CDECL cycles_f4_add(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
 	ccl::float4 r = a + b;
 	res.x = r.x;
 	res.y = r.y;
@@ -107,7 +107,7 @@ void cycles_f4_add(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
 	res.w = r.w;
 }
 
-void cycles_f4_sub(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
+CCL_CAPI void CDECL cycles_f4_sub(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
 	ccl::float4 r = a - b;
 	res.x = r.x;
 	res.y = r.y;
@@ -115,7 +115,7 @@ void cycles_f4_sub(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
 	res.w = r.w;
 }
 
-void cycles_f4_mul(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
+CCL_CAPI void CDECL cycles_f4_mul(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
 	ccl::float4 r = a * b;
 	res.x = r.x;
 	res.y = r.y;
@@ -123,7 +123,7 @@ void cycles_f4_mul(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
 	res.w = r.w;
 }
 
-void cycles_f4_div(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
+CCL_CAPI void CDECL cycles_f4_div(ccl::float4 a, ccl::float4 b, ccl::float4& res) {
 	ccl::float4 r = a / b;
 	res.x = r.x;
 	res.y = r.y;
@@ -148,20 +148,20 @@ static void _tfm_copy(const ccl::Transform& source, ccl::Transform& target) {
 	target.z.w = source.z.w;
 }
 
-void cycles_tfm_inverse(const ccl::Transform& t, ccl::Transform& res) {
+CCL_CAPI void CDECL cycles_tfm_inverse(const ccl::Transform& t, ccl::Transform& res) {
 	ccl::Transform r = ccl::transform_inverse(t);
 
 	_tfm_copy(r, res);
 }
 
-void cycles_tfm_rotate_around_axis(float angle, const ccl::float3& axis, ccl::Transform& res)
+CCL_CAPI void CDECL cycles_tfm_rotate_around_axis(float angle, const ccl::float3& axis, ccl::Transform& res)
 {
 	ccl::Transform r = ccl::transform_rotate(angle, axis);
 
 	_tfm_copy(r, res);
 }
 
-void cycles_tfm_lookat(const ccl::float3& position, const ccl::float3& look, const ccl::float3& up, ccl::Transform &res)
+CCL_CAPI void CDECL cycles_tfm_lookat(const ccl::float3& position, const ccl::float3& look, const ccl::float3& up, ccl::Transform &res)
 {
 	ccl::Transform r = ccl::transform_identity();
 	r[0][3] = position.x;
@@ -193,7 +193,7 @@ void cycles_tfm_lookat(const ccl::float3& position, const ccl::float3& look, con
 	_tfm_copy(r, res);
 }
 
-void cycles_set_rhino_perlin_noise_table(int* data, unsigned int count)
+CCL_CAPI void CDECL cycles_set_rhino_perlin_noise_table(int* data, unsigned int count)
 {
 	ccycles_rhino_perlin_noise_table.resize(count);
 
@@ -203,7 +203,7 @@ void cycles_set_rhino_perlin_noise_table(int* data, unsigned int count)
 	}
 }
 
-void cycles_set_rhino_impulse_noise_table(float* data, unsigned int count)
+CCL_CAPI void CDECL cycles_set_rhino_impulse_noise_table(float* data, unsigned int count)
 {
 	ccycles_rhino_impulse_noise_table.resize(count);
 
@@ -213,7 +213,7 @@ void cycles_set_rhino_impulse_noise_table(float* data, unsigned int count)
 	}
 }
 
-void cycles_set_rhino_vc_noise_table(float* data, unsigned int count)
+CCL_CAPI void CDECL cycles_set_rhino_vc_noise_table(float* data, unsigned int count)
 {
 	ccycles_rhino_vc_noise_table.resize(count);
 
@@ -223,7 +223,7 @@ void cycles_set_rhino_vc_noise_table(float* data, unsigned int count)
 	}
 }
 
-void cycles_set_rhino_aaltonen_noise_table(const int* data, unsigned int count)
+CCL_CAPI void CDECL cycles_set_rhino_aaltonen_noise_table(const int* data, unsigned int count)
 {
 	ccycles_rhino_aaltonen_noise_table.resize(count);
 
