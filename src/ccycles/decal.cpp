@@ -21,29 +21,29 @@ limitations under the License.
 extern "C" {
 #endif
 
-CCL_CAPI ccl::RhinoMapping* CDECL cycles_scene_add_decal(ccl::Session* session_id)
+CCL_CAPI ccl::RhinoMapping* CDECL cycles_scene_add_rhinomapping(ccl::Session* session_id)
 {
 	ccl::Scene* sce = session_id->scene;
 	if(sce)
 	{
-		auto decal= sce->create_node<ccl::RhinoMapping>();
+		auto mapping = sce->create_node<ccl::RhinoMapping>();
 
-		return decal;
+		return mapping;
 	}
 
 	return nullptr;
 }
 
-CCL_CAPI void CDECL cycles_scene_decal_delete(ccl::Session* session, ccl::RhinoMapping* decal)
+CCL_CAPI void CDECL cycles_scene_rhinomapping_delete(ccl::Session* session, ccl::RhinoMapping* mapping)
 {
 	ccl::Scene* sce = session->scene;
 	if(sce)
 	{
-		sce->delete_node(decal);
+		sce->delete_node(mapping);
 	}
 }
 
-CCL_CAPI void CDECL cycles_decal_set_pxyz(ccl::RhinoMapping* decal,
+CCL_CAPI void CDECL cycles_rhinomapping_set_pxyz(ccl::RhinoMapping* decal,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -59,7 +59,7 @@ CCL_CAPI void CDECL cycles_decal_set_pxyz(ccl::RhinoMapping* decal,
 	decal->set_pxyz(pxyz);
 }
 
-CCL_CAPI void CDECL cycles_decal_set_nxyz(ccl::RhinoMapping* decal,
+CCL_CAPI void CDECL cycles_rhinomapping_set_nxyz(ccl::RhinoMapping* decal,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
@@ -75,7 +75,7 @@ CCL_CAPI void CDECL cycles_decal_set_nxyz(ccl::RhinoMapping* decal,
 	decal->set_nxyz(nxyz);
 }
 
-CCL_CAPI void CDECL cycles_decal_set_uvw(ccl::RhinoMapping* decal,
+CCL_CAPI void CDECL cycle_rhinomapping_set_uvw(ccl::RhinoMapping* decal,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
