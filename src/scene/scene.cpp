@@ -854,9 +854,9 @@ template<> Pass *Scene::create_node<Pass>()
   return node;
 }
 
-template<> Decal *Scene::create_node<Decal>()
+template<> RhinoMapping *Scene::create_node<RhinoMapping>()
 {
-  Decal *node = new Decal();
+  RhinoMapping *node = new RhinoMapping();
   node->set_owner(this);
   decals.push_back(node);
   decal_manager->tag_update(this);
@@ -961,7 +961,7 @@ template<> void Scene::delete_node_impl(Pass *node)
   film->tag_modified();
 }
 
-template<> void Scene::delete_node_impl(Decal *node)
+template<> void Scene::delete_node_impl(RhinoMapping *node)
 {
   delete_node_from_array(decals, node);
   decal_manager->tag_update(this);
@@ -1036,7 +1036,7 @@ template<> void Scene::delete_nodes(const set<Pass *> &nodes, const NodeOwner *o
   film->tag_modified();
 }
 
-template<> void Scene::delete_nodes(const set<Decal *> &nodes, const NodeOwner *owner)
+template<> void Scene::delete_nodes(const set<RhinoMapping *> &nodes, const NodeOwner *owner)
 {
   remove_nodes_in_set(nodes, decals, owner);
   decal_manager->tag_update(this);

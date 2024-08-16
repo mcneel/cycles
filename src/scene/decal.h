@@ -9,25 +9,28 @@
 
 CCL_NAMESPACE_BEGIN
 
-class Decal : public Node
+class RhinoMapping : public Node
 {
 public:
   NODE_DECLARE
 
   enum Type {
-    BOX,
+    UV,
+    PLANE,
     SPHERE,
     CYLINDER,
-    UV
+	BOX,
   };
 
-  Type decal_type;
+  NODE_SOCKET_API(Type, decal_type);
   /* decal origin */
   NODE_SOCKET_API(float3, decal_origin);
   /* decal across vector */
-  NODE_SOCKET_API(float3, decal_across);
+  NODE_SOCKET_API(float3, decal_across); // x
   /* decal up vector */
-  NODE_SOCKET_API(float3, decal_up);
+  NODE_SOCKET_API(float3, decal_up); // y
+  /* decal z vector */
+  NODE_SOCKET_API(float3, decal_z); // z, used in box mapping, interval 0,0 for plane
 
   /* Pxyz transform to map ShaderData->P to normalized mapping primitive */
   NODE_SOCKET_API(Transform, pxyz);
@@ -49,22 +52,22 @@ public:
 
   int get_device_index() const;
 
-  Decal();
-  ~Decal();
+  RhinoMapping();
+  ~RhinoMapping();
 
   protected:
    int index;
 
-   friend class DecalManager;
+   friend class RhinoMappingManager;
    friend class SceneManager;
 
 };
 
-class DecalManager
+class RhinoMappingManager
 {
   public:
-    DecalManager();
-    ~DecalManager();
+    RhinoMappingManager();
+    ~RhinoMappingManager();
 
     void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
     void device_free(Device *device, DeviceScene *dscene, bool force_free);

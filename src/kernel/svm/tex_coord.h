@@ -696,7 +696,6 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
       DecalData decal;
       decal_data_read(kg, sd, stack, node, &offset, &decal, 0);
       data = decal.data;
-      // data = map_to_uv(data, decal);
       break;
     }
     case NODE_TEXCO_ENV_DECAL_PLANAR: {

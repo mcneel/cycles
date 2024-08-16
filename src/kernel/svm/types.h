@@ -130,6 +130,14 @@ typedef enum NodeTexCoord {
   NODE_TEXCO_ENV_DECAL_CYLINDRICAL,
 } NodeTexCoord;
 
+typedef enum NodeDecalType {
+  NODE_DECAL_UV = 0,
+  NODE_DECAL_PLANAR = 1,
+  NODE_DECAL_SPHERICAL = 2,
+  NODE_DECAL_CYLINDRICAL = 3,
+  NODE_TM_BOX = 4,
+} NodeDecalType;
+
 typedef enum NodeImageDecalProjection {
   NODE_IMAGE_DECAL_BOTH = 0,
   NODE_IMAGE_DECAL_FORWARD = 1,

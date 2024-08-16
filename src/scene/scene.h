@@ -232,7 +232,7 @@ class Scene : public NodeOwner {
   vector<Pass *> passes;
   vector<Procedural *> procedurals;
   vector<float4> clipping_planes;
-  vector<Decal *> decals;
+  vector<RhinoMapping*> decals;
 
   /* data managers */
   ImageManager *image_manager;
@@ -243,7 +243,7 @@ class Scene : public NodeOwner {
   ParticleSystemManager *particle_system_manager;
   BakeManager *bake_manager;
   ProceduralManager *procedural_manager;
-  DecalManager *decal_manager;
+  RhinoMappingManager *decal_manager;
 
   /* default shaders */
   Shader *default_surface;
@@ -390,7 +390,7 @@ template<> AlembicProcedural *Scene::create_node<AlembicProcedural>();
 
 template<> Pass *Scene::create_node<Pass>();
 
-template<> Decal *Scene::create_node<Decal>();
+template<> RhinoMapping *Scene::create_node<RhinoMapping>();
 
 template<> void Scene::delete_node_impl(Light *node);
 
@@ -416,7 +416,7 @@ template<> void Scene::delete_node_impl(AlembicProcedural *node);
 
 template<> void Scene::delete_node_impl(Pass *node);
 
-template<> void Scene::delete_node_impl(Decal *node);
+template<> void Scene::delete_node_impl(RhinoMapping *node);
 
 template<> void Scene::delete_nodes(const set<Light *> &nodes, const NodeOwner *owner);
 
@@ -432,7 +432,7 @@ template<> void Scene::delete_nodes(const set<Procedural *> &nodes, const NodeOw
 
 template<> void Scene::delete_nodes(const set<Pass *> &nodes, const NodeOwner *owner);
 
-template<> void Scene::delete_nodes(const set<Decal *> &nodes, const NodeOwner *owner);
+template<> void Scene::delete_nodes(const set<RhinoMapping *> &nodes, const NodeOwner *owner);
 
 CCL_NAMESPACE_END
 

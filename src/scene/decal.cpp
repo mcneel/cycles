@@ -7,11 +7,19 @@
 
 CCL_NAMESPACE_BEGIN
 
-/* Decal */
+/* RhinoMapping */
 
-NODE_DEFINE(Decal)
+NODE_DEFINE(RhinoMapping)
 {
   NodeType *type = NodeType::add("decal", create);
+
+  static NodeEnum decal_type_enum;
+  decal_type_enum.insert("uv", RhinoMapping::UV);
+  decal_type_enum.insert("planar", RhinoMapping::PLANE);
+  decal_type_enum.insert("spherical", RhinoMapping::SPHERE);
+  decal_type_enum.insert("cylindrical", RhinoMapping::CYLINDER);
+  decal_type_enum.insert("box", NODE_TM_BOX);
+  SOCKET_ENUM(decal_type, "RhinoMapping Type", decal_type_enum, NODE_DECAL_PLANAR);
 
   SOCKET_VECTOR(decal_origin, "Origin", zero_float3());
   SOCKET_VECTOR(decal_across, "Across", zero_float3());
@@ -32,26 +40,26 @@ NODE_DEFINE(Decal)
   return type;
 }
 
-Decal::Decal() : Node(get_node_type())
+RhinoMapping::RhinoMapping() : Node(get_node_type())
 {
 }
 
-Decal::~Decal()
+RhinoMapping::~RhinoMapping()
 {
 }
 
-int Decal::get_device_index() const
+int RhinoMapping::get_device_index() const
 {
   return index;
 }
 
 
-DecalManager::DecalManager()
+RhinoMappingManager::RhinoMappingManager()
 {}
 
-DecalManager::~DecalManager()
+RhinoMappingManager::~RhinoMappingManager()
 {}
-void DecalManager::device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress)
+void RhinoMappingManager::device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress)
 {
   {
     scoped_callback_timer timer([scene](double time) {
@@ -63,12 +71,12 @@ void DecalManager::device_update(Device *device, DeviceScene *dscene, Scene *sce
   }
 }
 
-void DecalManager::device_free(Device *device, DeviceScene *dscene, bool force_free)
+void RhinoMappingManager::device_free(Device *device, DeviceScene *dscene, bool force_free)
 {
 
 }
 
-void DecalManager::tag_update(Scene *scene)
+void RhinoMappingManager::tag_update(Scene *scene)
 {
   need_update = true;
 }
