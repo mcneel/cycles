@@ -90,6 +90,6 @@ KERNEL_DATA_ARRAY(float, ies)
 KERNEL_DATA_ARRAY(float4, clipping_planes)
 
 /* decals */
-KERNEL_DATA_ARRAY(KernelDecal, decals)
+KERNEL_DATA_ARRAY(KernelDecal, rhinomappings)
 
 #undef KERNEL_DATA_ARRAY

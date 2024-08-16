@@ -83,7 +83,7 @@ DeviceScene::DeviceScene(Device *device)
       sample_pattern_lut(device, "sample_pattern_lut", MEM_GLOBAL),
       ies_lights(device, "ies", MEM_GLOBAL),
       clipping_planes(device, "clipping_planes", MEM_GLOBAL),
-      decals(device, "decals", MEM_GLOBAL)
+      rhinomappings(device, "rhinomappings", MEM_GLOBAL)
 {
   memset((void *)&data, 0, sizeof(data));
 }
@@ -116,6 +116,7 @@ Scene::Scene(const SceneParams &params_, Device *device_)
   particle_system_manager = new ParticleSystemManager();
   bake_manager = new BakeManager();
   procedural_manager = new ProceduralManager();
+  rhinomapping_manager = new RhinoMappingManager();
 
   /* Create nodes after managers, since create_node() can tag the managers. */
   camera = create_node<Camera>();
@@ -169,7 +170,7 @@ void Scene::free_memory(bool final)
   procedurals.clear();
   passes.clear();
   clipping_planes.clear();
-  decals.clear();
+  rhinomappings.clear();
 
   if (device) {
     camera->device_free(device, dscene, this);
@@ -223,7 +224,7 @@ void Scene::free_memory(bool final)
     delete bake_manager;
     delete update_stats;
     delete procedural_manager;
-    delete decal_manager;
+    delete rhinomapping_manager;
     delete dscene;
   }
 }
@@ -858,8 +859,8 @@ template<> RhinoMapping *Scene::create_node<RhinoMapping>()
 {
   RhinoMapping *node = new RhinoMapping();
   node->set_owner(this);
-  decals.push_back(node);
-  decal_manager->tag_update(this);
+  rhinomappings.push_back(node);
+  rhinomapping_manager->tag_update(this);
   return node;
 
 }
@@ -963,8 +964,8 @@ template<> void Scene::delete_node_impl(Pass *node)
 
 template<> void Scene::delete_node_impl(RhinoMapping *node)
 {
-  delete_node_from_array(decals, node);
-  decal_manager->tag_update(this);
+  delete_node_from_array(rhinomappings, node);
+  rhinomapping_manager->tag_update(this);
 }
 
 template<typename T>
@@ -1038,8 +1039,8 @@ template<> void Scene::delete_nodes(const set<Pass *> &nodes, const NodeOwner *o
 
 template<> void Scene::delete_nodes(const set<RhinoMapping *> &nodes, const NodeOwner *owner)
 {
-  remove_nodes_in_set(nodes, decals, owner);
-  decal_manager->tag_update(this);
+  remove_nodes_in_set(nodes, rhinomappings, owner);
+  rhinomapping_manager->tag_update(this);
 }
 
 CCL_NAMESPACE_END

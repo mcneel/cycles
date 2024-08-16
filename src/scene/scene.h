@@ -139,7 +139,7 @@ class DeviceScene {
   device_vector<float4> clipping_planes;
 
   /* Rhino decals */
-  device_vector<KernelDecal> decals;
+  device_vector<KernelDecal> rhinomappings;
 
   KernelData data;
 
@@ -232,7 +232,7 @@ class Scene : public NodeOwner {
   vector<Pass *> passes;
   vector<Procedural *> procedurals;
   vector<float4> clipping_planes;
-  vector<RhinoMapping*> decals;
+  vector<RhinoMapping*> rhinomappings;
 
   /* data managers */
   ImageManager *image_manager;
@@ -243,7 +243,7 @@ class Scene : public NodeOwner {
   ParticleSystemManager *particle_system_manager;
   BakeManager *bake_manager;
   ProceduralManager *procedural_manager;
-  RhinoMappingManager *decal_manager;
+  RhinoMappingManager *rhinomapping_manager;
 
   /* default shaders */
   Shader *default_surface;
