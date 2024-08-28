@@ -609,7 +609,7 @@ void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dsce
    * handlers need to apply the offset manually. */
   uint object_count = scene->objects.size();
   uint *object_prim_offset = dscene->object_prim_offset.alloc(object_count);
-  if(object_prim_offset == nullptr) {
+  if(object_prim_offset == nullptr && object_count > 0) {
     device->set_error("Failed to allocate memory for object_prim_offset");
     return;
   }
