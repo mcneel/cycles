@@ -607,8 +607,17 @@ void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dsce
 
   /* On MetalRT, primitive / curve segment offsets can't be baked at BVH build time. Intersection
    * handlers need to apply the offset manually. */
-  uint *object_prim_offset = dscene->object_prim_offset.alloc(scene->objects.size());
   uint object_count = scene->objects.size();
+  uint *object_prim_offset = dscene->object_prim_offset.alloc(object_count);
+  if(object_prim_offset == nullptr) {
+    device->set_error("Failed to allocate memory for object_prim_offset");
+    return;
+  }
+  if(dscene->object_prim_offset.size() != object_count) {
+    device->set_error("object_prim_offset size incorrect");
+    return;
+  }
+
   foreach (Object *ob, scene->objects) {
     uint32_t prim_offset = 0;
     if (Geometry *const geom = ob->geometry) {
