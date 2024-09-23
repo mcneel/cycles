@@ -102,17 +102,19 @@ vector<id<MTLDevice>> const &MetalInfo::get_usable_devices()
     return usable_devices;
   }
 
+  NSArray *devices = MTLCopyAllDevices();
+
   /* If the system has both an AMD GPU (discrete) and an Intel one (integrated), prefer the AMD
    * one. This can be overridden with CYCLES_METAL_FORCE_INTEL. */
   bool has_usable_amd_gpu = false;
   if (@available(macos 12.3, *)) {
-    for (id<MTLDevice> device in MTLCopyAllDevices()) {
+    for (id<MTLDevice> device in devices) {
       has_usable_amd_gpu |= (get_device_vendor(device) == METAL_GPU_AMD);
     }
   }
 
   metal_printf("Usable Metal devices:\n");
-  for (id<MTLDevice> device in MTLCopyAllDevices()) {
+  for (id<MTLDevice> device in devices) {
     string device_name = get_device_name(device);
     MetalGPUVendor vendor = get_device_vendor(device);
     bool usable = false;
@@ -145,6 +147,8 @@ vector<id<MTLDevice>> const &MetalInfo::get_usable_devices()
   if (usable_devices.empty()) {
     metal_printf("   No usable Metal devices found\n");
   }
+
+  [devices release];
   already_enumerated = true;
 
   return usable_devices;
