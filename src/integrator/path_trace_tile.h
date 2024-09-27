@@ -21,6 +21,7 @@ class PathTraceTile : public OutputDriver::Tile {
   bool set_pass_pixels(const string_view pass_name,
                        const int num_channels,
                        const float *pixels) const;
+  int get_sample() const;
 
  private:
   PathTrace &path_trace_;

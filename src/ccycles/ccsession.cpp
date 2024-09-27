@@ -186,19 +186,21 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 #if 0
 	const int width = tile.size.x;
 	const int height = tile.size.y;
-	vector<float> pixels(width * height * 4);
-	if (tile.get_pass_pixels("combined", 4, pixels.data())) {
+	vector<float> pixels(width * height * 1);
+
+	if (tile.get_sample() < 2 && tile.get_pass_pixels("depth", 1, pixels.data())) {
 		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
-		fs::path save_path = "C:/Users/jesterKing/check_cycles_output.png";
+		//fs::path save_path = "C:/Users/jesterKing/check_cycles_output.png";
+		fs::path save_path = "/Users/jesterking/check_cycles_output.exr";
 		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
-		unique_ptr<ImageOutput> image_output(ImageOutput::create("png"));
-		ImageSpec spec(width, height, 4, TypeDesc::FLOAT);
+		unique_ptr<ImageOutput> image_output(ImageOutput::create("exr"));
+		ImageSpec spec(width, height, 1, TypeDesc::FLOAT);
 		if(nullptr != image_output &&image_output->open(save_path.string(), spec))
 		{
 			ImageBuf image_buffer(spec,
 				pixels.data(),
 				AutoStride,
-				width * 4 * sizeof(float),
+				width * 1 * sizeof(float),
 				AutoStride);
 			/* Write to disk and close */
 			image_buffer.set_write_format(TypeDesc::FLOAT);
@@ -237,6 +239,11 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 			auto &tile_pass = tile_passes[i];
 			auto &full_pass = (*full_passes)[i];
 
+			if(full_pass->get_pass_type() == PASS_DEPTH && tile.get_sample() > 1)
+			{
+				continue;
+			}
+
 			full_pass->lock();
 
 			PassInfo pass_info = Pass::get_info(full_pass->get_pass_type());
@@ -271,6 +278,11 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 	}
 	else {
 		for (auto &pass : *full_passes) {
+			if(pass->get_pass_type() == PASS_DEPTH && tile.get_sample() > 1)
+			{
+				continue;
+			}
+
 			pass->lock();
 
 			PassInfo pass_info = Pass::get_info(pass->get_pass_type());
