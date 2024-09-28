@@ -278,8 +278,9 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 	}
 	else {
 		for (auto &pass : *full_passes) {
-			if(pass->get_pass_type() == PASS_DEPTH && tile.get_sample() > 1)
-			{
+			bool upscale = tile.resolution_divider > ccsession_->params.pixel_size ||
+						   ccsession_->params.pixel_size > 1;
+			if (!upscale && pass->get_pass_type() == PASS_DEPTH && tile.get_sample() > 1) {
 				continue;
 			}
 
@@ -306,8 +307,7 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 			/* In case we have pixel_size > 1 we need to move data so that we get
 			 * pixels in top-left quadrant.
 			 */
-			if(tile.resolution_divider > ccsession_->params.pixel_size
-				|| ccsession_->params.pixel_size > 1) {
+			if(upscale) {
 				const int ps =
 					tile.resolution_divider > ccsession_->params.pixel_size
 					? tile.resolution_divider
