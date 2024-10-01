@@ -20,9 +20,12 @@ ccl_device float4 svm_image_texture(KernelGlobals kg, int id, float x, float y, 
     r.w = alpha;
   }
 
+  /* Don't convert to linear, messes up shader setup in RhinoCycles
+     - jesterKing, 2024.10.01
   if (flags & NODE_IMAGE_COMPRESS_AS_SRGB) {
     r = color_srgb_to_linear_v4(r);
   }
+  */
 
   return r;
 }
