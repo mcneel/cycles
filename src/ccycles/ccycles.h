@@ -290,54 +290,11 @@ CCL_CAPI void CDECL cycles_scene_discard_clipping_plane(ccl::Session* session_id
  * Set a clipping plane equation.
  */
 CCL_CAPI void CDECL cycles_scene_set_clipping_plane(ccl::Session* session_id, unsigned int cp_id, float a, float b, float c, float d);
-/** Tag integrator for update. */
-CCL_CAPI void CDECL cycles_integrator_tag_update(ccl::Session* session_id);
-/** Set the maximum bounces for integrator. */
-CCL_CAPI void CDECL cycles_integrator_set_max_bounce(ccl::Session* session_id, int max_bounce);
-/** Set the minimum bounces for integrator. */
-CCL_CAPI void CDECL cycles_integrator_set_min_bounce(ccl::Session* session_id, int min_bounce);
-CCL_CAPI void CDECL cycles_integrator_set_ao_factor(ccl::Session* session_id, float ao_factor);
-CCL_CAPI void CDECL cycles_integrator_set_ao_distance(ccl::Session* session_id, float ao_distance);
-CCL_CAPI void CDECL cycles_integrator_set_ao_bounces(ccl::Session* session_id, int ao_bounces);
-CCL_CAPI void CDECL cycles_integrator_set_ao_additive_factor(ccl::Session* session_id, float ao_additive_factor);
-/** Set to true if caustics should be skipped.
- * \todo split for caustics_reflective and caustics_refractive.
- */
-CCL_CAPI void CDECL cycles_integrator_set_no_caustics(ccl::Session* session_id, bool no_caustics);
-/** Set the maximum amount of diffuse bounces. */
-CCL_CAPI void CDECL cycles_integrator_set_max_diffuse_bounce(ccl::Session* session_id, int max_diffuse_bounce);
-/** Set the maximum amount of glossy bounces. */
-CCL_CAPI void CDECL cycles_integrator_set_max_glossy_bounce(ccl::Session* session_id, int max_glossy_bounce);
-/** Set the maximum amount of transmission bounces. */
-CCL_CAPI void CDECL cycles_integrator_set_max_transmission_bounce(ccl::Session* session_id, int max_transmission_bounce);
-/** Set the maximum amount of volume bounces. */
-CCL_CAPI void CDECL cycles_integrator_set_max_volume_bounce(ccl::Session* session_id, int max_volume_bounce);
-/** Set the maximum amount of transparency bounces. */
-CCL_CAPI void CDECL cycles_integrator_set_transparent_max_bounce(ccl::Session* session_id, int transparent_max_bounce);
-/** Set the minimum amount of transparency bounces. */
-CCL_CAPI void CDECL cycles_integrator_set_transparent_min_bounce(ccl::Session* session_id, int transparent_min_bounce);
-/** Set the amount of AA samples. */
-CCL_CAPI void CDECL cycles_integrator_set_aa_samples(ccl::Session* session_id, int aa_samples);
-/** Set the glossiness filter. */
-CCL_CAPI void CDECL cycles_integrator_set_filter_glossy(ccl::Session* session_id, float filter_glossy);
-/** Set to true if all lights should be directly sampled. */
-CCL_CAPI void CDECL cycles_integrator_set_use_direct_light(ccl::Session* session_id, bool use_direct_light);
-/** Set to true if all lights should be indirectly sampled. */
-CCL_CAPI void CDECL cycles_integrator_set_use_indirect_light(ccl::Session* session_id, bool use_indirect_light);
-CCL_CAPI void CDECL cycles_integrator_set_volume_step_rate(ccl::Session* session_id, float volume_step_rate);
-CCL_CAPI void CDECL cycles_integrator_set_volume_max_steps(ccl::Session* session_id, int volume_max_steps);
-CCL_CAPI void CDECL cycles_integrator_set_caustics_reflective(ccl::Session *session_id, bool caustics_reflective);
-CCL_CAPI void CDECL cycles_integrator_set_caustics_refractive(ccl::Session *session_id, bool caustics_refractive);
-CCL_CAPI void CDECL cycles_integrator_set_seed(ccl::Session* session_id, int seed);
 
 enum class sampling_pattern : unsigned int {
 	SOBOL = 0,
 	CMJ
 };
-CCL_CAPI void CDECL cycles_integrator_set_sampling_pattern(ccl::Session* session_id, sampling_pattern pattern);
-CCL_CAPI void CDECL cycles_integrator_set_sample_clamp_direct(ccl::Session* session_id, float sample_clamp_direct);
-CCL_CAPI void CDECL cycles_integrator_set_sample_clamp_indirect(ccl::Session* session_id, float sample_clamp_indirect);
-CCL_CAPI void CDECL cycles_integrator_set_light_sampling_threshold(ccl::Session* session_id, float light_sampling_threshold);
 
 /** Different camera types. */
 enum class camera_type : unsigned int {
