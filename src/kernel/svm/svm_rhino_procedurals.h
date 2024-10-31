@@ -1778,7 +1778,7 @@ ccl_device float3 light_probe_to_world(float2 uv)
   float v = uv.y;
 
   float d = sqrt((0.5f - u) * (0.5f - u) + (0.5f - v) * (0.5f - v)) * 2.0f;
-  float cosine = cos(PI * d);
+  float cosine = cosf(PI * d);
   float factor = 2.0f * sqrt(1.0f - cosine * cosine);
 
   float3 vec;
@@ -1813,12 +1813,12 @@ ccl_device float3 equirect_to_world(float2 uv)
   float theta = (uv.x - 0.5f) * TWO_PI;
   float phi = -(uv.y - 0.5f) * PI;
 
-  float cosphi = cos(phi);
+  float cosphi = cosf(phi);
 
   float3 vec;
   vec.x = sin(theta) * cosphi;
   vec.y = sin(phi);
-  vec.z = cos(theta) * cosphi;
+  vec.z = cosf(theta) * cosphi;
 
   return vec;
 }
@@ -2254,7 +2254,7 @@ ccl_device float3 emap_to_world(float2 uv)
   float3 vec;
   vec.x = -s * x;
   vec.y = s * y;
-  vec.z = cos(t);
+  vec.z = cosf(t);
 
   return vec;
 }
@@ -2292,7 +2292,7 @@ ccl_device float2 world_to_hemispherical(float3 n)
 ccl_device Transform rotation_matrix(float3 axis, float angle)
 {
   float s = -sin(angle);
-  float c = cos(angle);
+  float c = cosf(angle);
   float oc = 1.0f - c;
 
   Transform tf;
@@ -3554,7 +3554,7 @@ ccl_device void ProcessDotColor(KernelGlobals kg,
     s = hsb.y;
     b = hsb.z;
 
-    float shiftedHue = fmod(h + hueAdjust, 360.0f);
+    float shiftedHue = fmodf(h + hueAdjust, 360.0f);
 
     if (shiftedHue < 0)
       shiftedHue += 360.0f;

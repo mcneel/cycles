@@ -849,7 +849,7 @@ void ShaderGraph::default_inputs(bool do_osl)
    * everything the position by default, except for the sky texture */
 
   GeometryNode *geom = NULL;
-  TextureCoordinateNode *texco = NULL;
+  RhinoTextureCoordinateNode *texco = NULL;
   VectorTransformNode *normal_transform = NULL;
 
   foreach (ShaderNode *node, nodes) {

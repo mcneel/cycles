@@ -35,7 +35,7 @@ ccl_device_forceinline bool integrate_surface_shader_setup(KernelGlobals kg,
   shader_setup_from_ray(kg, sd, &ray, &isect);
 
   if (path_clip_ray(kg, state, sd, &ray)) {
-      integrator_state_write_ray(kg, state, &ray);
+      integrator_state_write_ray(state, &ray);
       return false;
   }
 

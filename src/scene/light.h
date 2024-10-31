@@ -91,6 +91,11 @@ class Light : public Node {
   float3 get_dir() const;
   float3 get_axisu() const;
   float3 get_axisv() const;
+  /* Rhino mod, add set access to transform. */
+  void set_co(float3 co);
+  void set_dir(float3 dir);
+  void set_axisu(float3 axisu);
+  void set_axisv(float3 axisv);
 
   friend class LightManager;
   friend class LightTree;

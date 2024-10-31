@@ -481,10 +481,6 @@ CCL_CAPI void CDECL cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode *sh
 		ccl::VoronoiTextureNode *node = dynamic_cast<ccl::VoronoiTextureNode *>(shnode);
 		_set_texmapping_mapping(node->tex_mapping, x, y, z);
 	}
-	else if (shn_type == "musgrave_texture") {
-		ccl::MusgraveTextureNode *node = dynamic_cast<ccl::MusgraveTextureNode *>(shnode);
-		_set_texmapping_mapping(node->tex_mapping, x, y, z);
-	}
 	else if (shn_type == "brick_texture") {
 		ccl::BrickTextureNode *node = dynamic_cast<ccl::BrickTextureNode *>(shnode);
 		_set_texmapping_mapping(node->tex_mapping, x, y, z);
@@ -576,10 +572,6 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		ccl::GlassBsdfNode *node = dynamic_cast<ccl::GlassBsdfNode *>(shnode);
 		node->set_distribution((ccl::ClosureType)value);
 	}
-	else if (shntype == "anisotropic_bsdf") {
-		ccl::AnisotropicBsdfNode *node = dynamic_cast<ccl::AnisotropicBsdfNode *>(shnode);
-		node->set_distribution((ccl::ClosureType)value);
-	}
 	else if (shntype == "wave_texture") {
 		if (ename == "wave") {
 		ccl::WaveTextureNode *node = dynamic_cast<ccl::WaveTextureNode *>(shnode);
@@ -597,15 +589,6 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		}
 		else if (ename == "feature") {
 		node->set_feature((ccl::NodeVoronoiFeature)value);
-		}
-		else if (ename == "dimension") {
-		node->set_dimensions(value);
-		}
-	}
-	else if (shntype == "musgrave_texture") {
-		ccl::MusgraveTextureNode *node = dynamic_cast<ccl::MusgraveTextureNode *>(shnode);
-		if (ename == "musgrave") {
-		node->set_musgrave_type((ccl::NodeMusgraveType)value);
 		}
 		else if (ename == "dimension") {
 		node->set_dimensions(value);

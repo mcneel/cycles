@@ -2381,7 +2381,6 @@ void ConvertNode::compile(SVMCompiler &compiler)
 		/* color to float */
 		compiler.add_node(
 			NODE_CONVERT, NODE_CONVERT_CF2, compiler.stack_assign(in), compiler.stack_assign(out));
-		)
 	}
     else {
       /* vector/point/normal to float */

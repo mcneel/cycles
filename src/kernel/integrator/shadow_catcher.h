@@ -42,7 +42,7 @@ ccl_device_inline bool kernel_shadow_catcher_is_path_split_bounce(KernelGlobals 
   }
 
   Ray ray ccl_optional_struct_init;
-  integrator_state_read_ray(kg, state, &ray);
+  integrator_state_read_ray(state, &ray);
 
   ShaderData sd;
   shader_setup_from_ray(kg, &sd, &ray, isect);

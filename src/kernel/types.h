@@ -1453,8 +1453,12 @@ typedef struct KernelTables {
   int sheen_ltc;
   int ggx_gen_schlick_ior_s;
   int ggx_gen_schlick_s;
-  int pad1;
-  int pad2;
+  int rhino_perlin_noise_offset;
+  int rhino_impulse_noise_offset;
+  int rhino_vc_noise_offset;
+  int rhino_aaltonen_noise_offset;
+  int rhino_dots_tree_data_offset;
+  int rhino_dots_dot_data_offset;
 } KernelTables;
 static_assert_align(KernelTables, 16);
 

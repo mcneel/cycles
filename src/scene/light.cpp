@@ -210,6 +210,30 @@ float3 Light::get_axisv() const
   return transform_get_column(&tfm, 1);
 }
 
+/* Begin Rhino mod . Write access to transform. */
+
+void Light::set_co(float3 co)
+{
+  return transform_set_column(&tfm, 3, co);
+}
+
+void Light::set_dir(float3 dir)
+{
+  return transform_set_column(&tfm, 2, dir);
+}
+
+void Light::set_axisu(float3 axisu)
+{
+  return transform_set_column(&tfm, 0, axisu);
+}
+
+void Light::set_axisv(float3 axisv)
+{
+  return transform_set_column(&tfm, 1, axisv);
+}
+
+/* End Rhino mod . Write access to transform. */
+
 /* Light Manager */
 
 LightManager::LightManager()
