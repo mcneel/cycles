@@ -115,6 +115,8 @@ class CPUKernels {
   KERNEL_FILM_CONVERT_FUNCTION(depth)
   KERNEL_FILM_CONVERT_FUNCTION(mist)
   KERNEL_FILM_CONVERT_FUNCTION(sample_count)
+  KERNEL_FILM_CONVERT_FUNCTION(shadow_catcher_transparent_sample_count)
+  KERNEL_FILM_CONVERT_FUNCTION(shadow_catcher_background_sample_count)
   KERNEL_FILM_CONVERT_FUNCTION(float)
 
   KERNEL_FILM_CONVERT_FUNCTION(light_path)

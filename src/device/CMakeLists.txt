@@ -214,6 +214,10 @@ include_directories(${INC})
 include_directories(SYSTEM ${INC_SYS})
 
 cycles_add_library(cycles_device "${LIB}" ${SRC})
+if(WIN32)
+	target_compile_options(cycles_device PRIVATE /Zc:__cplusplus)
+endif()
+
 
 if(WITH_CYCLES_DEVICE_ONEAPI)
   # Need to have proper rebuilding in case of changes

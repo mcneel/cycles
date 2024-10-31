@@ -60,6 +60,9 @@ CCL_NAMESPACE_BEGIN
 #define INTEGRATOR_SHADOW_ISECT_SIZE_CPU 1024U
 #define INTEGRATOR_SHADOW_ISECT_SIZE_GPU 4U
 
+#define RHINO_PERLIN_NOISE_PERM_SIZE 256
+#define RHINO_PERLIN_NOISE_TABLE_SIZE (2 * RHINO_PERLIN_NOISE_PERM_SIZE)
+
 #ifdef __KERNEL_GPU__
 #  define INTEGRATOR_SHADOW_ISECT_SIZE INTEGRATOR_SHADOW_ISECT_SIZE_GPU
 #else
@@ -133,6 +136,9 @@ CCL_NAMESPACE_BEGIN
 
 /* Light tree. */
 #define KERNEL_FEATURE_LIGHT_TREE (1U << 30U)
+
+/* Clipping planes. */
+#define KERNEL_FEATURE_CLIPPING_PLANES (1U << 31U)
 
 /* Shader node feature mask, to specialize shader evaluation for kernels. */
 
@@ -529,6 +535,8 @@ typedef enum PassType {
   PASS_AOV_VALUE,
   PASS_ADAPTIVE_AUX_BUFFER,
   PASS_SAMPLE_COUNT,
+  PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT,
+  PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT,
   PASS_DIFFUSE_COLOR,
   PASS_GLOSSY_COLOR,
   PASS_TRANSMISSION_COLOR,
@@ -1097,6 +1105,8 @@ enum ShaderDataObjectFlag {
   SD_OBJECT_CAUSTICS_RECEIVER = (1 << 10),
   /* object has attribute for volume motion */
   SD_OBJECT_HAS_VOLUME_MOTION = (1 << 11),
+  /* object is mesh lamp, but doesn't cast shadows */
+  SD_OBJECT_LIGHT_NO_CAST_SHADOWS = (1 << 12),
 
   /* object is using caustics */
   SD_OBJECT_CAUSTICS = (SD_OBJECT_CAUSTICS_CASTER | SD_OBJECT_CAUSTICS_RECEIVER),
@@ -1323,6 +1333,8 @@ typedef struct KernelCamera {
   ProjectionTransform worldtondc;
   Transform worldtocamera;
 
+  Transform cameratondc;
+
   /* Stores changes in the projection matrix. Use for camera zoom motion
    * blur and motion pass output for perspective camera. */
   ProjectionTransform perspective_pre;
@@ -1354,6 +1366,8 @@ typedef struct KernelFilmConvert {
 
   int pass_combined;
   int pass_sample_count;
+  int pass_shadow_catcher_transparent_sample_count;
+  int pass_shadow_catcher_background_sample_count;
   int pass_adaptive_aux_buffer;
   int pass_motion_weight;
   int pass_shadow_catcher;
@@ -1380,6 +1394,8 @@ typedef struct KernelFilmConvert {
 
   /* Padding. */
   int pad1;
+  int pad2;
+  int pad3;
 } KernelFilmConvert;
 static_assert_align(KernelFilmConvert, 16);
 
@@ -1514,6 +1530,8 @@ typedef struct KernelObject {
   int numsteps;
   int numverts;
 
+  int shader;
+
   uint patch_map_offset;
   uint attribute_map_offset;
   uint motion_offset;
@@ -1539,6 +1557,13 @@ typedef struct KernelObject {
   uint receiver_light_set;
   uint64_t shadow_set_membership;
   uint blocker_shadow_set;
+
+  /* Rhino properties */
+  bool use_ocs_frame;
+  Transform ocs_frame; /* OCS frame for controlling WCS and WCS Box. */
+  Transform ocs_frame_normal; /* OCS frame for controlling WCS and WCS Box normals. */
+  /* Rhino properties end */
+
 } KernelObject;
 static_assert_align(KernelObject, 16);
 
@@ -1840,6 +1865,8 @@ typedef enum DeviceKernel : int {
   DECLARE_FILM_CONVERT_KERNEL(DEPTH),
   DECLARE_FILM_CONVERT_KERNEL(MIST),
   DECLARE_FILM_CONVERT_KERNEL(SAMPLE_COUNT),
+  DECLARE_FILM_CONVERT_KERNEL(SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT),
+  DECLARE_FILM_CONVERT_KERNEL(SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT),
   DECLARE_FILM_CONVERT_KERNEL(FLOAT),
   DECLARE_FILM_CONVERT_KERNEL(LIGHT_PATH),
   DECLARE_FILM_CONVERT_KERNEL(FLOAT3),

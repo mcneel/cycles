@@ -187,6 +187,20 @@ GeometryManager::GeometryManager()
 
 GeometryManager::~GeometryManager() {}
 
+void GeometryManager::prune(Scene* scene)
+{
+	vector<Geometry *> geom_to_prune;
+	for(Geometry* geom: scene->geometry) {
+		if(static_cast<Mesh *>(geom)->triangles.size() == 0) {
+			geom_to_prune.push_back(geom);
+		}
+	}
+
+	for(Geometry* geom: geom_to_prune) {
+		scene->delete_node(geom);
+	}
+}
+
 void GeometryManager::update_osl_globals(Device *device, Scene *scene)
 {
 #ifdef WITH_OSL
@@ -500,7 +514,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   }
 
   /* tag the device arrays for reallocation or modification */
-  DeviceScene *dscene = &scene->dscene;
+  DeviceScene *dscene = scene->dscene;
 
   if (device_update_flags & (DEVICE_MESH_DATA_NEEDS_REALLOC | DEVICE_CURVE_DATA_NEEDS_REALLOC |
                              DEVICE_POINT_DATA_NEEDS_REALLOC))

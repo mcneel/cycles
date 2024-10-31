@@ -13,6 +13,9 @@ void HIPDeviceKernels::load(HIPDevice *device)
 {
   hipModule_t hipModule = device->hipModule;
 
+  int prev_min_blocks = -1;
+  int prev_num_threads_per_block = -1;
+
   for (int i = 0; i < (int)DEVICE_KERNEL_NUM; i++) {
     HIPDeviceKernel &kernel = kernels_[i];
 
@@ -29,10 +32,25 @@ void HIPDeviceKernels::load(HIPDevice *device)
     if (kernel.function) {
       hip_device_assert(device, hipFuncSetCacheConfig(kernel.function, hipFuncCachePreferL1));
 
+	  // 2023-06-09 David E.
+	  // I have been getting division-by-zero errors in the function
+	  // 'hipModuleOccupancyMaxPotentialBlockSize' when processing
+	  // the following two kernels. Prevent crash by setting hopefully
+	  // safe values to 'min_blocks' and 'num_threads_per_block'.
+      if (i == DEVICE_KERNEL_INTEGRATOR_SORT_BUCKET_PASS ||
+          i == DEVICE_KERNEL_INTEGRATOR_SORT_WRITE_PASS) {
+        kernel.min_blocks = prev_min_blocks >= 0 ? prev_min_blocks : 56;
+        kernel.num_threads_per_block = prev_num_threads_per_block >= 0 ? prev_num_threads_per_block : 1024;
+        continue;
+      }
+
       hip_device_assert(
           device,
           hipModuleOccupancyMaxPotentialBlockSize(
               &kernel.min_blocks, &kernel.num_threads_per_block, kernel.function, 0, 0));
+
+      prev_min_blocks = kernel.min_blocks;
+      prev_num_threads_per_block = kernel.num_threads_per_block;
     }
     else {
       LOG(ERROR) << "Unable to load kernel " << function_name;

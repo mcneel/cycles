@@ -25,7 +25,7 @@ CCL_NAMESPACE_BEGIN
 ccl_device_noinline void motion_triangle_shader_setup(KernelGlobals kg, ccl_private ShaderData *sd)
 {
   /* Get shader. */
-  sd->shader = kernel_data_fetch(tri_shader, sd->prim);
+  sd->shader = object_shader(kg, sd->object); // Rhino mod. orig: kernel_data_fetch(tri_shader, sd->prim);
 
   /* Compute motion info. */
   int numsteps, step;

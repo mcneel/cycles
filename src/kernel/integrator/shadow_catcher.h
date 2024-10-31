@@ -6,12 +6,14 @@
 
 #include "kernel/integrator/path_state.h"
 #include "kernel/integrator/state_util.h"
+#include "kernel/geom/geom.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Check whether current surface bounce is where path is to be split for the shadow catcher. */
 ccl_device_inline bool kernel_shadow_catcher_is_path_split_bounce(KernelGlobals kg,
                                                                   IntegratorState state,
+                                                                  ccl_private const Intersection *ccl_restrict isect,
                                                                   const int object_flag)
 {
 #ifdef __SHADOW_CATCHER__
@@ -38,6 +40,16 @@ ccl_device_inline bool kernel_shadow_catcher_is_path_split_bounce(KernelGlobals 
   if (path_flag & PATH_RAY_SHADOW_CATCHER_HIT) {
     return false;
   }
+
+  Ray ray ccl_optional_struct_init;
+  integrator_state_read_ray(kg, state, &ray);
+
+  ShaderData sd;
+  shader_setup_from_ray(kg, &sd, &ray, isect);
+
+  // CORE_PATCH: Only do shadow catching when hitting front face.
+  if ((sd.flag & SD_BACKFACING) == SD_BACKFACING)
+    return false;
 
   return true;
 #else
