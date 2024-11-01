@@ -72,6 +72,7 @@ ccl_device void integrator_volume_stack_update_for_subsurface(KernelGlobals kg,
       bool clipped = path_clip_ray(kg, state, stack_sd, &volume_ray);
 
       if (!clipped)
+      {
         volume_stack_enter_exit(kg, state, stack_sd);
       }
     }
