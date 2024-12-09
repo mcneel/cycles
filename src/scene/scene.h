@@ -135,6 +135,7 @@ class Scene : public NodeOwner {
   vector<ParticleSystem *> particle_systems;
   vector<Pass *> passes;
   vector<Procedural *> procedurals;
+  vector<float4> clipping_planes;
 
   /* data managers */
   ImageManager *image_manager;
@@ -155,7 +156,8 @@ class Scene : public NodeOwner {
 
   /* device */
   Device *device;
-  DeviceScene dscene;
+  DeviceScene dscene;/* Rhino mod. Testing not being a pointer in case it now works. Otherwise change back session.cpp:66 -> NOTE: In upstream this is not a pointer. Made a pointer, otherwise heap corruption errors happen during debug. */
+  /* See original Rhino mod patch: https://github.com/mcneel/cycles/commit/3f41fae10c8920c346b02c3900b2d1772aeb322d */
 
   /* parameters */
   SceneParams params;

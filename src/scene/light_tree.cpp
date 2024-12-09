@@ -92,7 +92,7 @@ LightTreeEmitter::LightTreeEmitter(Scene *scene,
     Object *object = scene->objects[object_id];
     Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
     Mesh::Triangle triangle = mesh->get_triangle(prim_id);
-    Shader *shader = static_cast<Shader *>(mesh->get_used_shaders()[mesh->get_shader()[prim_id]]);
+    Shader *shader = object->get_shader(); // take object shader instead of prim shader, Rhino specific
 
     for (int i = 0; i < 3; i++) {
       vertices[i] = mesh->get_verts()[triangle.v[i]];

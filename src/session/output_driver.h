@@ -28,8 +28,10 @@ class OutputDriver {
          const int2 size,
          const int2 full_size,
          const string_view layer,
-         const string_view view)
-        : offset(offset), size(size), full_size(full_size), layer(layer), view(view)
+         const string_view view,
+         const int resolution_divider,
+		 const int sample)
+        : offset(offset), size(size), full_size(full_size), layer(layer), view(view), resolution_divider(resolution_divider), sample(sample)
     {
     }
     virtual ~Tile() = default;
@@ -39,6 +41,8 @@ class OutputDriver {
     const int2 full_size;
     const string layer;
     const string view;
+    const int resolution_divider;
+    const int sample;
 
     virtual bool get_pass_pixels(const string_view pass_name,
                                  const int num_channels,
@@ -46,6 +50,7 @@ class OutputDriver {
     virtual bool set_pass_pixels(const string_view pass_name,
                                  const int num_channels,
                                  const float *pixels) const = 0;
+    virtual int get_sample() const = 0;
   };
 
   /* Write tile once it has finished rendering. */

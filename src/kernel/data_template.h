@@ -70,6 +70,7 @@ KERNEL_STRUCT_MEMBER(film, float4, xyz_to_g)
 KERNEL_STRUCT_MEMBER(film, float4, xyz_to_b)
 KERNEL_STRUCT_MEMBER(film, float4, rgb_to_y)
 KERNEL_STRUCT_MEMBER(film, float4, white_xyz)
+KERNEL_STRUCT_MEMBER(film, float4, rgb_to_lum)
 /* Rec709 to rendering color space. */
 KERNEL_STRUCT_MEMBER(film, float4, rec709_to_r)
 KERNEL_STRUCT_MEMBER(film, float4, rec709_to_g)
@@ -117,6 +118,8 @@ KERNEL_STRUCT_MEMBER(film, int, pass_cryptomatte)
 /* Adaptive sampling. */
 KERNEL_STRUCT_MEMBER(film, int, pass_adaptive_aux_buffer)
 KERNEL_STRUCT_MEMBER(film, int, pass_sample_count)
+KERNEL_STRUCT_MEMBER(film, int, pass_shadow_catcher_transparent_sample_count)
+KERNEL_STRUCT_MEMBER(film, int, pass_shadow_catcher_background_sample_count)
 /* Mist. */
 KERNEL_STRUCT_MEMBER(film, int, pass_mist)
 KERNEL_STRUCT_MEMBER(film, float, mist_start)
@@ -223,9 +226,9 @@ KERNEL_STRUCT_MEMBER(integrator, int, use_guiding_direct_light)
 KERNEL_STRUCT_MEMBER(integrator, int, use_guiding_mis_weights)
 
 /* Padding. */
+KERNEL_STRUCT_MEMBER(integrator, int, num_clipping_planes)
 KERNEL_STRUCT_MEMBER(integrator, int, pad1)
 KERNEL_STRUCT_MEMBER(integrator, int, pad2)
-KERNEL_STRUCT_MEMBER(integrator, int, pad3)
 KERNEL_STRUCT_END(KernelIntegrator)
 
 /* SVM. For shader specialization. */

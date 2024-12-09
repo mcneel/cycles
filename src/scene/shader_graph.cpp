@@ -8,6 +8,7 @@
 #include "scene/scene.h"
 #include "scene/shader.h"
 #include "scene/shader_nodes.h"
+#include "scene/rhino_shader_nodes.h"
 
 #include "util/algorithm.h"
 #include "util/foreach.h"
@@ -848,7 +849,7 @@ void ShaderGraph::default_inputs(bool do_osl)
    * everything the position by default, except for the sky texture */
 
   GeometryNode *geom = NULL;
-  TextureCoordinateNode *texco = NULL;
+  RhinoTextureCoordinateNode *texco = NULL;
   VectorTransformNode *normal_transform = NULL;
 
   foreach (ShaderNode *node, nodes) {
@@ -856,21 +857,21 @@ void ShaderGraph::default_inputs(bool do_osl)
       if (!input->link && (!(input->flags() & SocketType::OSL_INTERNAL) || do_osl)) {
         if (input->flags() & SocketType::LINK_TEXTURE_GENERATED) {
           if (!texco) {
-            texco = create_node<TextureCoordinateNode>();
+            texco = create_node<RhinoTextureCoordinateNode>();
           }
 
           connect(texco->output("Generated"), input);
         }
         if (input->flags() & SocketType::LINK_TEXTURE_NORMAL) {
           if (!texco) {
-            texco = create_node<TextureCoordinateNode>();
+            texco = create_node<RhinoTextureCoordinateNode>();
           }
 
           connect(texco->output("Normal"), input);
         }
         else if (input->flags() & SocketType::LINK_TEXTURE_UV) {
           if (!texco) {
-            texco = create_node<TextureCoordinateNode>();
+            texco = create_node<RhinoTextureCoordinateNode>();
           }
 
           connect(texco->output("UV"), input);
@@ -1214,6 +1215,144 @@ int ShaderGraph::get_num_closures()
   return num_closures;
 }
 
+std::string vector_string(ShaderInput* socket)
+{
+  auto socket_type = socket->type();
+    switch(socket_type) {
+    case SocketType::COLOR:
+    case SocketType::COLOR2:
+    case SocketType::VECTOR:
+    case SocketType::POINT:
+    case SocketType::NORMAL:
+    case SocketType::POINT2:
+    {
+          float3 _val = ((Node *)socket->parent)->get_float3(socket->socket_type);
+          return string_printf("(%f, %f, %f)", _val.x, _val.y, _val.z);
+    }
+    default:
+      return "";
+    }
+}
+
+const char* env_projection(EnvironmentTextureNode* envtex)
+{
+  auto projection = envtex->get_projection();
+  switch(projection) {
+    case NODE_ENVIRONMENT_EQUIRECTANGULAR:
+      return "equirectangular";
+    case NODE_ENVIRONMENT_MIRROR_BALL:
+      return "mirrorball";
+    case NODE_ENVIRONMENT_WALLPAPER:
+      return "wallpaper";
+    case NODE_ENVIRONMENT_EMAP:
+      return "emap";
+    case NODE_ENVIRONMENT_BOX:
+      return "box";
+    case NODE_ENVIRONMENT_LIGHT_PROBE:
+      return "lightprobe";
+    case NODE_ENVIRONMENT_CUBEMAP:
+      return "cubemap";
+    case NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL:
+      return "cubemapH";
+    case NODE_ENVIRONMENT_CUBEMAP_VERTICAL:
+      return "cubemapV";
+    case NODE_ENVIRONMENT_HEMISPHERICAL:
+      return "hemispherical";
+    case NODE_ENVIRONMENT_SPHERICAL:
+      return "spherical";
+    default:
+      return "...";
+  }
+}
+
+const char* math_node_operation(MathNode* mnode)
+{
+  switch (mnode->get_math_type()) {
+    case NODE_MATH_ADD:
+      return "add";
+    case NODE_MATH_SUBTRACT:
+      return "sub";
+    case NODE_MATH_MULTIPLY:
+      return "mul";
+    case NODE_MATH_DIVIDE:
+      return "div";
+    case NODE_MATH_SINE:
+      return "sin";
+    case NODE_MATH_COSINE:
+      return "cos";
+    case NODE_MATH_TANGENT:
+      return "tan";
+    case NODE_MATH_ARCSINE:
+      return "arcsin";
+    case NODE_MATH_ARCCOSINE:
+      return "arccos";
+    case NODE_MATH_ARCTANGENT:
+      return "arctan";
+    case NODE_MATH_POWER:
+      return "pow";
+    case NODE_MATH_LOGARITHM:
+      return "log";
+    case NODE_MATH_MINIMUM:
+      return "min";
+    case NODE_MATH_MAXIMUM:
+      return "max";
+    case NODE_MATH_ROUND:
+      return "round";
+    case NODE_MATH_LESS_THAN:
+      return "&lt;";
+    case NODE_MATH_GREATER_THAN:
+      return "&gt;";
+    case NODE_MATH_MODULO:
+      return "mod";
+    case NODE_MATH_ABSOLUTE:
+      return "abs";
+    case NODE_MATH_ARCTAN2:
+      return "arctan2";
+    case NODE_MATH_FLOOR:
+      return "floor";
+    case NODE_MATH_CEIL:
+      return "ceil";
+    case NODE_MATH_FRACTION:
+      return "fract";
+    case NODE_MATH_SQRT:
+      return "sqrt";
+    case NODE_MATH_INV_SQRT:
+      return "inv_sqrt";
+    case NODE_MATH_SIGN:
+      return "sgn";
+    case NODE_MATH_EXPONENT:
+      return "exp";
+    case NODE_MATH_RADIANS:
+      return "rad";
+    case NODE_MATH_DEGREES:
+      return "deg";
+    case NODE_MATH_SINH:
+      return "sinh";
+    case NODE_MATH_COSH:
+      return "cosh";
+    case NODE_MATH_TANH:
+      return "tanh";
+    case NODE_MATH_TRUNC:
+      return "trunc";
+    case NODE_MATH_SNAP:
+      return "snap";
+    case NODE_MATH_WRAP:
+      return "wrap";
+    case NODE_MATH_COMPARE:
+      return "comp";
+    case NODE_MATH_MULTIPLY_ADD:
+      return "muladd";
+    case NODE_MATH_PINGPONG:
+      return "pingpong";
+    case NODE_MATH_SMOOTH_MIN:
+      return "smoothmin";
+    case NODE_MATH_SMOOTH_MAX:
+      return "smoothmax";
+    default:
+      return "...";
+  }
+}
+
 void ShaderGraph::dump_graph(const char *filename)
 {
   FILE *fd = fopen(filename, "w");
@@ -1227,29 +1366,109 @@ void ShaderGraph::dump_graph(const char *filename)
   fprintf(fd, "ranksep=1.5\n");
   fprintf(fd, "rankdir=LR\n");
   fprintf(fd, "splines=false\n");
+  const ccl::NodeType *math_node_type = ccl::NodeType::find(ustring("math"));
+  const ccl::NodeType *value_node_type = ccl::NodeType::find(ustring("value"));
+  const ccl::NodeType *color_node_type = ccl::NodeType::find(ustring("color"));
+  const ccl::NodeType *imtex_node_type = ccl::NodeType::find(ustring("image_texture"));
+  const ccl::NodeType *envtex_node_type = ccl::NodeType::find(ustring("environment_texture"));
+  const ccl::NodeType *rhenvtex_node_type = ccl::NodeType::find(ustring("rhino_environment_texture"));
+
+  ustring fillcolor = ustring("grey96");
 
   foreach (ShaderNode *node, nodes) {
+    fillcolor = ustring("grey96");
+    if (node->is_a(math_node_type)) {
+      fillcolor = ustring("rosybrown2");
+    }
+    else if(node->is_a(imtex_node_type)) {
+      fillcolor = ustring("skyblue3");
+    }
+    else if(node->is_a(rhenvtex_node_type) || node->is_a(envtex_node_type)) {
+      fillcolor = ustring("springgreen3");
+    }
+    else if(node->is_a(value_node_type)) {
+      fillcolor = ustring("tan3");
+    }
     fprintf(fd, "// NODE: %p\n", node);
-    fprintf(fd, "\"%p\" [shape=record,label=\"{", node);
+    fprintf(fd, "\"%p\" [shape=record,style=filled,fillcolor=%s,label=\"{", node, fillcolor.c_str());
     if (node->inputs.size()) {
       fprintf(fd, "{");
       foreach (ShaderInput *socket, node->inputs) {
+        string val = vector_string(socket);
+        if(socket->type() == SocketType::FLOAT)
+        {
+          float _val = ((Node *)socket->parent)->get_float(socket->socket_type);
+          val = string_printf("%f", _val);
+        }
+        if(socket->type() == SocketType::BOOLEAN)
+        {
+          int _val = ((Node *)socket->parent)->get_bool(socket->socket_type) ? 1 : 0;
+          val = string_printf("%d", _val);
+        }
+        if(socket->type() == SocketType::INT)
+        {
+          int _val = ((Node *)socket->parent)->get_int(socket->socket_type);
+          val = string_printf("%d", _val);
+        }
+        if(socket->type() == SocketType::STRING)
+        {
+          auto _val = ((Node *)socket->parent)->get_string(socket->socket_type);
+          val = string_printf("%s", _val.c_str());
+        }
         if (socket != node->inputs[0]) {
           fprintf(fd, "|");
         }
-        fprintf(fd, "<IN_%p>%s", socket, socket->name().c_str());
+        fprintf(fd, "<IN_%p>%s&#92;n%s", socket, socket->name().c_str(), val.c_str());
       }
       fprintf(fd, "}|");
     }
-    fprintf(fd, "%s", node->name.c_str());
+    std::string from = std::string("\\");
+    std::string to = std::string("-");
+    std::string nodename = node->name.c_str();
+    if (node->is_a(math_node_type)) {
+      MathNode *mnode = dynamic_cast<MathNode *>(node);
+      nodename = string_printf("%s&#92;n(%s)", node->name.c_str(), math_node_operation(mnode));
+    } else if (node->is_a(value_node_type)){
+      ValueNode *vnode = dynamic_cast<ValueNode *>(node);
+      nodename = string_printf("%s&#92;n(%f)", node->name.c_str(), vnode->get_value());
+    } else if (node->is_a(color_node_type)){
+      ColorNode *cnode = dynamic_cast<ColorNode *>(node);
+      float3 color = cnode->get_value();
+      nodename = string_printf("%s&#92;n(%f, %f, %f)", node->name.c_str(), color.x, color.y, color.z);
+    } else if (node->is_a(imtex_node_type)) {
+      ImageTextureNode *imtexnode = dynamic_cast<ImageTextureNode *>(node);
+      auto color_space = imtexnode->get_colorspace();
+      auto filename = imtexnode->get_filename();
+      auto sfilename = std::string(filename.string());
+      size_t startpos = 0;
+      while ((startpos = sfilename.find(from, startpos)) != std::string::npos) {
+        sfilename.replace(startpos, from.length(), to);
+        startpos += to.length();
+      }
+      nodename = string_printf("%s&#92;n(%s)&#92;n%s", node->name.c_str(), color_space.c_str(), sfilename.c_str());
+    } else if (node->is_a(envtex_node_type)) {
+      EnvironmentTextureNode *envtexnode = dynamic_cast<EnvironmentTextureNode *>(node);
+      auto color_space = envtexnode->get_colorspace();
+      auto projection = env_projection(envtexnode);
+      auto filename = envtexnode->get_filename();
+      auto sfilename = std::string(filename.string());
+      size_t startpos = 0;
+      while ((startpos = sfilename.find(from, startpos)) != std::string::npos) {
+        sfilename.replace(startpos, from.length(), to);
+        startpos += to.length();
+      }
+      nodename = string_printf("%s&#92;n(%s&#92; _&#92; %s)&#92;n%s", node->name.c_str(), color_space.c_str(), projection, sfilename.c_str());
+    }
+    string_replace(nodename, " ", "&#92; ");
+    fprintf(fd, "%s", nodename.c_str());
     if (node->bump == SHADER_BUMP_CENTER) {
-      fprintf(fd, " (bump:center)");
+      fprintf(fd, "&#92; (bump:center)");
     }
     else if (node->bump == SHADER_BUMP_DX) {
-      fprintf(fd, " (bump:dx)");
+      fprintf(fd, "&#92; (bump:dx)");
     }
     else if (node->bump == SHADER_BUMP_DY) {
-      fprintf(fd, " (bump:dy)");
+      fprintf(fd, "&#92; (bump:dy)");
     }
     if (node->outputs.size()) {
       fprintf(fd, "|{");

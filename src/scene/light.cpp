@@ -210,6 +210,30 @@ float3 Light::get_axisv() const
   return transform_get_column(&tfm, 1);
 }
 
+/* Begin Rhino mod . Write access to transform. */
+
+void Light::set_co(float3 co)
+{
+  return transform_set_column(&tfm, 3, co);
+}
+
+void Light::set_dir(float3 dir)
+{
+  return transform_set_column(&tfm, 2, dir);
+}
+
+void Light::set_axisu(float3 axisu)
+{
+  return transform_set_column(&tfm, 0, axisu);
+}
+
+void Light::set_axisv(float3 axisv)
+{
+  return transform_set_column(&tfm, 1, axisv);
+}
+
+/* End Rhino mod . Write access to transform. */
+
 /* Light Manager */
 
 LightManager::LightManager()
@@ -313,13 +337,14 @@ void LightManager::device_update_distribution(Device *,
     Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
     int mesh_num_triangles = static_cast<int>(mesh->num_triangles());
 
-    for (int i = 0; i < mesh_num_triangles; i++) {
-      int shader_index = mesh->get_shader()[i];
+    for (size_t i = 0; i < mesh_num_triangles; i++) {
+      Shader* shader = object->get_shader();
+      /* Rhino mod. original block: int shader_index = mesh->get_shader()[i];
       Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
                            static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+                           scene->default_surface;*/
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         num_triangles++;
       }
     }
@@ -383,12 +408,13 @@ void LightManager::device_update_distribution(Device *,
 
     size_t mesh_num_triangles = mesh->num_triangles();
     for (size_t i = 0; i < mesh_num_triangles; i++) {
-      int shader_index = mesh->get_shader()[i];
+      Shader* shader = object->get_shader();
+      /* Rhino mod. original block: int shader_index = mesh->get_shader()[i];
       Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
                            static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+                           scene->default_surface;*/
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         distribution[offset].totarea = totarea;
         distribution[offset].prim = i + mesh->prim_offset;
         distribution[offset].mesh_light.shader_flag = shader_flag;

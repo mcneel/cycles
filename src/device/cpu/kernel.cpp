@@ -46,6 +46,8 @@ CPUKernels::CPUKernels()
       REGISTER_KERNEL_FILM_CONVERT(depth),
       REGISTER_KERNEL_FILM_CONVERT(mist),
       REGISTER_KERNEL_FILM_CONVERT(sample_count),
+      REGISTER_KERNEL_FILM_CONVERT(shadow_catcher_transparent_sample_count),
+      REGISTER_KERNEL_FILM_CONVERT(shadow_catcher_background_sample_count),
       REGISTER_KERNEL_FILM_CONVERT(float),
       REGISTER_KERNEL_FILM_CONVERT(light_path),
       REGISTER_KERNEL_FILM_CONVERT(float3),

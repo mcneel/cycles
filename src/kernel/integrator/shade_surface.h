@@ -22,8 +22,8 @@
 
 CCL_NAMESPACE_BEGIN
 
-ccl_device_forceinline void integrate_surface_shader_setup(KernelGlobals kg,
-                                                           ConstIntegratorState state,
+ccl_device_forceinline bool integrate_surface_shader_setup(KernelGlobals kg,
+                                                           IntegratorState state,
                                                            ccl_private ShaderData *sd)
 {
   Intersection isect ccl_optional_struct_init;
@@ -33,6 +33,13 @@ ccl_device_forceinline void integrate_surface_shader_setup(KernelGlobals kg,
   integrator_state_read_ray(state, &ray);
 
   shader_setup_from_ray(kg, sd, &ray, &isect);
+
+  if (path_clip_ray(kg, state, sd, &ray)) {
+      integrator_state_write_ray(state, &ray);
+      return false;
+  }
+
+  return true;
 }
 
 ccl_device_forceinline float3 integrate_surface_ray_offset(KernelGlobals kg,
@@ -692,7 +699,12 @@ ccl_device int integrate_surface(KernelGlobals kg,
 
   /* Setup shader data. */
   ShaderData sd;
-  integrate_surface_shader_setup(kg, state, &sd);
+  if (!integrate_surface_shader_setup(kg, state, &sd))
+  {
+    /* Ray is clipped by a clipping plane. Return true to continue tracing ray. */
+    return true;
+  }
+
   PROFILING_SHADER(sd.object, sd.shader);
 
   int continue_path_label = 0;

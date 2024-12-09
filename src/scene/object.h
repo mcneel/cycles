@@ -54,6 +54,7 @@ class Object : public Node {
   NODE_SOCKET_API(bool, hide_on_missing_motion)
   NODE_SOCKET_API(bool, use_holdout)
   NODE_SOCKET_API(bool, is_shadow_catcher)
+  NODE_SOCKET_API(bool, mesh_light_no_cast_shadow)
   NODE_SOCKET_API(float, shadow_terminator_shading_offset)
   NODE_SOCKET_API(float, shadow_terminator_geometry_offset)
 
@@ -66,6 +67,8 @@ class Object : public Node {
   NODE_SOCKET_API(ParticleSystem *, particle_system);
   NODE_SOCKET_API(int, particle_index);
 
+  NODE_SOCKET_API(Shader*, shader);
+
   NODE_SOCKET_API(float, ao_distance)
 
   NODE_SOCKET_API(ustring, lightgroup)
@@ -73,6 +76,10 @@ class Object : public Node {
   NODE_SOCKET_API(uint64_t, light_set_membership)
   NODE_SOCKET_API(uint, blocker_shadow_set)
   NODE_SOCKET_API(uint64_t, shadow_set_membership)
+
+  NODE_SOCKET_API(bool, use_ocs_frame)
+  NODE_SOCKET_API(Transform, ocs_frame) /* OCS frame for controlling WCS and WCS Box. */
+  NODE_SOCKET_API(Transform, ocs_frame_normal) /* OCS frame for controlling WCS and WCS Box normal. */
 
   /* Set during device update. */
   bool intersects_volume;
@@ -148,6 +155,7 @@ class ObjectManager {
     HOLDOUT_MODIFIED = (1 << 6),
     TRANSFORM_MODIFIED = (1 << 7),
     VISIBILITY_MODIFIED = (1 << 8),
+    CLIPPING_PLANE_MODIFIED = (1 << 9),
 
     /* tag everything in the manager for an update */
     UPDATE_ALL = ~0u,
@@ -155,10 +163,18 @@ class ObjectManager {
     UPDATE_NONE = 0u,
   };
 
+  bool need_clipping_plane_update = true;
   bool need_flags_update;
 
   ObjectManager();
   ~ObjectManager();
+
+  void prune(Scene* scene);
+
+  void device_update_clipping_planes(Device* device,
+      DeviceScene* dscene,
+      Scene* scene,
+      Progress& progress);
 
   void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
   void device_update_transforms(DeviceScene *dscene, Scene *scene, Progress &progress);
