@@ -209,8 +209,9 @@ class ShaderManager {
   /* Selective nodes compilation. */
   uint get_kernel_features(Scene *scene);
 
-  float linear_rgb_to_gray(const float3 c);
-  float3 rec709_to_scene_linear(const float3 c);
+  float linear_rgb_to_gray(float3 c);
+  float linear_rgb_to_luminance(float3 c);
+  float3 rec709_to_scene_linear(float3 c);
 
   string get_cryptomatte_materials(Scene *scene);
 
@@ -219,6 +220,13 @@ class ShaderManager {
   bool need_update() const;
 
   void init_xyz_transforms();
+
+  void set_rhino_perlin_noise_table(const vector<float> &perlin_noise_table);
+  void set_rhino_impulse_noise_table(const vector<float> &impulse_noise_table);
+  void set_rhino_vc_noise_table(const vector<float> &vc_noise_table);
+  void set_rhino_aaltonen_noise_table(const vector<float> &aaltonen_noise_table);
+  void set_rhino_dots_dot_data_table(const vector<float> &dot_data_table);
+  void set_rhino_dots_tree_data_table(const vector<float> &tree_data_table);
 
  protected:
   ShaderManager();
@@ -250,11 +258,25 @@ class ShaderManager {
   float3 xyz_to_g;
   float3 xyz_to_b;
   float3 rgb_to_y;
+  float3 rgb_to_lum;
   float3 white_xyz;
   float3 rec709_to_r;
   float3 rec709_to_g;
   float3 rec709_to_b;
   bool is_rec709;
+
+  static vector<float> rhino_perlin_noise_table;
+  static vector<float> rhino_impulse_noise_table;
+  static vector<float> rhino_vc_noise_table;
+  static vector<float> rhino_aaltonen_noise_table;
+  static vector<float> rhino_dots_tree_data_table;
+  static vector<float> rhino_dots_dot_data_table;
+  size_t rhino_perlin_noise_table_offset;
+  size_t rhino_impulse_noise_table_offset;
+  size_t rhino_vc_noise_table_offset;
+  size_t rhino_aaltonen_noise_table_offset;
+  size_t rhino_dots_tree_data_table_offset;
+  size_t rhino_dots_dot_data_table_offset;
 };
 
 CCL_NAMESPACE_END

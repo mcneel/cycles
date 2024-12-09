@@ -86,6 +86,9 @@ class DeviceScene {
   /* IES lights */
   device_vector<float> ies_lights;
 
+  /* Clipping planes float4 contains a,b,c,d to plane equation ax+by+cz+d. */
+  device_vector<float4> clipping_planes;
+
   KernelData data;
 
   DeviceScene(Device *device);

@@ -170,6 +170,10 @@ set(SRC_KERNEL_CLOSURE_HEADERS
 
 set(SRC_KERNEL_SVM_HEADERS
   svm/svm.h
+  svm/svm_rhino_matrix_math.h
+  svm/svm_rhino_azimuth_altitude_transform.h
+  svm/svm_rhino_procedurals.h
+  svm/svm_rhino_types.h
   svm/ao.h
   svm/aov.h
   svm/attribute.h
@@ -489,10 +493,15 @@ if(WITH_CYCLES_CUDA_BINARIES)
   macro(CYCLES_CUDA_KERNEL_ADD arch prev_arch name flags sources experimental)
     if(${arch} MATCHES "compute_.*")
       set(format "ptx")
+      # 2023-05-23 David E.
+      # Don't include shader model version in filename for ptx files since they are all the same.
+      # This commit includes change to CyclesX to look for ptx file without shader model version in file name.
+      set(filename_arch "compute")
     else()
       set(format "cubin")
+      set(filename_arch ${arch})
     endif()
-    set(cuda_file ${name}_${arch}.${format})
+    set(cuda_file ${name}_${filename_arch}.${format})
     set(cuda_file_compressed ${cuda_file}.zst)
 
     set(kernel_sources ${sources})
@@ -537,6 +546,12 @@ if(WITH_CYCLES_CUDA_BINARIES)
       set(cuda_flags ${cuda_flags} -std=c++17)
     endif()
 
+    if(${cuda_version} GREATER_EQUAL 110)
+      # Helps with compatibility when using recent clang host compiler.
+      set(cuda_flags ${cuda_flags} -std=c++17)
+    endif()
+
+# add -G and -O0 when creating a debug build
     set(_cuda_nvcc_args
       -arch=${arch}
       ${CUDA_NVCC_FLAGS}

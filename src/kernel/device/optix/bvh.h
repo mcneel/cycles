@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+SPDX-FileCopyrightText: 2021-2022 Blender Foundation
  *
  * SPDX-License-Identifier: Apache-2.0 */
 
@@ -202,7 +202,7 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
 
   /* If no transparent shadows, all light is blocked and we can stop immediately. */
   if (num_hits >= max_hits ||
-      !(intersection_get_shader_flags(nullptr, prim, type) & SD_HAS_TRANSPARENT_SHADOW))
+      !(intersection_get_shader_flags(nullptr, prim, object, type) & SD_HAS_TRANSPARENT_SHADOW))
   {
     optixSetPayload_5(true);
     return optixTerminateRay();

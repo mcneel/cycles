@@ -344,8 +344,8 @@ ccl_device_forceinline void kernel_embree_filter_occluded_shadow_all_func_impl(
 #endif
 
   /* If no transparent shadows or max number of hits exceeded, all light is blocked. */
-  const int flags = intersection_get_shader_flags(kg, current_isect.prim, current_isect.type);
-  if ((flags & SD_HAS_TRANSPARENT_SHADOW) == 0) {
+  const int flags = intersection_get_shader_flags(kg, current_isect.prim, current_isect.object, current_isect.type);
+  if (!(flags & (SD_HAS_TRANSPARENT_SHADOW)) || ctx->num_hits >= ctx->max_hits) {
     ctx->opaque_hit = true;
     return;
   }

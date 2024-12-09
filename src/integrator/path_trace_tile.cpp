@@ -16,7 +16,9 @@ PathTraceTile::PathTraceTile(PathTrace &path_trace)
                          path_trace.get_render_tile_size(),
                          path_trace.get_render_size(),
                          path_trace.get_render_tile_params().layer,
-                         path_trace.get_render_tile_params().view),
+                         path_trace.get_render_tile_params().view,
+                         path_trace.get_resolution_divider(),
+						 path_trace.get_num_render_tile_samples()),
       path_trace_(path_trace),
       copied_from_device_(false)
 {
@@ -97,6 +99,11 @@ bool PathTraceTile::set_pass_pixels(const string_view pass_name,
   const PassAccessor::Source source(pixels, num_channels);
 
   return path_trace_.set_render_tile_pixels(pass_accessor, source);
+}
+
+int PathTraceTile::get_sample() const
+{
+  return sample;
 }
 
 CCL_NAMESPACE_END

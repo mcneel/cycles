@@ -144,10 +144,10 @@ bool CUDADevice::support_device(const uint /*kernel_features*/)
   cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevId);
   cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, cuDevId);
 
-  /* We only support sm_30 and above */
-  if (major < 3) {
+  /* We only support above sm_37 */
+  if (major <= 3 && minor <= 7) {
     set_error(string_printf(
-        "CUDA backend requires compute capability 3.0 or up, but found %d.%d.", major, minor));
+        "CUDA backend requires compute capability above 3.7, but found %d.%d.", major, minor));
     return false;
   }
 
@@ -267,8 +267,12 @@ string CUDADevice::compile_kernel(const string &common_cflags,
     /* The driver can JIT-compile PTX generated for older generations, so find the closest one. */
     int ptx_major = major, ptx_minor = minor;
     while (ptx_major >= 3) {
+	  /* In Cycles original code the format string is
+	   *   lib/%s_compute_%d%d.ptx.zst
+	   * -jK
+	   */
       const string ptx = path_get(
-          string_printf("lib/%s_compute_%d%d.ptx.zst", name, ptx_major, ptx_minor));
+          string_printf("lib/%s_compute.ptx", name));
       VLOG_INFO << "Testing for pre-compiled kernel " << ptx << ".";
       if (path_exists(ptx)) {
         VLOG_INFO << "Using precompiled kernel.";
@@ -680,7 +684,8 @@ void CUDADevice::const_copy_to(const char *name, void *host, const size_t size)
   size_t bytes;
 
   cuda_assert(cuModuleGetGlobal(&mem, &bytes, cuModule, "kernel_params"));
-  assert(bytes == sizeof(KernelParamsCUDA));
+  size_t kpcuda = sizeof(KernelParamsCUDA);
+  assert(bytes == kpcuda);
 
   /* Update data storage pointers in launch parameters. */
 #  define KERNEL_DATA_ARRAY(data_type, data_name) \

@@ -496,6 +496,7 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
 
   for (Geometry *geom : geometry) {
     BVH2 *bvh = static_cast<BVH2 *>(geom->bvh.get());
+	if(bvh == nullptr) continue;
 
     if (geom->need_build_bvh(params.bvh_layout)) {
       prim_index_size += bvh->pack.prim_index.size();
@@ -552,6 +553,7 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
     }
 
     BVH2 *bvh = static_cast<BVH2 *>(geom->bvh.get());
+	if(bvh == nullptr) continue;
 
     const int noffset = nodes_offset;
     const int noffset_leaf = nodes_leaf_offset;

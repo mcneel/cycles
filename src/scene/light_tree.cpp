@@ -93,8 +93,8 @@ LightTreeEmitter::LightTreeEmitter(Scene *scene,
   if (is_triangle()) {
     float3 vertices[3];
     Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
-    const Mesh::Triangle triangle = mesh->get_triangle(prim_id);
-    Shader *shader = static_cast<Shader *>(mesh->get_used_shaders()[mesh->get_shader()[prim_id]]);
+    Mesh::Triangle triangle = mesh->get_triangle(prim_id);
+    Shader *shader = object->get_shader(); // take object shader instead of prim shader, Rhino specific
 
     for (int i = 0; i < 3; i++) {
       vertices[i] = mesh->get_verts()[triangle.v[i]];

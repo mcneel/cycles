@@ -22,7 +22,7 @@ class Background : public Node {
   NODE_SOCKET_API(bool, use_shader)
 
   NODE_SOCKET_API(uint, visibility)
-  NODE_SOCKET_API(Shader *, shader)
+  NODE_SOCKET_API(Node *, shader)
 
   NODE_SOCKET_API(bool, transparent)
   NODE_SOCKET_API(bool, transparent_glass)

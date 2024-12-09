@@ -143,7 +143,7 @@ ccl_device_forceinline void mnee_setup_manifold_vertex(KernelGlobals kg,
   sd_vtx->u = isect->u;
   sd_vtx->v = isect->v;
 
-  sd_vtx->shader = kernel_data_fetch(tri_shader, sd_vtx->prim);
+  sd_vtx->shader = object_shader(kg, sd_vtx->object);//kernel_data_fetch(tri_shader, sd_vtx->prim);
 
   float3 verts[3];
   float3 normals[3];
@@ -1009,6 +1009,9 @@ ccl_device_forceinline int kernel_path_mnee_sample(KernelGlobals kg,
 
       /* Setup shader data on caustic caster and evaluate context. */
       shader_setup_from_ray(kg, sd_mnee, &probe_ray, &probe_isect);
+
+      if (path_clip_ray(kg, state, sd_mnee, &probe_ray))
+        continue;
 
       /* Reject caster if smooth normals are not available: Manifold exploration assumes local
        * differential geometry can be created at any point on the surface which is not possible if

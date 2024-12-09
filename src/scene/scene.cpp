@@ -102,6 +102,7 @@ void Scene::free_memory(bool final)
   geometry.clear();
   particle_systems.clear();
   passes.clear();
+  clipping_planes.clear();
 
   if (device) {
     camera->device_free(device, &dscene, this);
@@ -187,6 +188,9 @@ void Scene::device_update(Device *device_, Progress &progress)
     }
   });
 
+  object_manager->prune(this);
+  geometry_manager->prune(this);
+
   /* The order of updates is important, because there's dependencies between
    * the different managers, using data computed by previous managers.
    *
@@ -251,6 +255,13 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   progress.set_status("Updating Particle Systems");
   particle_system_manager->device_update(device, &dscene, this, progress);
+
+  if (progress.get_cancel() || device->have_error()) {
+    return;
+  }
+
+  progress.set_status("Updating Lookup Tables");
+  lookup_tables->device_update(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -337,7 +348,7 @@ void Scene::device_update(Device *device_, Progress &progress)
     dscene.data.volume_stack_size = get_volume_stack_size();
 
     progress.set_status("Updating Device", "Writing constant memory");
-    device->const_copy_to("data", &dscene.data, sizeof(dscene.data));
+    device->const_copy_to("data", &(dscene.data), sizeof(dscene.data));
   }
 
   device->optimize_for_scene(this);
@@ -409,7 +420,7 @@ bool Scene::need_update()
 
 bool Scene::need_data_update()
 {
-  return (background->is_modified() || image_manager->need_update() ||
+  return (background->is_modified() || image_manager->need_update() || object_manager->need_clipping_plane_update ||
           object_manager->need_update() || geometry_manager->need_update() ||
           light_manager->need_update() || lookup_tables->need_update() ||
           integrator->is_modified() || shader_manager->need_update() ||

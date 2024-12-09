@@ -23,11 +23,14 @@ ccl_device_noinline void svm_node_fresnel(ccl_private ShaderData *sd,
   svm_unpack_node_uchar2(node, &normal_offset, &out_offset);
   float eta = (stack_valid(ior_offset)) ? stack_load_float(stack, ior_offset) :
                                           __uint_as_float(ior_value);
-  const float3 normal_in = stack_valid(normal_offset) ? stack_load_float3(stack, normal_offset) :
+  float3 normal_in = stack_valid(normal_offset) ? stack_load_float3(stack, normal_offset) :
                                                         sd->N;
 
   eta = fmaxf(eta, 1e-5f);
-  eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
+  //eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
+  if (sd->flag & SD_BACKFACING) {
+      normal_in = -normal_in;
+  }
 
   const float f = fresnel_dielectric_cos(dot(sd->wi, normal_in), eta);
 

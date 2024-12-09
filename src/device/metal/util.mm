@@ -84,8 +84,10 @@ const vector<id<MTLDevice>> &MetalInfo::get_usable_devices()
     return usable_devices;
   }
 
+  NSArray *devices = MTLCopyAllDevices();
+
   metal_printf("Usable Metal devices:\n");
-  for (id<MTLDevice> device in MTLCopyAllDevices()) {
+  for (id<MTLDevice> device in devices) {
     string device_name = get_device_name(device);
     bool usable = false;
 
@@ -113,6 +115,8 @@ const vector<id<MTLDevice>> &MetalInfo::get_usable_devices()
   if (usable_devices.empty()) {
     metal_printf("   No usable Metal devices found\n");
   }
+
+  [devices release];
   already_enumerated = true;
 
   return usable_devices;

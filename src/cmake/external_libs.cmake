@@ -38,10 +38,14 @@ endif()
 
 if(APPLE)
   if(CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
-    set(_cycles_lib_platform "macos_x64")
+    set(_cycles_lib_dir "${CMAKE_SOURCE_DIR}/lib/macos_x64")
+  elseif("${CMAKE_OSX_ARCHITECTURES}" STREQUAL "x86_64;arm64")
+    set(_cycles_lib_dir "${CMAKE_SOURCE_DIR}/lib/macos_universal")
   else()
     set(_cycles_lib_platform "macos_arm64")
   endif()
+
+	MESSAGE(STATUS "----> Using ${_cycles_lib_dir}")
 
   # Always use system zlib
   find_package(ZLIB REQUIRED)

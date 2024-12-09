@@ -39,6 +39,8 @@ size_t SocketType::size(Type type)
       return sizeof(uint64_t);
     case COLOR:
       return sizeof(float3);
+    case COLOR2:
+      return sizeof(float3);
     case VECTOR:
       return sizeof(float3);
     case POINT:
@@ -101,14 +103,15 @@ ustring SocketType::type_name(Type type)
 {
   static const ustring names[] = {ustring("undefined"),
 
-                                  ustring("boolean"),       ustring("float"),
-                                  ustring("int"),           ustring("uint"),
-                                  ustring("uint64"),        ustring("color"),
-                                  ustring("vector"),        ustring("point"),
-                                  ustring("normal"),        ustring("point2"),
-                                  ustring("closure"),       ustring("string"),
-                                  ustring("enum"),          ustring("transform"),
-                                  ustring("node"),
+                            ustring("boolean"),       ustring("float"),
+                            ustring("int"),           ustring("uint"),
+                            ustring("uint64"),        ustring("color"),
+                            ustring("color2"),
+                            ustring("vector"),        ustring("point"),
+                            ustring("normal"),        ustring("point2"),
+                            ustring("closure"),       ustring("string"),
+                            ustring("enum"),          ustring("transform"),
+                            ustring("node"),
 
                                   ustring("array_boolean"), ustring("array_float"),
                                   ustring("array_int"),     ustring("array_color"),

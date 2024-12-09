@@ -1,0 +1,41 @@
+// This file contains the version resources for ccycles.vcxproj
+// The version numbers and copyright information comes from the header file below.
+// Please do not modify this file unless you are certain you know what you are doing!
+#if !defined(STANDALONE)
+#include "..\..\..\..\..\version.h"
+#else
+#include "version.h"
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION VERSION_WITH_COMMAS
+ PRODUCTVERSION VERSION_WITH_COMMAS
+ FILEFLAGSMASK RHINO_FILE_FLAGS_MASK
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080904e4"
+        BEGIN
+            VALUE "CompanyName", "Robert McNeel & Associates"
+            VALUE "FileDescription", "CCycles - C-API for Cycles. Part of C[CS]?ycles"
+            VALUE "FileVersion", VERSION_WITH_PERIODS
+            VALUE "InternalName", "ccycles.dll"
+            VALUE "LegalCopyright", COPYRIGHT
+            VALUE "OriginalFilename", "ccycles.dll"
+            VALUE "ProductName", "C[CS]?ycles - CCycles"
+            VALUE "ProductVersion", RMA_VERSION_WITH_PERIODS_STRING
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x809, 1252
+    END
+END

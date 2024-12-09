@@ -176,6 +176,7 @@ Camera::Camera() : Node(get_node_type())
   rastertocamera = projection_identity();
   cameratoworld = transform_identity();
   worldtoraster = projection_identity();
+  cameratondc = transform_identity();
 
   full_rastertocamera = projection_identity();
 
@@ -283,6 +284,8 @@ void Camera::update(Scene *scene)
   worldtondc = screentondc * worldtoscreen;
   worldtoraster = ndctoraster * worldtondc;
 
+  cameratondc = projection_to_transform(screentondc * cameratoscreen);
+
   /* differentials */
   if (camera_type == CAMERA_ORTHOGRAPHIC) {
     dx = transform_perspective_direction(&rastertocamera, make_float3(1, 0, 0));
@@ -334,6 +337,8 @@ void Camera::update(Scene *scene)
   kcam->worldtoraster = worldtoraster;
   kcam->worldtondc = worldtondc;
   kcam->ndctoworld = ndctoworld;
+
+  kcam->cameratondc = cameratondc;
 
   /* camera motion */
   kcam->num_motion_steps = 0;

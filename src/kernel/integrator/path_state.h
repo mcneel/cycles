@@ -7,6 +7,7 @@
 #include "kernel/integrator/state.h"
 
 #include "kernel/sample/pattern.h"
+#include "kernel/bvh/util.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -253,6 +254,33 @@ ccl_device_inline uint path_state_ray_visibility(ConstIntegratorState state)
 
   return visibility;
 }
+
+ccl_device_forceinline bool path_clip_ray(
+    KernelGlobals kg,
+    IntegratorState state,
+    ccl_private ShaderData* sd,
+    ccl_private Ray* ray)
+{
+  const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
+
+  if ((path_flag & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+    for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+      float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
+      float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
+      if (testdist < 0) {
+        ray->P = ray_offset(
+            sd->P, -sd->Ng);  // start ray a bit after hit point, using negative geometry normal
+        return true;
+      }
+    }
+  }
+
+    return false;
+}
+
+
+
+
 
 ccl_device_inline float path_state_continuation_probability(KernelGlobals kg,
                                                             ConstIntegratorState state,

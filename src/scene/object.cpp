@@ -89,6 +89,7 @@ NODE_DEFINE(Object)
   SOCKET_STRING(asset_name, "Asset Name", ustring());
 
   SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
+  SOCKET_BOOLEAN(mesh_light_no_cast_shadow, "Mesh Light No Cast Shadow", false);
 
   SOCKET_BOOLEAN(is_caustics_caster, "Cast Shadow Caustics", false);
   SOCKET_BOOLEAN(is_caustics_receiver, "Receive Shadow Caustics", false);
@@ -98,6 +99,8 @@ NODE_DEFINE(Object)
   SOCKET_NODE(particle_system, "Particle System", ParticleSystem::get_node_type());
   SOCKET_INT(particle_index, "Particle Index", 0);
 
+  SOCKET_NODE(shader, "Shader", nullptr);
+
   SOCKET_FLOAT(ao_distance, "AO Distance", 0.0f);
 
   SOCKET_STRING(lightgroup, "Light Group", ustring());
@@ -105,6 +108,10 @@ NODE_DEFINE(Object)
   SOCKET_UINT64(light_set_membership, "Light Set Membership", LIGHT_LINK_MASK_ALL);
   SOCKET_UINT(blocker_shadow_set, "Shadow Set Index", 0);
   SOCKET_UINT64(shadow_set_membership, "Shadow Set Membership", LIGHT_LINK_MASK_ALL);
+
+  SOCKET_BOOLEAN(use_ocs_frame, "Use OCS Frame", false);
+  SOCKET_TRANSFORM(ocs_frame, "OCS Frame", transform_identity());
+  SOCKET_TRANSFORM(ocs_frame_normal, "OCS Frame Normal", transform_identity());
 
   return type;
 }
@@ -116,6 +123,7 @@ Object::Object() : Node(get_node_type())
   attr_map_offset = 0;
   bounds = BoundBox::empty;
   intersects_volume = false;
+  shader = nullptr;
 }
 
 Object::~Object() = default;
@@ -450,6 +458,20 @@ ObjectManager::ObjectManager()
 
 ObjectManager::~ObjectManager() = default;
 
+void ObjectManager::prune(Scene* scene)
+{
+	vector<Object*> obs_to_prune;
+	for (Object* ob : scene->objects) {
+		if(static_cast<Mesh *>(ob->geometry)->triangles.size() == 0) {
+			obs_to_prune.push_back(ob);
+		}
+	}
+
+	for (Object* ob : obs_to_prune) {
+		scene->delete_node(ob);
+	}
+}
+
 static float object_volume_density(const Transform &tfm, Geometry *geom)
 {
   if (geom->is_volume()) {
@@ -495,6 +517,9 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
 
   kobject.tfm = tfm;
   kobject.itfm = itfm;
+  kobject.ocs_frame = ob->ocs_frame;
+  kobject.ocs_frame_normal = ob->ocs_frame_normal;
+  kobject.use_ocs_frame = ob->use_ocs_frame;
   kobject.volume_density = object_volume_density(tfm, geom);
   kobject.color[0] = color.x;
   kobject.color[1] = color.y;
@@ -649,6 +674,8 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   else {
     kobject.lightgroup = LIGHTGROUP_NONE;
   }
+
+  kobject.shader = ob->shader ? state->scene->shader_manager->get_shader_id(ob->shader, true) : 0;
 }
 
 void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dscene, Scene *scene)
@@ -665,7 +692,17 @@ void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dsce
 
   /* On MetalRT, primitive / curve segment offsets can't be baked at BVH build time. Intersection
    * handlers need to apply the offset manually. */
-  uint *object_prim_offset = dscene->object_prim_offset.alloc(scene->objects.size());
+  uint object_count = scene->objects.size();
+  uint *object_prim_offset = dscene->object_prim_offset.alloc(object_count);
+  if(object_prim_offset == nullptr && object_count > 0) {
+    device->set_error("Failed to allocate memory for object_prim_offset");
+    return;
+  }
+  if(dscene->object_prim_offset.size() != object_count) {
+    device->set_error("object_prim_offset size incorrect");
+    return;
+  }
+
   for (Object *ob : scene->objects) {
     uint32_t prim_offset = 0;
     if (Geometry *const geom = ob->geometry) {
@@ -676,8 +713,15 @@ void ObjectManager::device_update_prim_offsets(Device *device, DeviceScene *dsce
         prim_offset = geom->prim_offset;
       }
     }
-    const uint obj_index = ob->get_device_index();
-    object_prim_offset[obj_index] = prim_offset;
+    uint obj_index = ob->get_device_index();
+
+    // jK: sometimes we get crashes here in RhinoCycles.
+    // Make sure we don't access out of bounds.
+    if(obj_index >= 0 && obj_index < object_count)
+    {
+      object_prim_offset[obj_index] = prim_offset;
+    }
+
   }
 
   dscene->object_prim_offset.copy_to_device();
@@ -810,7 +854,11 @@ void ObjectManager::device_update(Device *device,
 
     int index = 0;
     for (Object *object : scene->objects) {
-      object->index = index++;
+      // jK: attempt to fix OOB crashes. Increase only for objects with
+      // geometry that have triangles
+      if(static_cast<Mesh *>(object->geometry)->triangles.size() > 0) {
+        object->index = index++;
+      }
 
       /* this is a bit too broad, however a bigger refactor might be needed to properly separate
        * update each type of data (transform, flags, etc.) */
@@ -919,6 +967,13 @@ void ObjectManager::device_update_flags(Device * /*unused*/,
     else {
       object_flag[object->index] &= ~SD_OBJECT_SHADOW_CATCHER;
     }
+
+	if (object->mesh_light_no_cast_shadow) {
+		object_flag[object->index] |= SD_OBJECT_LIGHT_NO_CAST_SHADOWS;
+	}
+	else {
+		object_flag[object->index] &= ~SD_OBJECT_LIGHT_NO_CAST_SHADOWS;
+	}
 
     if (bounds_valid) {
       object->intersects_volume = false;
@@ -1101,6 +1156,8 @@ void ObjectManager::tag_update(Scene *scene, const uint32_t flag)
   if (flag & (OBJECT_ADDED | OBJECT_REMOVED | OBJECT_MODIFIED)) {
     scene->integrator->tag_update(scene, Integrator::OBJECT_MANAGER);
   }
+
+  need_clipping_plane_update = true;
 }
 
 bool ObjectManager::need_update() const
@@ -1141,5 +1198,41 @@ string ObjectManager::get_cryptomatte_assets(Scene *scene)
   manifest[manifest.size() - 1] = '}';
   return manifest;
 }
+
+
+
+void ObjectManager::device_update_clipping_planes(Device*, DeviceScene* dscene,
+    Scene* scene,
+    Progress& progress)
+{
+    float4* cps;
+    need_clipping_plane_update = false;
+    /* Set the clipping planes. */
+    dscene->clipping_planes.free();
+    int num_cps = 0;
+    for (float4* cp : scene->clipping_planes) {
+        if (cp->x == FLT_MAX) continue;
+        num_cps++;
+    }
+    cps = dscene->clipping_planes.alloc(num_cps);
+
+    int cp_idx = 0;
+    for (float4* cp : scene->clipping_planes) {
+        float4& dscene_cp = cps[cp_idx];
+        if (cp->x == FLT_MAX) continue;
+        dscene_cp.x = cp->x;
+        dscene_cp.y = cp->y;
+        dscene_cp.z = cp->z;
+        dscene_cp.w = cp->w;
+        cp_idx++;
+    }
+
+    KernelIntegrator* kintegrator = &dscene->data.integrator;
+    kintegrator->num_clipping_planes = cp_idx;
+
+    dscene->clipping_planes.copy_to_device();
+
+}
+
 
 CCL_NAMESPACE_END

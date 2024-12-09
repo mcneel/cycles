@@ -115,6 +115,9 @@ class ImageTextureNode : public ImageSlotTextureNode {
   NODE_SOCKET_API(bool, animated)
   NODE_SOCKET_API(float3, vector)
   NODE_SOCKET_API_ARRAY(array<int>, tiles)
+  NODE_SOCKET_API(bool, alternate_tiles)
+  NODE_SOCKET_API(float, decalforward)
+  NODE_SOCKET_API(float, decalusage)
 
  protected:
   void cull_tiles(Scene *scene, ShaderGraph *graph);
@@ -429,6 +432,14 @@ class RGBToBWNode : public ShaderNode {
   NODE_SOCKET_API(float3, color)
 };
 
+class RGBToLuminanceNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(RGBToLuminanceNode)
+		void constant_fold(const ConstantFolder& folder);
+
+	NODE_SOCKET_API(float3, color)
+};
+
 class ConvertNode : public ShaderNode {
  public:
   ConvertNode(SocketType::Type from, SocketType::Type to, bool autoconvert = false);
@@ -450,7 +461,7 @@ class ConvertNode : public ShaderNode {
   };
   ustring value_string;
 
-  static const int MAX_TYPE = 13;
+  static const int MAX_TYPE = 14; // jK bumped due to COLOR2 addition
   static bool register_types();
   static unique_ptr<Node> create(const NodeType *type);
   static const NodeType *node_types[MAX_TYPE][MAX_TYPE];
@@ -969,6 +980,73 @@ class TextureCoordinateNode : public ShaderNode {
   NODE_SOCKET_API(bool, from_dupli)
   NODE_SOCKET_API(bool, use_transform)
   NODE_SOCKET_API(Transform, ob_tfm)
+};
+
+class RhinoTextureCoordinateNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoTextureCoordinateNode)
+  void attributes(Shader *shader, AttributeRequestSet *attributes);
+  bool has_attribute_dependency()
+  {
+    return true;
+  }
+  bool has_spatial_varying()
+  {
+    return true;
+  }
+  bool has_object_dependency()
+  {
+    return use_transform;
+  }
+
+  virtual bool equals(const ShaderNode &other)
+  {
+    const RhinoTextureCoordinateNode &texco_node = (const RhinoTextureCoordinateNode &)other;
+    return ShaderNode::equals(other) && uvmap == texco_node.uvmap &&
+           decal_origin == texco_node.decal_origin && decal_across == texco_node.decal_across &&
+           decal_up == texco_node.decal_up && pxyz == texco_node.pxyz && nxyz == texco_node.nxyz &&
+           uvw == texco_node.uvw && horizontal_sweep_start == texco_node.horizontal_sweep_start &&
+           horizontal_sweep_end == texco_node.horizontal_sweep_end &&
+           vertical_sweep_start == texco_node.vertical_sweep_start &&
+           vertical_sweep_end == texco_node.vertical_sweep_end && height == texco_node.height &&
+           radius == texco_node.radius && decal_projection && texco_node.decal_projection;
+  }
+
+  void decal_setup(ShaderOutput *out,
+                   ShaderNodeType texco_node,
+                   NodeTexCoord texcoord,
+                   SVMCompiler &compiler);
+
+  NODE_SOCKET_API(float3, normal_osl);
+  NODE_SOCKET_API(bool, from_dupli);
+  NODE_SOCKET_API(bool, use_transform);
+  NODE_SOCKET_API(Transform, ob_tfm);
+
+  /* decal origin */
+  float3 decal_origin;
+  /* decal across vector */
+  float3 decal_across;
+  /* decal up vector */
+  float3 decal_up;
+
+  /* Pxyz transform to map ShaderData->P to normalized mapping primitive */
+  Transform pxyz;
+  /* Nxyz transform to map ShaderData->N to normalized mapping primitive */
+  Transform nxyz;
+  /* UVW transform to map point to UV(W) space*/
+  Transform uvw;
+  /* Sweep used in spherical and tubular projections t. */
+  NODE_SOCKET_API(float, horizontal_sweep_start);
+  NODE_SOCKET_API(float, horizontal_sweep_end);
+  NODE_SOCKET_API(float, vertical_sweep_start);
+  NODE_SOCKET_API(float, vertical_sweep_end);
+  /* Height used in tubular, radius in spherical and tubular projections. */
+  NODE_SOCKET_API(float, height);
+  NODE_SOCKET_API(float, radius);
+  /* Projection used by decal: both, forward or backward */
+  NODE_SOCKET_API(NodeImageDecalProjection, decal_projection);
+  /* UV Map to use, used for Decals */
+  ustring uvmap;
 };
 
 class UVMapNode : public ShaderNode {

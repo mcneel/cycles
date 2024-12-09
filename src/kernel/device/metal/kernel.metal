@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+SPDX-FileCopyrightText: 2021-2022 Blender Foundation
  *
  * SPDX-License-Identifier: Apache-2.0 */
 
@@ -263,7 +263,7 @@ bool metalrt_shadow_all_hit(
 
   /* If no transparent shadows, all light is blocked and we can stop immediately. */
   if (num_hits >= max_hits ||
-      !(context.intersection_get_shader_flags(nullptr, prim, type) & SD_HAS_TRANSPARENT_SHADOW))
+      !(context.intersection_get_shader_flags(nullptr, prim, object, type) & SD_HAS_TRANSPARENT_SHADOW))
   {
     payload.result = true;
     /* terminate ray */

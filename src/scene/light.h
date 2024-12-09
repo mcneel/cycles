@@ -75,6 +75,14 @@ class Light : public Geometry {
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
   PrimitiveType primitive_type() const override;
 
+  /* Rhino mod, add set access to transform. */
+  /* jk TODO. Move these to Object
+  void set_co(float3 co);
+  void set_dir(float3 dir);
+  void set_axisu(float3 axisu);
+  void set_axisv(float3 axisv);
+  */
+
   friend class LightManager;
   friend class LightTree;
 };

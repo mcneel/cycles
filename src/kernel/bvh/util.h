@@ -126,13 +126,13 @@ ccl_device_inline void sort_intersections_and_normals(ccl_private Intersection *
 /* Utility to quickly get flags from an intersection. */
 
 ccl_device_forceinline int intersection_get_shader_flags(KernelGlobals kg,
-                                                         const int prim,
+                                                         const int prim, const int object,
                                                          const int type)
 {
   int shader = 0;
 
   if (type & PRIMITIVE_TRIANGLE) {
-    shader = kernel_data_fetch(tri_shader, prim);
+    shader = kernel_data_fetch(objects, object).shader;
   }
 #ifdef __POINTCLOUD__
   else if (type & PRIMITIVE_POINT) {
@@ -149,13 +149,13 @@ ccl_device_forceinline int intersection_get_shader_flags(KernelGlobals kg,
 }
 
 ccl_device_forceinline int intersection_get_shader_from_isect_prim(KernelGlobals kg,
-                                                                   const int prim,
+                                                                   const int prim, const int object,
                                                                    const int isect_type)
 {
   int shader = 0;
 
   if (isect_type & PRIMITIVE_TRIANGLE) {
-    shader = kernel_data_fetch(tri_shader, prim);
+    shader = kernel_data_fetch(objects, object).shader;
   }
 #ifdef __POINTCLOUD__
   else if (isect_type & PRIMITIVE_POINT) {
@@ -174,7 +174,7 @@ ccl_device_forceinline int intersection_get_shader_from_isect_prim(KernelGlobals
 ccl_device_forceinline int intersection_get_shader(
     KernelGlobals kg, const ccl_private Intersection *ccl_restrict isect)
 {
-  return intersection_get_shader_from_isect_prim(kg, isect->prim, isect->type);
+  return intersection_get_shader_from_isect_prim(kg, isect->prim, isect->object, isect->type);
 }
 
 ccl_device_forceinline int intersection_get_object_flags(
