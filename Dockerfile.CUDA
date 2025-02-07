@@ -1,0 +1,60 @@
+# Preparations:
+# - download https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_570.86.10_linux.run
+# - rename the CUDA run file to cuda.run, make sure it is placed in the same
+#   folder as this Dockerfile
+# - download the OptiX 7.6.0 SDK from https://developer.nvidia.com/designworks/optix/download
+# - if the name has changed from what is used below do change the names below as well.
+#
+#
+# Build image:
+# $ docker build -t cycles-cuda-optix .
+#
+# In Docker Desktop click the run button for the image if it is the first time.
+# In additional options for the first time give a name to the container, e.g.
+# cycles-cuda-optix-container, and set the volume. For the host path choose wherever RDK/cycles
+# lives. As the mount point give /cycles
+#
+# On subsequent runs in Docker Desktop find the container cycles-cuda-optix-container and
+# click the run button. The container will start and you can open a terminal in
+# it using the Exec tab of the running instance.
+#
+# To build the CUDA and OptiX kernels do:
+# > bash
+# > sh make_cudaoptix.sh
+#
+# Final cubin and ptx files (compressed to .zst) will be available in the folder
+# RDK/cycles/cycles/install/lib on the host computer
+
+FROM ubuntu:24.04
+
+RUN apt-get update
+RUN apt-get upgrade -y
+
+RUN apt-get install -y g++
+RUN apt-get install -y cmake
+RUN apt-get install -y python3
+RUN apt-get install -y git
+RUN apt-get install -y build-essential
+RUN apt-get install -y wget
+RUN apt-get install -y vim
+
+WORKDIR /tmp
+
+COPY cuda.run cuda.run
+COPY NVIDIA-OptiX-SDK-7.6.0-linux64-x86_64-31894579.sh NVIDIA-OptiX-SDK-7.6.0-linux64-x86_64-31894579.sh
+
+RUN mkdir /opt/optix76
+
+RUN sh cuda.run --silent --toolkit --override
+RUN sh NVIDIA-OptiX-SDK-7.6.0-linux64-x86_64-31894579.sh --skip-license --prefix=/opt/optix76
+
+RUN rm /tmp/*
+
+RUN echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}" | tee -a /root/.bashrc > /dev/null
+RUN echo "PATH=/usr/local/cuda/bin:${PATH}" | tee -a /root/.bashrc
+
+WORKDIR /cycles
+
+# Put as entry point this command to keep the container running.
+#
+ENTRYPOINT [ "tail", "-f", "/dev/null"]
