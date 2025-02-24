@@ -461,7 +461,7 @@ class ConvertNode : public ShaderNode {
   };
   ustring value_string;
 
-  static const int MAX_TYPE = 13;
+  static const int MAX_TYPE = 14; // jK bumped due to COLOR2 addition
   static bool register_types();
   static Node *create(const NodeType *type);
   static const NodeType *node_types[MAX_TYPE][MAX_TYPE];
