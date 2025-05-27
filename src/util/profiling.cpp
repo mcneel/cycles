@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0
  * Copyright 2011-2022 Blender Foundation */
 
+#include <chrono>
+#include <thread>
 #include "util/profiling.h"
 #include "util/algorithm.h"
 #include "util/foreach.h"
