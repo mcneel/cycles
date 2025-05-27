@@ -31,12 +31,13 @@ using namespace metal::raytracing;
 
 #define ccl_device
 #define ccl_device_inline ccl_device __attribute__((always_inline))
-#define ccl_device_rhino_inline ccl_device __attribute__((always_inline))
 #define ccl_device_forceinline ccl_device __attribute__((always_inline))
 #if defined(__KERNEL_METAL_APPLE__)
+#define ccl_device_rhino_inline ccl_device
 #  define ccl_device_noinline ccl_device
 #else
 #  define ccl_device_noinline ccl_device __attribute__((noinline))
+#define ccl_device_rhino_inline ccl_device __attribute__((noinline))
 #endif
 
 #define ccl_device_extern extern "C"
