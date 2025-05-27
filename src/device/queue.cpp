@@ -72,9 +72,13 @@ void DeviceQueue::debug_enqueue_begin(DeviceKernel kernel, const int work_size)
 
 void DeviceQueue::debug_enqueue_end()
 {
+#ifdef WITH_HIP
+  synchronize();
+#else
   if (VLOG_DEVICE_STATS_IS_ON && is_per_kernel_performance_) {
     synchronize();
   }
+#endif
 }
 
 void DeviceQueue::debug_synchronize()
