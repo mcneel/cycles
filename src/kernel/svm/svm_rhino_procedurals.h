@@ -24,7 +24,7 @@ CCL_NAMESPACE_BEGIN
 #define INV_TWO_PI 0.15915494309190f
 #define SQRT_PI 1.77245385090552f
 
-ccl_device_inline float get_float_from_f2(float2 f2, int index)
+ccl_device_rhino_inline float get_float_from_f2(float2 f2, int index)
 {
   if(index == 1)
     return f2.y;
@@ -32,7 +32,7 @@ ccl_device_inline float get_float_from_f2(float2 f2, int index)
   return f2.x;
 }
 
-ccl_device_inline float get_float_from_f3(float3 f3, int index)
+ccl_device_rhino_inline float get_float_from_f3(float3 f3, int index)
 {
   if(index == 1)
     return f3.y;
@@ -42,7 +42,7 @@ ccl_device_inline float get_float_from_f3(float3 f3, int index)
   return f3.x;
 }
 
-ccl_device_inline float get_float_from_f4(float4 f4, int index)
+ccl_device_rhino_inline float get_float_from_f4(float4 f4, int index)
 {
   if(index == 1)
     return f4.y;
@@ -54,7 +54,7 @@ ccl_device_inline float get_float_from_f4(float4 f4, int index)
   return f4.x;
 }
 
-ccl_device_inline float3 set_float_in_f3(float3 f3, int index, float v)
+ccl_device_rhino_inline float3 set_float_in_f3(float3 f3, int index, float v)
 {
   if(index == 0)
     f3.x = v;
@@ -66,7 +66,7 @@ ccl_device_inline float3 set_float_in_f3(float3 f3, int index, float v)
   return f3;
 }
 
-ccl_device_inline bool is_odd(int x)
+ccl_device_rhino_inline bool is_odd(int x)
 {
   return (x & 1) == 1;
 }
@@ -483,7 +483,7 @@ ccl_device float K(int a, float u, float v, float w, int i, int j, int k, int3 a
   return 8.0f * t * t * (p + (b == 0 ? q + r : (b2 == 0 ? q : r)));
 }
 
-ccl_device_inline int3 roll_int3(int3 a, int idx)
+ccl_device_rhino_inline int3 roll_int3(int3 a, int idx)
 {
   if(idx == 0)
     a.x++;
@@ -494,7 +494,7 @@ ccl_device_inline int3 roll_int3(int3 a, int idx)
   return a;
 }
 
-ccl_device_inline float simplex_noise(float x, float y, float z)
+ccl_device_rhino_inline float simplex_noise(float x, float y, float z)
 {
   float s = (x + y + z) / 3.0f;
   int i = int(floorf(x + s));
@@ -528,7 +528,7 @@ ccl_device_inline float simplex_noise(float x, float y, float z)
 #define VCNPERM(kg, x) perlin_noise((kg), (x) & (RHINO_PERLIN_NOISE_PERM_SIZE - 1))
 #define VCNINDEX(kg, ix, iy, iz) VCNPERM((kg), (ix) + VCNPERM((kg), (iy) + VCNPERM((kg), iz)))
 
-ccl_device_inline float4 impulse_noise(KernelGlobals kg, int x)
+ccl_device_rhino_inline float4 impulse_noise(KernelGlobals kg, int x)
 {
   float4 noise = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
   noise.x = kernel_data_fetch(lookup_table, kernel_data.tables.rhino_impulse_noise_offset + x++);
@@ -539,7 +539,7 @@ ccl_device_inline float4 impulse_noise(KernelGlobals kg, int x)
   return noise;
 }
 
-ccl_device_inline float catrom2(float d)
+ccl_device_rhino_inline float catrom2(float d)
 {
 #define SAMPRATE 100 /* table entries per unit distance */
 
@@ -632,48 +632,48 @@ ccl_device float lattice_convolution_noise(KernelGlobals kg, float x, float y, f
   return sum;
 }
 
-ccl_device_inline float WHN_frand(int seed)
+ccl_device_rhino_inline float WHN_frand(int seed)
 {
   seed = seed << (13 ^ seed);
   return (1.0f - float(int(seed * (seed * seed * 15731 + 789221) + 1376312589) & 0x7fffffff) /
                      1073741824.0f);
 }
 
-ccl_device_inline float WHN_rand3a(int x, int y, int z)
+ccl_device_rhino_inline float WHN_rand3a(int x, int y, int z)
 {
   return WHN_frand(67 * x + 59 * y + 71 * z);
 }
-ccl_device_inline float WHN_rand3b(int x, int y, int z)
+ccl_device_rhino_inline float WHN_rand3b(int x, int y, int z)
 {
   return WHN_frand(73 * x + 79 * y + 83 * z);
 }
-ccl_device_inline float WHN_rand3c(int x, int y, int z)
+ccl_device_rhino_inline float WHN_rand3c(int x, int y, int z)
 {
   return WHN_frand(89 * x + 97 * y + 101 * z);
 }
-ccl_device_inline float WHN_rand3d(int x, int y, int z)
+ccl_device_rhino_inline float WHN_rand3d(int x, int y, int z)
 {
   return WHN_frand(103 * x + 107 * y + 109 * z);
 }
 
-ccl_device_inline float WHN_hpoly1(float t)
+ccl_device_rhino_inline float WHN_hpoly1(float t)
 {
   return ((2.0f * t - 3.0f) * t * t + 1.0f);
 }
-ccl_device_inline float WHN_hpoly2(float t)
+ccl_device_rhino_inline float WHN_hpoly2(float t)
 {
   return (-2.0f * t + 3.0f) * t * t;
 }
-ccl_device_inline float WHN_hpoly3(float t)
+ccl_device_rhino_inline float WHN_hpoly3(float t)
 {
   return ((t - 2.0f) * t + 1.0f) * t;
 }
-ccl_device_inline float WHN_hpoly4(float t)
+ccl_device_rhino_inline float WHN_hpoly4(float t)
 {
   return (t - 1.0f) * t * t;
 }
 
-ccl_device_inline float4 WHN_rand(int i, int3 xlim[2])
+ccl_device_rhino_inline float4 WHN_rand(int i, int3 xlim[2])
 {
   float4 f;
 
@@ -685,7 +685,7 @@ ccl_device_inline float4 WHN_rand(int i, int3 xlim[2])
   return f;
 }
 
-ccl_device_inline float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
+ccl_device_rhino_inline float4 WHN_hpoly(int n, float3 xarg, float4 f0, float4 f1)
 {
   float4 f;
 

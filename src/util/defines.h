@@ -30,6 +30,7 @@
 /* Forced inlining. */
 #  if defined(_WIN32) && !defined(FREE_WINDOWS)
 #    define ccl_device_inline static __forceinline
+#    define ccl_device_rhino_inline static __forceinline
 #    define ccl_device_forceinline static __forceinline
 #    define ccl_device_inline_method __forceinline
 #    define ccl_align(...) __declspec(align(__VA_ARGS__))
@@ -45,6 +46,7 @@
 #    define ccl_never_inline __declspec(noinline)
 #  else /* _WIN32 && !FREE_WINDOWS */
 #    define ccl_device_inline static inline __attribute__((always_inline))
+#    define ccl_device_rhino_inline static inline __attribute__((always_inline))
 #    define ccl_device_forceinline static inline __attribute__((always_inline))
 #    define ccl_device_inline_method __attribute__((always_inline))
 #    define ccl_align(...) __attribute__((aligned(__VA_ARGS__)))

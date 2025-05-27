@@ -37,6 +37,7 @@ typedef unsigned long long uint64_t;
       __forceinline__  // Function calls are bad for OptiX performance, so inline everything
 #define ccl_device_extern extern "C" __device__
 #define ccl_device_inline ccl_device
+#define ccl_device_rhino_inline ccl_device
 #define ccl_device_forceinline ccl_device
 #define ccl_device_inline_method __device__ __forceinline__
 #define ccl_device_noinline static __device__ __noinline__
