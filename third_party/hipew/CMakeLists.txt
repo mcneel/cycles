@@ -27,4 +27,8 @@ if(HIPRT_INCLUDE_DIR)
   )
 endif()
 
+include_directories(
+  ${INC} ${INC_SYS}
+)
+
 add_library(extern_hipew ${SRC} ${INC} ${INC_SYS})

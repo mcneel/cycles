@@ -420,7 +420,7 @@ ccl_device_inline bool shadow_intersection_filter(const hiprtRay &ray,
   return false;
 #  else
   if (num_hits >= max_hits ||
-      !(intersection_get_shader_flags(kg, prim, primitive_type) & SD_HAS_TRANSPARENT_SHADOW))
+      !(intersection_get_shader_flags(kg, prim, object, primitive_type) & SD_HAS_TRANSPARENT_SHADOW))
   {
     return false;
   }
@@ -512,7 +512,7 @@ ccl_device_inline bool shadow_intersection_filter_curves(const hiprtRay &ray,
   return false;
 #  else
   if (num_hits >= max_hits ||
-      !(intersection_get_shader_flags(kg, prim, primitive_type) & SD_HAS_TRANSPARENT_SHADOW))
+      !(intersection_get_shader_flags(kg, prim, object, primitive_type) & SD_HAS_TRANSPARENT_SHADOW))
   {
     return false;
   }

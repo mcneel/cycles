@@ -534,6 +534,15 @@ NODE_DEFINE(EnvironmentTextureNode)
   static NodeEnum projection_enum;
   projection_enum.insert("equirectangular", NODE_ENVIRONMENT_EQUIRECTANGULAR);
   projection_enum.insert("mirror_ball", NODE_ENVIRONMENT_MIRROR_BALL);
+  projection_enum.insert("wallpaper", NODE_ENVIRONMENT_WALLPAPER);
+  projection_enum.insert("emap", NODE_ENVIRONMENT_EMAP);
+  projection_enum.insert("box", NODE_ENVIRONMENT_BOX);
+  projection_enum.insert("light_probe", NODE_ENVIRONMENT_LIGHT_PROBE);
+  projection_enum.insert("cubemap", NODE_ENVIRONMENT_CUBEMAP);
+  projection_enum.insert("cubemap_horizontal", NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL);
+  projection_enum.insert("cubemap_vertical", NODE_ENVIRONMENT_CUBEMAP_VERTICAL);
+  projection_enum.insert("hemispherical", NODE_ENVIRONMENT_HEMISPHERICAL);
+  projection_enum.insert("spherical", NODE_ENVIRONMENT_SPHERICAL);
   SOCKET_ENUM(projection, "Projection", projection_enum, NODE_ENVIRONMENT_EQUIRECTANGULAR);
 
   SOCKET_BOOLEAN(animated, "Animated", false);
@@ -1600,7 +1609,7 @@ NODE_DEFINE(WaveTextureNode)
   rings_direction_enum.insert("z", NODE_WAVE_RINGS_DIRECTION_Z);
   rings_direction_enum.insert("spherical", NODE_WAVE_RINGS_DIRECTION_SPHERICAL);
   SOCKET_ENUM(
-      rings_direction, "Rings Direction", rings_direction_enum, NODE_WAVE_BANDS_DIRECTION_X);
+      rings_direction, "Rings Direction", rings_direction_enum, NODE_WAVE_RINGS_DIRECTION_X);
 
   static NodeEnum profile_enum;
   profile_enum.insert("sine", NODE_WAVE_PROFILE_SIN);
@@ -2306,8 +2315,7 @@ void ConvertNode::constant_fold(const ConstantFolder &folder)
         }
         else if (from == SocketType::COLOR2) {
           /* color to scalar. Rhino mod. RGB to Luminance */
-          float val = folder.scene->shader_manager->linear_rgb_to_luminance(value_color);
-          folder.make_constant(val);
+          val = folder.scene->shader_manager->linear_rgb_to_luminance(value_color);
         }
         else {
           /* vector/point/normal to scalar */

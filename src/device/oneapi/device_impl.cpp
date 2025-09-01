@@ -26,7 +26,7 @@
 #  include "kernel/device/oneapi/globals.h"
 #  include "kernel/device/oneapi/kernel.h"
 
-#  if defined(WITH_EMBREE_GPU) && defined(EMBREE_SYCL_SUPPORT) && !defined(SYCL_LANGUAGE_VERSION)
+#  if defined(WITH_EMBREE_GPU) && defined(EMBREE_SYCL_SUPPORT) && !defined(SYCL_LANGUAGE_VERSION) && !defined(DEBUG)
 /* These declarations are missing from embree headers when compiling from a compiler that doesn't
  * support SYCL. */
 extern "C" RTCDevice rtcNewSYCLDevice(sycl::context context, const char *config);
@@ -978,6 +978,7 @@ bool OneapiDevice::create_queue(SyclQueue *&external_queue,
                                                  sycl::property::queue::in_order());
     external_queue = reinterpret_cast<SyclQueue *>(created_queue);
 #  ifdef WITH_EMBREE_GPU
+#  if !defined(DEBUG)
     if (embree_device_pointer) {
       RTCDevice *device_object_ptr = reinterpret_cast<RTCDevice *>(embree_device_pointer);
       *device_object_ptr = rtcNewSYCLDevice(created_queue->get_context(), "");
@@ -988,6 +989,9 @@ bool OneapiDevice::create_queue(SyclQueue *&external_queue,
             "\"intel-level-zero-gpu-raytracing\" to enable it or disable Embree on GPU.";
       }
     }
+#  else
+    (void)embree_device_pointer;
+#  endif
 #  else
     (void)embree_device_pointer;
 #  endif
@@ -1560,7 +1564,11 @@ void OneapiDevice::iterate_devices(OneAPIDeviceIteratorCallback cb, void *user_p
     std::string name = "SYCL Host Task (Debug)";
 #  endif
 #  ifdef WITH_EMBREE_GPU
+#  if !defined(DEBUG)
     bool hwrt_support = rtcIsSYCLDeviceSupported(device);
+#  else
+    bool hwrt_support = false;
+#  endif
 #  else
     bool hwrt_support = false;
 #  endif

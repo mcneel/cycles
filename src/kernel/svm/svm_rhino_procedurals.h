@@ -3634,6 +3634,7 @@ ccl_device float4 dots_texture(KernelGlobals kg,
 
   float4 original_background_color = color1;
   float4 original_dot_color = color2;
+  float4 colors_added_f4 = color2;
 
   float4 color = original_background_color;
   int colors_added = 0;
@@ -3666,7 +3667,18 @@ ccl_device float4 dots_texture(KernelGlobals kg,
   }
 
   if (composition_type == RHINO_DOTS_COMPOSITION_AVERAGE) {
-    color /= (colors_added == 0 ? 1 : colors_added);
+    if(colors_added == 0) {
+        colors_added_f4.x = 1.0f;
+        colors_added_f4.y = 1.0f;
+        colors_added_f4.z = 1.0f;
+        colors_added_f4.w = 1.0f;
+    } else {
+        colors_added_f4.x = 1.0f / (float)colors_added;
+        colors_added_f4.y = colors_added_f4.x;
+        colors_added_f4.z = colors_added_f4.x;
+        colors_added_f4.w = colors_added_f4.x;
+    }
+    color *= colors_added_f4;
   }
   else if (composition_type == RHINO_DOTS_COMPOSITION_STANDARD) {
     color = (1.f - standard_composition_value) * original_background_color +

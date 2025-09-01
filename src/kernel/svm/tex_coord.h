@@ -549,6 +549,21 @@ ccl_device_noinline int svm_node_tex_coord(KernelGlobals kg,
 #endif
       break;
     }
+    case NODE_TEXCO_WCS_BOX:
+    case NODE_TEXCO_ENV_SPHERICAL:
+    case NODE_TEXCO_ENV_EMAP:
+    case NODE_TEXCO_ENV_BOX:
+    case NODE_TEXCO_ENV_LIGHTPROBE:
+    case NODE_TEXCO_ENV_CUBEMAP:
+    case NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS:
+    case NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS:
+    case NODE_TEXCO_ENV_HEMI:
+    case NODE_TEXCO_ENV_DECAL_UV:
+    case NODE_TEXCO_ENV_DECAL_PLANAR:
+    case NODE_TEXCO_ENV_DECAL_SPHERICAL:
+    case NODE_TEXCO_ENV_DECAL_CYLINDRICAL: {
+        break;
+    }
   }
 
   stack_store_float3(stack, out_offset, data);
@@ -601,7 +616,8 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
   uint out_offset = node.z;
 
   switch (type) {
-    case NODE_TEXCO_OBJECT: {
+    case NODE_TEXCO_OBJECT:
+    case NODE_TEXCO_OBJECT_WITH_TRANSFORM: {
       bool has_ocs = false;
       data = sd->P;
       if (sd->object != OBJECT_NONE && kernel_data_fetch(objects, sd->object).use_ocs_frame) {
@@ -908,6 +924,13 @@ ccl_device_noinline int svm_node_tex_coord_bump_dx(KernelGlobals kg,
       data = env_world_emap(data);
       break;
     }
+    case NODE_TEXCO_ENV_BOX: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dx;
+      data = env_box(data);
+      break;
+    }
     case NODE_TEXCO_ENV_LIGHTPROBE: {
       data = get_reflected_incoming_ray(kg, sd);
       const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
@@ -1112,6 +1135,13 @@ ccl_device_noinline int svm_node_tex_coord_bump_dy(KernelGlobals kg,
       Transform tfm = kernel_data.cam.worldtocamera;
       data = transform_direction(&tfm, data);
       data = env_world_emap(data);
+      break;
+    }
+    case NODE_TEXCO_ENV_BOX: {
+      data = get_reflected_incoming_ray(kg, sd);
+      const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+      data = data + dP.dy;
+      data = env_box(data);
       break;
     }
     case NODE_TEXCO_ENV_LIGHTPROBE: {

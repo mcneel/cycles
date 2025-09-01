@@ -6,9 +6,9 @@ param (
 
 $cwd = $PSScriptRoot
 
-Import-Module 'C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+#Import-Module 'C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
 
-Enter-VsDevShell -VsInstallPath "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools" -StartInPath $cwd
+#Enter-VsDevShell -VsInstallPath "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools" -StartInPath $cwd
 
 $cycles_lib_dir = (Convert-Path "$cwd\..\lib")
 $install_location = (Convert-Path "$cwd\..\..\..\..\..\bin\$buildConfig\Plug-ins")
@@ -17,7 +17,7 @@ $dependencies = (Get-ChildItem -Recurse -Path $cycles_lib_dir -Include "OpenColo
 
 Push-Location $cwd
 
-.\make_rhino.bat $buildConfig.ToLower() cuda
+.\make_rhino.bat $buildConfig.ToLower() all
 
 Pop-Location
 

@@ -38,14 +38,10 @@ endif()
 
 if(APPLE)
   if(CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
-    set(_cycles_lib_dir "${CMAKE_SOURCE_DIR}/lib/macos_x64")
-  elseif("${CMAKE_OSX_ARCHITECTURES}" STREQUAL "x86_64;arm64")
-    set(_cycles_lib_dir "${CMAKE_SOURCE_DIR}/lib/macos_universal")
+    set(_cycles_lib_platform "macos_x64")
   else()
     set(_cycles_lib_platform "macos_arm64")
   endif()
-
-	MESSAGE(STATUS "----> Using ${_cycles_lib_dir}")
 
   # Always use system zlib
   find_package(ZLIB REQUIRED)
@@ -71,13 +67,25 @@ else()
   endif()
 endif()
 
-set(_cycles_lib_dir "${CMAKE_SOURCE_DIR}/lib/${_cycles_lib_platform}")
+set(_top_source_dir "${CMAKE_SOURCE_DIR}/../../../../../../big_libs/RhinoCycles/ccycles")
+
+# set Rhino specific _cycles_lib_dir
+if(APPLE)
+	set(_cycles_lib_platform "/osx/deps")
+elseif(WIN32)
+	set(_cycles_lib_platform "/win/deps")
+else()
+  message(FATAL_ERROR "Unsupported platform for Rhino")
+endif()
+
+set(_cycles_lib_dir "${_top_source_dir}/${_cycles_lib_platform}")
 
 # Use legacy libraries for compatibility with Houdini or USD without oneTBB.
-set(_cycles_lib_dir_legacy "${CMAKE_SOURCE_DIR}/lib/legacy/${_cycles_lib_platform}")
+set(_cycles_lib_dir_legacy "${_top_source_dir}/lib/legacy/${_cycles_lib_platform}")
 if((HOUDINI_ROOT AND HOUDINI_VERSION_MAJOR VERSION_LESS 21) OR WITH_LEGACY_LIBRARIES)
   set(_cycles_use_legacy_libs ON)
   set(_cycles_lib_dir "${_cycles_lib_dir_legacy}")
+  message(FATAL_ERROR "No legacy libraries for Rhino")
 else()
   set(_cycles_use_legacy_libs OFF)
 endif()
@@ -116,11 +124,7 @@ if(EXISTS ${_cycles_lib_dir} AND WITH_LIBS_PRECOMPILED)
   _set_default(WEBP_ROOT_DIR "${_cycles_lib_dir}/webp")
   _set_default(ZLIB_ROOT "${_cycles_lib_dir}/zlib")
   _set_default(ZSTD_ROOT_DIR "${_cycles_lib_dir}/zstd")
-  if(WIN32)
-    set(LEVEL_ZERO_ROOT_DIR ${_cycles_lib_dir}/level_zero)
-  else()
-    set(LEVEL_ZERO_ROOT_DIR ${_cycles_lib_dir}/level-zero)
-  endif()
+  _set_default(LEVEL_ZERO_ROOT_DIR ${_cycles_lib_dir}/level-zero)
   _set_default(SYCL_ROOT_DIR "${_cycles_lib_dir}/dpcpp")
 
   # Look in all library directories by default, except mesa and dpcpp which

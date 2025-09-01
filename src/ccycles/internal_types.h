@@ -18,47 +18,77 @@ limitations under the License.
 
 
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
+#include <functional>
+#include <iostream>
+#include <numeric>
+#include <random>
+#include <string>
+#include <thread>
 #include <unordered_set>
 #include <vector>
-#include <chrono>
-//#include <ctime>
-#include <thread>
-//#include <mutex>
-#include <string>
-#include <functional>
+
+namespace fs = std::filesystem;
 
 #pragma warning ( push )
 
 #pragma warning ( disable : 4244 )
 
+#include "device/device.h"
+
 #include "scene/background.h"
+#include "scene/bake.h"
 #include "scene/camera.h"
 #include "scene/colorspace.h"
-#include "device/device.h"
+#include "scene/curves.h"
 #include "scene/film.h"
-#include "scene/shader_graph.h"
 #include "scene/integrator.h"
 #include "scene/light.h"
+#include "scene/light_tree.h"
 #include "scene/mesh.h"
-#include "scene/shader_nodes.h"
-#include "scene/rhino_shader_nodes.h"
 #include "scene/object.h"
+#include "scene/pass.h"
+#include "scene/pointcloud.h"
+#include "scene/procedural.h"
+#include "scene/rhino_shader_nodes.h"
 #include "scene/scene.h"
-#include "session/session.h"
+#include "scene/shader.h"
+#include "scene/shader_graph.h"
+#include "scene/shader_nodes.h"
+#include "scene/volume.h"
+
+#include "subd/patch.h"
+
 #include "session/display_driver.h"
 #include "session/output_driver.h"
-#include "scene/shader.h"
+#include "session/session.h"
 
+#include "util/array.h"
 #include "util/color.h"
+#include "util/md5.h"
+#include "util/param.h"
+#include "util/path.h"
 #include "util/progress.h"
 #include "util/string.h"
 #include "util/thread.h"
+#include "util/types.h"
 #include "util/unique_ptr.h"
 #include "util/unique_ptr_vector.h"
+#include "util/vector.h"
+
+#include <OpenImageIO/imagebuf.h>
+#include <OpenImageIO/imagebufalgo.h>
+#include <OpenImageIO/ustring.h>
+
+using OIIO::ustring;
 
 #pragma warning ( pop )
 
 #include "ccycles.h"
+
+#if defined(MORJENSTAS)
 
 #define MULTIDEVICEOFFSET 100000
 #define ISMULTIDEVICE(id) (id>=MULTIDEVICEOFFSET)
@@ -410,3 +440,4 @@ extern void _init_shaders(ccl::Session* session_id);
 		sh->shader-> var = (type)(val); \
 	}
 
+#endif // def MORJENSTAS

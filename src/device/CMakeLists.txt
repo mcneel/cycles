@@ -164,6 +164,9 @@ if(WITH_CYCLES_DEVICE_METAL)
   list(APPEND LIB
     ${METAL_LIBRARY}
   )
+  list(APPEND LIB
+    "-framework IOKit"
+  )
   list(APPEND SRC
     ${SRC_METAL}
   )
