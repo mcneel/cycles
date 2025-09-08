@@ -1,0 +1,628 @@
+[HEADER]
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
+
+using ccl.ShaderNodes;
+
+namespace ccl
+{
+
+/*************************************************/
+/************* START OF MANUAL CODE **************/
+/******* CODE at extra/CSycles.cs.template *******/
+/******* GENERATED CODE AFTER MANUAL CODE ********/
+/*************************************************/
+
+  public static class Constants
+  {
+    public const string ccycles = "ccycles";
+  }
+
+  public partial class CSycles
+  {
+#region string holder
+    internal class CSStringHolder : IDisposable
+    {
+      IntPtr stringHolderPtr;
+      public CSStringHolder()
+      {
+        stringHolderPtr = cycles_string_holder_new();
+      }
+
+      public string Value
+      {
+        get
+        {
+          if (stringHolderPtr != IntPtr.Zero)
+          {
+            IntPtr strPtr = cycles_string_holder_get(stringHolderPtr);
+            string s = Marshal.PtrToStringAnsi(strPtr);
+            return s;
+          }
+          return "";
+        }
+      }
+
+      public IntPtr Ptr { get { return stringHolderPtr; } }
+
+      #region IDisposable Support
+      private bool disposedValue = false; // To detect redundant calls
+
+      protected virtual void Dispose(bool disposing)
+      {
+        if (!disposedValue)
+        {
+          if (disposing)
+          {
+          }
+
+          cycles_string_holder_delete(stringHolderPtr);
+          stringHolderPtr = IntPtr.Zero;
+
+          disposedValue = true;
+        }
+      }
+
+      // This code added to correctly implement the disposable pattern.
+      public void Dispose()
+      {
+        Dispose(true);
+      }
+      #endregion
+    }
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_string_holder_new();
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern void cycles_string_holder_delete(IntPtr strHolder);
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_string_holder_get(IntPtr strHolder);
+#endregion
+
+#region Initialisation
+    private static bool g_ccycles_loaded;
+
+    /// <summary>
+    /// Load the ccycles DLL.
+    /// </summary>
+    private static void LoadCCycles()
+    {
+        if (g_ccycles_loaded) return;
+
+        LoadShaderNodes();
+        g_ccycles_loaded = true;
+        //GenShaderNodeCode();
+    }
+
+    private static readonly Dictionary<string, Type> g_registered_shadernodes = new Dictionary<string, Type>();
+
+    /// <summary>
+    /// Load all shader nodes from the assembly using reflection
+    /// </summary>
+    private static void LoadShaderNodes()
+    {
+        Assembly ccass = Assembly.GetExecutingAssembly();
+        var shaderAndNameConstructor = new Type[2];
+        shaderAndNameConstructor[0] = typeof(ccl.Shader);
+        shaderAndNameConstructor[1] = typeof(string);
+
+        var internalConstructor = new Type[2];
+        internalConstructor[0] = typeof(ccl.Shader);
+        internalConstructor[1] = typeof(IntPtr);
+
+        var exported_types = ccass.GetExportedTypes();
+        var shadernode_type = typeof(ShaderNodes.ShaderNode);
+        for (int i = 0; i < exported_types.Length; i++)
+        {
+            var exported_type = exported_types[i];
+            if (!exported_type.IsSubclassOf(shadernode_type))
+                continue;
+            var attr = exported_type.GetCustomAttributes(typeof(Attributes.ShaderNodeAttribute), false);
+            if (attr.Length < 1)
+            {
+                throw new NotImplementedException(String.Format("Class {0} must include a ShaderNode attribute", exported_type));
+            }
+            var shnattr = attr[0] as Attributes.ShaderNodeAttribute;
+            if (shnattr == null || shnattr.IsBase)
+                continue;
+
+            var constructor = exported_type.GetConstructor(shaderAndNameConstructor);
+            if (constructor == null)
+            {
+                throw new NotImplementedException(String.Format("Class {0} must include a constructor that takes a shader and a name", exported_type));
+            }
+
+            constructor = exported_type.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, internalConstructor, null);
+            if (constructor == null)
+            {
+                throw new NotImplementedException(String.Format("Class {0} must include an internal constructor that takes a shader and an IntPtr to a shadernode", exported_type));
+            }
+
+            if (!g_registered_shadernodes.ContainsKey(shnattr.Name))
+            {
+                g_registered_shadernodes.Add(shnattr.Name, exported_type);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Create a ShaderNode based on XML name. This name has been registered
+    /// using the ShaderNodeAttribute on each ShaderNode derived class
+    /// </summary>
+    /// <param name="xmlName"></param>
+    /// <param name="nodeName"></param>
+    /// <returns>a new ShaderNode if xmlName is registered, null otherwise</returns>
+    internal static ShaderNodes.ShaderNode CreateShaderNode(Shader shader, string xmlName, string nodeName)
+    {
+        if (xmlName.Equals("shader")) return null;
+
+        if (g_registered_shadernodes.ContainsKey(xmlName))
+        {
+            var constructTypes = new Type[2];
+            constructTypes[0] = typeof(Shader);
+            constructTypes[1] = typeof(string);
+            var shnt = g_registered_shadernodes[xmlName];
+            var constructor = shnt.GetConstructor(constructTypes);
+            var param = new object[2];
+            param[0] = shader;
+            param[1] = nodeName;
+
+            ShaderNode shader_node = constructor.Invoke(param) as ShaderNodes.ShaderNode;
+
+            shader.AddNode(shader_node);
+
+            return shader_node;
+        }
+
+        throw new InvalidDataException($"Node type '{xmlName}' not found.");
+    }
+    internal static ShaderNodes.ShaderNode CreateShaderNode(Shader shader, IntPtr shaderNodePtr, string xmlName)
+    {
+        if (xmlName.Equals("shader")) return null;
+
+        if (g_registered_shadernodes.ContainsKey(xmlName))
+        {
+            var constructTypes = new Type[2];
+            constructTypes[0] = typeof(Shader);
+            constructTypes[1] = typeof(IntPtr);
+            var shnt = g_registered_shadernodes[xmlName];
+            var constructor = shnt.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, constructTypes, new ParameterModifier[] { });
+            var param = new object[2];
+            param[0] = shader;
+            param[1] = shaderNodePtr;
+
+            ShaderNode shader_node = constructor.Invoke(param) as ShaderNode;
+
+            if (shader_node is OutputNode output_node)
+            {
+                shader.Output = output_node;
+            }
+
+            shader.AddNode(shader_node);
+
+            return shader_node;
+        }
+
+        throw new InvalidDataException($"Node type '{xmlName}' not found.");
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool cycles_shader_connect_nodes(IntPtr shader, IntPtr fromNode, string fromSocketName, IntPtr toNode, string toSocketName);
+    public static bool shader_connect_nodes(Shader shader, ShaderNode fromNode, string fromSocketName, ShaderNode toNode, string toSocketName)
+    {
+        return cycles_shader_connect_nodes(shader.Ptr, fromNode.Ptr, fromSocketName, toNode.Ptr, toSocketName);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_shader_disconnect_node(IntPtr shader, IntPtr node, string from);
+    public static void shader_disconnect_node(Shader shader, ShaderNode node, string from)
+    {
+        cycles_shader_disconnect_node(shader.Ptr, node.Ptr, from);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr cycles_shader_get_graph(IntPtr shader);
+    public static ShaderGraph shader_get_graph(Shader shader)
+    {
+        IntPtr graphPtr = cycles_shader_get_graph(shader.Ptr);
+        return new ShaderGraph(graphPtr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr cycles_add_shader_node(IntPtr shaderId, string shnType, string shnName);
+    public static IntPtr add_shader_node(IntPtr shaderId, string node_type, string node_name)
+    {
+        return cycles_add_shader_node(shaderId, node_type, node_name);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false,
+        CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_shader_new_graph(IntPtr shader, IntPtr scene);
+    public static void shader_new_graph(Shader shader, Scene scene)
+    {
+        cycles_shader_new_graph(shader.Ptr, scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false,
+        CallingConvention = CallingConvention.Cdecl)]
+    private static extern int cycles_shader_node_count(IntPtr shader);
+    public static int shader_node_count(IntPtr shader)
+    {
+        return cycles_shader_node_count(shader);
+    }
+    [DllImport(Constants.ccycles, SetLastError = false,
+        CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr cycles_shader_node_get(IntPtr shader, int idx);
+    public static IntPtr shader_node_get(IntPtr shader, int idx)
+    {
+        return cycles_shader_node_get(shader, idx);
+    }
+    [DllImport(Constants.ccycles, SetLastError = false,
+        CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool cycles_shadernode_get_name(IntPtr shn, IntPtr strholder);
+    public static string shadernode_get_name(IntPtr shn)
+    {
+        using (CSStringHolder stringHolder = new CSStringHolder())
+        {
+            bool success = cycles_shadernode_get_name(shn, stringHolder.Ptr);
+            if (success)
+            {
+                string name = stringHolder.Value;
+                return name;
+            }
+        }
+
+        return "";
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
+      CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_path_init(string path, string userPath);
+    /// <summary>
+    /// Set the paths for Cycles to look for pre-compiled or cached kernels, or kernel code
+    ///
+    /// Note: to have any effect needs to be called before <c>initialise</c>.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <param name="userPath"></param>
+    public static void path_init([MarshalAs(UnmanagedType.LPStr)] string path, [MarshalAs(UnmanagedType.LPStr)] string userPath)
+    {
+        LoadCCycles();
+        cycles_path_init(path, userPath);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern void cycles_initialise(uint mask);
+    public static void initialise(DeviceTypeMask mask) {
+      cycles_initialise((uint)mask);
+    }
+#endregion
+
+#region Device (manual), see manual_ccycles.cpp and manualcs/extra/Device.cs.extra
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern uint cycles_number_devices();
+    public static uint number_devices()
+    {
+      return cycles_number_devices();
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_get_device_info(uint index);
+    public static DeviceInfo get_device_info(uint index)
+    {
+      IntPtr ptr = cycles_get_device_info(index);
+      DeviceInfo devinfo = null;
+      if(IntPtr.Zero != ptr) devinfo = new DeviceInfo(ptr);
+      return devinfo;
+    }
+#endregion
+
+#region Session handling
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_prepare_ccsession(out IntPtr session_params, out IntPtr scene_params, out IntPtr buffer_params);
+    public static (IntPtr ccsession, SessionParams sessionParams, SceneParams sceneParams, BufferParams bufferParams) prepare_ccsession()
+    {
+        IntPtr ccsessPtr = cycles_prepare_ccsession(out IntPtr sessParamsPtr, out IntPtr sceParamsPtr, out IntPtr bufParamsPtr);
+
+        return (ccsessPtr, new SessionParams(sessParamsPtr), new SceneParams(sceParamsPtr), new BufferParams(bufParamsPtr));
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_create_session(IntPtr ccsession, IntPtr sessionParams, IntPtr sceneParams);
+    public static ccl.Session create_session(IntPtr idPtr, SessionParams sessionParams, SceneParams sceneParams) {
+        IntPtr sessionPtr = cycles_create_session(idPtr, sessionParams.Ptr, sceneParams.Ptr);
+        Session session = new Session(sessionPtr);
+        session._ccsession = idPtr;
+        return session;
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_session_get_session_params(IntPtr ccsession);
+    public static ccl.SessionParams session_get_session_params(IntPtr ccsession)
+    {
+        return new ccl.SessionParams(cycles_session_get_session_params(ccsession));
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_session_get_scene_params(IntPtr ccsession);
+    public static ccl.SceneParams session_get_scene_params(IntPtr ccsession)
+    {
+        return new ccl.SceneParams(cycles_session_get_scene_params(ccsession));
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_session_get_buffer_params(IntPtr ccsession);
+    public static ccl.BufferParams session_get_buffer_params(IntPtr ccsession)
+    {
+        return new ccl.BufferParams(cycles_session_get_buffer_params(ccsession));
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet=CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_session_reset(IntPtr ptr, IntPtr session_parameters, IntPtr buffer_parameters);
+    public static void session_reset(Session session, SessionParams session_parameters, BufferParams buffer_parameters)
+    {
+        cycles_session_reset(session.Ptr, session_parameters.Ptr, buffer_parameters.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet=CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_session_destroy(IntPtr ccsess);
+    public static void session_destroy(IntPtr ccsessPtr)
+    {
+        cycles_session_destroy(ccsessPtr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet=CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_session_add_pass(IntPtr ccsess, IntPtr pass);
+    public static void session_add_pass(IntPtr ccsess, Pass pass)
+    {
+        cycles_session_add_pass(ccsess, pass.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_session_retain_float_buffer(IntPtr ccsess, int passType, int width, int height, ref IntPtr pixels, ref int pixelSize);
+    public static void session_retain_float_buffer(IntPtr ccsess, PassType passType, int width, int height, ref IntPtr pixels, ref int pixelSize)
+    {
+        cycles_session_retain_float_buffer(ccsess, (int)passType, width, height, ref pixels, ref pixelSize);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_session_release_float_buffer(IntPtr sessionId, int passType);
+    public static void session_release_float_buffer(IntPtr ccsess, PassType passType)
+    {
+        cycles_session_release_float_buffer(ccsess, (int)passType);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_get_progress(IntPtr session);
+    public static ccl.Progress get_progress(ccl.Session session)
+    {
+        IntPtr progPtr = cycles_get_progress(session.Ptr);
+        return new ccl.Progress(progPtr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr cycles_session_get_scene(IntPtr session);
+    public static ccl.Scene session_get_scene(Session session)
+    {
+        IntPtr scenePtr = cycles_session_get_scene(session.Ptr);
+        return new ccl.Scene(scenePtr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern bool cycles_progress_get_status(IntPtr session, IntPtr statusstrholder, IntPtr substatusstrholder);
+    public static (string status, string substatus) progress_get_status(ccl.Progress progress)
+    {
+        CSStringHolder statusholder = new ();
+        CSStringHolder substatusholder = new ();
+        cycles_progress_get_status(progress.Ptr, statusholder.Ptr, substatusholder.Ptr);
+        return (statusholder.Value, substatusholder.Value);
+    }
+#endregion
+
+#region Session params handling
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern void cycles_session_params_set_deviceinfo(IntPtr parameters, IntPtr devinfo);
+    public static void session_params_set_deviceinfo(ccl.SessionParams sessionParams, ccl.DeviceInfo devInfo)
+    {
+        cycles_session_params_set_deviceinfo(sessionParams.Ptr, devInfo.Ptr);
+    }
+#endregion
+
+#region Rhino noise tables
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_set_rhino_perlin_noise_table(IntPtr data, uint count);
+    public static void set_rhino_perlin_noise_table(IntPtr data, uint count)
+    {
+        LoadCCycles();
+        cycles_set_rhino_perlin_noise_table(data, count);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_set_rhino_impulse_noise_table(IntPtr data, uint count);
+    public static void set_rhino_impulse_noise_table(IntPtr data, uint count)
+    {
+        LoadCCycles();
+        cycles_set_rhino_impulse_noise_table(data, count);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_set_rhino_vc_noise_table(IntPtr data, uint count);
+    public static void set_rhino_vc_noise_table(IntPtr data, uint count)
+    {
+        LoadCCycles();
+        cycles_set_rhino_vc_noise_table(data, count);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_set_rhino_aaltonen_noise_table(IntPtr data, uint count);
+    public static void set_rhino_aaltonen_noise_table(IntPtr data, uint count)
+    {
+        LoadCCycles();
+        cycles_set_rhino_aaltonen_noise_table(data, count);
+    }
+#endregion
+
+#region image data handling (builtin)
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_apply_gamma_to_byte_buffer(IntPtr rgba_buffer, int size_in_bytes, float gamma);
+    public static void apply_gamma_to_byte_buffer(IntPtr rgba_buffer, int size_in_bytes, float gamma)
+    {
+        cycles_apply_gamma_to_byte_buffer(rgba_buffer, size_in_bytes, gamma);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_apply_gamma_to_float_buffer(IntPtr rgba_buffer, int size_in_bytes, float gamma);
+    public static void apply_gamma_to_float_buffer(IntPtr rgba_buffer, int size_in_bytes, float gamma)
+    {
+        cycles_apply_gamma_to_float_buffer(rgba_buffer, size_in_bytes, gamma);
+    }
+#endregion
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr call_scene_createshader(IntPtr scene);
+    public static Shader scene_createshader(Scene scene)
+    {
+        IntPtr ptr = call_scene_createshader(scene.Ptr);
+        return new Shader(ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr call_shader_get_outputnode(IntPtr shader);
+    public static IntPtr shader_get_outputnode(Shader shader)
+    {
+        return call_shader_get_outputnode(shader.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr call_scene_createmesh(IntPtr scene);
+    public static Mesh scene_createmesh(Scene scene)
+    {
+        IntPtr ptr = call_scene_createmesh(scene.Ptr);
+        return new Mesh(ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr call_scene_createobject(IntPtr scene);
+    public static ccl.Object scene_createobject(Scene scene)
+    {
+        IntPtr ptr = call_scene_createobject(scene.Ptr);
+        return new ccl.Object(ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr call_scene_createlight(IntPtr scene);
+    public static Light scene_createlight(Scene scene)
+    {
+        IntPtr ptr = call_scene_createlight(scene.Ptr);
+        return new Light(ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr call_scene_createpass(IntPtr scene);
+    public static Pass scene_createpass(Scene scene)
+    {
+        IntPtr ptr = call_scene_createpass(scene.Ptr);
+        return new Pass(ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    private static extern bool cycles_scene_try_lock(IntPtr scene);
+    public static bool scene_try_lock(Scene scene)
+    {
+        return cycles_scene_try_lock(scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_scene_lock(IntPtr scene);
+    public static void scene_lock(Scene scene)
+    {
+        cycles_scene_lock(scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_scene_unlock(IntPtr scene);
+    public static void scene_unlock(Scene scene)
+    {
+        cycles_scene_unlock(scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_geometry_add_shader(IntPtr geometry, IntPtr shader);
+    public static void geometry_add_shader(IntPtr geometry, IntPtr shader)
+    {
+        cycles_geometry_add_shader(geometry, shader);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_geometry_set_shader(IntPtr geometry, IntPtr shader);
+    public static void geometry_set_shader(IntPtr geometry, IntPtr shader)
+    {
+        cycles_geometry_set_shader(geometry, shader);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_geometry_tag_update(IntPtr geometry, IntPtr scene);
+    public static void geometry_tag_update(Geometry geom, Scene scene)
+    {
+        cycles_geometry_tag_update(geom.Ptr, scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_object_tag_update(IntPtr ob, IntPtr scene);
+    public static void object_tag_update(ccl.Object ob, Scene scene)
+    {
+        cycles_object_tag_update(ob.Ptr, scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_shader_tag_update(IntPtr shader, IntPtr scene);
+    public static void shader_tag_update(Shader shader, Scene scene)
+    {
+        cycles_shader_tag_update(shader.Ptr, scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_camera_tag_update(IntPtr cam, IntPtr scene);
+    public static void camera_tag_update(Camera cam, Scene scene)
+    {
+        cycles_camera_tag_update(cam.Ptr, scene.Ptr);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_shader_dump_graph(IntPtr shaderId, [MarshalAs(UnmanagedType.LPStr)] string filename);
+    public static void shader_dump_graph(IntPtr shaderId, string filename)
+    {
+        cycles_shader_dump_graph(shaderId, filename);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_mesh_set_vertex_normals(IntPtr mesh, [In] float3[] vndata, int count);
+    public static void mesh_set_vertex_normals(Mesh mesh, List<float3> vndata)
+    {
+        cycles_mesh_set_vertex_normals(mesh.Ptr, vndata.ToArray(), vndata.Count);
+    }
+
+    [DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void cycles_mesh_set_vertex_uvs(IntPtr mesh, [In] float2[] uvdata, int count, string uvmap);
+    public static void mesh_set_vertex_uvs(Mesh mesh, List<float2> uvdata, string uvmap)
+    {
+        cycles_mesh_set_vertex_uvs(mesh.Ptr, uvdata.ToArray(), uvdata.Count, uvmap);
+    }
+
+/******* CODE at extra/CSycles.cs.template *******/
+/************** END OF MANUAL CODE ***************/
+/*************************************************/
+
+/*************************************************/
+/*************************************************/
+/*************************************************/
+/************ START OF GENERATED CODE ************/
+/*************************************************/
+
+[CODE]
+  }
+}

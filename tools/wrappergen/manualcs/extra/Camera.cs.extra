@@ -1,0 +1,5 @@
+
+        public void TagUpdate(Scene scene)
+        {
+            CSycles.camera_tag_update(this, scene);
+        }

@@ -1,0 +1,107 @@
+
+        public static Shader FromIntPtr(IntPtr ptr) {
+            Shader shader = new Shader(ptr);
+            OutputNode outnode = (OutputNode)CSycles.CreateShaderNode(shader, CSycles.shader_get_outputnode(shader), "output");
+
+            return shader;
+        }
+
+        public void TagUpdate(Scene scene)
+        {
+            CSycles.shader_tag_update(this, scene);
+        }
+
+        public OutputNode Output { get; internal set; }
+
+        readonly internal List<ShaderNode> m_nodes = new List<ShaderNode>();
+        /// <summary>
+        /// Add a ShaderNode to the shader. This will create the node in Cycles, set
+        /// any values for sockets and direct members.
+        /// </summary>
+        /// <param name="node">ShaderNode to add</param>
+        internal void AddNode(ShaderNode node)
+        {
+            m_nodes.Add(node);
+        }
+
+        private void CommonConstructor()
+        {
+            int nodeCount = CSycles.shader_node_count(Ptr);
+            for (int i = 0; i < nodeCount; i++)
+            {
+                IntPtr shn = CSycles.shader_node_get(Ptr, i);
+                string name = CSycles.shadernode_get_name(shn);
+                ShaderNode n = CSycles.CreateShaderNode(this, shn, name);
+            }
+        }
+
+        /// <summary>
+        /// Clear the shader graph for this node, so it can be repopulated.
+        /// </summary>
+        public void Recreate(Scene scene)
+        {
+            CSycles.shader_new_graph(this, scene);
+
+            m_nodes.Clear();
+            CommonConstructor();
+        }
+
+        /// <summary>
+        /// Make the actual connection between nodes.
+        /// </summary>
+        /// <param name="fromNode"></param>
+        /// <param name="fromout"></param>
+        /// <param name="toNode"></param>
+        /// <param name="toin"></param>
+        public bool Connect(ShaderNode fromNode, string fromout, ShaderNode toNode, string toin)
+        {
+            return CSycles.shader_connect_nodes(this, fromNode, fromout, toNode, toin);
+        }
+
+        /// <summary>
+        /// Disconnect given node.
+        /// </summary>
+        /// <param name="fromNode"></param>
+        /// <param name="fromOut"></param>
+        public void Disconnect(ShaderNode fromNode, string fromOut)
+        {
+            CSycles.shader_disconnect_node(this, fromNode, fromOut);
+        }
+
+        public ShaderGraph Graph {
+            get {
+                return CSycles.shader_get_graph(this);
+            }
+        }
+
+        /// <summary>
+        /// Create node graph in the given shader from the passed XML.
+        ///
+        /// Note that you should call FinalizeConstructor on shader if you are not further
+        /// changing the graph.
+        /// </summary>
+        /// <param name="shader">Shader to populate with nodes from the XML representation.</param>
+        /// <param name="shaderXml">The XML representation for the shader.</param>
+        /// <param name="finalize">Set to true if the shader should be finalized.</param>
+        public static void ShaderFromXml(Shader shader, string shaderXml, bool finalize)
+        {
+            var xmlmem = Encoding.UTF8.GetBytes(shaderXml);
+            using (var xmlstream = new MemoryStream(xmlmem))
+            {
+                var settings = new XmlReaderSettings
+                {
+                    ConformanceLevel = ConformanceLevel.Fragment,
+                    IgnoreComments = true,
+                    IgnoreProcessingInstructions = true,
+                    IgnoreWhitespace = true
+                };
+                var reader = XmlReader.Create(xmlstream, settings);
+                Utilities.Instance.ReadNodeGraph(shader, reader, finalize);
+            }
+        }
+
+        public void DumpGraph(string filename)
+        {
+            CSycles.shader_dump_graph(Ptr, filename);
+        }
+

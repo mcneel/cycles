@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2024 Robert McNeel and Associates
+Copyright 2014-2025 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,254 +12,168 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+----------------------------------------------------------------------
+NOTE: Do NOT modify this file directly, it is automatically generated.
+
+Code generated at: 2025-12-02 03:24:08 UTC
+----------------------------------------------------------------------
+
 **/
 
+using ccl;
 using ccl.Attributes;
+using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
+using ccl.NodeSockets;
 using System;
-
+using System.Collections.Generic;
 namespace ccl.ShaderNodes
 {
-	public class RhinoTextureCoordinateOutputs : Outputs
-	{
-		public VectorSocket Generated { get; set; }
-		public VectorSocket Normal { get; set; }
-		public VectorSocket UV { get; set; }
-		public VectorSocket Object { get; set; }
-		public VectorSocket Camera { get; set; }
-		public VectorSocket Window { get; set; }
-		public VectorSocket Reflection { get; set; }
-		public VectorSocket WcsBox { get; set; }
-		public VectorSocket EnvSpherical { get; set; }
-		public VectorSocket EnvEmap { get; set; }
-		public VectorSocket EnvBox { get; set; }
-		public VectorSocket EnvLightProbe { get; set; }
-		public VectorSocket EnvCubemap { get; set; }
-		public VectorSocket EnvCubemapVerticalCross { get; set; }
-		public VectorSocket EnvCubemapHorizontalCross { get; set; }
-		public VectorSocket EnvHemispherical { get; set; }
-		public VectorSocket DecalUv { get; set; }
-		public VectorSocket DecalPlanar { get; set; }
-		public VectorSocket DecalSpherical { get; set; }
-		public VectorSocket DecalCylindrical { get; set; }
-		public FloatSocket DecalForward { get; set; }
-		public FloatSocket DecalUsage { get; set; }
+    using cclext;
 
-		public RhinoTextureCoordinateOutputs(ShaderNode parentNode)
-		{
-			Generated = new VectorSocket(parentNode, "Generated", "generated");
-			AddSocket(Generated);
-			Normal = new VectorSocket(parentNode, "Normal", "normal");
-			AddSocket(Normal);
-			UV = new VectorSocket(parentNode, "UV", "uv");
-			AddSocket(UV);
-			Object = new VectorSocket(parentNode, "Object", "object");
-			AddSocket(Object);
-			Camera = new VectorSocket(parentNode, "Camera", "camera");
-			AddSocket(Camera);
-			Window = new VectorSocket(parentNode, "Window", "window");
-			AddSocket(Window);
-			Reflection = new VectorSocket(parentNode, "Reflection", "reflection");
-			AddSocket(Reflection);
-			WcsBox = new VectorSocket(parentNode, "WcsBox", "wscbox");
-			AddSocket(WcsBox);
-			EnvSpherical = new VectorSocket(parentNode, "EnvSpherical", "envspherical");
-			AddSocket(EnvSpherical);
-			EnvEmap = new VectorSocket(parentNode, "EnvEmap", "envemap");
-			AddSocket(EnvEmap);
-			EnvBox = new VectorSocket(parentNode, "EnvBox", "envbox");
-			AddSocket(EnvBox);
-			EnvLightProbe = new VectorSocket(parentNode, "EnvLightProbe", "envlightprobe");
-			AddSocket(EnvLightProbe);
-			EnvCubemap = new VectorSocket(parentNode, "EnvCubemap", "envcubemap");
-			AddSocket(EnvCubemap);
-			EnvCubemapVerticalCross = new VectorSocket(parentNode, "EnvCubemapVerticalCross", "envcubemapverticalcross");
-			AddSocket(EnvCubemapVerticalCross);
-			EnvCubemapHorizontalCross = new VectorSocket(parentNode, "EnvCubemapHorizontalCross", "envcubemaphorizontalcross");
-			AddSocket(EnvCubemapHorizontalCross);
-			EnvHemispherical = new VectorSocket(parentNode, "EnvHemi", "envhemi");
-			AddSocket(EnvHemispherical);
-			DecalUv = new VectorSocket(parentNode, "DecalUv", "decaluv");
-			AddSocket(DecalUv);
-			DecalPlanar = new VectorSocket(parentNode, "DecalPlanar", "decalplanar");
-			AddSocket(DecalPlanar);
-			DecalSpherical = new VectorSocket(parentNode, "DecalSpherical", "decalspherical");
-			AddSocket(DecalSpherical);
-			DecalCylindrical = new VectorSocket(parentNode, "DecalCylindrical", "decalcylindrical");
-			AddSocket(DecalCylindrical);
-			DecalForward = new FloatSocket(parentNode, "DecalForward", "decalforward");
-			AddSocket(DecalForward);
-			DecalUsage = new FloatSocket(parentNode, "DecalUsage", "decalusage");
-			AddSocket(DecalUsage);
-		}
-	}
+    public class TextureCoordinateNodeInputs : Inputs
+    {
+        public TransformSocket ObjectTransform { get; private set; }
+        public BoolSocket UseTransform { get; private set; }
+        public BoolSocket FromDupli { get; private set; }
 
-	public class RhinoTextureCoordinateInputs : Inputs
-	{
-	}
+        public TextureCoordinateNodeInputs(ShaderNode parentNode)
+        {
+            ObjectTransform = new TransformSocket(parentNode, "Object Transform", "ob_tfm", true);
+            AddSocket(ObjectTransform);
+            UseTransform = new BoolSocket(parentNode, "Use Transform", "use_transform", true);
+            AddSocket(UseTransform);
+            FromDupli = new BoolSocket(parentNode, "From Dupli", "from_dupli", true);
+            AddSocket(FromDupli);
+        }
+    }
+    public class TextureCoordinateNodeOutputs : Outputs
+    {
+        public PointSocket Window { get; private set; }
+        public PointSocket Object { get; private set; }
+        public NormalSocket Normal { get; private set; }
+        public NormalSocket Reflection { get; private set; }
+        public PointSocket Camera { get; private set; }
+        public PointSocket UV { get; private set; }
+        public PointSocket Generated { get; private set; }
 
-	[ShaderNode("rhino_texture_coordinate")]
-	public class RhinoTextureCoordinateNode : ShaderNode
-	{
-		public RhinoTextureCoordinateInputs ins => (RhinoTextureCoordinateInputs)inputs;
-		public RhinoTextureCoordinateOutputs outs => (RhinoTextureCoordinateOutputs)outputs;
+        public TextureCoordinateNodeOutputs(ShaderNode parentNode)
+        {
+            Window = new PointSocket(parentNode, "Window", "window", false);
+            AddSocket(Window);
+            Object = new PointSocket(parentNode, "Object", "object", false);
+            AddSocket(Object);
+            Normal = new NormalSocket(parentNode, "Normal", "normal", false);
+            AddSocket(Normal);
+            Reflection = new NormalSocket(parentNode, "Reflection", "reflection", false);
+            AddSocket(Reflection);
+            Camera = new PointSocket(parentNode, "Camera", "camera", false);
+            AddSocket(Camera);
+            UV = new PointSocket(parentNode, "UV", "UV", false);
+            AddSocket(UV);
+            Generated = new PointSocket(parentNode, "Generated", "generated", false);
+            AddSocket(Generated);
+        }
+    }
 
-		public RhinoTextureCoordinateNode(Shader shader)
-			: this(shader, "a texcoord") { }
-		public RhinoTextureCoordinateNode(Shader shader, string name)
-			: base(shader, name)
-		{
-			FinalizeConstructor();
-		}
+    [ShaderNode(name: "texture_coordinate")]
+    public class TextureCoordinateNode : ShaderNode
+    {
+        public TextureCoordinateNodeInputs ins => (TextureCoordinateNodeInputs)inputs;
+        public TextureCoordinateNodeOutputs outs => (TextureCoordinateNodeOutputs)outputs;
+        public TextureCoordinateNode(Shader shader) : this(shader, "a texture_coordinate node") { }
 
-		internal RhinoTextureCoordinateNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-		{
-			FinalizeConstructor();
-		}
+        public TextureCoordinateNode(Shader shader, string name) :
+            base(shader, name)
+        {
+            FinalizeConstructor();
+        }
 
-		private void FinalizeConstructor()
-		{
-			inputs = new RhinoTextureCoordinateInputs();
-			outputs = new RhinoTextureCoordinateOutputs(this);
+        internal TextureCoordinateNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+        {
+            FinalizeConstructor();
+        }
 
-			UseTransform = false;
-			ObjectTransform = ccl.Transform.Identity();
+        private void FinalizeConstructor()
+        {
+            inputs = new TextureCoordinateNodeInputs(this);
+            outputs = new TextureCoordinateNodeOutputs(this);
+        }
+        public static IntPtr GetNodeType() {
+            return CSycles.texturecoordinatenode_get_node_type();
+        }
+#region Setters
 
-			HorizontalSweepStart = 0.0f;
-			HorizontalSweepEnd = 1.0f;
-			VerticalSweepStart = 0.0f;
-			VerticalSweepEnd = 1.0f;
-			DecalHeight = 1.0f;
-			DecalRadius = 1.0f;
-			DecalOrigin = new float4(0.0f);
-			Across = new float4(0.0f);
-			Up = new float4(0.0f);
+        internal override void SetBool(string name, bool data)
+        {
+            switch(name) {
+            case "use_transform":
+                    /* texturecoordinatenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'use_transform', 'ui_name': 'Use Transform'} */
+                    {
+                    CSycles.texturecoordinatenode_set_use_transform(this.Ptr, data);
+                    }
+                    break;
+            case "from_dupli":
+                    /* texturecoordinatenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'from_dupli', 'ui_name': 'From Dupli'} */
+                    {
+                    CSycles.texturecoordinatenode_set_from_dupli(this.Ptr, data);
+                    }
+                    break;
 
-			DecalPxyz = ccl.Transform.Identity();
-			DecalNxyz = ccl.Transform.Identity();
-			DecalUvw = ccl.Transform.Identity();
-		}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type TextureCoordinateNode (setter)");
+            }
+        }
 
-		public ccl.Transform ObjectTransform { get; set; }
-		public bool UseTransform { get; set; }
+        internal override void SetTransform(string name, Transform data)
+        {
+            switch(name) {
+            case "ob_tfm":
+                    /* texturecoordinatenode . {'datatype': 'TRANSFORM', 'default_value': 'transform_identity()', 'default_value_type': 'Transform', 'is_input': True, 'member_name': 'ob_tfm', 'ui_name': 'Object Transform'} */
+                    {
+                    CSycles.texturecoordinatenode_set_ob_tfm(this.Ptr, data);
+                    }
+                    break;
 
-		/// <summary>
-		/// Give the start for the horizontal sweep of a spherical or cylindrical decal projection
-		/// </summary>
-		public float HorizontalSweepStart { get; set; }
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type TextureCoordinateNode (setter)");
+            }
+        }
 
-		/// <summary>
-		/// Give the end for the horizontal sweep of a spherical or cylindrical decal projection
-		/// </summary>
-		public float HorizontalSweepEnd { get; set; }
+#endregion
+#region Getters
 
-		/// <summary>
-		/// Give the start for the vertical sweep of a spherical or cylindrical decal projection
-		/// </summary>
-		public float VerticalSweepStart { get; set; }
+        internal override bool GetBool(string name)
+        {
+            switch(name) {
+            case "use_transform":
+                /* texturecoordinatenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'use_transform', 'ui_name': 'Use Transform'} */
+                {
+                    return CSycles.texturecoordinatenode_get_use_transform(this.Ptr);
+                }
+            case "from_dupli":
+                /* texturecoordinatenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'from_dupli', 'ui_name': 'From Dupli'} */
+                {
+                    return CSycles.texturecoordinatenode_get_from_dupli(this.Ptr);
+                }
 
-		/// <summary>
-		/// Give the end for the vertical sweep of a spherical or cylindrical decal projection
-		/// </summary>
-		public float VerticalSweepEnd { get; set; }
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type TextureCoordinateNode (getter)");
+            }
+        }
 
-		/// <summary>
-		/// Height for cylindrical projection of a decal
-		/// </summary>
-		public float DecalHeight { get; set; }
+        internal override Transform GetTransform(string name)
+        {
+            switch(name) {
+            case "ob_tfm":
+                /* texturecoordinatenode . {'datatype': 'TRANSFORM', 'default_value': 'transform_identity()', 'default_value_type': 'Transform', 'is_input': True, 'member_name': 'ob_tfm', 'ui_name': 'Object Transform'} */
+                {
+                    return CSycles.texturecoordinatenode_get_ob_tfm(this.Ptr);
+                }
 
-		/// <summary>
-		/// Radius for cylindrical or spherical decal projection
-		/// </summary>
-		public float DecalRadius { get; set; }
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type TextureCoordinateNode (getter)");
+            }
+        }
 
-		/// <summary>
-		/// Direction of the decal: forward, backward
-		/// </summary>
-		public DecalDirection Direction { get; set; }
-
-		/// <summary>
-		/// use the x, y and z properties for the origin vector. The w property is ignored.
-		/// </summary>
-		public ccl.float4 DecalOrigin { get; set; }
-		/// <summary>
-		/// use the x, y and z properties for the across vector. The w property is ignored.
-		/// </summary>
-		public ccl.float4 Across { get; set; }
-
-		/// <summary>
-		/// use the x, y and z properties for the up vector. The w property is ignored.
-		/// </summary>
-		public ccl.float4 Up { get; set; }
-
-		/// <summary>
-		/// Transform used to map point P to normalized mapping primitive
-		/// </summary>
-		public ccl.Transform DecalPxyz { get; set; }
-
-		/// <summary>
-		/// Transform used to map normal N to normalized mapping primitive
-		/// </summary>
-		public ccl.Transform DecalNxyz { get; set; }
-
-		/// <summary>
-		/// Transform used to map point to UV(W) space
-		/// </summary>
-		public ccl.Transform DecalUvw { get; set; }
-
-		public string UvMap { get; set; } = "uvmap1";
-
-		internal override void SetDirectMembers()
-		{
-			CSycles.shadernode_set_member_bool(Id, "use_transform", UseTransform);
-
-			if (UseTransform)
-			{
-				var obt = ObjectTransform;
-
-				CSycles.shadernode_set_member_vec4_at_index(Id, "object_transform", obt.x.x, obt.x.y, obt.x.z, obt.x.w, 0);
-				CSycles.shadernode_set_member_vec4_at_index(Id, "object_transform", obt.y.x, obt.y.y, obt.y.z, obt.y.w, 1);
-				CSycles.shadernode_set_member_vec4_at_index(Id, "object_transform", obt.z.x, obt.z.y, obt.z.z, obt.z.w, 2);
-			}
-			CSycles.shadernode_set_member_float(Id, "decal_height", DecalHeight);
-			CSycles.shadernode_set_member_float(Id, "decal_radius", DecalRadius);
-			CSycles.shadernode_set_member_float(Id, "decal_hor_start", HorizontalSweepStart);
-			CSycles.shadernode_set_member_float(Id, "decal_hor_end", HorizontalSweepEnd);
-			CSycles.shadernode_set_member_float(Id, "decal_ver_start", VerticalSweepStart);
-			CSycles.shadernode_set_member_float(Id, "decal_ver_end", VerticalSweepEnd);
-			CSycles.shadernode_set_member_vec(Id, "origin", DecalOrigin.x, DecalOrigin.y, DecalOrigin.z);
-			CSycles.shadernode_set_member_vec(Id, "across", Across.x, Across.y, Across.z);
-			CSycles.shadernode_set_member_vec(Id, "up", Up.x, Up.y, Up.z);
-
-			var pxyz = DecalPxyz;
-
-			CSycles.shadernode_set_member_vec4_at_index(Id, "pxyz", pxyz.x.x, pxyz.x.y, pxyz.x.z, pxyz.x.w, 0);
-			CSycles.shadernode_set_member_vec4_at_index(Id, "pxyz", pxyz.y.x, pxyz.y.y, pxyz.y.z, pxyz.y.w, 1);
-			CSycles.shadernode_set_member_vec4_at_index(Id, "pxyz", pxyz.z.x, pxyz.z.y, pxyz.z.z, pxyz.z.w, 2);
-
-			var nxyz = DecalNxyz;
-
-			CSycles.shadernode_set_member_vec4_at_index(Id, "nxyz", nxyz.x.x, nxyz.x.y, nxyz.x.z, nxyz.x.w, 0);
-			CSycles.shadernode_set_member_vec4_at_index(Id, "nxyz", nxyz.y.x, nxyz.y.y, nxyz.y.z, nxyz.y.w, 1);
-			CSycles.shadernode_set_member_vec4_at_index(Id, "nxyz", nxyz.z.x, nxyz.z.y, nxyz.z.z, nxyz.z.w, 2);
-
-			var uvw = DecalUvw;
-
-			CSycles.shadernode_set_member_vec4_at_index(Id, "uvw", uvw.x.x, uvw.x.y, uvw.x.z, uvw.x.w, 0);
-			CSycles.shadernode_set_member_vec4_at_index(Id, "uvw", uvw.y.x, uvw.y.y, uvw.y.z, uvw.y.w, 1);
-			CSycles.shadernode_set_member_vec4_at_index(Id, "uvw", uvw.z.x, uvw.z.y, uvw.z.z, uvw.z.w, 2);
-
-			CSycles.shadernode_set_member_string(Id, "uvmap", UvMap);
-		}
-
-		internal override void SetEnums()
-		{
-			CSycles.shadernode_set_enum(Id, "decal_projection", (int)Direction);
-		}
-
-		internal override void ParseXml(System.Xml.XmlReader xmlNode)
-		{
-		}
-	}
+#endregion
+    }
 
 }

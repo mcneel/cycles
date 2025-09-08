@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2024 Robert McNeel and Associates
+Copyright 2014-2025 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,103 +12,106 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+----------------------------------------------------------------------
+NOTE: Do NOT modify this file directly, it is automatically generated.
+
+Code generated at: 2025-12-02 03:24:08 UTC
+----------------------------------------------------------------------
+
 **/
 
+using ccl;
 using ccl.Attributes;
+using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
+using ccl.NodeSockets;
 using System;
-
+using System.Collections.Generic;
 namespace ccl.ShaderNodes
 {
-	/// <summary>
-	/// ColorNode output sockets
-	/// </summary>
-	public class ColorOutputs : Outputs
-	{
-		/// <summary>
-		/// ColorNode output color. Note only RGB is used
-		/// </summary>
-		public ColorSocket Color { get; set; }
+    using cclext;
 
-		internal ColorOutputs(ShaderNode parentNode)
-		{
-			Color = new ColorSocket(parentNode, "Color", "color");
-			AddSocket(Color);
-		}
-	}
+    public class ColorNodeInputs : Inputs
+    {
+        public ColorSocket Value { get; private set; }
 
-	/// <summary>
-	/// ColorNode input sockets. Empty, used for completeness
-	/// </summary>
-	public class ColorInputs : Inputs
-	{
-		internal ColorInputs(ShaderNode parentNode)
-		{
+        public ColorNodeInputs(ShaderNode parentNode)
+        {
+            Value = new ColorSocket(parentNode, "Value", "value", true);
+            AddSocket(Value);
+        }
+    }
+    public class ColorNodeOutputs : Outputs
+    {
+        public ColorSocket Color { get; private set; }
 
-		}
-	}
+        public ColorNodeOutputs(ShaderNode parentNode)
+        {
+            Color = new ColorSocket(parentNode, "Color", "color", false);
+            AddSocket(Color);
+        }
+    }
 
-	/// <summary>
-	/// ColorNode is a RGB input node.
-	/// </summary>
-	[ShaderNode("color")]
-	public class ColorNode : ShaderNode
-	{
-		/// <summary>
-		/// ColorNode input sockets
-		/// </summary>
-		public ColorInputs ins => (ColorInputs)inputs;
+    [ShaderNode(name: "color")]
+    public class ColorNode : ShaderNode
+    {
+        public ColorNodeInputs ins => (ColorNodeInputs)inputs;
+        public ColorNodeOutputs outs => (ColorNodeOutputs)outputs;
+        public ColorNode(Shader shader) : this(shader, "a color node") { }
 
-		/// <summary>
-		/// ColorNode output sockets
-		/// </summary>
-		public ColorOutputs outs => (ColorOutputs)outputs;
+        public ColorNode(Shader shader, string name) :
+            base(shader, name)
+        {
+            FinalizeConstructor();
+        }
 
-		/// <summary>
-		/// Create a ColorNode
-		/// </summary>
-		public ColorNode(Shader shader) : this(shader, "a rgb input")
-		{
-		}
+        internal ColorNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+        {
+            FinalizeConstructor();
+        }
 
-		/// <summary>
-		/// Create a ColorNode with name
-		/// </summary>
-		/// <param name="name"></param>
-		public ColorNode(Shader shader, string name) :
-			base(shader, name)
-		{
-			FinalizeConstructor();
-		}
+        private void FinalizeConstructor()
+        {
+            inputs = new ColorNodeInputs(this);
+            outputs = new ColorNodeOutputs(this);
+        }
+        public static IntPtr GetNodeType() {
+            return CSycles.colornode_get_node_type();
+        }
+#region Setters
 
-		internal ColorNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-		{
-			FinalizeConstructor();
-		}
+        internal override void SetColor(string name, float3 data)
+        {
+            switch(name) {
+            case "value":
+                    /* colornode . {'datatype': 'COLOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'value', 'ui_name': 'Value'} */
+                    {
+                    CSycles.colornode_set_value(this.Ptr, data);
+                    }
+                    break;
 
-		private void FinalizeConstructor()
-		{
-			inputs = null;
-			outputs = new ColorOutputs(this);
-			Value = new float4(0.8f);
-		}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ColorNode (setter)");
+            }
+        }
 
-		/// <summary>
-		/// Set Color member variable [IN] for ColorNode. Only RGB is used
-		/// </summary>
-		public float4 Value { get; set; }
+#endregion
+#region Getters
 
-		internal override void SetDirectMembers()
-		{
-			var val = Value;
-			CSycles.shadernode_set_member_vec(Id, "value", val.x, val.y, val.z);
-		}
+        internal override float3 GetColor(string name)
+        {
+            switch(name) {
+            case "value":
+                /* colornode . {'datatype': 'COLOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'value', 'ui_name': 'Value'} */
+                {
+                    return CSycles.colornode_get_value(this.Ptr);
+                }
 
-		internal override void ParseXml(System.Xml.XmlReader xmlNode)
-		{
-			var f4 = new float4(0.0f);
-			Utilities.Instance.get_float4(f4, xmlNode.GetAttribute("value"));
-			Value = f4;
-		}
-	}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ColorNode (getter)");
+            }
+        }
+
+#endregion
+    }
+
 }

@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2024 Robert McNeel and Associates
+Copyright 2014-2025 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,253 +12,168 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+----------------------------------------------------------------------
+NOTE: Do NOT modify this file directly, it is automatically generated.
+
+Code generated at: 2025-12-02 03:24:08 UTC
+----------------------------------------------------------------------
+
 **/
 
+using ccl;
+using ccl.Attributes;
+using ccl.ShaderNodes;
+using ccl.ShaderNodes.Sockets;
+using ccl.NodeSockets;
 using System;
 using System.Collections.Generic;
-
 namespace ccl
 {
-	/// <summary>
-	/// The Cycles session representation.
-	///
-	/// The Session is used to manage the render process at the highest level. Here one can set
-	/// the different callbacks to retrieve render results and updates and statistics during a render.
-	///
-	/// A session is created using SessionParameters and a Session.
-	///
-	/// Through Session the render process is started and ended.
-	/// </summary>
-	public class Session : IDisposable
-	{
-		/// <summary>
-		/// True if the session has already been destroyed.
-		/// </summary>
-		private bool Destroyed;
+    using cclext;
+    public class Session
+    {
+        public IntPtr Ptr { get; private set; } = IntPtr.Zero;
 
-		private Scene sc;
-		/// <summary>
-		/// Get or set the Session used for this Session
-		/// </summary>
-		public Scene Scene
-		{
-			get { return sc; }
-			private set
-			{
-				sc = value;
-			}
-		}
-		/// <summary>
-		/// Get the SessionParams used for this Session
-		/// </summary>
-		public SessionParameters SessionParams { get; private set; }
-		/// <summary>
-		/// Get the ID for this session
-		/// </summary>
-		public IntPtr Id { get; }
+        public Session() {}
 
-		/// <summary>
-		/// Create a new session using the given SessionParameters and Session
-		/// </summary>
-		/// <param name="sessionParams">Previously created SessionParameters to create Session with</param>
-		public Session(SessionParameters sessionParams)
-		{
-			SessionParams = sessionParams;
-			Id = CSycles.session_create(sessionParams.Id);
-			Scene = new Scene(this);
-		}
+        public Session(IntPtr intPtr) { Ptr = intPtr; }
+        public Scene Scene { get; private set; } = null;
 
-		public void WaitUntilLocked()
-		{
-			if (Destroyed) return;
-			Scene.WaitUntilLocked();
-		}
+        internal IntPtr _ccsession = IntPtr.Zero;
 
-		public void Unlock()
-		{
-			if (Destroyed) return;
-			Scene.Unlock();
-		}
+        static public (IntPtr idPtr, SessionParams sessionParams, SceneParams sceneParams, BufferParams bufferParams) PrepareForSession()
+        {
+            (IntPtr _idPtr, SessionParams sessParams, SceneParams sceParams, BufferParams bufParams) = CSycles.prepare_ccsession();
 
-		/// <summary>
-		/// Start the rendering session. After this one should Wait() for
-		/// the session to complete.
-		/// </summary>
-		public void Start()
-		{
-			if (Destroyed) return;
-			CSycles.progress_reset(Id);
-			CSycles.session_start(Id);
-		}
+            return (_idPtr, sessParams, sceParams, bufParams);
+        }
 
-		/// <summary>
-		/// Sample one pass. Return -1 when no pass was rendered, zero or positive when something was rendered.
-		/// </summary>
-		public int Sample()
-		{
-			if (Destroyed) return -1;
-			return CSycles.session_sample(Id);
-		}
+        static public Session CreateSession(IntPtr idPtr, SessionParams sessionParams, SceneParams sceneParams)
+        {
+            Session sess = CSycles.create_session(idPtr, sessionParams, sceneParams);
+            sess.Scene = CSycles.session_get_scene(sess);
+            sess.Scene.Background.ins.Shader.Value = sess.Scene.DefaultBackground.Ptr;
+            return sess;
+        }
 
-		/// <summary>
-		/// Wait for the rendering session to complete
-		/// </summary>
-		public void Wait()
-		{
-			if (Destroyed) return;
-			CSycles.session_wait(Id);
-		}
+        readonly List<PassType> passes = [];
+        public List<PassType> Passes => passes;
 
-		/// <summary>
-		/// Cancel the currently in progress render
-		/// </summary>
-		/// <param name="cancelMessage"></param>
-		public void Cancel(string cancelMessage)
-		{
-			if (Destroyed) return;
-			CSycles.session_cancel(Id, cancelMessage);
-		}
+        public void AddPass(Pass pass)
+        {
+            CSycles.session_add_pass(_ccsession, pass);
+            passes.Add((PassType)pass.ins.Type.Value);
+        }
 
-		public void QuickCancel()
-		{
-			if (Destroyed) return;
-			CSycles.session_quickcancel(Id);
-		}
+        public void Reset(SessionParams session_params, BufferParams buffer_params)
+        {
+            CSycles.session_reset(this, session_params, buffer_params);
+        }
 
-		/// <summary>
-		/// Destroy the session and all related.
-		/// </summary>
-		public void Destroy()
-		{
-			if (Destroyed) return;
-			CSycles.session_destroy(Id);
-		}
+        public Progress Progress {
+            get {
+                return CSycles.get_progress(this);
+            }
+        }
 
-		public void GetPixelBuffer(PassType pt, ref IntPtr pixel_buffer)
-		{
-			if (Destroyed)
-			{
-				pixel_buffer = IntPtr.Zero;
-			}
-			else
-			{
-				CSycles.session_get_float_buffer(Id, pt, ref pixel_buffer);
-			}
-		}
+        public SessionParams SessionParams {
+            get {
+                return CSycles.session_get_session_params(_ccsession);
+            }
+        }
 
-		public void RetainPixelBuffer(PassType pt, int width, int height, ref IntPtr pixel_buffer, ref int pixel_size_from_cycles)
-		{
-			if (Destroyed)
-			{
-				pixel_buffer = IntPtr.Zero;
-				pixel_size_from_cycles = 0;
-			}
-			else
-			{
-				CSycles.session_retain_float_buffer(Id, pt, width, height, ref pixel_buffer, ref pixel_size_from_cycles);
-			}
-		}
+        public SceneParams SceneParams {
+            get {
+                return CSycles.session_get_scene_params(_ccsession);
+            }
+        }
 
-		public void ReleasePixelBuffer(PassType pt)
-		{
-			if (!Destroyed)
-			{
-				CSycles.session_release_float_buffer(Id, pt);
-			}
-		}
+        public BufferParams BufferParams {
+            get {
+                return CSycles.session_get_buffer_params(_ccsession);
+            }
+        }
 
+        public void RetainPixelBuffer(PassType pt, int width, int height, ref IntPtr pixel_buffer, ref int pixel_size_from_cycles)
+        {
+            if (_destroyed)
+            {
+                pixel_buffer = IntPtr.Zero;
+                pixel_size_from_cycles = 0;
+            }
+            else
+            {
+                CSycles.session_retain_float_buffer(_ccsession, pt, width, height, ref pixel_buffer, ref pixel_size_from_cycles);
+            }
+        }
 
-		/// <summary>
-		/// Reset a Session
-		/// </summary>
-		/// <param name="width">Width of the resolution to reset with</param>
-		/// <param name="height">Height of the resolutin to reset with</param>
-		/// <param name="samples">The amount of samples to reset with</param>
-		/// <returns>0 on success. -1 when the session is already destroyed. -13 when a crash happened.</returns>
-		public int Reset(int width, int height, int samples, int full_x, int full_y, int full_width, int full_height, int pixel_size)
-		{
-			if (Destroyed) return -1;
-			CSycles.progress_reset(Id);
-			return CSycles.session_reset(Id, width, height, samples, full_x, full_y, full_width, full_height, pixel_size);
-		}
+        public void ReleasePixelBuffer(PassType pt)
+        {
+            if (!_destroyed)
+            {
+                CSycles.session_release_float_buffer(_ccsession, pt);
+            }
+        }
 
-		/// <summary>
-		/// Pause or un-pause a render session.
-		/// </summary>
-		/// <param name="pause"></param>
-		public void SetPause(bool pause)
-		{
-			if (Destroyed) return;
-			CSycles.session_set_pause(Id, pause);
-		}
+        private bool _destroyed = false;
+        ~Session()
+        {
+            Dispose();
+        }
 
-		/// <summary>
-		/// Set sample count for session to render. This can be used to increase the sample
-		/// count for an interactive render session.
-		/// </summary>
-		/// <param name="samples"></param>
-		public void SetSamples(int samples)
-		{
-			if (Destroyed) return;
-			CSycles.session_set_samples(Id, samples);
-		}
+        public void Dispose()
+        {
+            if(!_destroyed) {
+                Cancel(quick: true);
+                CSycles.session_destroy(_ccsession);
+                _destroyed = true;
+            }
+            GC.SuppressFinalize(this);
+        }
 
+        public void Start() {
+            CSycles.session_start(Ptr);
+        }
 
-		public IEnumerable<PassType> Passes
-		{
-			get
-			{
-				foreach (var pass in _passes)
-				{
-					yield return pass;
-				}
-			}
-		}
-		private List<PassType> _passes = new List<PassType>();
+        public void CollectStatistics(IntPtr stats) {
+            CSycles.session_collect_statistics(Ptr, stats);
+        }
 
-		/// <summary>
-		/// Add given pass to output layers
-		/// </summary>
-		/// <param name="pass"></param>
-		public void AddPass(PassType pass)
-		{
-			if (Destroyed) return;
-			CSycles.session_add_pass(Id, pass);
-			if (!_passes.Contains(pass))
-			{
-				_passes.Add(pass);
-			}
-		}
+        public void SetTimeLimit(double time_limit) {
+            CSycles.session_set_time_limit(Ptr, time_limit);
+        }
 
-		/// <summary>
-		/// Clear all passes for session.
-		/// </summary>
-		public void ClearPasses()
-		{
-			if (Destroyed) return;
-			_passes.Clear();
-			CSycles.session_clear_passes(Id);
-		}
+        public void Draw() {
+            CSycles.session_draw(Ptr);
+        }
 
-		protected virtual void Dispose(bool disposing)
-		{
-			if (!Destroyed)
-			{
-				QuickCancel();
-				Destroy();
-				Destroyed = true;
-			}
-		}
+        public void Cancel(bool quick) {
+            if (!_destroyed)
+            {
+                CSycles.session_cancel(Ptr, quick);
+            }
+        }
 
-		~Session()
-		{
-			Dispose(disposing: false);
-		}
+        public bool ReadyToReset() {
+            return CSycles.session_ready_to_reset(Ptr);
+        }
 
-		public void Dispose()
-		{
-			Dispose(disposing: true);
-			GC.SuppressFinalize(this);
-		}
-	}
+        public void SetSamples(int samples) {
+            CSycles.session_set_samples(Ptr, samples);
+        }
+
+        public void Wait() {
+            CSycles.session_wait(Ptr);
+        }
+
+        public double GetEstimatedRemainingTime() {
+            return CSycles.session_get_estimated_remaining_time(Ptr);
+        }
+
+        public void SetPause(bool pause) {
+            CSycles.session_set_pause(Ptr, pause);
+        }
+    }
+
 }

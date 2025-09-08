@@ -1,0 +1,6 @@
+
+        public void TagUpdate(Scene scene)
+        {
+            CSycles.object_tag_update(this, scene);
+        }
+

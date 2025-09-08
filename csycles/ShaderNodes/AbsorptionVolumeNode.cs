@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2024 Robert McNeel and Associates
+Copyright 2014-2025 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,78 +12,140 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+----------------------------------------------------------------------
+NOTE: Do NOT modify this file directly, it is automatically generated.
+
+Code generated at: 2025-12-02 03:24:08 UTC
+----------------------------------------------------------------------
+
 **/
 
+using ccl;
 using ccl.Attributes;
+using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
+using ccl.NodeSockets;
 using System;
-using System.Xml;
-
+using System.Collections.Generic;
 namespace ccl.ShaderNodes
 {
-	public class AbsorptionVolumeInputs : Inputs
-	{
-		public ColorSocket Color { get; set; }
-		public FloatSocket Density { get; set; }
+    using cclext;
 
-		public AbsorptionVolumeInputs(ShaderNode parentNode)
-		{
-			Color = new ColorSocket(parentNode, "Color", "color");
-			AddSocket(Color);
-			Density = new FloatSocket(parentNode, "Density", "density");
-			AddSocket(Density);
-		}
-	}
+    public class AbsorptionVolumeNodeInputs : Inputs
+    {
+        public FloatSocket Density { get; private set; }
+        public ColorSocket Color { get; private set; }
 
-	public class AbsorptionVolumeOutputs : Outputs
-	{
-		public ClosureSocket Volume { get; set; }
+        public AbsorptionVolumeNodeInputs(ShaderNode parentNode)
+        {
+            Density = new FloatSocket(parentNode, "Density", "density", true);
+            AddSocket(Density);
+            Color = new ColorSocket(parentNode, "Color", "color", true);
+            AddSocket(Color);
+        }
+    }
+    public class AbsorptionVolumeNodeOutputs : Outputs
+    {
+        public ClosureSocket Volume { get; private set; }
 
-		public AbsorptionVolumeOutputs(ShaderNode parentNode)
-		{
-			Volume = new ClosureSocket(parentNode, "Volume", "volume");
-			AddSocket(Volume);
-		}
-	}
+        public AbsorptionVolumeNodeOutputs(ShaderNode parentNode)
+        {
+            Volume = new ClosureSocket(parentNode, "Volume", "volume", false);
+            AddSocket(Volume);
+        }
+    }
 
-	/// <summary>
-	/// A absorption volume node.
-	/// </summary>
-	[ShaderNode("absorption_volume")]
-	public class AbsorptionVolumeNode : ShaderNode
-	{
-		public AbsorptionVolumeInputs ins => (AbsorptionVolumeInputs)inputs;
-		public AbsorptionVolumeOutputs outs => (AbsorptionVolumeOutputs)outputs;
+    [ShaderNode(name: "absorption_volume")]
+    public class AbsorptionVolumeNode : VolumeNode
+    {
+        public AbsorptionVolumeNodeInputs ins => (AbsorptionVolumeNodeInputs)inputs;
+        public AbsorptionVolumeNodeOutputs outs => (AbsorptionVolumeNodeOutputs)outputs;
+        public AbsorptionVolumeNode(Shader shader) : this(shader, "a absorption_volume node") { }
 
-		/// <summary>
-		/// Create a new Absorption volume node
-		/// </summary>
-		public AbsorptionVolumeNode(Shader shader) : this(shader, "a absorption volume node") { }
+        public AbsorptionVolumeNode(Shader shader, string name) :
+            base(shader, name)
+        {
+            FinalizeConstructor();
+        }
 
-		public AbsorptionVolumeNode(Shader shader, string name) :
-			base(shader, name)
-		{
-			FinalizeConstructor();
-		}
+        internal AbsorptionVolumeNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+        {
+            FinalizeConstructor();
+        }
 
-		internal AbsorptionVolumeNode(Shader shader, IntPtr shaderNodePtr) : base(shader, shaderNodePtr)
-		{
-			FinalizeConstructor();
-		}
+        private void FinalizeConstructor()
+        {
+            inputs = new AbsorptionVolumeNodeInputs(this);
+            outputs = new AbsorptionVolumeNodeOutputs(this);
+        }
+        public override ClosureSocket GetClosureSocket()
+        {
+            return outs.Volume;
+        }
+        public static IntPtr GetNodeType() {
+            return CSycles.absorptionvolumenode_get_node_type();
+        }
+#region Setters
 
-		private void FinalizeConstructor()
-		{
-			inputs = new AbsorptionVolumeInputs(this);
-			outputs = new AbsorptionVolumeOutputs(this);
-			ins.Color.Value = new float4(1.0f);
-			ins.Density.Value = 1.0f;
-		}
+        internal override void SetFloat(string name, float data)
+        {
+            switch(name) {
+            case "density":
+                    /* absorptionvolumenode . {'datatype': 'FLOAT', 'default_value': '1.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'density', 'ui_name': 'Density'} */
+                    {
+                    CSycles.volumenode_set_density(this.Ptr, data);
+                    }
+                    break;
 
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type AbsorptionVolumeNode (setter)");
+            }
+        }
 
-		internal override void ParseXml(XmlReader xmlNode)
-		{
-			Utilities.Instance.get_float4(ins.Color, xmlNode.GetAttribute("color"));
-			Utilities.Instance.get_float(ins.Density, xmlNode.GetAttribute("density"));
-		}
-	}
+        internal override void SetColor(string name, float3 data)
+        {
+            switch(name) {
+            case "color":
+                    /* absorptionvolumenode . {'datatype': 'COLOR', 'default_value': 'make_float3(0.8f,0.8f,0.8f)', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color', 'ui_name': 'Color'} */
+                    {
+                    CSycles.volumenode_set_color(this.Ptr, data);
+                    }
+                    break;
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type AbsorptionVolumeNode (setter)");
+            }
+        }
+
+#endregion
+#region Getters
+
+        internal override float GetFloat(string name)
+        {
+            switch(name) {
+            case "density":
+                /* absorptionvolumenode . {'datatype': 'FLOAT', 'default_value': '1.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'density', 'ui_name': 'Density'} */
+                {
+                    return CSycles.volumenode_get_density(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type AbsorptionVolumeNode (getter)");
+            }
+        }
+
+        internal override float3 GetColor(string name)
+        {
+            switch(name) {
+            case "color":
+                /* absorptionvolumenode . {'datatype': 'COLOR', 'default_value': 'make_float3(0.8f,0.8f,0.8f)', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color', 'ui_name': 'Color'} */
+                {
+                    return CSycles.volumenode_get_color(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type AbsorptionVolumeNode (getter)");
+            }
+        }
+
+#endregion
+    }
+
 }

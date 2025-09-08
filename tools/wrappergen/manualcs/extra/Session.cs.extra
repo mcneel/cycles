@@ -1,0 +1,95 @@
+
+        public Scene Scene { get; private set; } = null;
+
+        internal IntPtr _ccsession = IntPtr.Zero;
+
+        static public (IntPtr idPtr, SessionParams sessionParams, SceneParams sceneParams, BufferParams bufferParams) PrepareForSession()
+        {
+            (IntPtr _idPtr, SessionParams sessParams, SceneParams sceParams, BufferParams bufParams) = CSycles.prepare_ccsession();
+
+            return (_idPtr, sessParams, sceParams, bufParams);
+        }
+
+        static public Session CreateSession(IntPtr idPtr, SessionParams sessionParams, SceneParams sceneParams)
+        {
+            Session sess = CSycles.create_session(idPtr, sessionParams, sceneParams);
+            sess.Scene = CSycles.session_get_scene(sess);
+            sess.Scene.Background.ins.Shader.Value = sess.Scene.DefaultBackground.Ptr;
+            return sess;
+        }
+
+        readonly List<PassType> passes = [];
+        public List<PassType> Passes => passes;
+
+        public void AddPass(Pass pass)
+        {
+            CSycles.session_add_pass(_ccsession, pass);
+            passes.Add((PassType)pass.ins.Type.Value);
+        }
+
+        public void Reset(SessionParams session_params, BufferParams buffer_params)
+        {
+            CSycles.session_reset(this, session_params, buffer_params);
+        }
+
+        public Progress Progress {
+            get {
+                return CSycles.get_progress(this);
+            }
+        }
+
+        public SessionParams SessionParams {
+            get {
+                return CSycles.session_get_session_params(_ccsession);
+            }
+        }
+
+        public SceneParams SceneParams {
+            get {
+                return CSycles.session_get_scene_params(_ccsession);
+            }
+        }
+
+        public BufferParams BufferParams {
+            get {
+                return CSycles.session_get_buffer_params(_ccsession);
+            }
+        }
+
+        public void RetainPixelBuffer(PassType pt, int width, int height, ref IntPtr pixel_buffer, ref int pixel_size_from_cycles)
+        {
+            if (_destroyed)
+            {
+                pixel_buffer = IntPtr.Zero;
+                pixel_size_from_cycles = 0;
+            }
+            else
+            {
+                CSycles.session_retain_float_buffer(_ccsession, pt, width, height, ref pixel_buffer, ref pixel_size_from_cycles);
+            }
+        }
+
+        public void ReleasePixelBuffer(PassType pt)
+        {
+            if (!_destroyed)
+            {
+                CSycles.session_release_float_buffer(_ccsession, pt);
+            }
+        }
+
+        private bool _destroyed = false;
+        ~Session()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if(!_destroyed) {
+                Cancel(quick: true);
+                CSycles.session_destroy(_ccsession);
+                _destroyed = true;
+            }
+            GC.SuppressFinalize(this);
+        }
+

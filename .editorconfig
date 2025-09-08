@@ -3,8 +3,7 @@
 # top-most EditorConfig file
 root = true
 
-# use tabs by default for everything
 [*]
-indent_style = tab
+indent_style = space
 indent_size = 4
 tab_size = 4

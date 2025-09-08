@@ -1,0 +1,16 @@
+
+        public void TagUpdate(Scene scene)
+        {
+            CSycles.geometry_tag_update(this, scene);
+        }
+
+        public void AddShader(Shader shader)
+        {
+            CSycles.geometry_add_shader(Ptr, shader.Ptr);
+        }
+
+        public void SetShader(Shader shader)
+        {
+            CSycles.geometry_set_shader(Ptr, shader.Ptr);
+        }
+

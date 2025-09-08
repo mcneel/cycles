@@ -3,8 +3,9 @@
 # top-most EditorConfig file
 root = true
 
-# use tabs by default for everything
 [*]
-indent_style = tab
-indent_size = 2
-tab_size = 2
+indent_style = space
+indent_size = 4
+
+# IDE1006: Naming Styles
+dotnet_diagnostic.IDE1006.severity = silent

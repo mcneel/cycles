@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2024 Robert McNeel and Associates
+Copyright 2014-2025 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,140 +12,184 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+----------------------------------------------------------------------
+NOTE: Do NOT modify this file directly, it is automatically generated.
+
+Code generated at: 2025-12-02 03:24:08 UTC
+----------------------------------------------------------------------
+
 **/
 
+using ccl;
 using ccl.Attributes;
+using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
+using ccl.NodeSockets;
 using System;
-using System.Xml;
-
+using System.Collections.Generic;
 namespace ccl.ShaderNodes
 {
-	/// <summary>
-	/// MappingNode input sockets
-	/// </summary>
-	public class MappingInputs : Inputs
-	{
-		/// <summary>
-		/// MappingNode input vector that should be transformed
-		/// </summary>
-		public VectorSocket Vector { get; set; }
-		public VectorSocket Location { get; set; }
-		public VectorSocket Rotation { get; set; }
-		public VectorSocket Scale { get; set; }
+    using cclext;
 
-		internal MappingInputs(ShaderNode parentNode)
-		{
-			Vector = new VectorSocket(parentNode, "Vector", "vector");
-			AddSocket(Vector);
-			Location = new VectorSocket(parentNode, "Location", "location");
-			AddSocket(Location);
-			Rotation = new VectorSocket(parentNode, "Rotation", "rotation");
-			AddSocket(Rotation);
-			Scale = new VectorSocket(parentNode, "Scale", "scale");
-			AddSocket(Scale);
-		}
-	}
+    public class MappingNodeInputs : Inputs
+    {
+        public PointSocket Scale { get; private set; }
+        public PointSocket Location { get; private set; }
+        public EnumSocket Type { get; private set; }
+        public PointSocket Rotation { get; private set; }
+        public PointSocket Vector { get; private set; }
 
-	/// <summary>
-	/// MappingNode output sockets
-	/// </summary>
-	public class MappingOutputs : Outputs
-	{
-		/// <summary>
-		/// MappingNode output vector
-		/// </summary>
-		public VectorSocket Vector { get; set; }
+        public MappingNodeInputs(ShaderNode parentNode)
+        {
+            Scale = new PointSocket(parentNode, "Scale", "scale", true);
+            AddSocket(Scale);
+            Location = new PointSocket(parentNode, "Location", "location", true);
+            AddSocket(Location);
+            Type = new EnumSocket(parentNode, "Type", "mapping_type", true);
+            AddSocket(Type);
+            Rotation = new PointSocket(parentNode, "Rotation", "rotation", true);
+            AddSocket(Rotation);
+            Vector = new PointSocket(parentNode, "Vector", "vector", true);
+            AddSocket(Vector);
+        }
+    }
+    public class MappingNodeOutputs : Outputs
+    {
+        public PointSocket Vector { get; private set; }
 
-		internal MappingOutputs(ShaderNode parentNode)
-		{
-			Vector = new VectorSocket(parentNode, "Vector", "vector");
-			AddSocket(Vector);
-		}
-	}
+        public MappingNodeOutputs(ShaderNode parentNode)
+        {
+            Vector = new PointSocket(parentNode, "Vector", "vector", false);
+            AddSocket(Vector);
+        }
+    }
 
-	/// <summary>
-	/// Mapping node to transform an input vector utilising one of the four
-	/// types
-	/// - Texture: Transform a texture by inverse mapping the texture coordinate
-	/// - Point: Transform a point
-	/// - Vector: Transform a direction vector
-	/// - Normal: Transform a normal vector with unit length
-	/// </summary>
-	[ShaderNode("mapping")]
-	public class MappingNode : TextureNode
-	{
-		/// <summary>
-		/// MappingNode input sockets
-		/// </summary>
-		public MappingInputs ins => (MappingInputs)inputs;
+    [ShaderNode(name: "mapping")]
+    public class MappingNode : ShaderNode
+    {
+        public enum MappingNodeType : uint {
+            Point = ccl.NodeMappingType.NODE_MAPPING_TYPE_POINT,
+            Texture = ccl.NodeMappingType.NODE_MAPPING_TYPE_TEXTURE,
+            Vector = ccl.NodeMappingType.NODE_MAPPING_TYPE_VECTOR,
+            Normal = ccl.NodeMappingType.NODE_MAPPING_TYPE_NORMAL,
+        }
+        public MappingNodeInputs ins => (MappingNodeInputs)inputs;
+        public MappingNodeOutputs outs => (MappingNodeOutputs)outputs;
+        public MappingNode(Shader shader) : this(shader, "a mapping node") { }
 
-		/// <summary>
-		/// MappingNode output sockets
-		/// </summary>
-		public MappingOutputs outs => (MappingOutputs)outputs;
+        public MappingNode(Shader shader, string name) :
+            base(shader, name)
+        {
+            FinalizeConstructor();
+        }
 
+        internal MappingNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+        {
+            FinalizeConstructor();
+        }
 
-		/// <summary>
-		/// Create new MappingNode
-		/// </summary>
-		public MappingNode(Shader shader) : this(shader, "a mapping node")
-		{
-		}
+        private void FinalizeConstructor()
+        {
+            inputs = new MappingNodeInputs(this);
+            outputs = new MappingNodeOutputs(this);
+        }
+        public static IntPtr GetNodeType() {
+            return CSycles.mappingnode_get_node_type();
+        }
+#region Setters
 
-		public MappingNode(Shader shader, string name) :
-			base(shader, name)
-		{
-			FinalizeConstructor();
-		}
+        internal override void SetPoint(string name, float3 data)
+        {
+            switch(name) {
+            case "scale":
+                    /* mappingnode . {'datatype': 'POINT', 'default_value': 'one_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'scale', 'ui_name': 'Scale'} */
+                    {
+                    CSycles.mappingnode_set_scale(this.Ptr, data);
+                    }
+                    break;
+            case "location":
+                    /* mappingnode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'location', 'ui_name': 'Location'} */
+                    {
+                    CSycles.mappingnode_set_location(this.Ptr, data);
+                    }
+                    break;
+            case "rotation":
+                    /* mappingnode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'rotation', 'ui_name': 'Rotation'} */
+                    {
+                    CSycles.mappingnode_set_rotation(this.Ptr, data);
+                    }
+                    break;
+            case "vector":
+                    /* mappingnode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector', 'ui_name': 'Vector'} */
+                    {
+                    CSycles.mappingnode_set_vector(this.Ptr, data);
+                    }
+                    break;
 
-		internal MappingNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-		{
-			FinalizeConstructor();
-		}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MappingNode (setter)");
+            }
+        }
 
-		private void FinalizeConstructor()
-		{
-			inputs = new MappingInputs(this);
-			outputs = new MappingOutputs(this);
-		}
+        internal override void SetEnum(string name, object data)
+        {
+            switch(name) {
+            case "mapping_type":
+                    /* mappingnode . {'datatype': 'ENUM', 'default_value': 'NODE_MAPPING_TYPE_POINT', 'default_value_type': 'NodeMappingType', 'is_input': True, 'member_name': 'mapping_type', 'ui_name': 'Type'} */
+                    {
+                    CSycles.mappingnode_set_mapping_type(this.Ptr, (ccl.NodeMappingType)data);
+                    }
+                    break;
 
-		internal override void ParseXml(XmlReader xmlNode)
-		{
-			Utilities.Instance.get_float4(ins.Vector, xmlNode.GetAttribute("vector"));
-			var mapping_type = xmlNode.GetAttribute("mapping_type");
-			if (!string.IsNullOrEmpty(mapping_type))
-			{
-				try
-				{
-					var mt = (MappingType)Enum.Parse(typeof(MappingType), mapping_type, true);
-					Mapping = mt;
-				}
-				catch (ArgumentException)
-				{
-					Mapping = MappingType.Texture;
-				}
-			}
-			var f4 = new float4(0.0f);
-			Utilities.Instance.get_float4(f4, xmlNode.GetAttribute("rotation"));
-			Rotation = f4;
-			Utilities.Instance.get_float4(f4, xmlNode.GetAttribute("translation"));
-			Translation = f4;
-			Utilities.Instance.get_float4(f4, xmlNode.GetAttribute("scale"));
-			Scale = f4;
-			bool b = false;
-			Utilities.Instance.get_bool(ref b, xmlNode.GetAttribute("useminmax"));
-			Utilities.Instance.get_float4(f4, xmlNode.GetAttribute("min"));
-			if (b && !f4.IsZero(false))
-			{
-				Min = f4;
-			}
-			Utilities.Instance.get_float4(f4, xmlNode.GetAttribute("max"));
-			if (b && !f4.IsZero(false))
-			{
-				Max = f4;
-			}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MappingNode (setter)");
+            }
+        }
 
-		}
-	}
+#endregion
+#region Getters
+
+        internal override float3 GetPoint(string name)
+        {
+            switch(name) {
+            case "scale":
+                /* mappingnode . {'datatype': 'POINT', 'default_value': 'one_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'scale', 'ui_name': 'Scale'} */
+                {
+                    return CSycles.mappingnode_get_scale(this.Ptr);
+                }
+            case "location":
+                /* mappingnode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'location', 'ui_name': 'Location'} */
+                {
+                    return CSycles.mappingnode_get_location(this.Ptr);
+                }
+            case "rotation":
+                /* mappingnode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'rotation', 'ui_name': 'Rotation'} */
+                {
+                    return CSycles.mappingnode_get_rotation(this.Ptr);
+                }
+            case "vector":
+                /* mappingnode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector', 'ui_name': 'Vector'} */
+                {
+                    return CSycles.mappingnode_get_vector(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MappingNode (getter)");
+            }
+        }
+
+        internal override object GetEnum(string name)
+        {
+            switch(name) {
+            case "mapping_type":
+                /* mappingnode . {'datatype': 'ENUM', 'default_value': 'NODE_MAPPING_TYPE_POINT', 'default_value_type': 'NodeMappingType', 'is_input': True, 'member_name': 'mapping_type', 'ui_name': 'Type'} */
+                {
+                    return (uint)CSycles.mappingnode_get_mapping_type(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MappingNode (getter)");
+            }
+        }
+
+#endregion
+    }
+
 }

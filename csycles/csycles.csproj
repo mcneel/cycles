@@ -6,7 +6,7 @@
     <EnableDefaultItems>False</EnableDefaultItems>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ccl</RootNamespace>
-    <LangVersion>11.0</LangVersion>
+    <LangVersion>latest</LangVersion>
     <AssemblyName>csycles</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -94,136 +94,12 @@
       <Link>Properties\version.cs</Link>
     </Compile>
     <Compile Condition="$(Configuration.Contains('Stand-alone'))" Include=".\Properties\version.cs" />
-    <Compile Include="Attributes\ShaderNodeAttribute.cs" />
-    <Compile Include="Background.cs" />
-    <Compile Include="Colors.cs" />
-    <Compile Include="Film.cs" />
-    <Compile Include="Camera.cs" />
-    <Compile Include="Client.cs" />
-    <Compile Include="CSycles.Film.cs" />
-    <Compile Include="CSycles.Camera.cs" />
-    <Compile Include="CSycles.cs" />
-    <Compile Include="CSycles.Device.cs" />
-    <Compile Include="CSycles.Integrator.cs" />
-    <Compile Include="CSycles.Light.cs" />
-    <Compile Include="CSycles.Mesh.cs" />
-    <Compile Include="CSycles.Object.cs" />
-    <Compile Include="CSycles.Scene.cs" />
-    <Compile Include="CSycles.Session.cs" />
-    <Compile Include="CSycles.Shader.cs" />
-    <Compile Include="Device.cs" />
-    <Compile Include="enums.cs" />
-    <Compile Include="float4.cs" />
-    <Compile Include="Mesh.cs" />
-    <Compile Include="Object.cs" />
-    <Compile Include="CodeShader.cs" />
-    <Compile Include="Inputs.cs" />
-    <Compile Include="Integrator.cs" />
-    <Compile Include="Light.cs" />
-    <Compile Include="Outputs.cs" />
+    <Compile Include="*.cs" />
+    <Compile Include="Attributes\*.cs" />
+    <Compile Include="NodeSockets\*.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Scene.cs" />
-    <Compile Include="SceneParameters.cs" />
-    <Compile Include="Session.cs" />
-    <Compile Include="Shader.cs" />
-    <Compile Include="ShaderNodes\AttributeNode.cs" />
-    <Compile Include="ShaderNodes\ColorRamp.cs" />
-    <Compile Include="ShaderNodes\CombineHsvNode.cs" />
-    <Compile Include="ShaderNodes\CombineRgbNode.cs" />
-    <Compile Include="ShaderNodes\CombineXyzNode.cs" />
-    <Compile Include="ShaderNodes\BrightnessContrastNode.cs" />
-    <Compile Include="ShaderNodes\AnisotropicBsdfNode.cs" />
-    <Compile Include="ShaderNodes\AbsorptionVolumeNode.cs" />
-    <Compile Include="ShaderNodes\CameraDataNode.cs" />
-    <Compile Include="ShaderNodes\DisplacementNode.cs" />
-    <Compile Include="ShaderNodes\RhinoBlendTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoCheckerTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoDotsTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoExposureTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoFbmTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoGradientTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoGridTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoInputOutputBase.cs" />
-    <Compile Include="ShaderNodes\RhinoMaskTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoNoiseTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoNormalTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoPerlinMarbleTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoPerturbingTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoPhysicalSkyTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoProjectionChangerTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoTextureAdjustmentTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoTileTextureNode.cs" />
-    <Compile Include="ShaderNodes\RhinoWavesTextureNode.cs" />
-    <Compile Include="ShaderNodes\Sockets\BoolSocket.cs" />
-    <Compile Include="ShaderNodes\Sockets\TransformSocket.cs" />
-    <Compile Include="ShaderNodes\TangentNode.cs" />
-    <Compile Include="ShaderNodes\ObjectInfoNode.cs" />
-    <Compile Include="ShaderNodes\UVMapNode.cs" />
-    <Compile Include="ShaderNodes\WireframeNode.cs" />
-    <Compile Include="ShaderNodes\NormalMapNode.cs" />
-    <Compile Include="ShaderNodes\InvertNode.cs" />
-    <Compile Include="ShaderNodes\PrincipledBsdfNode.cs" />
-    <Compile Include="ShaderNodes\GeometryInfoNode.cs" />
-    <Compile Include="ShaderNodes\SubsurfaceScatteringNode.cs" />
-    <Compile Include="ShaderNodes\ScatterVolumeNode.cs" />
-    <Compile Include="ShaderNodes\HueSaturationNode.cs" />
-    <Compile Include="ShaderNodes\HoldoutNode.cs" />
-    <Compile Include="ShaderNodes\GradientTextureNode.cs" />
-    <Compile Include="ShaderNodes\MatrixMathNode.cs" />
-    <Compile Include="ShaderNodes\ToonBsdfNode.cs" />
-    <Compile Include="ShaderNodes\VectorMathNode.cs" />
-    <Compile Include="ShaderNodes\RgbToLuminance.cs" />
-    <Compile Include="ShaderNodes\TranslucentBsdfNode.cs" />
-    <Compile Include="ShaderNodes\VelvetBsdfNode.cs" />
-    <Compile Include="ShaderNodes\MappingNode.cs" />
-    <Compile Include="ShaderNodes\SeparateRgbNode.cs" />
-    <Compile Include="ShaderNodes\SeparateHsvNode.cs" />
-    <Compile Include="ShaderNodes\SeparateXyzNode.cs" />
-    <Compile Include="ShaderNodes\TransparentBsdfNode.cs" />
-    <Compile Include="ShaderNodes\LayerWeightNode.cs" />
-    <Compile Include="ShaderNodes\GammaNode.cs" />
-    <Compile Include="ShaderNodes\LightFalloffNode.cs" />
-    <Compile Include="ShaderNodes\RgbToBwNode.cs" />
-    <Compile Include="ShaderNodes\CheckerTexture.cs" />
-    <Compile Include="ShaderNodes\GlassBsdfNode.cs" />
-    <Compile Include="ShaderNodes\EnvironmentTextureNode.cs" />
-    <Compile Include="ShaderNodes\BumpNode.cs" />
-    <Compile Include="ShaderNodes\NoiseTexture.cs" />
-    <Compile Include="ShaderNodes\OutputNode.cs" />
-    <Compile Include="ShaderNodes\ShaderNode.cs" />
-    <Compile Include="ShaderNodes\VoronoiTexture.cs" />
-    <Compile Include="ShaderNodes\SkyTexture.cs" />
-    <Compile Include="ShaderNodes\AddClosureNode.cs" />
-    <Compile Include="ShaderNodes\BackgroundNode.cs" />
-    <Compile Include="ShaderNodes\BrickTexture.cs" />
-    <Compile Include="ShaderNodes\ColorNode.cs" />
-    <Compile Include="ShaderNodes\DiffuseBsdfNode.cs" />
-    <Compile Include="ShaderNodes\EmissionNode.cs" />
-    <Compile Include="ShaderNodes\FresnelNode.cs" />
-    <Compile Include="ShaderNodes\GlossyBsdfNode.cs" />
-    <Compile Include="ShaderNodes\ImageTextureNode.cs" />
-    <Compile Include="ShaderNodes\MathNode.cs" />
-    <Compile Include="ShaderNodes\MixClosureNode.cs" />
-    <Compile Include="ShaderNodes\MixNode.cs" />
-    <Compile Include="ShaderNodes\RefractionBsdfNode.cs" />
-    <Compile Include="ShaderNodes\LightPathNode.cs" />
-    <Compile Include="ShaderNodes\TextureCoordinateNode.cs" />
-    <Compile Include="ShaderNodes\TextureNode.cs" />
-    <Compile Include="ShaderNodes\ValueNode.cs" />
-    <Compile Include="ShaderNodes\MagicTexture.cs" />
-    <Compile Include="ShaderNodes\MusgraveTexture.cs" />
-    <Compile Include="ShaderNodes\WaveTexture.cs" />
-    <Compile Include="ShaderNodes\RhinoAzimuthAltitudeTransformNode.cs" />
-    <Compile Include="ShaderNodes\Sockets\SocketBase.cs" />
-    <Compile Include="ShaderNodes\Sockets\ClosureSocket.cs" />
-    <Compile Include="ShaderNodes\Sockets\IntSocket.cs" />
-    <Compile Include="ShaderNodes\Sockets\StringSocket.cs" />
-    <Compile Include="ShaderNodes\Sockets\Float4Socket.cs" />
-    <Compile Include="ShaderNodes\Sockets\FloatSocket.cs" />
-    <Compile Include="SocketCollection.cs" />
-    <Compile Include="Transform.cs" />
-    <Compile Include="SessionParameters.cs" />
-    <Compile Include="Utilities.cs" />
+    <Compile Include="ShaderNodes\*.cs" />
+    <Compile Include="ShaderNodes\Sockets\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="license.txt">
@@ -248,6 +124,9 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="License\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Memory" Version="4.5.5" />
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Stand-alone Release' Or '$(Configuration)' == 'Stand-alone Debug'">
     <PostBuildEvent Condition="'$(OS)' == 'Windows_NT'">

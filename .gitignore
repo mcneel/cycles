@@ -1,8 +1,13 @@
 .DS_Store
 x64/
+__pycache__/
 
 lib/
 lib/*.cubin
+
+diagnostics.json
+nvimpath.ps1
+shadernodes_cs/
 
 *.o
 *.a
@@ -14,6 +19,8 @@ lib/*.cubin
 *.dia
 *.dat
 *.LinkFileList
+
+*.bu
 
 *.cmake
 CMakeCache.txt

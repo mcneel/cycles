@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2024 Robert McNeel and Associates
+Copyright 2014-2025 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,103 +12,218 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+----------------------------------------------------------------------
+NOTE: Do NOT modify this file directly, it is automatically generated.
+
+Code generated at: 2025-12-02 03:24:08 UTC
+----------------------------------------------------------------------
+
 **/
 
+using ccl;
 using ccl.Attributes;
+using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
+using ccl.NodeSockets;
 using System;
-using System.Xml;
-
+using System.Collections.Generic;
 namespace ccl.ShaderNodes
 {
-	public class ToonBsdfInputs : Inputs
-	{
-		public ColorSocket Color { get; set; }
-		public VectorSocket Normal { get; set; }
+    using cclext;
 
-		public FloatSocket Size { get; set; }
-		public FloatSocket Smooth { get; set; }
+    public class ToonBsdfNodeInputs : Inputs
+    {
+        public ColorSocket Color { get; private set; }
+        public FloatSocket Smooth { get; private set; }
+        public EnumSocket Component { get; private set; }
+        public NormalSocket Normal { get; private set; }
+        public FloatSocket Size { get; private set; }
 
-		internal ToonBsdfInputs(ShaderNode parentNode)
-		{
-			Color = new ColorSocket(parentNode, "Color", "color");
-			AddSocket(Color);
-			Normal = new VectorSocket(parentNode, "Normal", "normal");
-			AddSocket(Normal);
-			Size = new FloatSocket(parentNode, "Size", "size");
-			AddSocket(Size);
-			Smooth = new FloatSocket(parentNode, "Smooth", "smooth");
-			AddSocket(Smooth);
+        public ToonBsdfNodeInputs(ShaderNode parentNode)
+        {
+            Color = new ColorSocket(parentNode, "Color", "color", true);
+            AddSocket(Color);
+            Smooth = new FloatSocket(parentNode, "Smooth", "smooth", true);
+            AddSocket(Smooth);
+            Component = new EnumSocket(parentNode, "Component", "component", true);
+            AddSocket(Component);
+            Normal = new NormalSocket(parentNode, "Normal", "normal", true);
+            AddSocket(Normal);
+            Size = new FloatSocket(parentNode, "Size", "size", true);
+            AddSocket(Size);
+        }
+    }
+    public class ToonBsdfNodeOutputs : Outputs
+    {
+        public ClosureSocket BSDF { get; private set; }
 
-		}
-	}
+        public ToonBsdfNodeOutputs(ShaderNode parentNode)
+        {
+            BSDF = new ClosureSocket(parentNode, "BSDF", "BSDF", false);
+            AddSocket(BSDF);
+        }
+    }
 
-	public class ToonBsdfOutputs : Outputs
-	{
-		public ClosureSocket BSDF { get; set; }
+    [ShaderNode(name: "toon_bsdf")]
+    public class ToonBsdfNode : BsdfNode
+    {
+        public enum ToonBsdfNodeComponent : uint {
+            Diffuse = ccl.ClosureType.CLOSURE_BSDF_DIFFUSE_TOON_ID,
+            Glossy = ccl.ClosureType.CLOSURE_BSDF_GLOSSY_TOON_ID,
+        }
+        public ToonBsdfNodeInputs ins => (ToonBsdfNodeInputs)inputs;
+        public ToonBsdfNodeOutputs outs => (ToonBsdfNodeOutputs)outputs;
+        public ToonBsdfNode(Shader shader) : this(shader, "a toon_bsdf node") { }
 
-		internal ToonBsdfOutputs(ShaderNode parentNode)
-		{
-			BSDF = new ClosureSocket(parentNode, "BSDF", "BSDF");
-			AddSocket(BSDF);
-		}
-	}
+        public ToonBsdfNode(Shader shader, string name) :
+            base(shader, name)
+        {
+            FinalizeConstructor();
+        }
 
-	/// <summary>
-	/// A Toon BSDF closure.
+        internal ToonBsdfNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+        {
+            FinalizeConstructor();
+        }
 
-	/// There is one output <c>BSDF</c>
-	/// </summary>
-	[ShaderNode("toon_bsdf")]
-	public class ToonBsdfNode : ShaderNode
-	{
-		public ToonBsdfInputs ins => (ToonBsdfInputs)inputs;
-		public ToonBsdfOutputs outs => (ToonBsdfOutputs)outputs;
+        private void FinalizeConstructor()
+        {
+            inputs = new ToonBsdfNodeInputs(this);
+            outputs = new ToonBsdfNodeOutputs(this);
+        }
+        public override ClosureSocket GetClosureSocket()
+        {
+            return outs.BSDF;
+        }
+        public static IntPtr GetNodeType() {
+            return CSycles.toonbsdfnode_get_node_type();
+        }
+#region Setters
 
-		public enum Components
-		{
-			Diffuse = 7,
-			Glossy = 24,
-		}
+        internal override void SetFloat(string name, float data)
+        {
+            switch(name) {
+            case "smooth":
+                    /* toonbsdfnode . {'datatype': 'FLOAT', 'default_value': '0.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'smooth', 'ui_name': 'Smooth'} */
+                    {
+                    CSycles.toonbsdfnode_set_smooth(this.Ptr, data);
+                    }
+                    break;
+            case "size":
+                    /* toonbsdfnode . {'datatype': 'FLOAT', 'default_value': '0.5f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'size', 'ui_name': 'Size'} */
+                    {
+                    CSycles.toonbsdfnode_set_size(this.Ptr, data);
+                    }
+                    break;
 
-		/// <summary>
-		/// Create a new Toon BSDF closure. Default Color is white
-		/// </summary>
-		public ToonBsdfNode(Shader shader) : this(shader, "a toon bsdf node") { }
-		/// <summary>
-		/// Create a new Toon BSDF closure. Default Color is white
-		/// </summary>
-		public ToonBsdfNode(Shader shader, string name) :
-			base(shader, name)
-		{
-			FinalizeConstructor();
-		}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (setter)");
+            }
+        }
 
-		internal ToonBsdfNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-		{
-			FinalizeConstructor();
-		}
+        internal override void SetNormal(string name, float3 data)
+        {
+            switch(name) {
+            case "normal":
+                    /* toonbsdfnode . {'datatype': 'NORMAL', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'normal', 'ui_name': 'Normal'} */
+                    {
+                    CSycles.bsdfnode_set_normal(this.Ptr, data);
+                    }
+                    break;
 
-		private void FinalizeConstructor()
-		{
-			inputs = new ToonBsdfInputs(this);
-			outputs = new ToonBsdfOutputs(this);
-			ins.Color.Value = new float4(1.0f, 1.0f, 1.0f, 1.0f);
-			ins.Size.Value = 0.5f;
-			ins.Smooth.Value = 0.0f;
-			Component = Components.Diffuse;
-		}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (setter)");
+            }
+        }
 
-		public Components Component { get; set; }
+        internal override void SetColor(string name, float3 data)
+        {
+            switch(name) {
+            case "color":
+                    /* toonbsdfnode . {'datatype': 'COLOR', 'default_value': 'make_float3(0.8f,0.8f,0.8f)', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color', 'ui_name': 'Color'} */
+                    {
+                    CSycles.bsdfnode_set_color(this.Ptr, data);
+                    }
+                    break;
 
-		internal override void SetEnums()
-		{
-			CSycles.shadernode_set_enum(Id, "component", (int)Component);
-		}
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (setter)");
+            }
+        }
 
-		internal override void ParseXml(XmlReader xmlNode)
-		{
-			Utilities.Instance.get_float4(ins.Color, xmlNode.GetAttribute("color"));
-		}
-	}
+        internal override void SetEnum(string name, object data)
+        {
+            switch(name) {
+            case "component":
+                    /* toonbsdfnode . {'datatype': 'ENUM', 'default_value': 'CLOSURE_BSDF_DIFFUSE_TOON_ID', 'default_value_type': 'ClosureType', 'is_input': True, 'member_name': 'component', 'ui_name': 'Component'} */
+                    {
+                    CSycles.toonbsdfnode_set_component(this.Ptr, (ccl.ClosureType)data);
+                    }
+                    break;
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (setter)");
+            }
+        }
+
+#endregion
+#region Getters
+
+        internal override float GetFloat(string name)
+        {
+            switch(name) {
+            case "smooth":
+                /* toonbsdfnode . {'datatype': 'FLOAT', 'default_value': '0.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'smooth', 'ui_name': 'Smooth'} */
+                {
+                    return CSycles.toonbsdfnode_get_smooth(this.Ptr);
+                }
+            case "size":
+                /* toonbsdfnode . {'datatype': 'FLOAT', 'default_value': '0.5f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'size', 'ui_name': 'Size'} */
+                {
+                    return CSycles.toonbsdfnode_get_size(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (getter)");
+            }
+        }
+
+        internal override float3 GetNormal(string name)
+        {
+            switch(name) {
+            case "normal":
+                /* toonbsdfnode . {'datatype': 'NORMAL', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'normal', 'ui_name': 'Normal'} */
+                {
+                    return CSycles.bsdfnode_get_normal(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (getter)");
+            }
+        }
+
+        internal override float3 GetColor(string name)
+        {
+            switch(name) {
+            case "color":
+                /* toonbsdfnode . {'datatype': 'COLOR', 'default_value': 'make_float3(0.8f,0.8f,0.8f)', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color', 'ui_name': 'Color'} */
+                {
+                    return CSycles.bsdfnode_get_color(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (getter)");
+            }
+        }
+
+        internal override object GetEnum(string name)
+        {
+            switch(name) {
+            case "component":
+                /* toonbsdfnode . {'datatype': 'ENUM', 'default_value': 'CLOSURE_BSDF_DIFFUSE_TOON_ID', 'default_value_type': 'ClosureType', 'is_input': True, 'member_name': 'component', 'ui_name': 'Component'} */
+                {
+                    return (uint)CSycles.toonbsdfnode_get_component(this.Ptr);
+                }
+
+                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ToonBsdfNode (getter)");
+            }
+        }
+
+#endregion
+    }
+
 }

@@ -13,17 +13,18 @@ Write-Host "-> $commas"
 
 # Write .rc files
 # -- ccycles
-(Get-Content .\dll_version_replace.template).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\dll_version_replace.rc
+(Get-Content .\dll_version_replace.template).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install_release\dll_version_replace.rc
 # -- openvdb
-(Get-Content .\openvdb_manifest_replace.template).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\openvdb_manifest_replace.rc
+(Get-Content .\openvdb_manifest_replace.template).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install_release\ccycles\openvdb_manifest_replace.rc
 # Write manifest files
 # -- ccycles
-(Get-Content .\ccycles_manifest.txt).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\ccycles_manifest.txt
+(Get-Content .\ccycles_manifest.txt).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install_release\ccycles_manifest.txt
 # -- openvdb
-(Get-Content .\openvdb_manifest.txt).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\openvdb_manifest.txt
+(Get-Content .\openvdb_manifest.txt).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install_release\ccycles\openvdb_manifest.txt
 
-Push-Location .\cycles\install
+Push-Location .\cycles\install_release
 
+<#
 Remove-Item *gyd* -ErrorAction SilentlyContinue
 Remove-Item *_d.dll -ErrorAction SilentlyContinue
 Remove-Item *.so -ErrorAction SilentlyContinue
@@ -31,11 +32,12 @@ Remove-Item *.so.* -ErrorAction SilentlyContinue
 Remove-Item lib\*.so -ErrorAction SilentlyContinue
 Remove-Item lib\*.so.* -ErrorAction SilentlyContinue
 Remove-Item *_d_*.dll -ErrorAction SilentlyContinue
+#>
 
 cmd.exe /c "ResourceHacker -open .\dll_version_replace.rc -save .\dll_version_replace.res -action compile"
 cmd.exe /c "ResourceHacker -open .\openvdb_manifest_replace.rc -save .\openvdb_manifest_replace.res -action compile"
-cmd.exe /c "ResourceHacker -open openvdb.dll -save openvdb.dll -resource .\openvdb_manifest_replace.res -action addoverwrite -mask MANIFEST,,"
-cmd.exe /c "ResourceHacker -open cycles_kernel_oneapi_jit.dll -save cycles_kernel_oneapi_jit.dll -resource .\dll_version_replace.res -action addoverwrite -mask VERSIONINFO,,"
+cmd.exe /c "ResourceHacker -open ccycles\openvdb.dll -save ccycles\openvdb.dll -resource .\openvdb_manifest_replace.res -action addoverwrite -mask MANIFEST,,"
+cmd.exe /c "ResourceHacker -open cycles_kernel_oneapi_aot.dll -save cycles_kernel_oneapi_aot.dll -resource .\dll_version_replace.res -action addoverwrite -mask VERSIONINFO,,"
 
 Pop-Location
 
