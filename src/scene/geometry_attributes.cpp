@@ -466,6 +466,15 @@ void GeometryManager::device_update_attributes(Device *device,
     if (geom->is_hair() && static_cast<Hair *>(geom)->need_shadow_transparency()) {
       geom_attributes[i].add(ATTR_STD_SHADOW_TRANSPARENCY);
     }
+
+    /* Rhino addition: add all attributes explicitly. They are added to geometry
+     * but without the block below they won't be uploaded to the kernel data.
+     */
+    if (geom->is_mesh()) {
+      for (const Attribute &attr : geom->attributes.attributes) {
+        geom_attributes[i].add(attr.name);
+      }
+    }
   }
 
   /* convert object attributes to use the same data structures as geometry ones */
