@@ -1,7 +1,3 @@
-SPDX-FileCopyrightText: 2021-2022 Blender Foundation
- *
- * SPDX-License-Identifier: Apache-2.0 */
-
 /* Metal kernel entry points. */
 
 /* NOTE: Must come prior to other includes. */
