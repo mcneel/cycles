@@ -45,6 +45,15 @@ if(WITH_CYCLES_OSL)
   list(APPEND LIB cycles_kernel_osl)
 endif()
 
+if(WITH_CYCLES_DEVICE_ONEAPI)
+  list(APPEND LIB
+    ${SYCL_LIBRARIES}
+  )
+  list(APPEND INC_SYS
+    ${SYCL_INCLUDE_DIR}
+  )
+endif()
+
 if(CYCLES_STANDALONE_REPOSITORY)
   list(APPEND LIB extern_sky)
 else()

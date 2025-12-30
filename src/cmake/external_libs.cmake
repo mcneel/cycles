@@ -78,7 +78,12 @@ else()
   message(FATAL_ERROR "Unsupported platform for Rhino")
 endif()
 
-set(_cycles_lib_dir "${_top_source_dir}/${_cycles_lib_platform}")
+string(TOLOWER ${CMAKE_BUILD_TYPE} _build_config)
+if(_build_config STREQUAL "relwithdebinfo")
+    set(_build_config "release")
+endif()
+
+set(_cycles_lib_dir "${_top_source_dir}${_cycles_lib_platform}/${_build_config}")
 
 # Use legacy libraries for compatibility with Houdini or USD without oneTBB.
 set(_cycles_lib_dir_legacy "${_top_source_dir}/lib/legacy/${_cycles_lib_platform}")

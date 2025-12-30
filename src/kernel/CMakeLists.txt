@@ -470,6 +470,8 @@ if(WITH_CYCLES_CUDA_BINARIES)
   string(REGEX REPLACE ".*release ([0-9]+)\\.([0-9]+).*" "\\2" CUDA_VERSION_MINOR "${NVCC_OUT}")
   set(CUDA_VERSION "${CUDA_VERSION_MAJOR}${CUDA_VERSION_MINOR}")
 
+  message(STATUS "have ${CUDA_NVCC_EXECUTABLE} and ${CUDAVERSION}")
+
   # warn for other versions
   if((CUDA_VERSION STREQUAL "101") OR
      (CUDA_VERSION STREQUAL "102") OR

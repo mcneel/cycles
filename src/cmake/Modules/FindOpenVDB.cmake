@@ -38,6 +38,16 @@ find_path(OPENVDB_INCLUDE_DIR
     include
 )
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+find_library(OPENVDB_LIBRARY
+  NAMES
+    openvdb_d
+  HINTS
+    ${_openvdb_SEARCH_DIRS}
+  PATH_SUFFIXES
+    lib64 lib
+)
+else()
 find_library(OPENVDB_LIBRARY
   NAMES
     openvdb
@@ -46,6 +56,7 @@ find_library(OPENVDB_LIBRARY
   PATH_SUFFIXES
     lib64 lib
 )
+endif()
 
 # handle the QUIETLY and REQUIRED arguments and set OPENVDB_FOUND to TRUE if
 # all listed variables are TRUE
