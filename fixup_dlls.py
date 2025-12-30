@@ -22,13 +22,13 @@ def get_dependents(dll : Path):
     print(f"running {cmd}")
     cp = sp.run(cmd, check=True, capture_output=True, encoding='utf-8')
 
-    # print(cp.stdout)
+    print(cp.stdout)
 
     dlls = list()
     matches = re.finditer(dll_matcher, cp.stdout, re.MULTILINE)
     for matchIdx, match in enumerate(matches, start=1):
         name = match.group(1).strip()
-        # print(f"\t{name} - {match}")
+        print(f"\t{name} - {match}")
         if is_excluded(name):
             continue
         dll_name = match.group(0).strip()
@@ -68,8 +68,8 @@ def tune_dll(dll : Path):
 cc = Path('ccycles.dll')
 tune_dll(cc)
 
-cc = Path('cycles_kernel_oneapi_aot.dll')
-tune_dll(cc)
+#cc = Path('cycles_kernel_oneapi_aot.dll')
+#tune_dll(cc)
 
 print("\n\n===================\n\n")
 for pd in processed_dlls:

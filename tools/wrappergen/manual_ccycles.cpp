@@ -172,6 +172,10 @@ CCL_CAPI void cycles_initialise(unsigned int mask)
     }
 }
 
+CCL_CAPI void cycles_shutdown()
+{
+}
+
 CCL_CAPI unsigned int cycles_number_devices()
 {
     return static_cast<unsigned int>(devices.size());
