@@ -82,6 +82,10 @@ namespace fs = std::filesystem;
 #include <OpenImageIO/imagebufalgo.h>
 #include <OpenImageIO/ustring.h>
 
+#if WITH_ONEAPI
+#include <sycl/sycl.hpp>
+#endif
+
 using OIIO::ustring;
 
 #pragma warning ( pop )
