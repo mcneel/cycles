@@ -1,5 +1,6 @@
 # Pattern to match timestamp line
 $timestampPattern = "Code generated at: .* UTC"
+$copyrightPattern = "Copyright .* Robert McNeel and Associates"
 
 # Metadata patterns to exclude
 $metadataPatterns = @("^diff ", "^index ", "^---", "^\+\+\+", "^@@")
@@ -35,7 +36,8 @@ foreach ($file in $modifiedFiles) {
     }
 
     # Extract only actual content changes (lines starting with + or -), ignore timestamp changes
-    $changeLines = $rr | Where-Object { $_ -match '^[+-]' -and $_ -notmatch $timestampPattern }
+    $notimestamps = $rr | Where-Object { $_ -match '^[+-]' -and $_ -notmatch $timestampPattern }
+    $changeLines = $notimestamps | Where-Object { $_ -match '^[+-]' -and $_ -notmatch $copyrightPattern }
 
     # If we end up with an empty list we know there were only timestamp changes
     if ($changeLines.Count -eq 0) {
