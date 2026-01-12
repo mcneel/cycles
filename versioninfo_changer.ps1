@@ -51,7 +51,7 @@ Remove-Item *_d_*.dll -ErrorAction SilentlyContinue
 cmd.exe /c "ResourceHacker -open .\dll_version_replace.rc -save .\dll_version_replace.res -action compile"
 cmd.exe /c "ResourceHacker -open .\openvdb_manifest_replace.rc -save .\openvdb_manifest_replace.res -action compile"
 cmd.exe /c "ResourceHacker -open ccycles\openvdb.dll -save ccycles\openvdb.dll -resource .\openvdb_manifest_replace.res -action addoverwrite -mask MANIFEST,,"
-cmd.exe /c "ResourceHacker -open cycles_kernel_oneapi_aot.dll -save cycles_kernel_oneapi_aot.dll -resource .\dll_version_replace.res -action addoverwrite -mask VERSIONINFO,,"
+# cmd.exe /c "ResourceHacker -open cycles_kernel_oneapi_aot.dll -save cycles_kernel_oneapi_aot.dll -resource .\dll_version_replace.res -action addoverwrite -mask VERSIONINFO,,"
 
 foreach($key in $depdlls.Keys) {
     $depdll = $depdlls[$key]
