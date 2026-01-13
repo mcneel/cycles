@@ -5,7 +5,7 @@ $doy = $bd.DayOfYear.ToString("D3")
 $bhr = $bd.ToString("HH")
 $bmm = $bd.Minute.ToString("D2")
 
-$dotted = "9.0.$yy$doy.$bhr$bmm" + "1"
+$dotted = "8.0.$yy$doy.$bhr$bmm" + "1"
 $commas = $dotted.Replace(".", ",")
 
 Write-Host "-> $dotted"

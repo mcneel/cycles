@@ -38,7 +38,6 @@ namespace ccl
 		Multi,
 		Optix,
 		Hip,
-		HipRt,
 		Metal,
 		OneApi,
 		Dummy,
