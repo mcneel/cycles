@@ -59,8 +59,8 @@ def tune_dll(dll : Path):
     else:
         print(f"nothing to do for {dll}")
 
-    for (_, _, _, dll_path) in deps:
-        tune_dll(dll_path)
+    #for (_, _, _, dll_path) in deps:
+    #    tune_dll(dll_path)
 
     print("done tuning", dll, "<=")
 
