@@ -299,13 +299,6 @@ namespace ccl
     public static void initialise(DeviceTypeMask mask) {
       cycles_initialise((uint)mask);
     }
-
-    [DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-    private static extern void cycles_shutdown();
-    public static void shutdown() {
-      cycles_shutdown();
-    }
-
 #endregion
 
 #region Device (manual), see manual_ccycles.cpp and manualcs/extra/Device.cs.extra
