@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,163 +12,307 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
 **/
 
-using ccl;
 using ccl.Attributes;
 using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Xml;
 
 namespace ccl.ShaderNodes
 {
-    using cclext;
-    public class ShaderNode
-    {
-        /// <summary>
-        /// Set a NodeTypeName for this node
-        /// </summary>
-        public virtual string Name { get; set; }
+	using cclext;
+	/// <summary>
+	/// Base class for shader nodes.
+	/// </summary>
+	[ShaderNode("shadernode base", true)]
+	public class ShaderNode
+	{
 
-        /// <summary>
-        /// Get NodeTypeName that can be used as variable NodeTypeName
-        /// </summary>
-        public virtual string VariableName
-        {
-            get
-            {
-                var s = $"{Name}{Ptr}";
-                return Extensions.FirstCharacterToLower(s);
-            }
-        }
+		/// <summary>
+		/// Set a shaderNodeTypeName for this node
+		/// </summary>
+		public string Name { get; set; }
 
-        /// <summary>
-        /// Get the node ID. This is set when created in Cycles.
-        /// </summary>
-        public IntPtr Ptr { get; internal set; }
+		/// <summary>
+		/// Get shaderNodeTypeName that can be used as variable shaderNodeTypeName
+		/// </summary>
+		public virtual string VariableName
+		{
+			get
+			{
+				var s = $"{Name}{Id}";
+				return Extensions.FirstCharacterToLower(s);
+			}
+		}
 
-        /// <summary>
-        /// Get the XML NodeTypeName of the node type as string.
-        /// </summary>
-        virtual public string NodeTypeName
-        {
-            get
-            {
-                var t = GetType();
-                var attr = t.GetCustomAttributes(typeof(NodeAttribute), false)[0] as NodeAttribute;
-                return attr.Name;
-            }
-        }
+		/// <summary>
+		/// Get the node ID. This is set when created in Cycles.
+		/// </summary>
+		public IntPtr Id { get; internal set; }
 
-        public string NodeTypeCodeName
-        {
-            get
-            {
-                var t = GetType();
-                return t.Name;
-            }
-        }
-        /// <summary>
-        /// Get the XML shaderNodeTypeName of the node type as string.
-        /// </summary>
-        virtual public string ShaderNodeTypeName
-        {
-            get
-            {
-                var t = GetType();
-                var attr = t.GetCustomAttributes(typeof(ShaderNodeAttribute), false)[0] as ShaderNodeAttribute;
-                return attr.Name;
-            }
-        }
+		/// <summary>
+		/// Get the XML shaderNodeTypeName of the node type as string.
+		/// </summary>
+		virtual public string ShaderNodeTypeName
+		{
+			get
+			{
+				var t = GetType();
+				var attr = t.GetCustomAttributes(typeof(ShaderNodeAttribute), false)[0] as ShaderNodeAttribute;
+				return attr.Name;
+			}
+		}
 
-        public string ShaderNodeTypeCodeName
-        {
-            get
-            {
-                var t = GetType();
-                return t.Name;
-            }
-        }
+		public string ShaderNodeTypeCodeName
+		{
+			get
+			{
+				var t = GetType();
+				return t.Name;
+			}
+		}
 
-        /// <summary>
-        /// Generic access to input sockets.
-        /// </summary>
-        public Inputs inputs { get; set; }
-        /// <summary>
-        /// Generic access to output sockets.
-        /// </summary>
-        public Outputs outputs { get; set; }
+		/// <summary>
+		/// Generic access to input sockets.
+		/// </summary>
+		public Inputs inputs { get; set; }
+		/// <summary>
+		/// Generic access to output sockets.
+		/// </summary>
+		public Outputs outputs { get; set; }
 
-        public virtual ClosureSocket GetClosureSocket()
-        {
-            throw new NotImplementedException($"Should implement GetClosureSocket for this node {ShaderNodeTypeName}");
-        }
-        internal ShaderNode(Shader shader, string name)
-        {
-            Name = name;
-            ConstructShaderNode(shader, ShaderNodeTypeName, name);
-        }
+		public virtual ClosureSocket GetClosureSocket()
+		{
+			throw new NotImplementedException($"Should implement GetClosureSocket for this node {ShaderNodeTypeName}");
+		}
 
-        internal ShaderNode(Shader shader, IntPtr shadernodePtr)
-        {
-            Ptr = shadernodePtr;
-            Shader = shader;
-        }
+#if OLDSTUFF
+		/// <summary>
+		/// Create node of type ShaderNodeType type
+		/// </summary>
+		/// <param name="type"></param>
+		internal ShaderNode(ShaderNodeType type) : this(type, String.Empty)
+		{
+		}
 
-        public Shader Shader { get; private set; }
-        internal void ConstructShaderNode(Shader shader, string shaderNodeTypeName, string shaderNodeName)
-        {
-            Ptr = CSycles.add_shader_node(shader.Ptr, shaderNodeTypeName, shaderNodeName);
-            Shader = shader;
-        }
+		/// <summary>
+		/// Create node of type ShaderNodeType and with given name
+		/// </summary>
+		/// <param name="type"></param>
+		/// <param name="name"></param>
+		internal ShaderNode(ShaderNodeType type, string name)
+		{
+			Type = type;
+			Name = name;
+		}
+#endif
 
-        internal virtual void SetString(string name, string data) {}
-        internal virtual void SetFloat(string name, float data) {}
-        internal virtual void SetNormal(string name, float3 data) {}
-        internal virtual void SetVector(string name, float3 data) {}
-        internal virtual void SetColor(string name, float3 data) {}
-        internal virtual void SetPoint(string name, float3 data) {}
-        internal virtual void SetPoint2(string name, float2 data) {}
-        internal virtual void SetBool(string name, bool data) {}
-        internal virtual void SetInt(string name, int data) {}
-        internal virtual void SetUint(string name, uint data) {}
-        internal virtual void SetUint64(string name, ulong data) {}
-        internal virtual void SetEnum(string name, object data) {}
-        internal virtual void SetNode(string name, IntPtr data) {}
-        internal virtual void SetTransform(string name, Transform data) {}
-        internal virtual void SetIntArray(string name, List<int> data) {}
-        internal virtual void SetFloatArray(string name, List<float> data) {}
-        internal virtual void SetBooleanArray(string name, List<bool> data) {}
-        internal virtual void SetColorArray(string name, List<float3> data) {}
-        internal virtual void SetPointArray(string name, List<float3> data) {}
-        internal virtual void SetVectorArray(string name, List<float3> data) {}
-        internal virtual void SetPoint2Array(string name, List<float2> data) {}
-        internal virtual void SetTransformArray(string name, List<Transform> data) {}
+		internal ShaderNode(Shader shader, string name)
+		{
+			ConstructShaderNode(shader, ShaderNodeTypeName, name);
+		}
 
-        internal virtual string GetString(string name) { return ""; }
-        internal virtual float GetFloat(string name) { return float.MinValue; }
-        internal virtual float3 GetNormal(string name) { return new float3(0.0f, 0.0f, 0.0f); }
-        internal virtual float3 GetVector(string name) { return new float3(0.0f, 0.0f, 0.0f); }
-        internal virtual float3 GetColor(string name) { return new float3(0.0f, 0.0f, 0.0f); }
-        internal virtual float3 GetPoint(string name) { return new float3(0.0f, 0.0f, 0.0f); }
-        internal virtual float2 GetPoint2(string name) { return new float2(0.0f, 0.0f); }
-        internal virtual bool GetBool(string name) { return false; }
-        internal virtual int GetInt(string name) { return int.MinValue; }
-        internal virtual uint GetUint(string name) { return uint.MaxValue;}
-        internal virtual ulong GetUint64(string name) { return ulong.MaxValue;}
-        internal virtual object GetEnum(string name) { return 0;}
-        internal virtual IntPtr GetNode(string name) { return IntPtr.Zero;}
-        internal virtual ccl.Transform GetTransform(string name) { return ccl.Transform.Identity(); }
-        internal virtual List<int> GetIntArray(string name) { return new List<int>(); }
-        internal virtual List<float> GetFloatArray(string name) { return new List<float>(); }
-        internal virtual List<bool> GetBooleanArray(string name) { return new List<bool>(); }
-        internal virtual List<float3> GetColorArray(string name) { return new List<float3>(); }
-        internal virtual List<float3> GetPointArray(string name) { return new List<float3>(); }
-        internal virtual List<float3> GetVectorArray(string name) { return new List<float3>(); }
-        internal virtual List<float2> GetPoint2Array(string name) { return new List<float2>(); }
-        internal virtual List<Transform> GetTransformArray(string name) { return new List<Transform>(); }
-    }
+		internal ShaderNode(Shader shader, IntPtr shadernodePtr)
+		{
+			Id = shadernodePtr;
+			Shader = shader;
+		}
+
+		public Shader Shader { get; private set; }
+
+
+		internal void ConstructShaderNode(Shader shader, string shaderNodeTypeName, string shaderNodeName)
+		{
+			Id = CSycles.add_shader_node(shader.Id, shaderNodeTypeName, shaderNodeName);
+			Shader = shader;
+			Shader.AddNode(this);
+		}
+
+		/// <summary>
+		/// A node deriving from ShaderNode should override this if
+		/// it has enumerations that need to be committed to Cycles
+		/// </summary>
+		/// <param shaderNodeTypeName="clientId"></param>
+		/// <param shaderNodeTypeName="sceneId"></param>
+		/// <param shaderNodeTypeName="shaderId"></param>
+		virtual internal void SetEnums()
+		{
+			// do nothing
+		}
+
+		/// <summary>
+		/// A node deriving from ShaderNode should override this if
+		/// it has direct members that need to be committed to Cycles
+		/// </summary>
+		/// <param shaderNodeTypeName="clientId"></param>
+		/// <param shaderNodeTypeName="sceneId"></param>
+		/// <param shaderNodeTypeName="shaderId"></param>
+		virtual internal void SetDirectMembers()
+		{
+			// do nothing
+		}
+
+		internal void SetSockets()
+		{
+			/* set node attributes */
+			if (inputs != null)
+			{
+				foreach (var socket in inputs.Sockets)
+				{
+					if (socket is FloatSocket float_socket)
+					{
+						CSycles.shadernode_set_attribute_float(Id, float_socket.InternalName, float_socket.Value);
+					}
+					if (socket is IntSocket int_socket)
+					{
+						CSycles.shadernode_set_attribute_int(Id, int_socket.InternalName, int_socket.Value);
+					}
+					if (socket is Float4Socket float4_socket)
+					{
+						CSycles.shadernode_set_attribute_vec(Id, float4_socket.InternalName, float4_socket.Value);
+					}
+					if (socket is BoolSocket bool_socket)
+					{
+						CSycles.shadernode_set_attribute_bool(Id, bool_socket.InternalName, bool_socket.Value);
+					}
+					if (socket is StringSocket string_socket)
+					{
+						if (string.IsNullOrEmpty(string_socket.Value)) continue;
+						CSycles.shadernode_set_attribute_string(Id, string_socket.InternalName, string_socket.Value);
+					}
+				}
+			}
+		}
+
+		public override string ToString()
+		{
+			var str = $"{Name} ({ShaderNodeTypeName})";
+			return str;
+		}
+
+		/// <summary>
+		/// Implement ParseXml to support proper XMl support.
+		/// </summary>
+		/// <param shaderNodeTypeName="xmlNode"></param>
+		virtual internal void ParseXml(XmlReader xmlNode)
+		{
+		}
+
+		public virtual string CreateXmlAttributes()
+		{
+			return "";
+		}
+
+		public virtual string CreateChildNodes()
+		{
+			return "";
+		}
+
+		public virtual string CreateXml()
+		{
+			var nfi = Utilities.Instance.NumberFormatInfo;
+			var xml = new StringBuilder($"<{ShaderNodeTypeName} shaderNodeTypeName=\"{VariableName}\" ", 1024);
+
+			foreach (var inp in inputs.Sockets)
+			{
+				if (inp.ConnectionFrom != null) continue;
+
+				if (inp is FloatSocket fs)
+				{
+					xml.AppendFormat(nfi, " {0}=\"{1}\"", fs.XmlName, fs.Value);
+					continue;
+				}
+				if (inp is IntSocket ints)
+				{
+					xml.AppendFormat(nfi, " {0}=\"{1}\"", ints.XmlName, ints.Value);
+					continue;
+				}
+				if (inp is ColorSocket cols)
+				{
+					xml.AppendFormat(nfi, " {0}=\"{1} {2} {3} {4}\"", cols.XmlName, cols.Value.x, cols.Value.y, cols.Value.z, cols.Value.w);
+					continue;
+				}
+				if (inp is VectorSocket vec)
+				{
+					xml.AppendFormat(nfi, " {0}=\"{1} {2} {3} {4}\"", vec.XmlName, vec.Value.x, vec.Value.y, vec.Value.z, vec.Value.w);
+					continue;
+				}
+				if (inp is Float4Socket f4s)
+				{
+					xml.AppendFormat(nfi, " {0}=\"{1} {2} {3} {4}\"", f4s.XmlName, f4s.Value.x, f4s.Value.y, f4s.Value.z, f4s.Value.w);
+					continue;
+				}
+				if (inp is StringSocket strs)
+				{
+					xml.AppendFormat(nfi, " {0}=\"{1}\"", strs.XmlName, strs.Value);
+				}
+			}
+
+			xml.Append(CreateXmlAttributes());
+
+			var childNodes = CreateChildNodes();
+			if (String.IsNullOrEmpty(childNodes))
+			{
+				xml.Append(" />");
+			}
+			else
+			{
+				xml.Append(">");
+				xml.Append(childNodes);
+				xml.Append($"</{ShaderNodeTypeName}>");
+			}
+
+			return xml.ToString();
+		}
+
+		public virtual string CreateConnectXml()
+		{
+			var sb = inputs.Sockets.Aggregate(new StringBuilder("", 1024), (current, inp) => current.Append($"{inp.ConnectTag}\n"));
+			return sb.ToString();
+		}
+
+		public virtual string CreateCodeAttributes()
+		{
+			return "";
+		}
+
+		public virtual string CreateCode()
+		{
+			var cs = new StringBuilder($"var {VariableName} = new {ShaderNodeTypeCodeName}(\"{Name}\");", 1024);
+
+			var nfi = Utilities.Instance.NumberFormatInfo;
+			if (inputs.Sockets.Any())
+			{
+				foreach (var inp in inputs.Sockets.Where(inp => !(inp is ClosureSocket)))
+				{
+					if (inp.ConnectionFrom != null) continue;
+
+					cs.AppendFormat(nfi, " {0}.ins.{1}.Value = {2};", VariableName, inp.CodeName, inp);
+				}
+				cs.AppendLine();
+			}
+
+			cs.Append(CreateCodeAttributes());
+
+			return cs.ToString();
+		}
+
+		public virtual string CreateConnectCode()
+		{
+			var sb = inputs.Sockets.Aggregate(new StringBuilder("", 1024), (current, inp) => current.Append($"{inp.ConnectCode}\n"));
+			return sb.ToString();
+		}
+
+		public virtual string CreateAddToShaderCode(string shader)
+		{
+			var sb = new StringBuilder(1024);
+
+			sb.Append($"{shader}.AddNode({VariableName});");
+
+			return sb.ToString();
+		}
+	}
 }

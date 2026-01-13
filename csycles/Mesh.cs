@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,289 +12,184 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
-using ccl.Attributes;
-using ccl.ShaderNodes;
-using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
-using System;
-using System.Collections.Generic;
 namespace ccl
 {
-    using cclext;
+	/// <summary>
+	/// Representation of a Cycles mesh.
+	/// </summary>
+	public class Mesh
+	{
+		/// <summary>
+		/// Id of mesh in scene.
+		/// </summary>
+		public System.IntPtr GeometryPointer { get; }
+		/// <summary>
+		/// Reference to client.
+		/// </summary>
+		private Session Client { get; }
+		/// <summary>
+		/// Shader used for this mesh.
+		/// </summary>
+		private Shader Shader { get; set; }
 
-    public class MeshNodeInputs : NodeInputs
-    {
-        public PointArrayNodeSocket Vertices { get; private set; }
-        public IntArrayNodeSocket Triangles { get; private set; }
-        public IntArrayNodeSocket Shader { get; private set; }
-        public BooleanArrayNodeSocket Smooth { get; private set; }
+		/// <summary>
+		/// Create a new mesh for the given client using shader as the default shader
+		/// </summary>
+		/// <param name="client"></param>
+		/// <param name="shader"></param>
+		public Mesh(Session client, Shader shader)
+		{
+			Client = client;
+			Shader = shader;
+			GeometryPointer = CSycles.scene_add_mesh(Client.Scene.Id, shader.Id);
+			//System.Diagnostics.Trace.WriteLine($"Created mesh {GeometryPointer} with shader {shader.Id}\n");
+		}
 
-        public MeshNodeInputs(Node parentNode)
-        {
-            Vertices = new PointArrayNodeSocket(parentNode, "Vertices", "verts", true);
-            AddSocket(Vertices);
-            Triangles = new IntArrayNodeSocket(parentNode, "Triangles", "triangles", true);
-            AddSocket(Triangles);
-            Shader = new IntArrayNodeSocket(parentNode, "Shader", "shader", true);
-            AddSocket(Shader);
-            Smooth = new BooleanArrayNodeSocket(parentNode, "Smooth", "smooth", true);
-            AddSocket(Smooth);
-        }
-    }
-    public class Mesh : Geometry
-    {
-        public enum MeshSubdivisionBoundaryInterpolation : uint {
-            None = ccl.Mesh_SubdivisionBoundaryInterpolation.SUBDIVISION_BOUNDARY_NONE,
-            EdgeOnly = ccl.Mesh_SubdivisionBoundaryInterpolation.SUBDIVISION_BOUNDARY_EDGE_ONLY,
-            EdgeAndCorner = ccl.Mesh_SubdivisionBoundaryInterpolation.SUBDIVISION_BOUNDARY_EDGE_AND_CORNER,
-        }
-        public enum MeshSubdivisionFvarInterpolation : uint {
-            None = ccl.Mesh_SubdivisionFVarInterpolation.SUBDIVISION_FVAR_LINEAR_NONE,
-            CornersOnly = ccl.Mesh_SubdivisionFVarInterpolation.SUBDIVISION_FVAR_LINEAR_CORNERS_ONLY,
-            CornersPlus1 = ccl.Mesh_SubdivisionFVarInterpolation.SUBDIVISION_FVAR_LINEAR_CORNERS_PLUS1,
-            CornersPlus2 = ccl.Mesh_SubdivisionFVarInterpolation.SUBDIVISION_FVAR_LINEAR_CORNERS_PLUS2,
-            Boundaries = ccl.Mesh_SubdivisionFVarInterpolation.SUBDIVISION_FVAR_LINEAR_BOUNDARIES,
-            All = ccl.Mesh_SubdivisionFVarInterpolation.SUBDIVISION_FVAR_LINEAR_ALL,
-        }
-        public enum MeshSubdivisionType : uint {
-            None = ccl.Mesh_SubdivisionType.SUBDIVISION_NONE,
-            Linear = ccl.Mesh_SubdivisionType.SUBDIVISION_LINEAR,
-            CatmullClark = ccl.Mesh_SubdivisionType.SUBDIVISION_CATMULL_CLARK,
-        }
-        public MeshNodeInputs MeshNodeInputs { get; set; }
-        public MeshNodeInputs ins => MeshNodeInputs;
+		/// <summary>
+		/// Constructor to use when a mesh that already exists in Cycles needs to be represented.
+		/// </summary>
+		/// <param name="client"></param>
+		/// <param name="id"></param>
+		/// <param name="shader"></param>
+		internal Mesh(Session client, System.IntPtr geometry_ptr, Shader shader)
+		{
+			Client = client;
+			Shader = shader;
 
-        public Mesh() : this("a mesh node") { }
+			GeometryPointer = geometry_ptr;
+		}
 
-        public Mesh(string name) :
-            base(name)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// Clears out any pushed data
+		/// </summary>
+		public void ClearData()
+		{
+			CSycles.geometry_clear(Client.Scene.Id, GeometryPointer);
+		}
 
-        internal Mesh(IntPtr intPtr) : base(intPtr)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// Use given <c>shader</c> as new shader.
+		/// </summary>
+		/// <param name="shader"></param>
+		public void ReplaceShader(Shader shader)
+		{
+			System.Diagnostics.Trace.WriteLine($"on mesh {GeometryPointer} replacing {Shader.Id} with {shader.Id}\n");
+			Shader = shader;
+			CSycles.geometry_set_shader(Client.Scene.Id, GeometryPointer, Shader.Id);
+			TagRebuild();
+		}
 
-        private void FinalizeConstructor()
-        {
-            MeshNodeInputs = new MeshNodeInputs(this);
+		/// <summary>
+		/// Tag for update and rebuild
+		/// </summary>
+		public void TagRebuild()
+		{
+			CSycles.geometry_tag_rebuild(Client.Scene.Id, GeometryPointer);
+		}
 
-        }
-        public void SetUvs(List<float2> uvs, string uvmap)
-        {
-            CSycles.mesh_set_vertex_uvs(this, uvs, uvmap);
-        }
+		/// <summary>
+		/// Compute tangent space data
+		/// </summary>
+		/// <param name="uvmap_name"></param>
+		public void AttrTangentSpace(string uvmap_name)
+		{
+			CSycles.mesh_attr_tangentspace(Client.Scene.Id, GeometryPointer, uvmap_name);
+		}
 
-        public void SetVertexNormals(List<float3> vns)
-        {
-            CSycles.mesh_set_vertex_normals(this, vns);
-        }
+		/// <summary>
+		/// Reserve memory for mesh data
+		/// </summary>
+		/// <param name="vcount"></param>
+		/// <param name="fcount"></param>
+		public void Reserve(uint vcount, uint fcount)
+		{
+			CSycles.mesh_reserve(Client.Scene.Id, GeometryPointer, vcount, fcount);
+		}
 
-        public void ResizeMesh(int numverts, int numtris) {
-            CSycles.mesh_resize_mesh(Ptr, numverts, numtris);
-        }
+		/// <summary>
+		/// Resize mesh data to given counts
+		/// </summary>
+		/// <param name="vcount"></param>
+		/// <param name="fcount"></param>
+		public void Resize(uint vcount, uint fcount)
+		{
+			CSycles.mesh_resize(Client.Scene.Id, GeometryPointer, vcount, fcount);
+		}
 
-        public void Tessellate(SubdParams parameters) {
-            CSycles.mesh_tessellate(Ptr, parameters);
-        }
+		/// <summary>
+		/// Set vertex coordinates
+		/// </summary>
+		/// <param name="verts"></param>
+		public void SetVerts(ref float[] verts)
+		{
+			CSycles.mesh_set_verts(Client.Scene.Id, GeometryPointer, ref verts, (uint)(verts.Length / 3));
+		}
 
-        public override bool HasMotionBlur() {
-            return CSycles.mesh_has_motion_blur(Ptr);
-        }
+		/// <summary>
+		/// Set trifaces
+		/// </summary>
+		/// <param name="faces"></param>
+		/// <param name="smooth"></param>
+		public void SetVertTris(ref int[] faces, bool smooth)
+		{
+			CSycles.mesh_set_tris(Client.Scene.Id, GeometryPointer, ref faces, (uint)(faces.Length / 3), Shader.Id, smooth);
+		}
 
-        public void ReserveMesh(int numverts, int numtris) {
-            CSycles.mesh_reserve_mesh(Ptr, numverts, numtris);
-        }
-        public void AddTriangle(int v0, int v1, int v2, int shader, bool smooth) {
-            CSycles.mesh_add_triangle(Ptr, v0, v1, v2, shader, smooth);
-        }
+		/// <summary>
+		/// Set vertex normals
+		/// </summary>
+		/// <param name="vertex_normals"></param>
+		public void SetVertNormals(ref float[] vertex_normals)
+		{
+			CSycles.mesh_set_vertex_normals(Client.Scene.Id, GeometryPointer, ref vertex_normals, (uint)(vertex_normals.Length / 3));
+		}
 
-        public void PackShaders(IntPtr scene, IntPtr shader) {
-            CSycles.mesh_pack_shaders(Ptr, scene, shader);
-        }
+		/// <summary>
+		/// Set UVs
+		/// </summary>
+		/// <param name="uvs">UV coordinates. Stride 2.</param>
+		/// <param name="uvmap_name">UiName for the UV map attribute set</param>
+		public void SetUvs(ref float[] uvs, string uvmap_name)
+		{
+			CSycles.mesh_set_uvs(Client.Scene.Id, GeometryPointer, ref uvs, (uint)(uvs.Length / 2), uvmap_name);
+		}
 
-        public long VertOffset {
-            get { return CSycles.mesh_get_vert_offset(Ptr); }
-            set { CSycles.mesh_set_vert_offset(Ptr, value); }
-        }
+		/// <summary>
+		/// Set vertex colors
+		/// </summary>
+		/// <param name="uvs"></param>
+		public void SetVertexColors(ref float[] vertexcolors)
+		{
+			CSycles.mesh_set_vertex_colors(Client.Scene.Id, GeometryPointer, ref vertexcolors, (uint)(vertexcolors.Length / 3));
+		}
 
-        public void AddVertexCrease(int v, float weight) {
-            CSycles.mesh_add_vertex_crease(Ptr, v, weight);
-        }
+		/// <summary>
+		/// Add a triangle to the mesh using the given vertex coordinates, shader and smooth flag
+		/// </summary>
+		/// <param name="v0"></param>
+		/// <param name="v1"></param>
+		/// <param name="v2"></param>
+		/// <param name="shader"></param>
+		/// <param name="smooth"></param>
+		public void AddTri(uint v0, uint v1, uint v2, Shader shader, bool smooth)
+		{
+			CSycles.mesh_add_triangle(Client.Scene.Id, GeometryPointer, v0, v1, v2, shader.Id, smooth);
+		}
 
-        public bool NeedTesselation() {
-            return CSycles.mesh_need_tesselation(Ptr);
-        }
-
-        public void PackVerts(IntPtr tri_verts, IntPtr tri_vindex) {
-            CSycles.mesh_pack_verts(Ptr, tri_verts, tri_vindex);
-        }
-        public override void ComputeBounds() {
-            CSycles.mesh_compute_bounds(Ptr);
-        }
-
-        public long FaceOffset {
-            get { return CSycles.mesh_get_face_offset(Ptr); }
-            set { CSycles.mesh_set_face_offset(Ptr, value); }
-        }
-
-        public void PackNormals(IntPtr vnormal) {
-            CSycles.mesh_pack_normals(Ptr, vnormal);
-        }
-
-        public void AddVertexSlow(float3 P) {
-            CSycles.mesh_add_vertex_slow(Ptr, P);
-        }
-        public long NumTriangles() {
-            return CSycles.mesh_num_triangles(Ptr);
-        }
-        public override void Clear(bool preserve_shaders) {
-            CSycles.mesh_clear(Ptr, preserve_shaders);
-        }
-        public void AddUndisplaced() {
-            CSycles.mesh_add_undisplaced(Ptr);
-        }
-
-        public long CornerOffset {
-            get { return CSycles.mesh_get_corner_offset(Ptr); }
-            set { CSycles.mesh_set_corner_offset(Ptr, value); }
-        }
-
-        public void AddVertexNormals() {
-            CSycles.mesh_add_vertex_normals(Ptr);
-        }
-
-        public void AddEdgeCrease(int v0, int v1, float weight) {
-            CSycles.mesh_add_edge_crease(Ptr, v0, v1, weight);
-        }
-        public override PrimitiveType PrimitiveType() {
-            return CSycles.mesh_primitive_type(Ptr);
-        }
-        public void AddVertex(float3 P) {
-            CSycles.mesh_add_vertex(Ptr, P);
-        }
-
-        public void CopyCenterToMotionStep(int motion_step) {
-            CSycles.mesh_copy_center_to_motion_step(Ptr, motion_step);
-        }
-
-        public override void ApplyTransform(Transform tfm, bool apply_to_motion) {
-            CSycles.mesh_apply_transform(Ptr, tfm, apply_to_motion);
-        }
-
-        public static IntPtr GetNodeType() {
-            return CSycles.mesh_get_node_type();
-        }
-#region Setters
-
-        internal override void SetIntArray(string name, List<int> data)
-        {
-            switch(name) {
-            case "triangles":
-                    /* mesh . {'datatype': 'INT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'triangles', 'ui_name': 'Triangles'} */
-                    {
-                    CSycles.mesh_set_triangles(this.Ptr, data);
-                    }
-                    break;
-            case "shader":
-                    /* mesh . {'datatype': 'INT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'shader', 'ui_name': 'Shader'} */
-                    {
-                    CSycles.mesh_set_shader(this.Ptr, data);
-                    }
-                    break;
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type Mesh (setter)");
-            }
-        }
-
-        internal override void SetBooleanArray(string name, List<bool> data)
-        {
-            switch(name) {
-            case "smooth":
-                    /* mesh . {'datatype': 'BOOLEAN_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'smooth', 'ui_name': 'Smooth'} */
-                    {
-                    CSycles.mesh_set_smooth(this.Ptr, data);
-                    }
-                    break;
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type Mesh (setter)");
-            }
-        }
-
-        internal override void SetPointArray(string name, List<float3> data)
-        {
-            switch(name) {
-            case "verts":
-                    /* mesh . {'datatype': 'POINT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'verts', 'ui_name': 'Vertices'} */
-                    {
-                    CSycles.mesh_set_verts(this.Ptr, data);
-                    }
-                    break;
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type Mesh (setter)");
-            }
-        }
-
-#endregion
-#region Getters
-
-        internal override List<int> GetIntArray(string name)
-        {
-            switch(name) {
-            case "triangles":
-                /* mesh . {'datatype': 'INT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'triangles', 'ui_name': 'Triangles'} */
-                {
-                    return CSycles.mesh_get_triangles(this.Ptr);
-                }
-            case "shader":
-                /* mesh . {'datatype': 'INT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'shader', 'ui_name': 'Shader'} */
-                {
-                    return CSycles.mesh_get_shader(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type Mesh (getter)");
-            }
-        }
-
-        internal override List<bool> GetBooleanArray(string name)
-        {
-            switch(name) {
-            case "smooth":
-                /* mesh . {'datatype': 'BOOLEAN_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'smooth', 'ui_name': 'Smooth'} */
-                {
-                    return CSycles.mesh_get_smooth(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type Mesh (getter)");
-            }
-        }
-
-        internal override List<float3> GetPointArray(string name)
-        {
-            switch(name) {
-            case "verts":
-                /* mesh . {'datatype': 'POINT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'verts', 'ui_name': 'Vertices'} */
-                {
-                    return CSycles.mesh_get_verts(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type Mesh (getter)");
-            }
-        }
-
-#endregion
-    }
-
+		/// <summary>
+		/// Set a triangle to the mesh at given triangle idx using the given vertex coordinates, shader and smooth flag
+		/// </summary>
+		/// <param name="idx"></param>
+		/// <param name="v0"></param>
+		/// <param name="v1"></param>
+		/// <param name="v2"></param>
+		/// <param name="shader"></param>
+		/// <param name="smooth"></param>
+		public void SetTri(uint idx, uint v0, uint v1, uint v2, Shader shader, bool smooth)
+		{
+			CSycles.mesh_set_triangle(Client.Scene.Id, GeometryPointer, idx, v0, v1, v2, shader.Id, smooth);
+		}
+	}
 }

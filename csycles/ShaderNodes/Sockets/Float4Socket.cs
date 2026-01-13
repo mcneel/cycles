@@ -26,14 +26,27 @@ namespace ccl.ShaderNodes.Sockets
 		/// </summary>
 		/// <param name="parentNode"></param>
 		/// <param name="name"></param>
-		public Float4Socket(ShaderNode parentNode, string name, string internalname, bool isInput)
-			: base(parentNode, name, internalname, isInput)
+		public Float4Socket(ShaderNode parentNode, string name, string internalname)
+			: base(parentNode, name, internalname)
 		{
+			Value = new float4();
 		}
 		public override string ToString()
 		{
 			var nfi = Utilities.Instance.NumberFormatInfo;
 			return $"new {SetValueCode ?? Value.ToString()}";
+		}
+	}
+
+	public class ColorSocket : Float4Socket {
+		public ColorSocket(ShaderNode parentNode, string name, string internalname)
+			: base(parentNode, name, internalname)
+		{
+		}
+	}
+	public class VectorSocket : Float4Socket {
+		public VectorSocket(ShaderNode parentNode, string name, string internalname) : base(parentNode, name, internalname)
+		{
 		}
 	}
 }

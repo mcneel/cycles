@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,115 +12,139 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
 using ccl.Attributes;
-using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
+using System.Text;
+using System.Xml;
+
+/**
+ * \defgroup cclshadernodes CSycles Shader Nodes
+ */
+
+/**
+ * \ingroup cclshadernodes
+ *  This pacakage contains the high-level <c>ccl.ShaderNode</c>s to be used in a <c>ccl.Shader</c>.
+ *
+ *  The classes give a clear and concise way of setting up <c>ccl.ShaderNode</c>s with a minimum of
+ *  fuss.
+ */
+
 namespace ccl.ShaderNodes
 {
-    using cclext;
+	/// <summary>
+	/// Attribute node input sockets
+	/// </summary>
+	public class AttributeInputs : Inputs
+	{
+	}
 
-    public class AttributeNodeInputs : Inputs
-    {
-        public StringSocket Attribute { get; private set; }
+	/// <summary>
+	/// Attribute node output sockets
+	/// </summary>
+	public class AttributeOutputs : Outputs
+	{
+		/// <summary>
+		/// Attribute output socket
+		/// </summary>
+		public ColorSocket Color { get; set; }
+		public VectorSocket Vector { get; set; }
+		public FloatSocket Fac { get; set; }
+		public FloatSocket Alpha { get; set; }
 
-        public AttributeNodeInputs(ShaderNode parentNode)
-        {
-            Attribute = new StringSocket(parentNode, "Attribute", "attribute", true);
-            AddSocket(Attribute);
-        }
-    }
-    public class AttributeNodeOutputs : Outputs
-    {
-        public FloatSocket Fac { get; private set; }
-        public VectorSocket Vector { get; private set; }
-        public ColorSocket Color { get; private set; }
-        public FloatSocket Alpha { get; private set; }
+		internal AttributeOutputs(ShaderNode parentNode)
+		{
+			Color = new ColorSocket(parentNode, "Color", "color");
+			AddSocket(Color);
+			Vector = new VectorSocket(parentNode, "Vector", "vector");
+			AddSocket(Vector);
+			Fac = new FloatSocket(parentNode, "Fac", "fac");
+			AddSocket(Fac);
+			Alpha = new FloatSocket(parentNode, "Alpha", "alpha");
+			AddSocket(Alpha);
+		}
+	}
 
-        public AttributeNodeOutputs(ShaderNode parentNode)
-        {
-            Fac = new FloatSocket(parentNode, "Fac", "fac", false);
-            AddSocket(Fac);
-            Vector = new VectorSocket(parentNode, "Vector", "vector", false);
-            AddSocket(Vector);
-            Color = new ColorSocket(parentNode, "Color", "color", false);
-            AddSocket(Color);
-            Alpha = new FloatSocket(parentNode, "Alpha", "alpha", false);
-            AddSocket(Alpha);
-        }
-    }
+	/// <summary>
+	/// An Add attribute.
+	/// This attribute takes two inputs, <c>Closure1</c> and <c>Closure2</c>. These
+	/// will be simply added together.
+	///
+	/// There is one output <c>Closure</c>
+	/// </summary>
+	[ShaderNode("attribute")]
+	public class AttributeNode : ShaderNode
+	{
+		/// <summary>
+		/// Attribute input sockets
+		/// </summary>
+		public AttributeInputs ins => (AttributeInputs)inputs;
 
-    [ShaderNode(name: "attribute")]
-    public class AttributeNode : ShaderNode
-    {
-        public AttributeNodeInputs ins => (AttributeNodeInputs)inputs;
-        public AttributeNodeOutputs outs => (AttributeNodeOutputs)outputs;
-        public AttributeNode(Shader shader) : this(shader, "a attribute node") { }
+		/// <summary>
+		/// Attribute output sockets
+		/// </summary>
+		public AttributeOutputs outs => (AttributeOutputs)outputs;
 
-        public AttributeNode(Shader shader, string name) :
-            base(shader, name)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// Create a new Add attribute.
+		/// </summary>
+		public AttributeNode(Shader shader) : this(shader, "An add attribute node")
+		{
+		}
 
-        internal AttributeNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// UiName of the attribute to use
+		/// </summary>
+		public string Attribute { get; set; }
 
-        private void FinalizeConstructor()
-        {
-            inputs = new AttributeNodeInputs(this);
-            outputs = new AttributeNodeOutputs(this);
-        }
-        public static IntPtr GetNodeType() {
-            return CSycles.attributenode_get_node_type();
-        }
-#region Setters
+		/// <summary>
+		/// Create a new Add attribute with name
+		/// </summary>
+		/// <param name="name"></param>
+		public AttributeNode(Shader shader, string name) :
+			base(shader, name)
+		{
+			FinalizeConstructor();
+		}
 
-        internal override void SetString(string name, string data)
-        {
-            switch(name) {
-            case "attribute":
-                    /* attributenode . {'datatype': 'STRING', 'default_value': 'ustring()', 'default_value_type': 'ustring', 'is_input': True, 'member_name': 'attribute', 'ui_name': 'Attribute'} */
-                    {
-                    CSycles.attributenode_set_attribute(this.Ptr, data);
-                    }
-                    break;
+		internal AttributeNode(Shader shader, IntPtr shaderNodePtr) : base(shader, shaderNodePtr)
+		{
+			FinalizeConstructor();
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type AttributeNode (setter)");
-            }
-        }
+		private void FinalizeConstructor()
+		{
+			inputs = new AttributeInputs();
+			outputs = new AttributeOutputs(this);
+		}
 
-#endregion
-#region Getters
+		internal override void SetDirectMembers()
+		{
 
-        internal override string GetString(string name)
-        {
-            switch(name) {
-            case "attribute":
-                /* attributenode . {'datatype': 'STRING', 'default_value': 'ustring()', 'default_value_type': 'ustring', 'is_input': True, 'member_name': 'attribute', 'ui_name': 'Attribute'} */
-                {
-                    return CSycles.attributenode_get_attribute(this.Ptr);
-                }
+			var val = Attribute;
+			CSycles.shadernode_set_member_string(Id, "attribute", val);
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type AttributeNode (getter)");
-            }
-        }
+		internal override void ParseXml(XmlReader xmlNode)
+		{
+			var attr = "";
+			if (Utilities.Instance.read_string(ref attr, xmlNode.GetAttribute("Attribute")))
+			{
+				Attribute = attr;
+			}
+		}
 
-#endregion
-    }
-
+		public override string CreateXmlAttributes()
+		{
+			var code = new StringBuilder($" Attribute=\"{Attribute}\" ", 1024);
+			return code.ToString();
+		}
+		public override string CreateCodeAttributes()
+		{
+			var code = $"{VariableName}.Attribute = {Attribute};";
+			return code;
+		}
+	}
 }

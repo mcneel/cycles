@@ -29,8 +29,9 @@ namespace ccl.ShaderNodes.Sockets
 		/// </summary>
 		/// <param name="parentNode">The ShaderNode for which the socket is created</param>
 		/// <param name="name">UiName of the socket</param>
-		public FloatSocket(ShaderNode parentNode, string name, string internalname, bool isInput) : base(parentNode, name, internalname, isInput)
+		public FloatSocket(ShaderNode parentNode, string name, string internalname) : base(parentNode, name, internalname)
 		{
+			Value = 0.0f;
 		}
 
 		public override string ToString()

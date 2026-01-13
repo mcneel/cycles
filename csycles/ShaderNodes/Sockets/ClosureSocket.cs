@@ -21,7 +21,7 @@ namespace ccl.ShaderNodes.Sockets
 	/// </summary>
 	public class ClosureSocket : SocketBase<object>
 	{
-		public ClosureSocket(ShaderNode parentNode, string name, string internalname, bool isInput) : base(parentNode, name, internalname, isInput)
+		public ClosureSocket(ShaderNode parentNode, string name, string internalname) : base(parentNode, name, internalname)
 		{
 		}
 	}

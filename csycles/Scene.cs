@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,176 +12,138 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
-using ccl.Attributes;
-using ccl.ShaderNodes;
-using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
-
 using System.Threading;
+
 namespace ccl
 {
-    using cclext;
-    public class Scene : Node
-    {
-        public Scene() : this("a scene node") { }
+	/// <summary>
+	/// The Cycles scene representation
+	/// </summary>
+	public class Scene
+	{
+		/// <summary>
+		/// Get the ID of the created Session as given by CCycles
+		/// </summary>
+		public IntPtr Id { get; private set; }
 
-        public Scene(string name) :
-            base(name)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// Access to the Camera for this Session
+		/// </summary>
+		public Camera Camera { get; private set; }
 
-        internal Scene(IntPtr intPtr) : base(intPtr)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// Access to the Integrator settings for this Session
+		/// </summary>
+		public Integrator Integrator { get; private set; }
 
-        private void FinalizeConstructor()
-        {
-        }
-        public bool TryLock()
-        {
-            return CSycles.scene_try_lock(this);
-        }
+		/// <summary>
+		/// Access to the Bacground settings for this Session
+		/// </summary>
+		public Background Background { get; private set; }
 
-        public void Unlock()
-        {
-            CSycles.scene_unlock(this);
-        }
+		/// <summary>
+		/// Access to the Film for this Session
+		/// </summary>
+		public Film Film { get; private set; }
 
-        public void WaitUntilLocked()
-        {
-            while(!TryLock())
-            {
-                Thread.Sleep(10);
-            }
-        }
+		/// <summary>
+		/// Access to the Device used for this Session
+		/// </summary>
+		public Device Device { get; private set; }
 
-        private readonly object addMeshLock = new object();
-        public Mesh AddMesh()
-        {
-            lock(addMeshLock)
-            {
-                return CSycles.scene_createmesh(this);
-            }
-        }
+		/// <summary>
+		/// Create a new scene with the given SceneParameters and Device
+		/// </summary>
+		/// <param name="client">The client from C[CS]ycles API</param>
+		/// <param name="sceneParams">The SceneParameters to create scene with</param>
+		/// <param name="session">The Session to create scene for</param>
+		public Scene(Session session)
+		{
+			// for now use Session.Id as Session.Id too, since they are now tightly coupled in Cycles
+			Id = session.Id;
+			Camera = new Camera(session);
+			Integrator = new Integrator(session);
+			Film = new Film(session);
+			Background = new Background(session);
+#if SCENESTUFF
+// TODO: XXXX scenes are created directly by ccl::Session constructor.
+// TODO: XXXX wrap access of scene through session.
+			Client = client;
+			Id = CSycles.scene_create(sceneParams.Id, session.Id);
+			Integrator = new Integrator(this);
+			Film = new Film(this);
 
-        private readonly object addObjectLock = new object();
-        public ccl.Object AddObject()
-        {
-            lock(addObjectLock)
-            {
-                return CSycles.scene_createobject(this);
-            }
-        }
+			/* add simple wrappers for shadermanager created default shaders */
+			var surface = Shader.WrapDefaultSurfaceShader(client);
+			var light = Shader.WrapDefaultLightShader(client);
+			var background = Shader.WrapDefaultBackgroundShader(client);
+			var empty = Shader.WrapDefaultEmptyShader(client);
 
-        private readonly object addLightLock = new object();
-        public Light AddLight()
-        {
-            lock(addLightLock)
-            {
-                return CSycles.scene_createlight(this);
-            }
-        }
+			/* register the wrapped shaders with scene */
+			m_shader_in_scene_ids.Add(surface, surface.Id);
+			m_shader_in_scene_ids.Add(background, background.Id);
+			m_shader_in_scene_ids.Add(light, light.Id);
+			m_shader_in_scene_ids.Add(empty, empty.Id);
 
-        private readonly object addShaderLock = new object();
-        public Shader AddShader()
-        {
-            lock(addShaderLock)
-            {
-                Shader shader = CSycles.scene_createshader(this);
-                OutputNode outnode = (OutputNode)CSycles.CreateShaderNode(shader, CSycles.shader_get_outputnode(shader), "output");
+			DefaultSurface = surface;
 
-                return shader;
-            }
-        }
+			// set ourself to client as reference
+			client.Scene = this;
+#endif
+		}
 
-        public Pass AddPass()
-        {
-            return CSycles.scene_createpass(this);
-        }
+		/// <summary>
+		/// Reset the scene, forcing update and device update in Cycles.
+		/// </summary>
+		public void Reset()
+		{
+			CSycles.scene_reset(Id);
+		}
 
-        public IntPtr DefaultVolume {
-            get { return CSycles.scene_get_default_volume(Ptr); }
-            set { CSycles.scene_set_default_volume(Ptr, value); }
-        }
+		/// <summary>
+		/// Try aqcuire lock on scene mutex non-blocking.
+		/// </summary>
+		/// <returns>True if lock was acquired, false otherwise</returns>
+		public bool TryLock()
+		{
+			return CSycles.scene_try_lock(Id);
+		}
 
-        public Integrator Integrator {
-            get { return new Integrator(CSycles.scene_get_integrator(Ptr)); }
-            set { CSycles.scene_set_integrator(Ptr, value.Ptr); }
-        }
+		/// <summary>
+		/// Wait until lock on scene is acquired. While
+		/// acquire fails sleep for 10 milliseconds and
+		/// try again
+		/// </summary>
+		public void WaitUntilLocked()
+		{
+			while (!TryLock())
+			{
+				Thread.Sleep(10);
+			}
+		}
 
-        public Camera Camera {
-            get { return new Camera(CSycles.scene_get_camera(Ptr)); }
-            set { CSycles.scene_set_camera(Ptr, value.Ptr); }
-        }
+		/// <summary>
+		/// Aqcuire lock on scene mutex blocking.
+		/// </summary>
+		public void Lock()
+		{
+			CSycles.scene_lock(Id);
+		}
 
-        public bool NeedReset(bool check_camera) {
-            return CSycles.scene_need_reset(Ptr, check_camera);
-        }
+		/// <summary>
+		/// Release lock.
+		/// </summary>
+		public void Unlock()
+		{
+			CSycles.scene_unlock(Id);
+		}
 
-        public Background Background {
-            get { return new Background(CSycles.scene_get_background(Ptr)); }
-            set { CSycles.scene_set_background(Ptr, value.Ptr); }
-        }
-
-        public Shader DefaultBackground {
-            get { return new Shader(CSycles.scene_get_default_background(Ptr)); }
-            set { CSycles.scene_set_default_background(Ptr, value.Ptr); }
-        }
-
-        public void CollectStatistics(IntPtr stats) {
-            CSycles.scene_collect_statistics(Ptr, stats);
-        }
-
-        public Shader DefaultLight {
-            get { return new Shader(CSycles.scene_get_default_light(Ptr)); }
-            set { CSycles.scene_set_default_light(Ptr, value.Ptr); }
-        }
-
-        public Shader DefaultSurface {
-            get { return new Shader(CSycles.scene_get_default_surface(Ptr)); }
-            set { CSycles.scene_set_default_surface(Ptr, value.Ptr); }
-        }
-
-        public float MotionShutterTime() {
-            return CSycles.scene_motion_shutter_time(Ptr);
-        }
-
-        public Film Film {
-            get { return new Film(CSycles.scene_get_film(Ptr)); }
-            set { CSycles.scene_set_film(Ptr, value.Ptr); }
-        }
-
-        public IntPtr DefaultEmpty {
-            get { return CSycles.scene_get_default_empty(Ptr); }
-            set { CSycles.scene_set_default_empty(Ptr, value); }
-        }
-
-        public IntPtr DicingCamera {
-            get { return CSycles.scene_get_dicing_camera(Ptr); }
-            set { CSycles.scene_set_dicing_camera(Ptr, value); }
-        }
-
-        public bool HasShadowCatcher() {
-            return CSycles.scene_has_shadow_catcher(Ptr);
-        }
-
-        public void Reset() {
-            CSycles.scene_reset(Ptr);
-        }
-    }
-
+		public void ClearClippingPlanes()
+		{
+			CSycles.scene_clear_clipping_planes(Id);
+		}
+	}
 }

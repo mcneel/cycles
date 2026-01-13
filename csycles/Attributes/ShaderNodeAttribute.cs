@@ -16,40 +16,29 @@ limitations under the License.
 
 namespace ccl.Attributes
 {
-    [System.AttributeUsage(System.AttributeTargets.Class)]
-    public sealed class ShaderNodeAttribute : System.Attribute
-    {
-        /// <summary>
-        /// Shadernode attribute with given name. Non-base class, public SDK by default.
-        /// </summary>
-        /// <param name="name"></param>
-        public ShaderNodeAttribute(string name)
-        {
-            Name = name;
-            IsBase = false;
-            PublicSdk = true;
-        }
+	[System.AttributeUsage(System.AttributeTargets.Class)]
+	public sealed class ShaderNodeAttribute : System.Attribute
+	{
+		public ShaderNodeAttribute(string name, bool base_class)
+		{
+			Name = name;
+			IsBase = base_class;
+		}
 
-        public ShaderNodeAttribute(string name, bool for_public_sdk)
-        {
-            Name = name;
-            IsBase = false;
-            PublicSdk = for_public_sdk;
-        }
+		/// <summary>
+		/// Shadernode attribute with given name. Non-base class.
+		/// </summary>
+		/// <param name="name"></param>
+		public ShaderNodeAttribute(string name)
+		{
+			Name = name;
+			IsBase = false;
+		}
 
-        public ShaderNodeAttribute(string name, bool for_public_sdk, bool base_class)
-        {
-            Name = name;
-            IsBase = base_class;
-            PublicSdk = for_public_sdk;
-        }
+		public ShaderNodeAttribute() { }
 
-        public ShaderNodeAttribute() { }
+		public string Name { get; set; }
 
-        public string Name { get; set; }
-
-        public bool IsBase { get; set; }
-
-        public bool PublicSdk { get; set; }
-    }
+		public bool IsBase { get; set; }
+	}
 }

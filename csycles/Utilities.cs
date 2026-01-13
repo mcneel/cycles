@@ -22,265 +22,269 @@ using System.Xml;
 
 namespace cclext
 {
-    public static class Extensions
-    {
-        public static string FirstCharacterToLower(string str)
-        {
-            if (string.IsNullOrEmpty(str) || char.IsLower(str, 0))
-                return str;
-            return char.ToLowerInvariant(str[0]) + str.Substring(1);
-        }
-    }
+  public static class Extensions
+	{
+		public static string FirstCharacterToLower(string str)
+		{
+			if (string.IsNullOrEmpty(str) || char.IsLower(str, 0))
+				return str;
+			return char.ToLowerInvariant(str[0]) + str.Substring(1);
+		}
+	}
 }
 
 namespace ccl
 {
 
-    public delegate void ConsoleWriteDelegate(string message);
+  public delegate void ConsoleWriteDelegate(string message);
 
-    public class Utilities
-    {
-        public static Utilities g_utilities;
+	public class Utilities
+	{
+		public static Utilities g_utilities;
 
-        public NumberFormatInfo NumberFormatInfo { get; set; }
-        public Utilities()
-        {
-            NumberFormatInfo = CultureInfo.InvariantCulture.NumberFormat;
-        }
+		public NumberFormatInfo NumberFormatInfo { get; set; }
+		public Utilities()
+		{
+			NumberFormatInfo = CultureInfo.InvariantCulture.NumberFormat;
+		}
 
-        public static Utilities Instance => g_utilities ?? (g_utilities = new Utilities());
+		public static Utilities Instance => g_utilities ?? (g_utilities = new Utilities());
 
-        private static ConsoleWriteDelegate m_consoleWriter = null;
+		private static ConsoleWriteDelegate m_consoleWriter = null;
 
-        public static void RegisterConsoleWriter(ConsoleWriteDelegate consoleWriter)
-        {
-            m_consoleWriter = consoleWriter;
-        }
+		public static void RegisterConsoleWriter(ConsoleWriteDelegate consoleWriter)
+		{
+			m_consoleWriter = consoleWriter;
+		}
 
-        public static void ConsoleWrite(string message) {
-            if(m_consoleWriter!=null) {
-                m_consoleWriter(message);
-            }
-        }
+		public static void ConsoleWrite(string message) {
+			if(m_consoleWriter!=null) {
+				m_consoleWriter(message);
+			}
+		}
 
-        public float[] parse_floats(string floats)
-        {
-            floats = floats.Trim();
-            floats = floats.Replace("  ", " ");
-            floats = floats.Replace(",", "");
-            var fs = floats.Split(' ');
-            var realfloats = new float[fs.Length];
-            for (var i = 0; i < fs.Length; i++)
-            {
-                realfloats[i] = float.Parse(fs[i], NumberFormatInfo);
-            }
+		public float[] parse_floats(string floats)
+		{
+			floats = floats.Trim();
+			floats = floats.Replace("  ", " ");
+			floats = floats.Replace(",", "");
+			var fs = floats.Split(' ');
+			var realfloats = new float[fs.Length];
+			for (var i = 0; i < fs.Length; i++)
+			{
+				realfloats[i] = float.Parse(fs[i], NumberFormatInfo);
+			}
 
-            return realfloats;
-        }
+			return realfloats;
+		}
 
-        /// <summary>
-        /// Get a transform from given float string
-        /// </summary>
-        /// <param name="transform">Transform to create new transform in</param>
-        /// <param name="mat">string with 16 floats</param>
-        /// <returns>true if a parsing was possible</returns>
-        public bool get_transform(Transform transform, string mat)
-        {
-            if (string.IsNullOrWhiteSpace(mat)) return false;
-            var matrix = parse_floats(mat);
+		/// <summary>
+		/// Get a transform from given float string
+		/// </summary>
+		/// <param name="transform">Transform to create new transform in</param>
+		/// <param name="mat">string with 16 floats</param>
+		/// <returns>true if a parsing was possible</returns>
+		public bool get_transform(Transform transform, string mat)
+		{
+			if (string.IsNullOrWhiteSpace(mat)) return false;
+			var matrix = parse_floats(mat);
 
-            if (matrix.Length != 16) return false;
+			if (matrix.Length != 16) return false;
 
-            transform.SetMatrix(matrix);
+			transform.SetMatrix(matrix);
 
-            return true;
-        }
+			return true;
+		}
 
-        /// <summary>
-        /// Get a float4 from given string. This function creates a new float4
-        /// </summary>
-        /// <param name="f4">Will be assigned a new float4 when at least 3 floats are found</param>
-        /// <param name="floats">String with 3 or more floats. At most 4 will be used</param>
-        /// <returns>true if a parsing was possible</returns>
-        public bool get_float4(float4 f4, string floats)
-        {
-            //f4 = new float4(0.0f);
-            if (string.IsNullOrEmpty(floats)) return false;
+		/// <summary>
+		/// Get a float4 from given string. This function creates a new float4
+		/// </summary>
+		/// <param name="f4">Will be assigned a new float4 when at least 3 floats are found</param>
+		/// <param name="floats">String with 3 or more floats. At most 4 will be used</param>
+		/// <returns>true if a parsing was possible</returns>
+		public bool get_float4(float4 f4, string floats)
+		{
+			//f4 = new float4(0.0f);
+			if (string.IsNullOrEmpty(floats)) return false;
 
-            var vec = parse_floats(floats);
-            if (vec.Length < 3) return false;
+			var vec = parse_floats(floats);
+			if (vec.Length < 3) return false;
 
-            f4.x = vec[0];
-            f4.y = vec[1];
-            f4.z = vec[2];
+			f4.x = vec[0];
+			f4.y = vec[1];
+			f4.z = vec[2];
 
-            if (vec.Length >= 4)
-                f4.w = vec[3];
-            return true;
-        }
+			if (vec.Length >= 4)
+				f4.w = vec[3];
+			return true;
+		}
 
-        /// <summary>
-        /// Set the Value float4 for a Float4Socket from given string. This function creates a new float4
-        /// </summary>
-        /// <param name="socket">Will be assigned a new float4 in Value when at least 3 floats are found</param>
-        /// <param name="floats">String with 3 or more floats. At most 4 will be used</param>
-        public void get_float4(Float4Socket socket, string floats)
-        {
-            if (string.IsNullOrEmpty(floats)) return;
+		/// <summary>
+		/// Set the Value float4 for a Float4Socket from given string. This function creates a new float4
+		/// </summary>
+		/// <param name="socket">Will be assigned a new float4 in Value when at least 3 floats are found</param>
+		/// <param name="floats">String with 3 or more floats. At most 4 will be used</param>
+		public void get_float4(Float4Socket socket, string floats)
+		{
+			if (string.IsNullOrEmpty(floats)) return;
 
-            var vec = parse_floats(floats);
-            if (vec.Length < 3) return;
+			var vec = parse_floats(floats);
+			if (vec.Length < 3) return;
 
-            socket.Value = new float4(vec[0], vec[1], vec[2], 0.0f);
-            if (vec.Length >= 4)
-                socket.Value = new float4(vec[0], vec[1], vec[2], vec[3]);
-        }
-        public void get_float4(Float4Socket socket, XmlReader node)
-        {
-            var floats = node.GetAttribute(socket.XmlName);
-            if (string.IsNullOrEmpty(floats)) return;
+			socket.Value = new float4(vec[0], vec[1], vec[2]);
+			if (vec.Length >= 4)
+				socket.Value.w = vec[3];
+		}
+		public void get_float4(Float4Socket socket, XmlReader node)
+		{
+			var floats = node.GetAttribute(socket.XmlName);
+			if (string.IsNullOrEmpty(floats)) return;
 
-            var vec = parse_floats(floats);
-            if (vec.Length < 3) return;
+			var vec = parse_floats(floats);
+			if (vec.Length < 3) return;
 
-            socket.Value = new float4(vec[0], vec[1], vec[2], 0.0f);
-            if (vec.Length >= 4)
-                socket.Value = new float4(vec[0], vec[1], vec[2], vec[3]);
-        }
+			socket.Value = new float4(vec[0], vec[1], vec[2]);
+			if (vec.Length >= 4)
+				socket.Value.w = vec[3];
+		}
 
-        /// <summary>
-        /// Set the Value float for a FloatSocket from given string.
-        /// </summary>
-        /// <param name="socket">socket for which the Value will be set</param>
-        /// <param name="nr">float string</param>
-        public void get_float(FloatSocket socket, string nr)
-        {
-            if (string.IsNullOrEmpty(nr)) return;
+		/// <summary>
+		/// Set the Value float for a FloatSocket from given string.
+		/// </summary>
+		/// <param name="socket">socket for which the Value will be set</param>
+		/// <param name="nr">float string</param>
+		public void get_float(FloatSocket socket, string nr)
+		{
+			if (string.IsNullOrEmpty(nr)) return;
 
-            socket.Value = float.Parse(nr, NumberFormatInfo);
-        }
-        public void get_float(FloatSocket socket, XmlReader node)
-        {
-            var nr = node.GetAttribute(socket.XmlName);
-            if (string.IsNullOrEmpty(nr)) return;
+			socket.Value = float.Parse(nr, NumberFormatInfo);
+		}
+		public void get_float(FloatSocket socket, XmlReader node)
+		{
+			var nr = node.GetAttribute(socket.XmlName);
+			if (string.IsNullOrEmpty(nr)) return;
 
-            socket.Value = float.Parse(nr, NumberFormatInfo);
-        }
+			socket.Value = float.Parse(nr, NumberFormatInfo);
+		}
 
-        /// <summary>
-        /// Set the Value float for a FloatSocket from given string.
-        /// </summary>
-        /// <param name="val">float to set</param>
-        /// <param name="floatstring">float string</param>
-        public bool get_float(ref float val, string floatstring)
-        {
-            if (string.IsNullOrEmpty(floatstring)) return false;
+		/// <summary>
+		/// Set the Value float for a FloatSocket from given string.
+		/// </summary>
+		/// <param name="val">float to set</param>
+		/// <param name="floatstring">float string</param>
+		public bool get_float(ref float val, string floatstring)
+		{
+			if (string.IsNullOrEmpty(floatstring)) return false;
 
-            val = float.Parse(floatstring, NumberFormatInfo);
-            return true;
-        }
+			val = float.Parse(floatstring, NumberFormatInfo);
+			return true;
+		}
 
-        /// <summary>
-        /// Set the Value int for an IntSocket from given string
-        /// </summary>
-        /// <param name="socket">IntSocket for wich Value is set</param>
-        /// <param name="nr">int string</param>
-        public void get_int(IntSocket socket, string nr)
-        {
-            if (string.IsNullOrEmpty(nr)) return;
+		/// <summary>
+		/// Set the Value int for an IntSocket from given string
+		/// </summary>
+		/// <param name="socket">IntSocket for wich Value is set</param>
+		/// <param name="nr">int string</param>
+		public void get_int(IntSocket socket, string nr)
+		{
+			if (string.IsNullOrEmpty(nr)) return;
 
-            socket.Value = int.Parse(nr);
-        }
+			socket.Value = int.Parse(nr);
+		}
 
-        public int[] parse_ints(string ints)
-        {
-            ints = ints.Trim();
-            ints = ints.Replace("  ", " ");
-            ints = ints.Replace(",", "");
-            var fs = ints.Split(' ');
-            var realints = new int[fs.Length];
-            for (var i = 0; i < fs.Length; i++)
-            {
-                realints[i] = int.Parse(fs[i]);
-            }
+		public int[] parse_ints(string ints)
+		{
+			ints = ints.Trim();
+			ints = ints.Replace("  ", " ");
+			ints = ints.Replace(",", "");
+			var fs = ints.Split(' ');
+			var realints = new int[fs.Length];
+			for (var i = 0; i < fs.Length; i++)
+			{
+				realints[i] = int.Parse(fs[i]);
+			}
 
-            return realints;
-        }
+			return realints;
+		}
 
-        public bool get_bool(ref bool val, string booleanstring)
-        {
-            if (string.IsNullOrEmpty(booleanstring))
-            {
-                val = false;
-                return false;
-            }
+		public bool get_bool(ref bool val, string booleanstring)
+		{
+			if (string.IsNullOrEmpty(booleanstring))
+			{
+				val = false;
+				return false;
+			}
 
-            val = bool.Parse(booleanstring);
-            return true;
-        }
+			val = bool.Parse(booleanstring);
+			return true;
+		}
 
-        public bool get_int(ref int val, string intstring)
-        {
-            if (string.IsNullOrEmpty(intstring)) return false;
+		public bool get_int(ref int val, string intstring)
+		{
+			if (string.IsNullOrEmpty(intstring)) return false;
 
-            val = int.Parse(intstring);
-            return true;
-        }
+			val = int.Parse(intstring);
+			return true;
+		}
 
-        public bool read_string(ref string val, string stringstring)
-        {
-            if (string.IsNullOrEmpty(stringstring)) return false;
+		public bool read_string(ref string val, string stringstring)
+		{
+			if (string.IsNullOrEmpty(stringstring)) return false;
 
-            val = stringstring;
-            return true;
-        }
+			val = stringstring;
+			return true;
+		}
 
-        public void ReadNodeGraph(Shader shader, XmlReader xmlNode, bool finalize)
-        {
-            var nodes = new Dictionary<string, ShaderNode> {{"output", shader.Output}};
 
-            while (xmlNode.Read())
-            {
-                ShaderNode shader_node = null;
-                if (!xmlNode.IsStartElement()) continue;
-                var nodename = xmlNode.GetAttribute("name");
-                if (string.IsNullOrEmpty(nodename) && xmlNode.Name != "connect") continue;
+		public void ReadNodeGraph(Shader shader, XmlReader xmlNode, bool finalize)
+		{
+			var nodes = new Dictionary<string, ShaderNode> {{"output", shader.Output}};
 
-                if (string.IsNullOrEmpty(nodename)) nodename = "";
+			while (xmlNode.Read())
+			{
+				ShaderNode shader_node = null;
+				if (!xmlNode.IsStartElement()) continue;
+				var nodename = xmlNode.GetAttribute("name");
+				if (string.IsNullOrEmpty(nodename) && xmlNode.Name != "connect") continue;
 
-                switch (xmlNode.Name)
-                {
-                    case "connect":
-                        var fromstring = xmlNode.GetAttribute("from");
-                        var tostring = xmlNode.GetAttribute("to");
-                        if (fromstring != null && tostring != null)
-                        {
-                            var from = fromstring.Split(' ');
-                            var to = tostring.Split(' ');
+				if (string.IsNullOrEmpty(nodename)) nodename = "";
 
-                            if (!nodes.ContainsKey(from[0]))
-                                throw new KeyNotFoundException($"'from' node [{@from[0]}] not defined prior to connection.");
-                            var fromnode = nodes[from[0]];
-                            var fromsocket = fromnode.outputs.Socket(from[1]);
+				switch (xmlNode.Name)
+				{
+					case "connect":
+						var fromstring = xmlNode.GetAttribute("from");
+						var tostring = xmlNode.GetAttribute("to");
+						if (fromstring != null && tostring != null)
+						{
+							var from = fromstring.Split(' ');
+							var to = tostring.Split(' ');
 
-                            if (!nodes.ContainsKey(to[0]))
-                                throw new KeyNotFoundException($"'to' node [{to[0]}] not defined prior to connection.");
-                            var tonode = nodes[to[0]];
-                            var tosocket = tonode.inputs.Socket(to[1]);
+							if (!nodes.ContainsKey(from[0]))
+								throw new KeyNotFoundException($"'from' node [{@from[0]}] not defined prior to connection.");
+							var fromnode = nodes[from[0]];
+							var fromsocket = fromnode.outputs.Socket(from[1]);
 
-                            fromsocket.Connect(tosocket);
-                        }
-                        break;
-                    default:
-                        shader_node = CSycles.CreateShaderNode(shader, xmlNode.Name, nodename);
-                        break;
-                }
-                if (shader_node != null)
-                {
-                    //shader_node.ParseXml(xmlNode);
-                    nodes.Add(nodename, shader_node);
-                }
-            }
-        }
-    }
+							if (!nodes.ContainsKey(to[0]))
+								throw new KeyNotFoundException($"'to' node [{to[0]}] not defined prior to connection.");
+							var tonode = nodes[to[0]];
+							var tosocket = tonode.inputs.Socket(to[1]);
+
+							fromsocket.Connect(tosocket);
+						}
+						break;
+					default:
+						shader_node = CSycles.CreateShaderNode(shader, xmlNode.Name, nodename);
+						break;
+				}
+				if (shader_node != null)
+				{
+					shader_node.ParseXml(xmlNode);
+					nodes.Add(nodename, shader_node);
+					shader.AddNode(shader_node);
+				}
+			}
+
+			if(finalize) shader.WriteDataToNodes();
+		}
+	}
 }

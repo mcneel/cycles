@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,231 +12,160 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
 using ccl.Attributes;
-using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
+using System.Text;
+using System.Xml;
+
 namespace ccl.ShaderNodes
 {
-    using cclext;
+	public class MixInputs : Inputs
+	{
+		public FloatSocket Fac { get; set; }
+		public ColorSocket Color1 { get; set; }
+		public ColorSocket Color2 { get; set; }
 
-    public class MixNodeInputs : Inputs
-    {
-        public ColorSocket Color2 { get; private set; }
-        public FloatSocket Fac { get; private set; }
-        public EnumSocket Type { get; private set; }
-        public ColorSocket Color1 { get; private set; }
-        public BoolSocket UseClamp { get; private set; }
+		internal MixInputs(ShaderNode parentNode)
+		{
+			Color1 = new ColorSocket(parentNode, "Color1", "color1");
+			AddSocket(Color1);
+			Color2 = new ColorSocket(parentNode, "Color2", "color2");
+			AddSocket(Color2);
+			Fac = new FloatSocket(parentNode, "Fac", "fac");
+			AddSocket(Fac);
+		}
+	}
 
-        public MixNodeInputs(ShaderNode parentNode)
-        {
-            Color2 = new ColorSocket(parentNode, "Color2", "color2", true);
-            AddSocket(Color2);
-            Fac = new FloatSocket(parentNode, "Fac", "fac", true);
-            AddSocket(Fac);
-            Type = new EnumSocket(parentNode, "Type", "mix_type", true);
-            AddSocket(Type);
-            Color1 = new ColorSocket(parentNode, "Color1", "color1", true);
-            AddSocket(Color1);
-            UseClamp = new BoolSocket(parentNode, "Use Clamp", "use_clamp", true);
-            AddSocket(UseClamp);
-        }
-    }
-    public class MixNodeOutputs : Outputs
-    {
-        public ColorSocket Color { get; private set; }
+	public class MixOutputs : Outputs
+	{
+		public ColorSocket Color { get; set; }
 
-        public MixNodeOutputs(ShaderNode parentNode)
-        {
-            Color = new ColorSocket(parentNode, "Color", "color", false);
-            AddSocket(Color);
-        }
-    }
+		internal MixOutputs(ShaderNode parentNode)
+		{
+			Color = new ColorSocket(parentNode, "Color", "color");
+			AddSocket(Color);
+		}
+	}
 
-    [ShaderNode(name: "mix")]
-    public class MixNode : ShaderNode
-    {
-        public enum MixNodeType : uint {
-            Mix = ccl.NodeMix.NODE_MIX_BLEND,
-            Add = ccl.NodeMix.NODE_MIX_ADD,
-            Multiply = ccl.NodeMix.NODE_MIX_MUL,
-            Subtract = ccl.NodeMix.NODE_MIX_SUB,
-            Screen = ccl.NodeMix.NODE_MIX_SCREEN,
-            Divide = ccl.NodeMix.NODE_MIX_DIV,
-            Difference = ccl.NodeMix.NODE_MIX_DIFF,
-            Darken = ccl.NodeMix.NODE_MIX_DARK,
-            Lighten = ccl.NodeMix.NODE_MIX_LIGHT,
-            Overlay = ccl.NodeMix.NODE_MIX_OVERLAY,
-            Dodge = ccl.NodeMix.NODE_MIX_DODGE,
-            Burn = ccl.NodeMix.NODE_MIX_BURN,
-            Hue = ccl.NodeMix.NODE_MIX_HUE,
-            Saturation = ccl.NodeMix.NODE_MIX_SAT,
-            Value = ccl.NodeMix.NODE_MIX_VAL,
-            Color = ccl.NodeMix.NODE_MIX_COL,
-            SoftLight = ccl.NodeMix.NODE_MIX_SOFT,
-            LinearLight = ccl.NodeMix.NODE_MIX_LINEAR,
-            Exclusion = ccl.NodeMix.NODE_MIX_EXCLUSION,
-        }
-        public MixNodeInputs ins => (MixNodeInputs)inputs;
-        public MixNodeOutputs outs => (MixNodeOutputs)outputs;
-        public MixNode(Shader shader) : this(shader, "a mix node") { }
+	/// <summary>
+	/// Blending node for two colors. Default BlendType is BlendTypes.Mix
+	/// </summary>
+	[ShaderNode("mix")]
+	public class MixNode : ShaderNode
+	{
+		public enum BlendTypes
+		{
+			Blend,
+			Add,
+			Multiply,
+			Subtract,
+			Screen,
+			Divide,
+			Difference,
+			Darken,
+			Lighten,
+			Overlay,
+			Dodge,
+			Burn,
+			Hue,
+			Saturation,
+			Value,
+			Color,
+			Soft_Light,
+			Linear_Light,
+		}
 
-        public MixNode(Shader shader, string name) :
-            base(shader, name)
-        {
-            FinalizeConstructor();
-        }
 
-        internal MixNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-        {
-            FinalizeConstructor();
-        }
+		public MixInputs ins => (MixInputs)inputs;
+		public MixOutputs outs => (MixOutputs)outputs;
 
-        private void FinalizeConstructor()
-        {
-            inputs = new MixNodeInputs(this);
-            outputs = new MixNodeOutputs(this);
-        }
-        public static IntPtr GetNodeType() {
-            return CSycles.mixnode_get_node_type();
-        }
-#region Setters
+		/// <summary>
+		/// Create new MixNode with blend type Mix. By default Color inputs are black.
+		/// </summary>
+		public MixNode(Shader shader) : this(shader, "a mix color node")
+		{
+		}
 
-        internal override void SetFloat(string name, float data)
-        {
-            switch(name) {
-            case "fac":
-                    /* mixnode . {'datatype': 'FLOAT', 'default_value': '0.5f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'fac', 'ui_name': 'Fac'} */
-                    {
-                    CSycles.mixnode_set_fac(this.Ptr, data);
-                    }
-                    break;
+		/// <summary>
+		/// Create new MixNode with blend type Mix and name.
+		/// </summary>
+		/// <param name="name"></param>
+		public MixNode(Shader shader, string name) :
+			base(shader, name)
+		{
+			FinalizeConstructor();
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (setter)");
-            }
-        }
+		internal MixNode(Shader shader, IntPtr intptr) : base(shader, intptr)
+		{
+			FinalizeConstructor();
+		}
 
-        internal override void SetColor(string name, float3 data)
-        {
-            switch(name) {
-            case "color2":
-                    /* mixnode . {'datatype': 'COLOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color2', 'ui_name': 'Color2'} */
-                    {
-                    CSycles.mixnode_set_color2(this.Ptr, data);
-                    }
-                    break;
-            case "color1":
-                    /* mixnode . {'datatype': 'COLOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color1', 'ui_name': 'Color1'} */
-                    {
-                    CSycles.mixnode_set_color1(this.Ptr, data);
-                    }
-                    break;
+		private void FinalizeConstructor()
+		{
+			inputs = new MixInputs(this);
+			outputs = new MixOutputs(this);
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (setter)");
-            }
-        }
+			BlendType = BlendTypes.Blend;
+			UseClamp = false;
 
-        internal override void SetBool(string name, bool data)
-        {
-            switch(name) {
-            case "use_clamp":
-                    /* mixnode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'use_clamp', 'ui_name': 'Use Clamp'} */
-                    {
-                    CSycles.mixnode_set_use_clamp(this.Ptr, data);
-                    }
-                    break;
+			ins.Fac.Value = 0.5f;
+			ins.Color1.Value = new float4();
+			ins.Color2.Value = new float4();
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (setter)");
-            }
-        }
+		public BlendTypes BlendType { get; set; }
+		public bool UseClamp { get; set; }
 
-        internal override void SetEnum(string name, object data)
-        {
-            switch(name) {
-            case "mix_type":
-                    /* mixnode . {'datatype': 'ENUM', 'default_value': 'NODE_MIX_BLEND', 'default_value_type': 'NodeMix', 'is_input': True, 'member_name': 'mix_type', 'ui_name': 'Type'} */
-                    {
-                    CSycles.mixnode_set_mix_type(this.Ptr, (ccl.NodeMix)data);
-                    }
-                    break;
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "type", (int)BlendType);
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (setter)");
-            }
-        }
+		internal override void SetDirectMembers()
+		{
+			CSycles.shadernode_set_member_bool(Id, "use_clamp", UseClamp);
+		}
 
-#endregion
-#region Getters
+		private void SetBlendType(string op)
+		{
+			op = op.Replace(" ", "_");
+			BlendType = (BlendTypes)Enum.Parse(typeof(BlendTypes), op, true);
+		}
 
-        internal override float GetFloat(string name)
-        {
-            switch(name) {
-            case "fac":
-                /* mixnode . {'datatype': 'FLOAT', 'default_value': '0.5f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'fac', 'ui_name': 'Fac'} */
-                {
-                    return CSycles.mixnode_get_fac(this.Ptr);
-                }
+		internal override void ParseXml(XmlReader xmlNode)
+		{
+			Utilities.Instance.get_float4(ins.Color1, xmlNode.GetAttribute("color1"));
+			Utilities.Instance.get_float4(ins.Color2, xmlNode.GetAttribute("color2"));
+			Utilities.Instance.get_float(ins.Fac, xmlNode.GetAttribute("fac"));
+			bool useclamp = false;
+			Utilities.Instance.get_bool(ref useclamp, xmlNode.GetAttribute("use_clamp"));
+			UseClamp = useclamp;
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (getter)");
-            }
-        }
+			var blendtype = xmlNode.GetAttribute("type");
+			if (!string.IsNullOrEmpty(blendtype))
+			{
+				SetBlendType(blendtype);
+			}
+		}
 
-        internal override float3 GetColor(string name)
-        {
-            switch(name) {
-            case "color2":
-                /* mixnode . {'datatype': 'COLOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color2', 'ui_name': 'Color2'} */
-                {
-                    return CSycles.mixnode_get_color2(this.Ptr);
-                }
-            case "color1":
-                /* mixnode . {'datatype': 'COLOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color1', 'ui_name': 'Color1'} */
-                {
-                    return CSycles.mixnode_get_color1(this.Ptr);
-                }
+		public override string CreateXmlAttributes()
+		{
+			var code = new StringBuilder($" type=\"{BlendType}\" ", 1024);
+			code.Append($" use_clamp=\"{UseClamp}\"");
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (getter)");
-            }
-        }
+			return code.ToString();
+		}
 
-        internal override bool GetBool(string name)
-        {
-            switch(name) {
-            case "use_clamp":
-                /* mixnode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'use_clamp', 'ui_name': 'Use Clamp'} */
-                {
-                    return CSycles.mixnode_get_use_clamp(this.Ptr);
-                }
+		public override string CreateCodeAttributes()
+		{
+			var code = new StringBuilder($"{VariableName}.BlendType = ccl.ShaderNodes.MixNode.BlendTypes.{BlendType};", 1024);
+			code.Append($"{VariableName}.UseClamp = {UseClamp.ToString().ToLowerInvariant()};");
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (getter)");
-            }
-        }
-
-        internal override object GetEnum(string name)
-        {
-            switch(name) {
-            case "mix_type":
-                /* mixnode . {'datatype': 'ENUM', 'default_value': 'NODE_MIX_BLEND', 'default_value_type': 'NodeMix', 'is_input': True, 'member_name': 'mix_type', 'ui_name': 'Type'} */
-                {
-                    return (uint)CSycles.mixnode_get_mix_type(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type MixNode (getter)");
-            }
-        }
-
-#endregion
-    }
-
+			return code.ToString();
+		}
+	}
 }

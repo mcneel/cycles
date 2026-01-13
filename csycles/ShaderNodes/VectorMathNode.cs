@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,226 +12,360 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
 using ccl.Attributes;
-using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
+using System.Text;
+using System.Xml;
+#pragma warning disable IDE1006 // Naming Styles
+
 namespace ccl.ShaderNodes
 {
-    using cclext;
+	/// <summary>
+	/// VectorMathNode input sockets
+	/// </summary>
+	public class VectorMathInputs : Inputs
+	{
+		/// <summary>
+		/// VectorMathNode Vector1 input socket
+		/// </summary>
+		public VectorSocket Vector1 { get; set; }
+		/// <summary>
+		/// VectorMathNode Vector2 input socket
+		/// </summary>
+		public VectorSocket Vector2 { get; set; }
+		public VectorSocket Vector3 { get; set; }
+		public FloatSocket Scale { get; set; }
 
-    public class VectorMathNodeInputs : Inputs
-    {
-        public VectorSocket Vector2 { get; private set; }
-        public EnumSocket Type { get; private set; }
-        public VectorSocket Vector3 { get; private set; }
-        public VectorSocket Vector1 { get; private set; }
-        public FloatSocket Scale { get; private set; }
+		/// <summary>
+		/// Create VectorMathNode input sockets
+		/// </summary>
+		/// <param name="parentNode"></param>
+		internal VectorMathInputs(ShaderNode parentNode)
+		{
+			Vector1 = new VectorSocket(parentNode, "Vector1", "vector1");
+			AddSocket(Vector1);
+			Vector2 = new VectorSocket(parentNode, "Vector2", "vector2");
+			AddSocket(Vector2);
+			Vector3 = new VectorSocket(parentNode, "Vector3", "vector3");
+			AddSocket(Vector3);
+			Scale = new FloatSocket(parentNode, "Scale", "scale");
+			AddSocket(Scale);
+		}
+	}
 
-        public VectorMathNodeInputs(ShaderNode parentNode)
-        {
-            Vector2 = new VectorSocket(parentNode, "Vector2", "vector2", true);
-            AddSocket(Vector2);
-            Type = new EnumSocket(parentNode, "Type", "math_type", true);
-            AddSocket(Type);
-            Vector3 = new VectorSocket(parentNode, "Vector3", "vector3", true);
-            AddSocket(Vector3);
-            Vector1 = new VectorSocket(parentNode, "Vector1", "vector1", true);
-            AddSocket(Vector1);
-            Scale = new FloatSocket(parentNode, "Scale", "scale", true);
-            AddSocket(Scale);
-        }
-    }
-    public class VectorMathNodeOutputs : Outputs
-    {
-        public VectorSocket Vector { get; private set; }
-        public FloatSocket Value { get; private set; }
+	/// <summary>
+	/// VectorMathNode output sockets
+	/// </summary>
+	public class VectorMathOutputs : Outputs
+	{
+		/// <summary>
+		/// The resulting vector of the VectorMathNode operation
+		/// </summary>
+		public FloatSocket Value { get; set; }
 
-        public VectorMathNodeOutputs(ShaderNode parentNode)
-        {
-            Vector = new VectorSocket(parentNode, "Vector", "vector", false);
-            AddSocket(Vector);
-            Value = new FloatSocket(parentNode, "Value", "value", false);
-            AddSocket(Value);
-        }
-    }
+		public VectorSocket Vector { get; set; }
 
-    [ShaderNode(name: "vector_math")]
-    public class VectorMathNode : ShaderNode
-    {
-        public enum VectorMathNodeType : uint {
-            Add = ccl.NodeVectorMathType.NODE_VECTOR_MATH_ADD,
-            Subtract = ccl.NodeVectorMathType.NODE_VECTOR_MATH_SUBTRACT,
-            Multiply = ccl.NodeVectorMathType.NODE_VECTOR_MATH_MULTIPLY,
-            Divide = ccl.NodeVectorMathType.NODE_VECTOR_MATH_DIVIDE,
-            CrossProduct = ccl.NodeVectorMathType.NODE_VECTOR_MATH_CROSS_PRODUCT,
-            Project = ccl.NodeVectorMathType.NODE_VECTOR_MATH_PROJECT,
-            Reflect = ccl.NodeVectorMathType.NODE_VECTOR_MATH_REFLECT,
-            DotProduct = ccl.NodeVectorMathType.NODE_VECTOR_MATH_DOT_PRODUCT,
-            Distance = ccl.NodeVectorMathType.NODE_VECTOR_MATH_DISTANCE,
-            Length = ccl.NodeVectorMathType.NODE_VECTOR_MATH_LENGTH,
-            Scale = ccl.NodeVectorMathType.NODE_VECTOR_MATH_SCALE,
-            Normalize = ccl.NodeVectorMathType.NODE_VECTOR_MATH_NORMALIZE,
-            Snap = ccl.NodeVectorMathType.NODE_VECTOR_MATH_SNAP,
-            Floor = ccl.NodeVectorMathType.NODE_VECTOR_MATH_FLOOR,
-            Ceil = ccl.NodeVectorMathType.NODE_VECTOR_MATH_CEIL,
-            Modulo = ccl.NodeVectorMathType.NODE_VECTOR_MATH_MODULO,
-            Fraction = ccl.NodeVectorMathType.NODE_VECTOR_MATH_FRACTION,
-            Absolute = ccl.NodeVectorMathType.NODE_VECTOR_MATH_ABSOLUTE,
-            Minimum = ccl.NodeVectorMathType.NODE_VECTOR_MATH_MINIMUM,
-            Maximum = ccl.NodeVectorMathType.NODE_VECTOR_MATH_MAXIMUM,
-            Wrap = ccl.NodeVectorMathType.NODE_VECTOR_MATH_WRAP,
-            Sine = ccl.NodeVectorMathType.NODE_VECTOR_MATH_SINE,
-            Cosine = ccl.NodeVectorMathType.NODE_VECTOR_MATH_COSINE,
-            Tangent = ccl.NodeVectorMathType.NODE_VECTOR_MATH_TANGENT,
-            Refract = ccl.NodeVectorMathType.NODE_VECTOR_MATH_REFRACT,
-            Faceforward = ccl.NodeVectorMathType.NODE_VECTOR_MATH_FACEFORWARD,
-            MultiplyAdd = ccl.NodeVectorMathType.NODE_VECTOR_MATH_MULTIPLY_ADD,
-        }
-        public VectorMathNodeInputs ins => (VectorMathNodeInputs)inputs;
-        public VectorMathNodeOutputs outs => (VectorMathNodeOutputs)outputs;
-        public VectorMathNode(Shader shader) : this(shader, "a vector_math node") { }
+		/// <summary>
+		/// Create VectorMathNode output sockets
+		/// </summary>
+		/// <param name="parentNode"></param>
+		internal VectorMathOutputs(ShaderNode parentNode)
+		{
+			Value = new FloatSocket(parentNode, "Value", "value");
+			AddSocket(Value);
+			Vector = new VectorSocket(parentNode, "Vector", "vector");
+			AddSocket(Vector);
+		}
+	}
 
-        public VectorMathNode(Shader shader, string name) :
-            base(shader, name)
-        {
-            FinalizeConstructor();
-        }
+	/// <summary>
+	/// Add a VectorMath node, setting output Value with any of the following <c>Operation</c>s using Vector1 and Vector2
+	///
+	/// Note that some operations use only Vector1
+	/// </summary>
+	[ShaderNode("vector_math")]
+	public class VectorMathNode : ShaderNode
+	{
+		/// <summary>
+		/// VectorMath operations the VectorMathNode can do.
+		/// </summary>
+		public enum Operations
+		{
+			/// <summary>
+			/// Vector = Vector1 + Vector2
+			/// Value = average_fac(Vector)
+			/// </summary>
+			Add,
+			/// <summary>
+			/// Vector = Vector1 - Vector2
+			/// Value = average_fac(Vector)
+			/// </summary>
+			Subtract,
+			/// <summary>
+			/// Vector = len(Vector1 + Vector2)
+			/// Value = average_fac(Vector)
+			/// </summary>
+			Average,
+			/// <summary>
+			/// Value = dot(Vector1, Vector2)
+			/// Vector = 0.0, 0.0, 0.0
+			/// </summary>
+			Dot_Product,
+			/// <summary>
+			/// Vector = normalize(cross(Vector1, Vector2))
+			/// Value = len(cross(Vector1, Vector2))
+			/// </summary>
+			Cross_Product,
+			/// <summary>
+			/// Vector = normalize(Vector1)
+			/// Value = len(Vector1)
+			///
+			/// Note, Vector2 unused
+			/// </summary>
+			Normalize
+		}
 
-        internal VectorMathNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// VectorMathNode input sockets
+		/// </summary>
+		public VectorMathInputs ins => (VectorMathInputs)inputs;
 
-        private void FinalizeConstructor()
-        {
-            inputs = new VectorMathNodeInputs(this);
-            outputs = new VectorMathNodeOutputs(this);
-        }
-        public static IntPtr GetNodeType() {
-            return CSycles.vectormathnode_get_node_type();
-        }
-#region Setters
+		/// <summary>
+		/// VectorMathNode output sockets
+		/// </summary>
+		public VectorMathOutputs outs => (VectorMathOutputs)outputs;
 
-        internal override void SetFloat(string name, float data)
-        {
-            switch(name) {
-            case "scale":
-                    /* vectormathnode . {'datatype': 'FLOAT', 'default_value': '1.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'scale', 'ui_name': 'Scale'} */
-                    {
-                    CSycles.vectormathnode_set_scale(this.Ptr, data);
-                    }
-                    break;
+		/// <summary>
+		/// VectorMath node operates on float inputs (note, some operations use only Vector1)
+		/// </summary>
+		public VectorMathNode(Shader shader) : this(shader, "a vector math node")
+		{
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type VectorMathNode (setter)");
-            }
-        }
+		}
 
-        internal override void SetVector(string name, float3 data)
-        {
-            switch(name) {
-            case "vector2":
-                    /* vectormathnode . {'datatype': 'VECTOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector2', 'ui_name': 'Vector2'} */
-                    {
-                    CSycles.vectormathnode_set_vector2(this.Ptr, data);
-                    }
-                    break;
-            case "vector3":
-                    /* vectormathnode . {'datatype': 'VECTOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector3', 'ui_name': 'Vector3'} */
-                    {
-                    CSycles.vectormathnode_set_vector3(this.Ptr, data);
-                    }
-                    break;
-            case "vector1":
-                    /* vectormathnode . {'datatype': 'VECTOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector1', 'ui_name': 'Vector1'} */
-                    {
-                    CSycles.vectormathnode_set_vector1(this.Ptr, data);
-                    }
-                    break;
+		public VectorMathNode(Shader shader, string name) :
+			base(shader, name)
+		{
+			FinalizeConstructor();
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type VectorMathNode (setter)");
-            }
-        }
+		internal VectorMathNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+		{
+			FinalizeConstructor();
+		}
 
-        internal override void SetEnum(string name, object data)
-        {
-            switch(name) {
-            case "math_type":
-                    /* vectormathnode . {'datatype': 'ENUM', 'default_value': 'NODE_VECTOR_MATH_ADD', 'default_value_type': 'NodeVectorMathType', 'is_input': True, 'member_name': 'math_type', 'ui_name': 'Type'} */
-                    {
-                    CSycles.vectormathnode_set_math_type(this.Ptr, (ccl.NodeVectorMathType)data);
-                    }
-                    break;
+		private void FinalizeConstructor()
+		{
+			inputs = new VectorMathInputs(this);
+			outputs = new VectorMathOutputs(this);
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type VectorMathNode (setter)");
-            }
-        }
+			Operation = Operations.Add;
+			ins.Vector1.Value = new float4(0.0f);
+			ins.Vector2.Value = new float4(0.0f);
+		}
 
-#endregion
-#region Getters
+		/// <summary>
+		/// The operation this node does on Vector1 and Vector2
+		/// </summary>
+		public Operations Operation { get; set; }
 
-        internal override float GetFloat(string name)
-        {
-            switch(name) {
-            case "scale":
-                /* vectormathnode . {'datatype': 'FLOAT', 'default_value': '1.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'scale', 'ui_name': 'Scale'} */
-                {
-                    return CSycles.vectormathnode_get_scale(this.Ptr);
-                }
+		public void SetOperation(string op)
+		{
+			op = op.Replace(" ", "_");
+			Operation = (Operations)Enum.Parse(typeof(Operations), op, true);
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type VectorMathNode (getter)");
-            }
-        }
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "operation", (int)Operation);
+		}
 
-        internal override float3 GetVector(string name)
-        {
-            switch(name) {
-            case "vector2":
-                /* vectormathnode . {'datatype': 'VECTOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector2', 'ui_name': 'Vector2'} */
-                {
-                    return CSycles.vectormathnode_get_vector2(this.Ptr);
-                }
-            case "vector3":
-                /* vectormathnode . {'datatype': 'VECTOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector3', 'ui_name': 'Vector3'} */
-                {
-                    return CSycles.vectormathnode_get_vector3(this.Ptr);
-                }
-            case "vector1":
-                /* vectormathnode . {'datatype': 'VECTOR', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector1', 'ui_name': 'Vector1'} */
-                {
-                    return CSycles.vectormathnode_get_vector1(this.Ptr);
-                }
+		internal override void ParseXml(XmlReader xmlNode)
+		{
+			Utilities.Instance.get_float4(ins.Vector1, xmlNode.GetAttribute("vector1"));
+			Utilities.Instance.get_float4(ins.Vector2, xmlNode.GetAttribute("vector2"));
+			var operation = xmlNode.GetAttribute("type");
+			if (!string.IsNullOrEmpty(operation))
+			{
+				SetOperation(operation);
+			}
+		}
+		public override string CreateXmlAttributes()
+		{
+			var codeattr = new StringBuilder(1024);
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type VectorMathNode (getter)");
-            }
-        }
+			codeattr.Append($" type=\"{Operation}\" ");
 
-        internal override object GetEnum(string name)
-        {
-            switch(name) {
-            case "math_type":
-                /* vectormathnode . {'datatype': 'ENUM', 'default_value': 'NODE_VECTOR_MATH_ADD', 'default_value_type': 'NodeVectorMathType', 'is_input': True, 'member_name': 'math_type', 'ui_name': 'Type'} */
-                {
-                    return (uint)CSycles.vectormathnode_get_math_type(this.Ptr);
-                }
+			return codeattr.ToString();
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type VectorMathNode (getter)");
-            }
-        }
+		public override string CreateCodeAttributes()
+		{
+			var codeattr = new StringBuilder(1024);
 
-#endregion
-    }
+			codeattr.Append($" {VariableName}.Operation = VectorMathNode.Operations.{Operation};");
 
+			return codeattr.ToString();
+		}
+	}
+	[ShaderNode("vector_add")]
+	public class VectorAdd : VectorMathNode
+	{
+
+		public VectorAdd(Shader shader) : this(shader, "a vector add node") { }
+		public VectorAdd(Shader shader, string name) : base(shader, name) { Operation = Operations.Add; }
+		internal VectorAdd(Shader shader, IntPtr intPtr) : base(shader, intPtr) { Operation = Operations.Add; }
+		public override string ShaderNodeTypeName => "vector_math";
+	}
+	[ShaderNode("vector_subtract")]
+	public class VectorSubtract : VectorMathNode
+	{
+
+		public VectorSubtract(Shader shader) : this(shader, "a vector subtract node") { }
+		public VectorSubtract(Shader shader, string name) : base(shader, name) { Operation = Operations.Subtract; }
+		internal VectorSubtract(Shader shader, IntPtr intPtr) : base(shader, intPtr) { Operation = Operations.Subtract; }
+		public override string ShaderNodeTypeName => "vector_math";
+	}
+	[ShaderNode("vector_average")]
+	public class VectorAverage : VectorMathNode
+	{
+
+		public VectorAverage(Shader shader) : this(shader, "a vector average node") { }
+		public VectorAverage(Shader shader, string name) : base(shader, name) { Operation = Operations.Average; }
+		internal VectorAverage(Shader shader, IntPtr intPtr) : base(shader, intPtr) { Operation = Operations.Average; }
+		public override string ShaderNodeTypeName => "vector_math";
+	}
+	[ShaderNode("vector_cross")]
+	public class VectorCross_Product : VectorMathNode
+	{
+
+		public VectorCross_Product(Shader shader) : this(shader, "a vector cross node") { }
+		public VectorCross_Product(Shader shader, string name) : base(shader, name) { Operation = Operations.Cross_Product; }
+		internal VectorCross_Product(Shader shader, IntPtr intPtr) : base(shader, intPtr) { Operation = Operations.Cross_Product; }
+		public override string ShaderNodeTypeName => "vector_math";
+	}
+	[ShaderNode("vector_dot")]
+	public class VectorDot_Product : VectorMathNode
+	{
+
+		public VectorDot_Product(Shader shader) : this(shader, "a vector dot node") { }
+		public VectorDot_Product(Shader shader, string name) : base(shader, name) { Operation = Operations.Dot_Product; }
+		internal VectorDot_Product(Shader shader, IntPtr intPtr) : base(shader, intPtr) { Operation = Operations.Dot_Product; }
+		public override string ShaderNodeTypeName => "vector_math";
+	}
+	[ShaderNode("vector_normalize")]
+	public class VectorNormalize : VectorMathNode
+	{
+
+		public VectorNormalize(Shader shader) : this(shader, "a vector normalize node") { }
+		public VectorNormalize(Shader shader, string name) : base(shader, name) { Operation = Operations.Normalize; }
+		internal VectorNormalize(Shader shader, IntPtr intPtr) : base(shader, intPtr) { Operation = Operations.Normalize; }
+		public override string ShaderNodeTypeName => "vector_math";
+	}
+
+	public class VectorRotateInputs : Inputs
+	{
+		public VectorSocket Vector { get; set; }
+		public VectorSocket Rotation { get; set; }
+		public VectorSocket Center { get; set; }
+		public VectorSocket Axis { get; set; }
+		public FloatSocket Angle { get; set; }
+
+		/// <summary>
+		/// Create VectorRotateNode input sockets
+		/// </summary>
+		/// <param name="parentNode"></param>
+		internal VectorRotateInputs(ShaderNode parentNode)
+		{
+			Vector = new VectorSocket(parentNode, "Vector", "vector");
+			AddSocket(Vector);
+			Rotation = new VectorSocket(parentNode, "Rotation", "rotation");
+			AddSocket(Rotation);
+			Center = new VectorSocket(parentNode, "Center", "center");
+			AddSocket(Center);
+			Axis = new VectorSocket(parentNode, "Axis", "axis");
+			AddSocket(Axis);
+			Angle = new FloatSocket(parentNode, "Angle", "angle");
+			AddSocket(Angle);
+		}
+	}
+
+	/// <summary>
+	/// VectorRotateNode output sockets
+	/// </summary>
+	public class VectorRotateOutputs : Outputs
+	{
+		public VectorSocket Vector { get; set; }
+
+		/// <summary>
+		/// Create VectorMathNode output sockets
+		/// </summary>
+		/// <param name="parentNode"></param>
+		internal VectorRotateOutputs(ShaderNode parentNode)
+		{
+			Vector = new VectorSocket(parentNode, "Vector", "vector");
+			AddSocket(Vector);
+		}
+	}
+
+	[ShaderNode("vector_rotate")]
+	public class VectorRotate : ShaderNode
+	{
+		public VectorRotate(Shader shader) : this(shader, "a vector rotate node") { }
+		public VectorRotate(Shader shader, string name) : base(shader, name) { FinalizeConstructor(); }
+		internal VectorRotate(Shader shader, IntPtr intPtr) : base(shader, intPtr) { FinalizeConstructor(); }
+		public override string ShaderNodeTypeName => "vector_rotate";
+
+		public enum VectorRotateType : int
+		{
+			Axis,
+			AxisX,
+			AxisY,
+			AxisZ,
+			Euler,
+		}
+
+		public VectorRotateType RotateType { get; set; }
+		public bool Invert { get; set; }
+
+		/// <summary>
+		/// VectorRotateNode input sockets
+		/// </summary>
+		public VectorRotateInputs ins => (VectorRotateInputs)inputs;
+
+		/// <summary>
+		/// VectorRotateNode output sockets
+		/// </summary>
+		public VectorRotateOutputs outs => (VectorRotateOutputs)outputs;
+
+		private void FinalizeConstructor()
+		{
+			inputs = new VectorRotateInputs(this);
+			outputs = new VectorRotateOutputs(this);
+
+			ins.Vector.Value = new float4(0.0f);
+			ins.Rotation.Value = new float4(0.0f);
+			ins.Center.Value = new float4(0.0f);
+			ins.Axis.Value = new float4(0.0f);
+			ins.Angle.Value = 0.0f;
+
+			RotateType = VectorRotateType.AxisY;
+			Invert = false;
+		}
+
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "type", (int)RotateType);
+		}
+
+		internal override void SetDirectMembers()
+		{
+			CSycles.shadernode_set_member_bool(Id, "invert", Invert);
+		}
+
+	}
 }
+#pragma warning restore IDE1006 // Naming Styles

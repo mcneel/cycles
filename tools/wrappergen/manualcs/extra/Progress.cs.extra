@@ -1,6 +1,0 @@
-
-        public (string status, string substatus) GetStatus()
-        {
-            return CSycles.progress_get_status(this);
-        }
-

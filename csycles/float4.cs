@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,255 +12,335 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-10-13 06:03:25 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
-using ccl.Attributes;
-using ccl.ShaderNodes.Sockets;
 using System;
-using System.Xml;
-using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace ccl
 {
-    using cclext;
-    using System.Runtime.CompilerServices;
+	internal struct _f4Api
+	{
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		[return: MarshalAs(UnmanagedType.LPStruct)]
+		static public extern void cycles_f4_add([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct float4
-    {
-        public float x;
-        public float y;
-        public float z;
-        public float w;
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		[return: MarshalAs(UnmanagedType.LPStruct)]
+		static public extern void cycles_f4_sub([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		[return: MarshalAs(UnmanagedType.LPStruct)]
+		static public extern void cycles_f4_mul([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		[return: MarshalAs(UnmanagedType.LPStruct)]
+		static public extern void cycles_f4_div([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
 
-        public float4(float x, float y, float z, float w)
-        {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.w = w;
-        }
+	}
+	[StructLayout(LayoutKind.Sequential, Pack = 8)]
+	public struct _float4
+	{
+		public float x;
+		public float y;
+		public float z;
+		public float w;
 
-        public float4(float x, float y, float z)
-        {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.w = 0f;
-        }
+		public _float4(float a, float b, float c, float d)
+		{
+			x = a;
+			y = b;
+			z = c;
+			w = d;
+		}
 
-        public float4(float v)
-        {
-            x = v;
-            y = v;
-            z = v;
-            w = v;
-        }
-        public float4(float4 v)
-        {
-            x = v.x;
-            y = v.y;
-            z = v.z;
-            w = v.w;
-        }
+		public static explicit operator float4(_float4 _f4)
+		{
+			float4 f4 = new float4(_f4.x, _f4.y, _f4.z, _f4.w);
 
-        public float4(float[] floats)
-        {
-            if(floats.Length < 4)
-                throw new ArgumentException("Array must contain at least 4 elements");
-            x = floats[0];
-            y = floats[1];
-            z = floats[2];
-            w = floats[3];
-        }
+			return f4;
+		}
 
-        public float this[int i]
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                switch(i)
-                {
-                    case 0: return x;
-                    case 1: return y;
-                    case 2: return z;
-                    case 3: return w;
-                    default:
-                        throw new IndexOutOfRangeException("Invalid float4 index!");
-                }
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set
-            {
-                switch(i)                 {
-                    case 0: x = value; break;
-                    case 1: y = value; break;
-                    case 2: z = value; break;
-                    case 3: w = value; break;
-                    default:
-                        throw new IndexOutOfRangeException("Invalid float4 index!");
-                }
-            }
-        }
+		public static explicit operator _float4(float4 f4)
+		{
+			_float4 _f4 = new _float4(f4.x, f4.y, f4.z, f4.w);
 
-        public override string ToString()
-        {
-            return $"({x}, {y}, {z}, {w})";
-        }
+			return _f4;
+		}
 
-        /// <summary>
-        /// Assume this float4 is a color representation and
-        /// apply gamma to the x, y and z channels if
-        /// gamma != 1.0f;
-        ///
-        /// pow(channel, gamma)
-        /// </summary>
-        /// <param name="gamma"></param>
-        public static float4 operator ^(float4 a, float gamma)
-        {
-            if (Math.Abs(1.0f - gamma) > float.Epsilon)
-            {
-                return new float4((float)Math.Pow(a.x, gamma), (float)Math.Pow(a.y, gamma), (float)Math.Pow(a.z, gamma), a.w);
-            }
-            return a;
-        }
+		public static _float4 operator +(_float4 a, _float4 b)
+		{
+			_float4 res = new _float4();
+			_f4Api.cycles_f4_add(a, b, ref res);
+			return res;
+		}
 
-        public static float4 operator /(float4 a, float4 b)
-        {
-            return new float4(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
-        }
+		public static _float4 operator -(_float4 a, _float4 b)
+		{
+			_float4 res = new _float4();
+			_f4Api.cycles_f4_sub(a, b, ref res);
+			return res;
+		}
+		public static _float4 operator *(_float4 a, _float4 b)
+		{
+			_float4 res = new _float4();
+			_f4Api.cycles_f4_mul(a, b, ref res);
+			return res;
+		}
+		public static _float4 operator /(_float4 a, _float4 b)
+		{
+			_float4 res = new _float4();
+			_f4Api.cycles_f4_div(a, b, ref res);
+			return res;
+		}
+		public float this[int index]
+		{
+			get
+			{
+				switch (index)
+				{
+					case 0:
+						return x;
+					case 1:
+						return y;
+					case 2:
+						return z;
+					case 3:
+						return w;
+					default:
+						throw new IndexOutOfRangeException("Only 0-3 are acceptable");
+				}
+			}
+			set
+			{
+				switch (index)
+				{
+					case 0:
+						x = value;
+						break;
+					case 1:
+						y = value;
+						break;
+					case 2:
+						z = value;
+						break;
+					case 3:
+						w = value;
+						break;
+					default:
+						throw new IndexOutOfRangeException("Only 0-3 are acceptable");
+				}
 
-        public static float4 operator /(float4 a, float b)
-        {
-            var inv = 1.0f / b;
-            return new float4(a.x * inv, a.y * inv, a.z * inv, a.w * inv);
-        }
+			}
+		}
 
-        public static float4 operator /(float a, float4 b)
-        {
-            return new float4(a / b.x, a / b.y, a / b.z, a / b.w);
-        }
 
-        public static float4 operator *(float4 a, float4 b)
-        {
-            return new float4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
-        }
+	}
+	public class float4
+	{
+		public float x;
+		public float y;
+		public float z;
+		public float w;
+		public float4() : this(0.0f, 0.0f, 0.0f, 0.0f) { }
+		/// <summary>
+		/// Create float4 with all members set to x_
+		/// </summary>
+		/// <param name="x_"></param>
+		public float4(float x_) : this(x_, x_, x_, x_) { }
+		public float4(float x_, float y_, float z_) : this(x_, y_, z_, 0.0f) { }
+		public float4(float x_, float y_, float z_, float w_)
+		{
+			x = x_;
+			y = y_;
+			z = z_;
+			w = w_;
+		}
+		public float4(double x_, double y_, double z_, double w_) :
+			this((float)x_, (float)y_, (float)z_, (float)w_)
+		{ }
+		public float4(double[] arr) : this(arr[0], arr[1], arr[2], arr[3]) { }
+		/// <summary>
+		/// Copy constructor
+		/// </summary>
+		/// <param name="old">float4 to copy</param>
+		public float4(float4 old) : this(old.x, old.y, old.z, old.w) { }
+		private static float srgb_to_linear(float c)
+		{
+			if (c < 0.04045f)
+				return (c < 0.0f) ? 0.0f : c * (1.0f / 12.92f);
+			else
+				return (float)Math.Pow((c + 0.055f) * (1.0f / 1.055f), 2.4f);
 
-        public static float4 operator *(float4 a, float b)
-        {
-            return new float4(a.x * b, a.y * b, a.z * b, a.w * b);
-        }
+		}
 
-        public static float4 operator *(float a, float4 b)
-        {
-            return new float4(b.x * a, b.y * a, b.z * a, b.w * a);
-        }
+		/// <summary>
+		/// Apply sRGB to linear conversion on RGB. The A is kept as is.
+		/// </summary>
+		/// <param name="f4"></param>
+		/// <returns></returns>
+		public static float4 SrgbToLinear(float4 f4)
+		{
+			return new float4(
+				srgb_to_linear(f4.x),
+				srgb_to_linear(f4.y),
+				srgb_to_linear(f4.z),
+				f4.w
+			)
+			;
+		}
 
-        public static float4 operator +(float4 a, float4 b)
-        {
-            return new float4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
-        }
+		public float this[int index]
+		{
+			get
+			{
+				switch (index)
+				{
+					case 0:
+						return x;
+					case 1:
+						return y;
+					case 2:
+						return z;
+					case 3:
+						return w;
+					default:
+						throw new IndexOutOfRangeException("Only 0-3 are acceptable");
+				}
+			}
+			set
+			{
+				switch (index)
+				{
+					case 0:
+						x = value;
+						break;
+					case 1:
+						y = value;
+						break;
+					case 2:
+						z = value;
+						break;
+					case 3:
+						w = value;
+						break;
+					default:
+						throw new IndexOutOfRangeException("Only 0-3 are acceptable");
+				}
 
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(this, obj)) return true;
-            if(obj.GetType() != typeof(float4)) return false;
-            return this == (float4)obj;
-        }
+			}
+		}
 
-        public override int GetHashCode()
-        {
-            return 43 * x.GetHashCode() +
-                   47 * y.GetHashCode() +
-                   53 * z.GetHashCode() +
-                   59 * w.GetHashCode();
-        }
+		/// <summary>
+		/// Copy values from given source float4
+		/// </summary>
+		/// <param name="source">float4 to copy from</param>
+		public void Copy(float4 source)
+		{
+			x = source.x;
+			y = source.y;
+			z = source.z;
+			w = source.w;
+		}
 
-        public static bool operator==(float4 lhs, float4 rhs)
-        {
-            if(lhs==null || rhs==null) return false;
-            return lhs.x==rhs.x && lhs.y==rhs.y && lhs.z==rhs.z && lhs.w==rhs.w;
-        }
+		public override string ToString()
+		{
+			var nfi = Utilities.Instance.NumberFormatInfo;
+			return string.Format(nfi, "ccl.float4({0}f, {1}f, {2}f, {3}f)", x, y, z, w);
+		}
 
-        public static bool operator!=(float4 lhs, float4 rhs)
-        {
-            return !(lhs==rhs);
-        }
+		/// <summary>
+		/// Assume this float4 is a color representation and
+		/// apply gamma to the x, y and z channels if
+		/// gamma != 1.0f;
+		/// 
+		/// pow(channel, gamma)
+		/// </summary>
+		/// <param name="gamma"></param>
+		public static float4 operator ^(float4 a, float gamma)
+		{
+			if (Math.Abs(1.0f - gamma) > float.Epsilon)
+			{
+				return new float4((float)Math.Pow(a.x, gamma), (float)Math.Pow(a.y, gamma), (float)Math.Pow(a.z, gamma), a.w);
+			}
+			return a;
+		}
 
-        /// <summary>
-        /// Transform point a with Transform t
-        /// </summary>
-        /// <param name="t"></param>
-        /// <param name="a"></param>
-        /// <returns></returns>
-        public static float4 operator *(Transform t, float4 a)
-        {
+		public static float4 operator /(float4 a, float4 b)
+		{
+			return new float4(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
+		}
 
-            float4 c = new float4(
-                a.x * t.x.x + a.y * t.x.y + a.z * t.x.z + t.x.w,
-                a.x * t.y.x + a.y * t.y.y + a.z * t.y.z + t.y.w,
-                a.x * t.z.x + a.y * t.z.y + a.z * t.z.z + t.z.w);
+		public static float4 operator /(float4 a, float b)
+		{
+			var inv = 1.0f / b;
+			return new float4(a.x * inv, a.y * inv, a.z * inv, a.w * inv);
+		}
 
-            return c;
-        }
+		public static float4 operator /(float a, float4 b)
+		{
+			return new float4(a / b.x, a / b.y, a / b.z, a / b.w);
+		}
 
-        public float Length()
-        {
-            return (float)Math.Sqrt(Dot(this, this));
-        }
+		public static float4 operator *(float4 a, float4 b)
+		{
+			return new float4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
+		}
 
-        public static float Dot(float4 a, float4 b)
-        {
-            return (a.x * b.x + a.y * b.y) + (a.z * b.z + a.w * b.w);
-        }
+		public static float4 operator *(float4 a, float b)
+		{
+			return new float4(a.x * b, a.y * b, a.z * b, a.w * b);
+		}
 
-        public static float4 Normalize(float4 a)
-        {
-            return a / a.Length();
-        }
+		public static float4 operator *(float a, float4 b)
+		{
+			return new float4(b.x * a, b.y * a, b.z * a, b.w * a);
+		}
 
-        public bool IsZero(bool checkW)
-        {
-            if (checkW)
-                return Math.Abs(x) < 0.00001f && Math.Abs(y) < 0.00001f
-                    && Math.Abs(z) < 0.00001f && Math.Abs(w) < 0.00001f;
+		public static float4 operator +(float4 a, float4 b)
+		{
+			return new float4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+		}
 
-            return Math.Abs(x) < 0.00001f && Math.Abs(y) < 0.00001f
-                && Math.Abs(z) < 0.00001f;
-        }
+		/// <summary>
+		/// Transform point a with Transform t
+		/// </summary>
+		/// <param name="t"></param>
+		/// <param name="a"></param>
+		/// <returns></returns>
+		public static float4 operator *(Transform t, float4 a)
+		{
 
-        private static float srgb_to_linear(float c)
-        {
-            if (c < 0.04045f)
-                return (c < 0.0f) ? 0.0f : c * (1.0f / 12.92f);
-            else
-                return (float)Math.Pow((c + 0.055f) * (1.0f / 1.055f), 2.4f);
+			float4 c = new float4(
+				a.x * t.x.x + a.y * t.x.y + a.z * t.x.z + t.x.w,
+				a.x * t.y.x + a.y * t.y.y + a.z * t.y.z + t.y.w,
+				a.x * t.z.x + a.y * t.z.y + a.z * t.z.z + t.z.w);
 
-        }
+			return c;
+		}
 
-        /// <summary>
-        /// Apply sRGB to linear conversion on RGB. The A is kept as is.
-        /// </summary>
-        /// <param name="f4"></param>
-        /// <returns></returns>
-        public static float4 SrgbToLinear(float4 f4)
-        {
-            return new float4(
-                srgb_to_linear(f4.x),
-                srgb_to_linear(f4.y),
-                srgb_to_linear(f4.z),
-                f4.w
-            )
-            ;
-        }
-    }
+		public float Length()
+		{
+			return (float)Math.Sqrt(Dot(this, this));
+		}
+
+		public static float Dot(float4 a, float4 b)
+		{
+			return (a.x * b.x + a.y * b.y) + (a.z * b.z + a.w * b.w);
+		}
+
+		public static float4 Normalize(float4 a)
+		{
+			return a / a.Length();
+		}
+
+		public bool IsZero(bool checkW)
+		{
+			if (checkW)
+				return Math.Abs(x) < 0.00001f && Math.Abs(y) < 0.00001f
+					&& Math.Abs(z) < 0.00001f && Math.Abs(w) < 0.00001f;
+
+			return Math.Abs(x) < 0.00001f && Math.Abs(y) < 0.00001f
+				&& Math.Abs(z) < 0.00001f;
+		}
+	}
+
 }

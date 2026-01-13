@@ -1,5 +1,6 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+C
+opyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,80 +13,117 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
 using ccl.Attributes;
-using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
+
+/**
+ * \defgroup cclshadernodes CSycles Shader Nodes
+ */
+
+/**
+ * \ingroup cclshadernodes
+ *  This pacakage contains the high-level <c>ccl.ShaderNode</c>s to be used in a <c>ccl.Shader</c>.
+ *
+ *  The classes give a clear and concise way of setting up <c>ccl.ShaderNode</c>s with a minimum of
+ *  fuss.
+ */
+
 namespace ccl.ShaderNodes
 {
-    using cclext;
+  /// <summary>
+  /// AddClosure node input sockets
+  /// </summary>
+  public class AddClosureInputs : Inputs
+	{
+		/// <summary>
+		/// AddClosure input socket
+		/// </summary>
+		public ClosureSocket Closure1 { get; set; }
+		/// <summary>
+		/// AddClosure input socket
+		/// </summary>
+		public ClosureSocket Closure2 { get; set; }
 
-    public class AddClosureNodeInputs : Inputs
-    {
-        public ClosureSocket Closure1 { get; private set; }
-        public ClosureSocket Closure2 { get; private set; }
+		internal AddClosureInputs(ShaderNode parentNode)
+		{
+			Closure1 = new ClosureSocket(parentNode, "Closure1", "closure1");
+			AddSocket(Closure1);
+			Closure2 = new ClosureSocket(parentNode, "Closure2", "closure2");
+			AddSocket(Closure2);
+		}
+	}
 
-        public AddClosureNodeInputs(ShaderNode parentNode)
-        {
-            Closure1 = new ClosureSocket(parentNode, "Closure1", "closure1", true);
-            AddSocket(Closure1);
-            Closure2 = new ClosureSocket(parentNode, "Closure2", "closure2", true);
-            AddSocket(Closure2);
-        }
-    }
-    public class AddClosureNodeOutputs : Outputs
-    {
-        public ClosureSocket Closure { get; private set; }
+	/// <summary>
+	/// AddClosure node output sockets
+	/// </summary>
+	public class AddClosureOutputs : Outputs
+	{
+		/// <summary>
+		/// AddClosure output socket
+		/// </summary>
+		public ClosureSocket Closure { get; set; }
 
-        public AddClosureNodeOutputs(ShaderNode parentNode)
-        {
-            Closure = new ClosureSocket(parentNode, "Closure", "closure", false);
-            AddSocket(Closure);
-        }
-    }
+		internal AddClosureOutputs(ShaderNode parentNode)
+		{
+			Closure = new ClosureSocket(parentNode, "Closure", "closure");
+			AddSocket(Closure);
+		}
+	}
 
-    [ShaderNode(name: "add_closure")]
-    public class AddClosureNode : ShaderNode
-    {
-        public AddClosureNodeInputs ins => (AddClosureNodeInputs)inputs;
-        public AddClosureNodeOutputs outs => (AddClosureNodeOutputs)outputs;
-        public AddClosureNode(Shader shader) : this(shader, "a add_closure node") { }
+	/// <summary>
+	/// An Add closure.
+	/// This closure takes two inputs, <c>Closure1</c> and <c>Closure2</c>. These
+	/// will be simply added together.
+	///
+	/// There is one output <c>Closure</c>
+	/// </summary>
+	[ShaderNode("add_closure")]
+	public class AddClosureNode : ShaderNode
+	{
+		/// <summary>
+		/// AddClosure input sockets
+		/// </summary>
+		public AddClosureInputs ins => (AddClosureInputs) inputs;
 
-        public AddClosureNode(Shader shader, string name) :
-            base(shader, name)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// AddClosure output sockets
+		/// </summary>
+		public AddClosureOutputs outs => (AddClosureOutputs) outputs;
 
-        internal AddClosureNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// Create a new Add closure.
+		/// </summary>
+		public AddClosureNode(Shader shader) : this(shader, "An add closures node")
+		{
+		}
 
-        private void FinalizeConstructor()
-        {
-            inputs = new AddClosureNodeInputs(this);
-            outputs = new AddClosureNodeOutputs(this);
-        }
-        public override ClosureSocket GetClosureSocket()
-        {
-            return outs.Closure;
-        }
-        public static IntPtr GetNodeType() {
-            return CSycles.addclosurenode_get_node_type();
-        }
-    }
+		/// <summary>
+		/// Create a new Add closure with name
+		/// </summary>
+		/// <param name="name"></param>
+		public AddClosureNode(Shader shader, string name) :
+			base(shader, name)
+		{
+			FinalizeConstructor();
+		}
 
+		internal AddClosureNode(Shader shader, IntPtr shaderNodePtr) : base(shader, shaderNodePtr)
+		{
+			FinalizeConstructor();
+		}
+
+		private void FinalizeConstructor()
+		{
+			inputs = new AddClosureInputs(this);
+			outputs = new AddClosureOutputs(this);
+		}
+
+		public override ClosureSocket GetClosureSocket()
+		{
+			return outs.Closure;
+		}
+	}
 }

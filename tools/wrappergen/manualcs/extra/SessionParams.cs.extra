@@ -1,5 +1,0 @@
-        public Device Device {
-            set {
-                CSycles.session_params_set_deviceinfo(this, value.Info);
-            }
-        }

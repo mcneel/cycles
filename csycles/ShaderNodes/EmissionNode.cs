@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,145 +12,70 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
 using ccl.Attributes;
-using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
+using System.Xml;
+
 namespace ccl.ShaderNodes
 {
-    using cclext;
+	public class EmissionInputs : Inputs
+	{
+		public ColorSocket Color { get; set; }
+		public FloatSocket Strength { get; set; }
 
-    public class EmissionNodeInputs : Inputs
-    {
-        public FloatSocket Strength { get; private set; }
-        public ColorSocket Color { get; private set; }
+		internal EmissionInputs(ShaderNode parentNode)
+		{
+			Color = new ColorSocket(parentNode, "Color", "color");
+			AddSocket(Color);
+			Strength = new FloatSocket(parentNode, "Strength", "strength");
+			AddSocket(Strength);
+		}
+	}
 
-        public EmissionNodeInputs(ShaderNode parentNode)
-        {
-            Strength = new FloatSocket(parentNode, "Strength", "strength", true);
-            AddSocket(Strength);
-            Color = new ColorSocket(parentNode, "Color", "color", true);
-            AddSocket(Color);
-        }
-    }
-    public class EmissionNodeOutputs : Outputs
-    {
-        public ClosureSocket Emission { get; private set; }
+	public class EmissionOutputs : Outputs
+	{
+		public ClosureSocket Emission { get; set; }
 
-        public EmissionNodeOutputs(ShaderNode parentNode)
-        {
-            Emission = new ClosureSocket(parentNode, "Emission", "emission", false);
-            AddSocket(Emission);
-        }
-    }
+		internal EmissionOutputs(ShaderNode parentNode)
+		{
+			Emission = new ClosureSocket(parentNode, "Emission", "emission");
+			AddSocket(Emission);
+		}
+	}
 
-    [ShaderNode(name: "emission")]
-    public class EmissionNode : ShaderNode
-    {
-        public EmissionNodeInputs ins => (EmissionNodeInputs)inputs;
-        public EmissionNodeOutputs outs => (EmissionNodeOutputs)outputs;
-        public EmissionNode(Shader shader) : this(shader, "a emission node") { }
+	[ShaderNode("emission")]
+	public class EmissionNode : ShaderNode
+	{
+		public EmissionInputs ins => (EmissionInputs)inputs;
+		public EmissionOutputs outs => (EmissionOutputs)outputs;
 
-        public EmissionNode(Shader shader, string name) :
-            base(shader, name)
-        {
-            FinalizeConstructor();
-        }
+		public EmissionNode(Shader shader) : this(shader, "an emission node") { }
+		public EmissionNode(Shader shader, string name) : base(shader, name)
+		{
+			FinalizeConstructor();
+		}
 
-        internal EmissionNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-        {
-            FinalizeConstructor();
-        }
+		internal EmissionNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+		{
+			FinalizeConstructor();
+		}
 
-        private void FinalizeConstructor()
-        {
-            inputs = new EmissionNodeInputs(this);
-            outputs = new EmissionNodeOutputs(this);
-        }
-        public override ClosureSocket GetClosureSocket()
-        {
-            return outs.Emission;
-        }
-        public static IntPtr GetNodeType() {
-            return CSycles.emissionnode_get_node_type();
-        }
+		private void FinalizeConstructor()
+		{
+			inputs = new EmissionInputs(this);
+			outputs = new EmissionOutputs(this);
 
-        public bool FromAutoConversion {
-            get { return CSycles.emissionnode_get_from_auto_conversion(Ptr); }
-            set { CSycles.emissionnode_set_from_auto_conversion(Ptr, value); }
-        }
-#region Setters
+			ins.Color.Value = new float4(0.8f);
+			ins.Strength.Value = 1.0f;
+		}
 
-        internal override void SetFloat(string name, float data)
-        {
-            switch(name) {
-            case "strength":
-                    /* emissionnode . {'datatype': 'FLOAT', 'default_value': '10.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'strength', 'ui_name': 'Strength'} */
-                    {
-                    CSycles.emissionnode_set_strength(this.Ptr, data);
-                    }
-                    break;
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type EmissionNode (setter)");
-            }
-        }
-
-        internal override void SetColor(string name, float3 data)
-        {
-            switch(name) {
-            case "color":
-                    /* emissionnode . {'datatype': 'COLOR', 'default_value': 'make_float3(0.8f,0.8f,0.8f)', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color', 'ui_name': 'Color'} */
-                    {
-                    CSycles.emissionnode_set_color(this.Ptr, data);
-                    }
-                    break;
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type EmissionNode (setter)");
-            }
-        }
-
-#endregion
-#region Getters
-
-        internal override float GetFloat(string name)
-        {
-            switch(name) {
-            case "strength":
-                /* emissionnode . {'datatype': 'FLOAT', 'default_value': '10.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'strength', 'ui_name': 'Strength'} */
-                {
-                    return CSycles.emissionnode_get_strength(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type EmissionNode (getter)");
-            }
-        }
-
-        internal override float3 GetColor(string name)
-        {
-            switch(name) {
-            case "color":
-                /* emissionnode . {'datatype': 'COLOR', 'default_value': 'make_float3(0.8f,0.8f,0.8f)', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'color', 'ui_name': 'Color'} */
-                {
-                    return CSycles.emissionnode_get_color(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type EmissionNode (getter)");
-            }
-        }
-
-#endregion
-    }
-
+		internal override void ParseXml(XmlReader xmlNode)
+		{
+			Utilities.Instance.get_float4(ins.Color, xmlNode.GetAttribute("color"));
+			Utilities.Instance.get_float(ins.Strength, xmlNode.GetAttribute("strength"));
+		}
+	}
 }

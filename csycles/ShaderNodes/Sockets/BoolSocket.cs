@@ -18,8 +18,9 @@ namespace ccl.ShaderNodes.Sockets
 {
 	public class BoolSocket : SocketBase<bool>
 	{
-		public BoolSocket(ShaderNode parentNode, string name, string internalname, bool isInput) : base(parentNode, name, internalname, isInput)
+		public BoolSocket(ShaderNode parentNode, string name, string internalname) : base(parentNode, name, internalname)
 		{
+			Value = false;
 		}
 		public override string ToString()
 		{

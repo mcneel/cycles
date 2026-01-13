@@ -1,5 +1,5 @@
 /**
-Copyright 2014-2025 Robert McNeel and Associates
+Copyright 2014-2024 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,400 +12,219 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-----------------------------------------------------------------------
-NOTE: Do NOT modify this file directly, it is automatically generated.
-
-Code generated at: 2025-12-02 03:24:08 UTC
-----------------------------------------------------------------------
-
 **/
 
-using ccl;
 using ccl.Attributes;
-using ccl.ShaderNodes;
 using ccl.ShaderNodes.Sockets;
-using ccl.NodeSockets;
 using System;
-using System.Collections.Generic;
+using System.Text;
+using System.Xml;
+
 namespace ccl.ShaderNodes
 {
-    using cclext;
+	/// <summary>
+	/// ImageTexture input sockets
+	/// </summary>
+	public class ImageTextureInputs : Inputs
+	{
+		/// <summary>
+		/// ImageTexture space coordinate to sample texture at
+		/// </summary>
+		public VectorSocket Vector { get; set; }
 
-    public class ImageTextureNodeInputs : Inputs
-    {
-        public EnumSocket Interpolation { get; private set; }
-        public EnumSocket Extension { get; private set; }
-        public EnumSocket Projection { get; private set; }
-        public FloatSocket ProjectionBlend { get; private set; }
-        public IntArraySocket Tiles { get; private set; }
-        public BoolSocket Animated { get; private set; }
-        public StringSocket Filename { get; private set; }
-        public PointSocket Vector { get; private set; }
-        public StringSocket Colorspace { get; private set; }
-        public FloatSocket DecalForward { get; private set; }
-        public BoolSocket AlternateTiles { get; private set; }
-        public FloatSocket DecalUsage { get; private set; }
-        public EnumSocket AlphaType { get; private set; }
+		/// <summary>
+		/// DecalForward as calculated by the TextureCoordinateNode. Needs to be
+		/// connected to work.
+		/// </summary>
+		public FloatSocket DecalForward { get; set; }
+		/// <summary>
+		/// DecalInside as calculated by the TextureCoordinateNode. Needs to be
+		/// connected to work.
+		/// </summary>
+		public FloatSocket DecalUsage { get; set; }
+		public StringSocket Filename { get; set; }
 
-        public ImageTextureNodeInputs(ShaderNode parentNode)
-        {
-            Interpolation = new EnumSocket(parentNode, "Interpolation", "interpolation", true);
-            AddSocket(Interpolation);
-            Extension = new EnumSocket(parentNode, "Extension", "extension", true);
-            AddSocket(Extension);
-            Projection = new EnumSocket(parentNode, "Projection", "projection", true);
-            AddSocket(Projection);
-            ProjectionBlend = new FloatSocket(parentNode, "Projection Blend", "projection_blend", true);
-            AddSocket(ProjectionBlend);
-            Tiles = new IntArraySocket(parentNode, "Tiles", "tiles", true);
-            AddSocket(Tiles);
-            Animated = new BoolSocket(parentNode, "Animated", "animated", true);
-            AddSocket(Animated);
-            Filename = new StringSocket(parentNode, "Filename", "filename", true);
-            AddSocket(Filename);
-            Vector = new PointSocket(parentNode, "Vector", "vector", true);
-            AddSocket(Vector);
-            Colorspace = new StringSocket(parentNode, "Colorspace", "colorspace", true);
-            AddSocket(Colorspace);
-            DecalForward = new FloatSocket(parentNode, "DecalForward", "decalforward", true);
-            AddSocket(DecalForward);
-            AlternateTiles = new BoolSocket(parentNode, "Alternate Tiles", "alternate_tiles", true);
-            AddSocket(AlternateTiles);
-            DecalUsage = new FloatSocket(parentNode, "DecalUsage", "decalusage", true);
-            AddSocket(DecalUsage);
-            AlphaType = new EnumSocket(parentNode, "Alpha Type", "alpha_type", true);
-            AddSocket(AlphaType);
-        }
-    }
-    public class ImageTextureNodeOutputs : Outputs
-    {
-        public FloatSocket Alpha { get; private set; }
-        public ColorSocket Color { get; private set; }
+		internal ImageTextureInputs(ShaderNode parentNode)
+		{
+			Vector = new VectorSocket(parentNode, "Vector", "vector");
+			AddSocket(Vector);
+			DecalForward = new FloatSocket(parentNode, "DecalForward", "decalforward");
+			AddSocket(DecalForward);
+			DecalUsage = new FloatSocket(parentNode, "DecalUsage", "decalusage");
+			AddSocket(DecalUsage);
+			Filename = new StringSocket(parentNode, "Filename", "filename");
+			AddSocket(Filename);
+		}
+	}
 
-        public ImageTextureNodeOutputs(ShaderNode parentNode)
-        {
-            Alpha = new FloatSocket(parentNode, "Alpha", "alpha", false);
-            AddSocket(Alpha);
-            Color = new ColorSocket(parentNode, "Color", "color", false);
-            AddSocket(Color);
-        }
-    }
+	/// <summary>
+	/// ImageTexture output sockets
+	/// </summary>
+	public class ImageTextureOutputs : Outputs
+	{
+		/// <summary>
+		/// ImageTexture Color output
+		/// </summary>
+		public ColorSocket Color { get; set; }
+		/// <summary>
+		/// ImageTexture alpha output
+		/// </summary>
+		public FloatSocket Alpha { get; set; }
 
-    [ShaderNode(name: "image_texture")]
-    public class ImageTextureNode : ImageSlotTextureNode
-    {
-        public enum ImageTextureNodeAlphaType : uint {
-            Unassociated = ccl.ImageAlphaType.IMAGE_ALPHA_UNASSOCIATED,
-            Associated = ccl.ImageAlphaType.IMAGE_ALPHA_ASSOCIATED,
-            ChannelPacked = ccl.ImageAlphaType.IMAGE_ALPHA_CHANNEL_PACKED,
-            Ignore = ccl.ImageAlphaType.IMAGE_ALPHA_IGNORE,
-            Auto = ccl.ImageAlphaType.IMAGE_ALPHA_AUTO,
-        }
-        public enum ImageTextureNodeExtension : uint {
-            Periodic = ccl.ExtensionType.EXTENSION_REPEAT,
-            Clamp = ccl.ExtensionType.EXTENSION_EXTEND,
-            Black = ccl.ExtensionType.EXTENSION_CLIP,
-            Mirror = ccl.ExtensionType.EXTENSION_MIRROR,
-        }
-        public enum ImageTextureNodeInterpolation : uint {
-            Linear = ccl.InterpolationType.INTERPOLATION_LINEAR,
-            Closest = ccl.InterpolationType.INTERPOLATION_CLOSEST,
-            Cubic = ccl.InterpolationType.INTERPOLATION_CUBIC,
-            Smart = ccl.InterpolationType.INTERPOLATION_SMART,
-        }
-        public enum ImageTextureNodeMappingAxis : uint {
-            None = ccl.TextureMapping_Mapping.NONE,
-            X = ccl.TextureMapping_Mapping.X,
-            Y = ccl.TextureMapping_Mapping.Y,
-            Z = ccl.TextureMapping_Mapping.Z,
-        }
-        public enum ImageTextureNodeMappingProjection : uint {
-            Flat = ccl.TextureMapping_Projection.FLAT,
-            Cube = ccl.TextureMapping_Projection.CUBE,
-            Tube = ccl.TextureMapping_Projection.TUBE,
-            Sphere = ccl.TextureMapping_Projection.SPHERE,
-        }
-        public enum ImageTextureNodeMappingType : uint {
-            Point = ccl.TextureMapping_Type.POINT,
-            Texture = ccl.TextureMapping_Type.TEXTURE,
-            Vector = ccl.TextureMapping_Type.VECTOR,
-            Normal = ccl.TextureMapping_Type.NORMAL,
-        }
-        public enum ImageTextureNodeProjection : uint {
-            Flat = ccl.NodeImageProjection.NODE_IMAGE_PROJ_FLAT,
-            Box = ccl.NodeImageProjection.NODE_IMAGE_PROJ_BOX,
-            Sphere = ccl.NodeImageProjection.NODE_IMAGE_PROJ_SPHERE,
-            Tube = ccl.NodeImageProjection.NODE_IMAGE_PROJ_TUBE,
-        }
-        public ImageTextureNodeInputs ins => (ImageTextureNodeInputs)inputs;
-        public ImageTextureNodeOutputs outs => (ImageTextureNodeOutputs)outputs;
-        public ImageTextureNode(Shader shader) : this(shader, "a image_texture node") { }
+		internal ImageTextureOutputs(ShaderNode parentNode)
+		{
+			Color = new ColorSocket(parentNode, "Color", "color");
+			AddSocket(Color);
+			Alpha = new FloatSocket(parentNode, "Alpha", "alpha");
+			AddSocket(Alpha);
+		}
+	}
 
-        public ImageTextureNode(Shader shader, string name) :
-            base(shader, name)
-        {
-            FinalizeConstructor();
-        }
+	[ShaderNode("image_texture")]
+	public class ImageTextureNode : TextureNode
+	{
+		/// <summary>
+		/// Image texture input sockets
+		/// </summary>
+		public ImageTextureInputs ins => (ImageTextureInputs)inputs;
 
-        internal ImageTextureNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
-        {
-            FinalizeConstructor();
-        }
+		/// <summary>
+		/// Image texture output sockets
+		/// </summary>
+		public ImageTextureOutputs outs => (ImageTextureOutputs)outputs;
 
-        private void FinalizeConstructor()
-        {
-            inputs = new ImageTextureNodeInputs(this);
-            outputs = new ImageTextureNodeOutputs(this);
-        }
-        public static IntPtr GetNodeType() {
-            return CSycles.imagetexturenode_get_node_type();
-        }
-#region Setters
+		public ImageTextureNode(Shader shader) : this(shader, "an image texture node")
+		{
+		}
 
-        internal override void SetFloat(string name, float data)
-        {
-            switch(name) {
-            case "projection_blend":
-                    /* imagetexturenode . {'datatype': 'FLOAT', 'default_value': '0.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'projection_blend', 'ui_name': 'Projection Blend'} */
-                    {
-                    CSycles.imagetexturenode_set_projection_blend(this.Ptr, data);
-                    }
-                    break;
-            case "decalforward":
-                    /* imagetexturenode . {'datatype': 'FLOAT', 'default_value': '0.5f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'decalforward', 'ui_name': 'DecalForward'} */
-                    {
-                    CSycles.imagetexturenode_set_decalforward(this.Ptr, data);
-                    }
-                    break;
-            case "decalusage":
-                    /* imagetexturenode . {'datatype': 'FLOAT', 'default_value': '0.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'decalusage', 'ui_name': 'DecalUsage'} */
-                    {
-                    CSycles.imagetexturenode_set_decalusage(this.Ptr, data);
-                    }
-                    break;
+		public ImageTextureNode(Shader shader, string name) :
+			base(shader, name)
+		{
+			FinalizeConstructor();
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (setter)");
-            }
-        }
+		internal ImageTextureNode(Shader shader, IntPtr intPtr) : base(shader, intPtr)
+		{
+			FinalizeConstructor();
+		}
 
-        internal override void SetPoint(string name, float3 data)
-        {
-            switch(name) {
-            case "vector":
-                    /* imagetexturenode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector', 'ui_name': 'Vector'} */
-                    {
-                    CSycles.imagetexturenode_set_vector(this.Ptr, data);
-                    }
-                    break;
+		private void FinalizeConstructor()
+		{
+			inputs = new ImageTextureInputs(this);
+			outputs = new ImageTextureOutputs(this);
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (setter)");
-            }
-        }
+			// By default we don't do decal sampling, instead
+			// this value gets set by TextureCoordinateNode output DecalUsage
+			// when connected up
+			ins.DecalUsage.Value = 0.0f;
 
-        internal override void SetBool(string name, bool data)
-        {
-            switch(name) {
-            case "animated":
-                    /* imagetexturenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'animated', 'ui_name': 'Animated'} */
-                    {
-                    CSycles.imagetexturenode_set_animated(this.Ptr, data);
-                    }
-                    break;
-            case "alternate_tiles":
-                    /* imagetexturenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'alternate_tiles', 'ui_name': 'Alternate Tiles'} */
-                    {
-                    CSycles.imagetexturenode_set_alternate_tiles(this.Ptr, data);
-                    }
-                    break;
+			UseAlpha = true;
+			AlternateTiles = false;
+			ProjectionBlend = 0.0f;
+			Interpolation = InterpolationType.Linear;
+			ColorSpace = TextureColorSpace.None;
+			Projection = TextureProjection.Flat;
+			Extension = TextureExtension.Repeat;
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (setter)");
-            }
-        }
+		/// <summary>
+		/// ImageTexture texture projection
+		/// </summary>
+		public TextureProjection Projection { get; set; }
+		/// <summary>
+		/// ImageTexture texture projection blend
+		/// </summary>
+		public float ProjectionBlend { get; set; }
+		/// <summary>
+		/// ImageTexture float image
+		/// </summary>
+		public bool IsFloat { get; set; }
+		/// <summary>
+		/// ImageTexture use alpha channel if true
+		///
+		/// TODO [NATHANLOOK] hook up different alpha usage types. For now auto (true), ignore (false)
+		/// </summary>
+		public bool UseAlpha { get; set; }
+		/// <summary>
+		/// Set to true to alternate UV grid tiling. (Rhino specific)
+		/// </summary>
+		public bool AlternateTiles { get; set; }
 
-        internal override void SetString(string name, string data)
-        {
-            switch(name) {
-            case "filename":
-                    /* imagetexturenode . {'datatype': 'STRING', 'default_value': 'ustring()', 'default_value_type': 'ustring', 'is_input': True, 'member_name': 'filename', 'ui_name': 'Filename'} */
-                    {
-                    CSycles.imagetexturenode_set_filename(this.Ptr, data);
-                    }
-                    break;
-            case "colorspace":
-                    /* imagetexturenode . {'datatype': 'STRING', 'default_value': 'u_colorspace_auto', 'default_value_type': 'ustring', 'is_input': True, 'member_name': 'colorspace', 'ui_name': 'Colorspace'} */
-                    {
-                    CSycles.imagetexturenode_set_colorspace(this.Ptr, data);
-                    }
-                    break;
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (setter)");
-            }
-        }
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "projection", (int)Projection);
+			CSycles.shadernode_set_enum(Id, "interpolation", (int)Interpolation);
+		}
 
-        internal override void SetEnum(string name, object data)
-        {
-            switch(name) {
-            case "interpolation":
-                    /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'INTERPOLATION_LINEAR', 'default_value_type': 'InterpolationType', 'is_input': True, 'member_name': 'interpolation', 'ui_name': 'Interpolation'} */
-                    {
-                    CSycles.imagetexturenode_set_interpolation(this.Ptr, (ccl.InterpolationType)data);
-                    }
-                    break;
-            case "extension":
-                    /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'EXTENSION_REPEAT', 'default_value_type': 'ExtensionType', 'is_input': True, 'member_name': 'extension', 'ui_name': 'Extension'} */
-                    {
-                    CSycles.imagetexturenode_set_extension(this.Ptr, (ccl.ExtensionType)data);
-                    }
-                    break;
-            case "projection":
-                    /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'NODE_IMAGE_PROJ_FLAT', 'default_value_type': 'NodeImageProjection', 'is_input': True, 'member_name': 'projection', 'ui_name': 'Projection'} */
-                    {
-                    CSycles.imagetexturenode_set_projection(this.Ptr, (ccl.NodeImageProjection)data);
-                    }
-                    break;
-            case "alpha_type":
-                    /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'IMAGE_ALPHA_AUTO', 'default_value_type': 'ImageAlphaType', 'is_input': True, 'member_name': 'alpha_type', 'ui_name': 'Alpha Type'} */
-                    {
-                    CSycles.imagetexturenode_set_alpha_type(this.Ptr, (ccl.ImageAlphaType)data);
-                    }
-                    break;
+		internal override void SetDirectMembers()
+		{
+			base.SetDirectMembers();
+			CSycles.shadernode_set_member_float(Id, "projection_blend", ProjectionBlend);
+			CSycles.shadernode_set_member_int(Id, "extension", (int)Extension);
+			CSycles.shadernode_set_member_bool(Id, "use_alpha", UseAlpha);
+			//CSycles.shadernode_set_member_bool(Id, "is_linear", IsLinear);
+			CSycles.shadernode_set_member_bool(Id, "alternate_tiles", AlternateTiles);
+		}
+		private void SetProjection(string projection)
+		{
+			projection = projection.Replace(" ", "_");
+			Projection = (TextureProjection)Enum.Parse(typeof(TextureProjection), projection, true);
+		}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (setter)");
-            }
-        }
+		internal override void ParseXml(XmlReader xmlNode)
+		{
+			var cs = xmlNode.GetAttribute("color_space");
+			if (!string.IsNullOrEmpty(cs))
+			{
+				SetColorSpace(cs);
+			}
+			var projection = xmlNode.GetAttribute("projection");
+			if (!string.IsNullOrEmpty(projection))
+			{
+				SetProjection(projection);
+			}
+			var extension = xmlNode.GetAttribute("extension");
+			if (!string.IsNullOrEmpty(extension))
+			{
+				SetExtension(extension);
+			}
+			var interpolation = xmlNode.GetAttribute("interpolation");
+			if (!string.IsNullOrEmpty(interpolation))
+			{
+				SetInterpolation(interpolation);
+			}
+			ImageParseXml(xmlNode);
+		}
 
-        internal override void SetIntArray(string name, List<int> data)
-        {
-            switch(name) {
-            case "tiles":
-                    /* imagetexturenode . {'datatype': 'INT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'tiles', 'ui_name': 'Tiles'} */
-                    {
-                    CSycles.imagetexturenode_set_tiles(this.Ptr, data);
-                    }
-                    break;
+		public override string CreateXmlAttributes()
+		{
+			var code = new StringBuilder($" projection=\"{Projection}\" ", 1024);
+			code.Append($" color_space=\"{ColorSpace}\"");
+			code.Append($" extension=\"{Extension}\"");
+			code.Append($" interpolation=\"{Interpolation}\"");
+			code.Append($" use_alpha=\"{UseAlpha}\"");
+			code.Append($" is_linear=\"{IsLinear}\"");
+			code.Append($" alternate_tiles=\"{AlternateTiles}\"");
+			if (Filename != null)
+			{
+				code.Append($" src=\"{Filename.Replace("\\", "\\\\")}\"");
+			}
 
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (setter)");
-            }
-        }
+			return code.ToString();
+		}
 
-#endregion
-#region Getters
+		public override string CreateCodeAttributes()
+		{
+			var code = new StringBuilder($"{VariableName}.Projection = {Projection};", 1024);
+			code.Append($"{VariableName}.ColorSpace = {ColorSpace};");
+			code.Append($"{VariableName}.Extension = {Extension};");
+			code.Append($"{VariableName}.Interpolation = {Interpolation};");
+			code.Append($"{VariableName}.UseAlpha = {UseAlpha};");
+			code.Append($"{VariableName}.IsLinear = {IsLinear};");
+			code.Append($"{VariableName}.AlternateTiles = {AlternateTiles};");
 
-        internal override float GetFloat(string name)
-        {
-            switch(name) {
-            case "projection_blend":
-                /* imagetexturenode . {'datatype': 'FLOAT', 'default_value': '0.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'projection_blend', 'ui_name': 'Projection Blend'} */
-                {
-                    return CSycles.imagetexturenode_get_projection_blend(this.Ptr);
-                }
-            case "decalforward":
-                /* imagetexturenode . {'datatype': 'FLOAT', 'default_value': '0.5f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'decalforward', 'ui_name': 'DecalForward'} */
-                {
-                    return CSycles.imagetexturenode_get_decalforward(this.Ptr);
-                }
-            case "decalusage":
-                /* imagetexturenode . {'datatype': 'FLOAT', 'default_value': '0.0f', 'default_value_type': 'float', 'is_input': True, 'member_name': 'decalusage', 'ui_name': 'DecalUsage'} */
-                {
-                    return CSycles.imagetexturenode_get_decalusage(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (getter)");
-            }
-        }
-
-        internal override float3 GetPoint(string name)
-        {
-            switch(name) {
-            case "vector":
-                /* imagetexturenode . {'datatype': 'POINT', 'default_value': 'zero_float3()', 'default_value_type': 'float3', 'is_input': True, 'member_name': 'vector', 'ui_name': 'Vector'} */
-                {
-                    return CSycles.imagetexturenode_get_vector(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (getter)");
-            }
-        }
-
-        internal override bool GetBool(string name)
-        {
-            switch(name) {
-            case "animated":
-                /* imagetexturenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'animated', 'ui_name': 'Animated'} */
-                {
-                    return CSycles.imagetexturenode_get_animated(this.Ptr);
-                }
-            case "alternate_tiles":
-                /* imagetexturenode . {'datatype': 'BOOLEAN', 'default_value': 'false', 'default_value_type': 'bool', 'is_input': True, 'member_name': 'alternate_tiles', 'ui_name': 'Alternate Tiles'} */
-                {
-                    return CSycles.imagetexturenode_get_alternate_tiles(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (getter)");
-            }
-        }
-
-        internal override string GetString(string name)
-        {
-            switch(name) {
-            case "filename":
-                /* imagetexturenode . {'datatype': 'STRING', 'default_value': 'ustring()', 'default_value_type': 'ustring', 'is_input': True, 'member_name': 'filename', 'ui_name': 'Filename'} */
-                {
-                    return CSycles.imagetexturenode_get_filename(this.Ptr);
-                }
-            case "colorspace":
-                /* imagetexturenode . {'datatype': 'STRING', 'default_value': 'u_colorspace_auto', 'default_value_type': 'ustring', 'is_input': True, 'member_name': 'colorspace', 'ui_name': 'Colorspace'} */
-                {
-                    return CSycles.imagetexturenode_get_colorspace(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (getter)");
-            }
-        }
-
-        internal override object GetEnum(string name)
-        {
-            switch(name) {
-            case "interpolation":
-                /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'INTERPOLATION_LINEAR', 'default_value_type': 'InterpolationType', 'is_input': True, 'member_name': 'interpolation', 'ui_name': 'Interpolation'} */
-                {
-                    return (uint)CSycles.imagetexturenode_get_interpolation(this.Ptr);
-                }
-            case "extension":
-                /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'EXTENSION_REPEAT', 'default_value_type': 'ExtensionType', 'is_input': True, 'member_name': 'extension', 'ui_name': 'Extension'} */
-                {
-                    return (uint)CSycles.imagetexturenode_get_extension(this.Ptr);
-                }
-            case "projection":
-                /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'NODE_IMAGE_PROJ_FLAT', 'default_value_type': 'NodeImageProjection', 'is_input': True, 'member_name': 'projection', 'ui_name': 'Projection'} */
-                {
-                    return (uint)CSycles.imagetexturenode_get_projection(this.Ptr);
-                }
-            case "alpha_type":
-                /* imagetexturenode . {'datatype': 'ENUM', 'default_value': 'IMAGE_ALPHA_AUTO', 'default_value_type': 'ImageAlphaType', 'is_input': True, 'member_name': 'alpha_type', 'ui_name': 'Alpha Type'} */
-                {
-                    return (uint)CSycles.imagetexturenode_get_alpha_type(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (getter)");
-            }
-        }
-
-        internal override List<int> GetIntArray(string name)
-        {
-            switch(name) {
-            case "tiles":
-                /* imagetexturenode . {'datatype': 'INT_ARRAY', 'default_value': None, 'default_value_type': None, 'is_input': True, 'member_name': 'tiles', 'ui_name': 'Tiles'} */
-                {
-                    return CSycles.imagetexturenode_get_tiles(this.Ptr);
-                }
-
-                default: throw new ArgumentException($"Unknown input socket name '{name}' for node type ImageTextureNode (getter)");
-            }
-        }
-
-#endregion
-    }
-
+			return code.ToString();
+		}
+	}
 }
