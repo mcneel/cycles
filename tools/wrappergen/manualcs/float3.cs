@@ -84,22 +84,6 @@ namespace ccl
             return new float3(x);
         }
 
-        public float Length()
-        {
-            return (float)Math.Sqrt(x * x + y * y + z * z);
-        }
-
-        public float3 Normalize(float epsilon = 1e-6f)
-        {
-            var length = Length();
-            if (length < epsilon)
-            {
-                return new float3(0.0f);
-            }
-            float inv = 1.0f / length;
-            return new float3(x * inv, y * inv, z * inv);
-        }
-
         public override string ToString()
         {
             return $"({x}, {y}, {z})";

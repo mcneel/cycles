@@ -532,7 +532,6 @@ CCL_CAPI void cycles_mesh_set_vertex_uvs(
 {
     ccl::ustring uvmap = _uvmap ? ccl::ustring(_uvmap) : ccl::ustring("uvmap1");
     ccl::Attribute *attr = mesh->attributes.add(ccl::ATTR_STD_UV, uvmap);
-    //ccl::Attribute *attr = mesh->attributes.add(uvmap, ccl::TypeFloat2, ccl::ATTR_ELEMENT_CORNER);
     ccl::float2 *fdata = attr->data_float2();
     for(int i = 0; i < count; i++) {
         fdata[i] = uvdata[i];

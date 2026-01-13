@@ -223,20 +223,9 @@ namespace ccl
             return (a.x * b.x + a.y * b.y) + (a.z * b.z + a.w * b.w);
         }
 
-        public static float4 Cross(float4 a, float4 b)
-        {
-            return new float4(
-                a.y * b.z - a.z * b.y,
-                a.z * b.x - a.x * b.z,
-                a.x * b.y - a.y * b.x,
-                0.0f
-            );
-        }
-
         public static float4 Normalize(float4 a)
         {
-            float inv = 1.0f / a.Length();
-            return a * inv;
+            return a / a.Length();
         }
 
         public bool IsZero(bool checkW)
