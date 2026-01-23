@@ -40,7 +40,11 @@ def tune_name(rpath : Path):
     actual_dylib = get_dylibpath(rp.name)
     #print("tune_name:", actual_dylib)
 
-    if 'ccycles' in name:
+
+    if 'ccycles' in name and name.endswith('_crh'):
+        name = name[:-4]
+
+    if name.startswith('lib'):
         name = name[3:]
 
     fixed_dylib = name + '.dylib'
@@ -155,7 +159,9 @@ def do_dylib(original_path, original_name, new_name):
 def copy_dylib(original_path, target_folder):
     curr_fixed_dylib, curr_id, actual_dylib = tune_name(original_path)
     target_file = target_folder / curr_fixed_dylib
-    actual_dylib.copy(target_file)
+    # Only copy if target is different from source
+    if actual_dylib.resolve() != target_file.resolve():
+        actual_dylib.copy(target_file)
 
 
 def main():

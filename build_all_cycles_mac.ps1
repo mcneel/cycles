@@ -84,7 +84,13 @@ foreach($buildConfig in $configs)
     Pop-Location
 
     $dylibs = Get-ChildItem -Path $biglibs_dll_location -Filter *.dylib | Where-Object { $_.Name -notmatch "crh" }
-    foreach($dylib in $dylibs) {
+    foreach($dylib in $dylibs)
+    {
+        if ($dylib.Name.StartsWith("ccycles"))
+        {
+            continue
+        }
+
         Remove-Item $dylib
     }
 }
