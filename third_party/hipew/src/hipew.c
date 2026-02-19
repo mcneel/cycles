@@ -251,7 +251,7 @@ static int hipewHipInit(void)
   /* Library paths. */
 #ifdef _WIN32
   /* Expected in c:/windows/system or similar, no path needed. */
-  const char *hip_paths[] = {"amdhip64_6.dll", "amdhip64.dll", NULL};
+  const char *hip_paths[] = {"amdhip64_7.dll", "amdhip64_6.dll", "amdhip64.dll", NULL};
 #elif defined(__APPLE__)
   /* Default installation path. */
   const char *hip_paths[] = {"", NULL};
