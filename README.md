@@ -60,6 +60,9 @@ git push <branch_name>
 
 2. Navigate to `RDK/cycles/cycles`.
 
+   For oneAPI DLL-only builds, run:
+   `make_oneapi.bat release jit` (or `make_oneapi.bat release aot`).
+
 3. Execute `rm -fr build/`.
 
 4. Run `./make_rhino.bat release all`.

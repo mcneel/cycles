@@ -157,6 +157,106 @@ ccl_device_inline float3 operator/=(float3 &a, float f)
 }
 
 #  if !(defined(__KERNEL_METAL__) || defined(__KERNEL_CUDA__))
+ccl_device_inline float3 operator+(const packed_float3 a, const packed_float3 b)
+{
+  return float3(a) + float3(b);
+}
+
+ccl_device_inline float3 operator+(const packed_float3 a, const float3 b)
+{
+  return float3(a) + b;
+}
+
+ccl_device_inline float3 operator+(const float3 a, const packed_float3 b)
+{
+  return a + float3(b);
+}
+
+ccl_device_inline float3 operator+(const packed_float3 a, float f)
+{
+  return float3(a) + f;
+}
+
+ccl_device_inline float3 operator+(float f, const packed_float3 a)
+{
+  return f + float3(a);
+}
+
+ccl_device_inline float3 operator-(const packed_float3 a, const packed_float3 b)
+{
+  return float3(a) - float3(b);
+}
+
+ccl_device_inline float3 operator-(const packed_float3 a, const float3 b)
+{
+  return float3(a) - b;
+}
+
+ccl_device_inline float3 operator-(const float3 a, const packed_float3 b)
+{
+  return a - float3(b);
+}
+
+ccl_device_inline float3 operator-(const packed_float3 a, float f)
+{
+  return float3(a) - f;
+}
+
+ccl_device_inline float3 operator-(float f, const packed_float3 a)
+{
+  return f - float3(a);
+}
+
+ccl_device_inline float3 operator*(const packed_float3 a, const packed_float3 b)
+{
+  return float3(a) * float3(b);
+}
+
+ccl_device_inline float3 operator*(const packed_float3 a, const float3 b)
+{
+  return float3(a) * b;
+}
+
+ccl_device_inline float3 operator*(const float3 a, const packed_float3 b)
+{
+  return a * float3(b);
+}
+
+ccl_device_inline float3 operator*(const packed_float3 a, float f)
+{
+  return float3(a) * f;
+}
+
+ccl_device_inline float3 operator*(float f, const packed_float3 a)
+{
+  return f * float3(a);
+}
+
+ccl_device_inline float3 operator/(const packed_float3 a, const packed_float3 b)
+{
+  return float3(a) / float3(b);
+}
+
+ccl_device_inline float3 operator/(const packed_float3 a, const float3 b)
+{
+  return float3(a) / b;
+}
+
+ccl_device_inline float3 operator/(const float3 a, const packed_float3 b)
+{
+  return a / float3(b);
+}
+
+ccl_device_inline float3 operator/(const packed_float3 a, float f)
+{
+  return float3(a) / f;
+}
+
+ccl_device_inline float3 operator/(float f, const packed_float3 a)
+{
+  return f / float3(a);
+}
+
 ccl_device_inline packed_float3 operator*=(packed_float3 &a, const float3 b)
 {
   a = float3(a) * b;

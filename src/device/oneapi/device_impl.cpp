@@ -3,6 +3,8 @@
 
 #ifdef WITH_ONEAPI
 
+#  include <algorithm>
+
 #  include "device/oneapi/device_impl.h"
 
 #  include "util/debug.h"

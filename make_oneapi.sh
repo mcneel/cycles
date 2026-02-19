@@ -11,7 +11,8 @@ then
   COMMAND=Release
 fi
 
-$PYTHON src/cmake/make_update.py
+export CYCLES_LIB_PLATFORMS=${CYCLES_LIB_PLATFORMS:-linux_x86_64_glibc_228}
+$PYTHON src/cmake/make_update.py --no-cycles
 
 cmake -B $BUILD_DIR \
 -DWITH_CYCLES_ALEMBIC=OFF \

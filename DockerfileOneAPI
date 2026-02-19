@@ -1,4 +1,6 @@
-# This Dockerfile will build Intel OneAPI binaries
+# This Dockerfile builds Intel oneAPI binaries for Linux.
+# Output artifact: libcycles_kernel_oneapi_*.so (not Windows DLL).
+# For Windows DLL output use make_oneapi.bat on a Windows oneAPI toolchain.
 # All you need to do is the following:
 # On Windows:
 #  * Install Docker Desktop
@@ -8,16 +10,17 @@
 #  * After that, run the Docker image in a container while mounting your Rhino repository root:
 #    'docker run -it -v D:/dev/mcneel/rhino-8.x:/rhino/rhino-8.x ubuntu-cycles-oneapi-build'
 
-FROM ubuntu:latest
+FROM ubuntu:22.04
 
-RUN apt-get update
-RUN apt-get install -y cmake
-RUN apt-get install -y g++
-RUN apt-get install -y subversion
-RUN apt-get install -y git
-RUN apt-get install -y python3
-RUN apt-get install -y xorg-dev
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      cmake \
+      dos2unix \
+      g++ \
+      git \
+      python3 \
+      subversion \
+      xorg-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-CMD ["bash", "-c", "cd /rhino/rhino-8.x/src4/rhino4/Plug-ins/RDK/cycles/cycles && ./make_oneapi.sh Debug"]
-
-# && ./make_oneapi.sh Debug
+CMD ["bash", "-lc", "cd /rhino/rhino-8.x/src4/rhino4/Plug-ins/RDK/cycles/cycles && dos2unix make_oneapi.sh && bash make_oneapi.sh Release"]
