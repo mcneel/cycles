@@ -60,7 +60,8 @@ git push <branch_name>
 
 2. Navigate to `RDK/cycles/cycles`.
 
-3. Execute `rm -fr build/`.
+3. Delete `build/`.
+- Do this before reconfiguring oneAPI so CMake does not reuse stale SYCL or Level Zero cache entries.
 
 4. Run `./make_rhino.bat release all`.
 - This will end with a build error.
@@ -76,6 +77,7 @@ git push <branch_name>
 7. Go back to `Cycles.sln`, reload the project, and then press `Build`.
 
 8. After the build is finished, explicitly build the `INSTALL` project.
+- The `install` folder should contain `ccycles.dll`, `cycles_kernel_oneapi_jit.dll`, and the oneAPI runtime DLLs copied from the bundled `dpcpp` and `level-zero` folders.
 
 9. Download [ResourceHacker](http://www.angusj.com/resourcehacker/) if you haven't and ensure the executable is in Windows' PATH.
 
@@ -84,15 +86,19 @@ git push <branch_name>
  .\versioninfo_changer.ps1
  ```
 
-11. Copy the following two files:
+11. Copy the following files:
  - `RDK/cycles/cycles/install/ccycles.dll`
  - `RDK/cycles/cycles/install/cycles_kernel_oneapi_jit.dll`
+ - `RDK/cycles/cycles/install/sycl6.dll`
+ - `RDK/cycles/cycles/install/pi_level_zero.dll`
+ - `RDK/cycles/cycles/install/xptifw.dll`
+ - `RDK/cycles/cycles/install/ze_loader.dll`
 
- To the following folder: `big_libs\RhinoCycles\ccycles\win\release`
+  To the following folder: `big_libs\RhinoCycles\ccycles\win\release`
 
 12. Go to `big_libs` and execute:
  ```
- git add -f RhinoCycles/ccycles/win/release/ccycles.dll RhinoCycles/ccycles/win/release/cycles_kernel_oneapi_jit.dll
+ git add -f RhinoCycles/ccycles/win/release/ccycles.dll RhinoCycles/ccycles/win/release/cycles_kernel_oneapi_jit.dll RhinoCycles/ccycles/win/release/sycl6.dll RhinoCycles/ccycles/win/release/pi_level_zero.dll RhinoCycles/ccycles/win/release/xptifw.dll RhinoCycles/ccycles/win/release/ze_loader.dll
  git commit
  git push
  ```
