@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("Release", "Debug")]
-    [string]$BuildType = "Release"
+    [ValidateSet("release", "debug", "release_debuggable", "hybrid", "minimal")]
+    [string]$BuildType = "release"
 )
 
 $ErrorActionPreference = "Stop"
@@ -99,6 +99,8 @@ $buildDir = if ([System.IO.Path]::IsPathRooted($buildDirInput)) { [System.IO.Pat
 $expectedBuildDir = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "build"))
 $installDir = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "install"))
 $expectedInstallDir = $installDir
+$hipBuildDir = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "build_hip"))
+$expectedHipBuildDir = $hipBuildDir
 
 $guardErrors = New-Object System.Collections.Generic.List[string]
 if (-not (PathsEqual -A $buildDir -B $expectedBuildDir)) {
@@ -108,14 +110,13 @@ if (-not (PathsEqual -A $installDir -B $expectedInstallDir)) {
     [void]$guardErrors.Add("For safety, install directory must resolve to '$expectedInstallDir'. Current value resolves to '$installDir'.")
 }
 
-$script:AllowedCleanupPaths = @($expectedBuildDir, $expectedInstallDir)
+$script:AllowedCleanupPaths = @($expectedBuildDir, $expectedInstallDir, $expectedHipBuildDir)
 
 $libRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\lib"))
 $rhinoCyclesRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\..\..\..\..\..\big_libs\RhinoCycles"))
 $dllDest = Join-Path $rhinoCyclesRoot "ccycles\win\release"
 $kernelDestinations = @(
-    (Join-Path $dllDest "lib"),
-    (Join-Path $rhinoCyclesRoot "lib")
+    (Join-Path $dllDest "lib")
 )
 
 $cmakeExe = if (Test-Path "C:\Tools\cmake329\bin\cmake.exe") { "C:\Tools\cmake329\bin\cmake.exe" } else { "cmake" }
@@ -124,8 +125,25 @@ $dpcppRoot = "..\lib\win64_vc15\dpcpp"
 $levelZeroRoot = "..\lib\win64_vc15\level-zero"
 $msvcRedistDir = "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Redist/MSVC/14.29.30133"
 $windowsKitsDir = "C:/Program Files (x86)/Windows Kits/10"
-$dockerVolume = "D:/dev/github/mcneel/rhino/8.x:/rhino/rhino-8.x"
-$buildConfig = if ($BuildType -ieq "Debug") { "Debug" } else { "RelWithDebInfo" }
+$rhinoBranchRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\..\..\..\..\.."))
+$rhinoBranchName = Split-Path -Leaf $rhinoBranchRoot
+$dockerHostRoot = $rhinoBranchRoot -replace '\\', '/'
+$dockerContainerRoot = "/rhino/rhino-$rhinoBranchName"
+$dockerVolume = "${dockerHostRoot}:$dockerContainerRoot"
+
+$buildMode = $BuildType.ToLowerInvariant()
+
+$buildConfig = switch ($buildMode) {
+    "debug" { "Debug" }
+    "release" { "Release" }
+    "release_debuggable" { "RelWithDebInfo" }
+    "hybrid" { "Release" }
+    "minimal" { "Release" }
+    default { throw "Unsupported build mode '$BuildType'." }
+}
+
+$wrappersConfig = if ($buildMode -eq "hybrid" -or $buildMode -eq "minimal") { "RelWithDebInfo" } else { $null }
+$isMinimalMode = ($buildMode -eq "minimal")
 
 function Test-RequiredLibContent {
     param([Parameter(Mandatory = $true)][string]$LibPath)
@@ -190,31 +208,40 @@ function Remove-DirectorySafe {
         return
     }
 
+    $previousProgressPreference = $ProgressPreference
     try {
-        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
-        Write-Log "Cleaned '$Path'."
-    }
-    catch {
-        $stalePath = "$Path.stale.$([DateTime]::Now.ToString('yyyyMMdd_HHmmss'))"
+        $ProgressPreference = "SilentlyContinue"
         try {
-            Rename-Item -LiteralPath $Path -NewName (Split-Path -Leaf $stalePath) -ErrorAction Stop
-            Write-Log "WARNING: Could not clean '$Path'. Renamed to '$stalePath'."
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            Write-Log "Cleaned '$Path'."
         }
         catch {
-            Write-Log "WARNING: Could not clean '$Path'. Continuing."
+            $stalePath = "$Path.stale.$([DateTime]::Now.ToString('yyyyMMdd_HHmmss'))"
+            try {
+                Rename-Item -LiteralPath $Path -NewName (Split-Path -Leaf $stalePath) -ErrorAction Stop
+                Write-Log "WARNING: Could not clean '$Path'. Renamed to '$stalePath'."
+            }
+            catch {
+                Write-Log "WARNING: Could not clean '$Path'. Continuing."
+            }
         }
+    }
+    finally {
+        $ProgressPreference = $previousProgressPreference
     }
 }
 
 function Copy-PrimaryBinaries {
-    $files = @(
-        "ccycles.dll",
-        "cycles_kernel_oneapi_jit.dll",
-        "sycl6.dll",
-        "pi_level_zero.dll",
-        "xptifw.dll",
-        "ze_loader.dll"
-    )
+    $files = @("ccycles.dll")
+    if (-not $isMinimalMode) {
+        $files += @(
+            "cycles_kernel_oneapi_jit.dll",
+            "sycl6.dll",
+            "pi_level_zero.dll",
+            "xptifw.dll",
+            "ze_loader.dll"
+        )
+    }
 
     foreach ($file in $files) {
         $source = Join-Path $installDir $file
@@ -251,6 +278,39 @@ function Copy-AllOutputs {
 
     Copy-PrimaryBinaries
     Copy-KernelArtifacts
+}
+
+function Promote-DebuggableWrappersToInstall {
+    param([Parameter(Mandatory = $true)][string]$WrapperConfig)
+
+    # Wrapper target is ccycles.dll; keep device/kernel binaries from Release install.
+    $wrapperDllSource = Join-Path $buildDir "bin\$WrapperConfig\ccycles.dll"
+    $wrapperDllDest = Join-Path $installDir "ccycles.dll"
+    if (-not (Test-Path $wrapperDllSource)) {
+        throw "Expected wrapper DLL was not found: '$wrapperDllSource'."
+    }
+    Copy-Item -LiteralPath $wrapperDllSource -Destination $wrapperDllDest -Force
+    Write-Log "Promoted debuggable wrapper: '$wrapperDllDest' from '$wrapperDllSource'."
+}
+
+function Promote-CcyclesPdbToInstall {
+    param([Parameter(Mandatory = $true)][string[]]$ConfigCandidates)
+
+    foreach ($config in $ConfigCandidates) {
+        if ([string]::IsNullOrWhiteSpace($config)) {
+            continue
+        }
+
+        $pdbSource = Join-Path $buildDir "bin\$config\ccycles.pdb"
+        if (Test-Path $pdbSource) {
+            $pdbDest = Join-Path $installDir "ccycles.pdb"
+            Copy-Item -LiteralPath $pdbSource -Destination $pdbDest -Force
+            Write-Log "Promoted wrapper symbols: '$pdbDest' from '$pdbSource'."
+            return
+        }
+    }
+
+    Write-Log "ccycles.pdb not found in candidate configs ($($ConfigCandidates -join ', '))."
 }
 
 function Ensure-DockerReady {
@@ -319,9 +379,19 @@ $exitCode = 1
 try {
     Write-Log "Log file: $logPath"
     Write-Log "Script root: $scriptRoot"
-    Write-Log "Build type: $BuildType"
+    Write-Log "Build mode: $buildMode"
+    Write-Log "Build config: $buildConfig"
+    if ($isMinimalMode) {
+        Write-Log "Minimal mode: ccycles.dll only (CUDA/OptiX/HIP/oneAPI disabled, hybrid-style wrapper promotion enabled)."
+    }
+    if ($wrappersConfig) {
+        Write-Log "Wrapper override config: $wrappersConfig"
+    }
     Write-Log "Build dir: $buildDir"
     Write-Log "Install dir: $installDir"
+    Write-Log "HIP build dir: $hipBuildDir"
+    Write-Log "Rhino branch root: $rhinoBranchRoot"
+    Write-Log "Docker volume: $dockerVolume"
     Write-Log "Allowed cleanup paths: $($script:AllowedCleanupPaths -join ', ')"
 
     if ($guardErrors.Count -gt 0) {
@@ -341,9 +411,10 @@ try {
     Invoke-TimedStage -Name "Clean Build Folders" -Action {
         Remove-DirectorySafe -Path $buildDir
         Remove-DirectorySafe -Path $installDir
+        Remove-DirectorySafe -Path $hipBuildDir
     }
 
-    Invoke-TimedStage -Name "Configure + Build ($BuildType, all devices)" -Action {
+    Invoke-TimedStage -Name "Configure + Build ($buildMode)" -Action {
         $cmakeArgs = @(
             "-B", $buildDir,
             "-G", "Visual Studio 16 2019",
@@ -351,17 +422,33 @@ try {
             "-DWITH_CYCLES_ALEMBIC=OFF",
             "-DWITH_CYCLES_USD=OFF",
             "-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF",
-            "-DWITH_CYCLES_CUDA_BINARIES=ON",
-            "-DWITH_CYCLES_DEVICE_OPTIX=ON",
-            "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;compute_75",
-            "-DOPTIX_ROOT_DIR=$optixRoot",
-            "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
             "-DSYCL_ROOT_DIR=$dpcppRoot",
             "-DLEVEL_ZERO_ROOT_DIR=$levelZeroRoot",
             "-DMSVC_REDIST_DIR=$msvcRedistDir",
-            "-DWINDOWS_KITS_DIR=$windowsKitsDir",
-            "-DWITH_CYCLES_DEVICE_HIP=ON"
+            "-DWINDOWS_KITS_DIR=$windowsKitsDir"
         )
+
+        if ($isMinimalMode) {
+            $cmakeArgs += @(
+                "-DWITH_CYCLES_DEVICE_CUDA=OFF",
+                "-DWITH_CYCLES_DEVICE_OPTIX=OFF",
+                "-DWITH_CYCLES_CUDA_BINARIES=OFF",
+                "-DWITH_CYCLES_DEVICE_HIP=OFF",
+                "-DWITH_CYCLES_HIP_BINARIES=OFF",
+                "-DWITH_CYCLES_DEVICE_ONEAPI=OFF",
+                "-DWITH_CYCLES_ONEAPI_BINARIES=OFF"
+            )
+        }
+        else {
+            $cmakeArgs += @(
+                "-DWITH_CYCLES_CUDA_BINARIES=ON",
+                "-DWITH_CYCLES_DEVICE_OPTIX=ON",
+                "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;compute_75",
+                "-DOPTIX_ROOT_DIR=$optixRoot",
+                "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
+                "-DWITH_CYCLES_DEVICE_HIP=ON"
+            )
+        }
 
         & $cmakeExe @cmakeArgs | Out-Host
         if ($LASTEXITCODE -ne 0) {
@@ -380,6 +467,30 @@ try {
         if ($buildExitCode -ne 0) {
             throw "CMake build/install failed with code $buildExitCode."
         }
+
+        if ($wrappersConfig) {
+            Push-Location $buildDir
+            try {
+                & $cmakeExe --build . --target ccycles --config $wrappersConfig | Out-Host
+                $wrapperBuildExitCode = $LASTEXITCODE
+            }
+            finally {
+                Pop-Location
+            }
+
+            if ($wrapperBuildExitCode -ne 0) {
+                throw "Wrapper build failed with code $wrapperBuildExitCode."
+            }
+
+            Promote-DebuggableWrappersToInstall -WrapperConfig $wrappersConfig
+        }
+
+        $pdbCandidates = @()
+        if ($wrappersConfig) {
+            $pdbCandidates += $wrappersConfig
+        }
+        $pdbCandidates += $buildConfig
+        Promote-CcyclesPdbToInstall -ConfigCandidates $pdbCandidates
     }
 
     Invoke-TimedStage -Name "Update Version Info" -Action {
@@ -400,6 +511,11 @@ try {
     }
 
     Invoke-TimedStage -Name "Docker HIP Build" -Action {
+        if ($isMinimalMode) {
+            Write-Log "Skipping Docker HIP step in minimal mode."
+            return
+        }
+
         if (Ensure-DockerReady) {
             $dockerExitCode = Run-DockerHipFlow
             if ($dockerExitCode -ne 0) {
