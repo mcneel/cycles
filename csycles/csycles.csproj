@@ -127,6 +127,7 @@
     <Compile Include="Session.cs" />
     <Compile Include="Shader.cs" />
     <Compile Include="ShaderNodes\AttributeNode.cs" />
+    <Compile Include="ShaderNodes\BevelNode.cs" />
     <Compile Include="ShaderNodes\ColorRamp.cs" />
     <Compile Include="ShaderNodes\CombineHsvNode.cs" />
     <Compile Include="ShaderNodes\CombineRgbNode.cs" />
