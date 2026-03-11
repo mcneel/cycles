@@ -259,19 +259,23 @@ namespace ccl
 		/// <param name="finalize">Set to true if the shader should be finalized.</param>
 		public static void ShaderFromXml(Shader shader, string shaderXml, bool finalize)
 		{
-			var xmlmem = Encoding.UTF8.GetBytes(shaderXml);
-			using (var xmlstream = new MemoryStream(xmlmem))
+			try
 			{
-				var settings = new XmlReaderSettings
+				var xmlmem = Encoding.UTF8.GetBytes(shaderXml);
+				using (var xmlstream = new MemoryStream(xmlmem))
 				{
-					ConformanceLevel = ConformanceLevel.Fragment,
-					IgnoreComments = true,
-					IgnoreProcessingInstructions = true,
-					IgnoreWhitespace = true
-				};
-				var reader = XmlReader.Create(xmlstream, settings);
-				Utilities.Instance.ReadNodeGraph(shader, reader, finalize);
+					var settings = new XmlReaderSettings
+					{
+						ConformanceLevel = ConformanceLevel.Fragment,
+						IgnoreComments = true,
+						IgnoreProcessingInstructions = true,
+						IgnoreWhitespace = true
+					};
+					var reader = XmlReader.Create(xmlstream, settings);
+					Utilities.Instance.ReadNodeGraph(shader, reader, finalize);
+				}
 			}
+			catch {}
 		}
 
 		protected virtual void Dispose(bool disposing)
