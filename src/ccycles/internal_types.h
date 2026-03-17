@@ -251,6 +251,7 @@ class CCSession final {
 public:
 	unsigned int id{ 0 };
 	ccl::SessionParams params;
+	ccl::SessionParams* params_original_handle = nullptr;
 	ccl::SceneParams scene_params;
 	ccl::Session* session = nullptr;
 
@@ -342,6 +343,7 @@ extern std::vector<ccl::SceneParams*> scene_params;
 extern std::vector<ccl::DeviceInfo> devices;
 extern std::vector<ccl::DeviceInfo> multi_devices;
 extern std::unordered_set<ccl::SessionParams*> session_params;
+extern ccl::thread_mutex session_params_mutex;
 
 /* rhino procedural data */
 extern ccl::vector<float> ccycles_rhino_perlin_noise_table;

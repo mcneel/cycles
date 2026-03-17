@@ -21,6 +21,30 @@ limitations under the License.
 
 /* Hold all created session parameters. */
 std::unordered_set<ccl::SessionParams*> session_params;
+ccl::thread_mutex session_params_mutex;
+
+template<typename TValue>
+static void log_session_params_action(const char* action,
+	ccl::SessionParams* session_params_id,
+	const TValue& value,
+	bool found)
+{
+	logger.logit("session_params ", action,
+		" ptr=", session_params_id,
+		" value=", value,
+		" found=", found ? 1 : 0,
+		" registry_size=", session_params.size());
+}
+
+static void log_session_params_action(const char* action,
+	ccl::SessionParams* session_params_id,
+	bool found)
+{
+	logger.logit("session_params ", action,
+		" ptr=", session_params_id,
+		" found=", found ? 1 : 0,
+		" registry_size=", session_params.size());
+}
 
 #define SESSION_PARAM_BOOL(session_params_id, varname) \
 	PARAM_BOOL(session_params, session_params_id, varname)
@@ -37,74 +61,113 @@ extern "C" {
 
 CCL_CAPI ccl::SessionParams* CDECL cycles_session_params_create(unsigned int device_id)
 {
+	ccl::thread_scoped_lock lock(session_params_mutex);
 	ccl::SessionParams* params = new ccl::SessionParams();
 
 	GETDEVICE(params->device, device_id);
 	session_params.insert(params);
-	logger.logit("Created session parameters for device ", device_id);
+	logger.logit("Created session parameters ptr=", params,
+		" for device ", device_id,
+		" registry_size=", session_params.size());
 
 	return params;
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_device(ccl::SessionParams* session_params_id, unsigned int device)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_device", session_params_id, device, found);
+	if (found) {
 		GETDEVICE((*search)->device, device)
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_background(ccl::SessionParams* session_params_id, unsigned int background)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_background", session_params_id, background, found);
+	if (found) {
 		(*search)->background = background != 0;
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_experimental(ccl::SessionParams* session_params_id, unsigned int experimental)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_experimental", session_params_id, experimental, found);
+	if (found) {
 		(*search)->experimental = experimental != 0;
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_samples(ccl::SessionParams* session_params_id, int samples)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_samples", session_params_id, samples, found);
+	if (found) {
 		(*search)->samples = samples;
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_tile_size(ccl::SessionParams* session_params_id, unsigned int tile_size)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_tile_size", session_params_id, tile_size, found);
+	if (found) {
 		(*search)->tile_size = tile_size;
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_threads(ccl::SessionParams* session_params_id, unsigned int threads)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_threads", session_params_id, threads, found);
+	if (found) {
 		(*search)->threads = threads;
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_shadingsystem(ccl::SessionParams* session_params_id, unsigned int shadingsystem)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_shadingsystem", session_params_id, shadingsystem, found);
+	if (found) {
 		(*search)->shadingsystem = (ccl::ShadingSystem)shadingsystem;
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_pixel_size(ccl::SessionParams* session_params_id, unsigned int pixel_size)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_pixel_size", session_params_id, pixel_size, found);
+	if (found) {
 		(*search)->pixel_size = pixel_size;
 	}
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_use_resolution_divider(ccl::SessionParams* session_params_id, bool use_resolution_divider)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
+	ccl::thread_scoped_lock lock(session_params_mutex);
+	auto search = session_params.find(session_params_id);
+	const bool found = search != session_params.end();
+	log_session_params_action("set_use_resolution_divider", session_params_id, use_resolution_divider, found);
+	if (found) {
 		(*search)->use_resolution_divider = use_resolution_divider;
 	}
 }
