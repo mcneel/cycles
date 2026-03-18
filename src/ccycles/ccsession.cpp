@@ -76,7 +76,6 @@ void _cleanup_sessions()
 {
 	ccl::thread_scoped_lock session_lock(session_mutex);
 	ccl::thread_scoped_lock params_lock(session_params_mutex);
-	logger.logit("_cleanup_sessions begin sessions_size=", sessions.size(), " session_params_size=", session_params.size());
 
 	for (CCSession* se : sessions) {
 		if (se == nullptr) continue;
@@ -95,7 +94,6 @@ void _cleanup_sessions()
 		delete params;
 	}
 	session_params.clear();
-	logger.logit("_cleanup_sessions end sessions_size=", sessions.size(), " session_params_size=", session_params.size());
 }
 
 CCSession* CCSession::create(int width, int height, unsigned int buffer_stride) {
@@ -450,32 +448,24 @@ extern "C" {
 CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_parameters)
 {
 	ccl::thread_scoped_lock lock(session_mutex);
-	logger.logit("cycles_session_create enter params_id=", _session_parameters, " sessions_size=", sessions.size());
 
 	CCSession* session = CCSession::create(10, 10, 4);
 	{
 		ccl::thread_scoped_lock params_lock(session_params_mutex);
-		logger.logit("cycles_session_create lookup params_id=", _session_parameters, " session_params_size=", session_params.size());
 		auto param_it = session_params.find(_session_parameters);
 		if (param_it == session_params.end()) {
-			logger.logit("cycles_session_create missing params_id=", _session_parameters, " session_params_size=", session_params.size());
 			delete session;
 			return nullptr;
 		}
 
 		ccl::SessionParams *params = *param_it;
 		if (params == nullptr) {
-			logger.logit("cycles_session_create null params pointer for params_id=", _session_parameters);
 			delete session;
 			return nullptr;
 		}
 
 		session->params = *params;
 		session->params_original_handle = params;
-		logger.logit("cycles_session_create copied params_id=", _session_parameters,
-			" registry_handle=", session->params_original_handle,
-			" ccsession=", session,
-			" session_params_size=", session_params.size());
 	}
 
 	int csesid{ -1 };
@@ -486,21 +476,13 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 	session->params.use_auto_tile = false;
 	session->params.experimental = true;
 	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
-
 	session->scene_params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
-
-	logger.logit("cycles_session_create new ccl::Session begin ccsession=", session, " params_id=", _session_parameters);
 	session->session = new ccl::Session(session->params, session->scene_params);
 
-	logger.logit("cycles_session_create prep_session begin session_id=", session->session, " ccsession=", session);
 	prep_session(session->session, &session->passes, session);
 
 	sessions.insert(session);
 	csesid = (unsigned int)(sessions.size() - 1);
-	logger.logit("cycles_session_create inserted session_id=", session->session,
-		" ccsession=", session,
-		" sessions_size=", sessions.size(),
-		" csesid=", csesid);
 
 	return session->session;
 }
@@ -508,7 +490,6 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 {
 	ccl::thread_scoped_lock lock(session_mutex);
-	logger.logit("cycles_session_destroy enter session_id=", session_id, " sessions_size=", sessions.size());
 
 	auto found = sessions.cend();
 	for (auto it = sessions.cbegin(); it != sessions.cend(); ++it) {
@@ -518,15 +499,11 @@ CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 		}
 	}
 	if (found == sessions.cend()) {
-		logger.logit("cycles_session_destroy missing session_id=", session_id, " sessions_size=", sessions.size());
 		return;
 	}
 
 	CCSession* ccsess = *found;
-	logger.logit("cycles_session_destroy found session_id=", session_id,
-		" ccsession=", ccsess,
-		" registry_handle=", ccsess->params_original_handle,
-		" sessions_size_before=", sessions.size());
+
 	sessions.erase(ccsess);
 	if (ccsess->params_original_handle != nullptr) {
 		ccl::thread_scoped_lock params_lock(session_params_mutex);
@@ -535,10 +512,7 @@ CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 		}
 		delete ccsess->params_original_handle;
 		ccsess->params_original_handle = nullptr;
-		logger.logit("cycles_session_destroy removed registry_handle for session_id=", session_id,
-			" session_params_size_after=", session_params.size());
 	}
-	logger.logit("cycles_session_destroy deleting ccsession=", ccsess, " session_id=", session_id);
 	delete ccsess;
 }
 
