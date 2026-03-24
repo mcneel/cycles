@@ -52,6 +52,22 @@ void CUDADevice::set_error(const string &error)
   }
 }
 
+static void maybe_fake_kernel_crash(const char *stage)
+{
+  const char *configured_stage = getenv("RHINO_FAKE_KERNEL_CRASH_STAGE");
+  if (configured_stage == nullptr || strcmp(configured_stage, stage) != 0) {
+    return;
+  }
+
+  fprintf(stderr, "ccycles: intentionally simulating crash at stage=%s\n", stage);
+  fflush(stderr);
+
+#ifdef _WIN32
+  RaiseException(0xE0000001, 0, 0, nullptr);
+#else
+  abort();
+#endif
+}
 CUDADevice::CUDADevice(const DeviceInfo &info, Stats &stats, Profiler &profiler)
     : GPUDevice(info, stats, profiler)
 {
@@ -71,20 +87,44 @@ CUDADevice::CUDADevice(const DeviceInfo &info, Stats &stats, Profiler &profiler)
 
   pitch_alignment = 0;
 
+  fprintf(stderr,
+          "ccycles: CUDADevice ctor enter type=%s desc='%s' id='%s' num=%d\n",
+          Device::string_from_type(info.type).c_str(),
+          info.description.c_str(),
+          info.id.c_str(),
+          info.num);
+  fflush(stderr);
+
   /* Initialize CUDA. */
+  fprintf(stderr, "ccycles: CUDADevice calling cuInit(0) for '%s'\n", info.description.c_str());
+  fflush(stderr);
+  maybe_fake_kernel_crash("before_cuInit");
   CUresult result = cuInit(0);
   if (result != CUDA_SUCCESS) {
     set_error(string_printf("Failed to initialize CUDA runtime (%s)", cuewErrorString(result)));
     return;
   }
+  fprintf(stderr, "ccycles: CUDADevice cuInit ok for '%s'\n", info.description.c_str());
+  fflush(stderr);
 
   /* Setup device and context. */
+  fprintf(stderr,
+          "ccycles: CUDADevice calling cuDeviceGet ordinal=%d for '%s'\n",
+          cuDevId,
+          info.description.c_str());
+  fflush(stderr);
+  maybe_fake_kernel_crash("before_cuDeviceGet");
   result = cuDeviceGet(&cuDevice, cuDevId);
   if (result != CUDA_SUCCESS) {
     set_error(string_printf("Failed to get CUDA device handle from ordinal (%s)",
                             cuewErrorString(result)));
     return;
   }
+  fprintf(stderr,
+          "ccycles: CUDADevice cuDeviceGet ok ordinal=%d for '%s'\n",
+          cuDevId,
+          info.description.c_str());
+  fflush(stderr);
 
   /* CU_CTX_MAP_HOST for mapping host memory when out of device memory.
    * CU_CTX_LMEM_RESIZE_TO_MAX for reserving local memory ahead of render,
@@ -103,12 +143,21 @@ CUDADevice::CUDADevice(const DeviceInfo &info, Stats &stats, Profiler &profiler)
   }
 
   /* Create context. */
+  fprintf(stderr,
+          "ccycles: CUDADevice calling cuCtxCreate flags=0x%X can_map_host=%d for '%s'\n",
+          ctx_flags,
+          (int)can_map_host,
+          info.description.c_str());
+  fflush(stderr);
+  maybe_fake_kernel_crash("before_cuCtxCreate");
   result = cuCtxCreate(&cuContext, ctx_flags, cuDevice);
 
   if (result != CUDA_SUCCESS) {
     set_error(string_printf("Failed to create CUDA context (%s)", cuewErrorString(result)));
     return;
   }
+  fprintf(stderr, "ccycles: CUDADevice cuCtxCreate ok for '%s'\n", info.description.c_str());
+  fflush(stderr);
 
   int major, minor;
   cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevId);
@@ -991,3 +1040,4 @@ int CUDADevice::get_device_default_attribute(CUdevice_attribute attribute, int d
 CCL_NAMESPACE_END
 
 #endif
+

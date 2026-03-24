@@ -15,6 +15,7 @@ limitations under the License.
 **/
 
 #include <iostream>
+#include <cstdio>
 #include <filesystem>
 #include <cstdlib>
 #include <numeric>
@@ -477,6 +478,16 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 	session->params.experimental = true;
 	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 	session->scene_params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
+	fprintf(stderr,
+		"ccycles: cycles_session_create device_type=%s desc='%s' id='%s' num=%d threads=%d background=%d experimental=%d\n",
+		ccl::Device::string_from_type(session->params.device.type).c_str(),
+		session->params.device.description.c_str(),
+		session->params.device.id.c_str(),
+		session->params.device.num,
+		session->params.threads,
+		(int)session->params.background,
+		(int)session->params.experimental);
+	fflush(stderr);
 	session->session = new ccl::Session(session->params, session->scene_params);
 
 	prep_session(session->session, &session->passes, session);

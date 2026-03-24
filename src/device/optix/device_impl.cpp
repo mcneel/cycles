@@ -4,6 +4,10 @@
 
 #ifdef WITH_OPTIX
 
+#  include <cstdlib>
+#  include <cstring>
+#  include <stdio.h>
+
 #  include "device/optix/device_impl.h"
 #  include "device/optix/queue.h"
 
@@ -24,6 +28,7 @@
 #  include "util/progress.h"
 #  include "util/task.h"
 #  include "util/time.h"
+#  include "util/windows.h"
 
 #  define __KERNEL_OPTIX__
 #  include "kernel/device/optix/globals.h"
@@ -49,11 +54,35 @@ static void execute_optix_task(TaskPool &pool, OptixTask task, OptixResult &fail
 }
 #  endif
 
+static void maybe_fake_kernel_crash(const char *stage)
+{
+  const char *configured_stage = getenv("RHINO_FAKE_KERNEL_CRASH_STAGE");
+  if (configured_stage == nullptr || strcmp(configured_stage, stage) != 0) {
+    return;
+  }
+
+  fprintf(stderr, "ccycles: intentionally simulating crash at stage=%s\n", stage);
+  fflush(stderr);
+
+#ifdef _WIN32
+  RaiseException(0xE0000002, 0, 0, nullptr);
+#else
+  abort();
+#endif
+}
 OptiXDevice::OptiXDevice(const DeviceInfo &info, Stats &stats, Profiler &profiler)
     : CUDADevice(info, stats, profiler),
       sbt_data(this, "__sbt", MEM_READ_ONLY),
       launch_params(this, "kernel_params", false)
 {
+  fprintf(stderr,
+          "ccycles: OptiXDevice ctor enter desc='%s' id='%s' num=%d cuda_ctx=%p\n",
+          info.description.c_str(),
+          info.id.c_str(),
+          info.num,
+          (void *)cuContext);
+  fflush(stderr);
+
   /* Make the CUDA context current. */
   if (!cuContext) {
     /* Do not initialize if CUDA context creation failed already. */
@@ -86,7 +115,16 @@ OptiXDevice::OptiXDevice(const DeviceInfo &info, Stats &stats, Profiler &profile
     VLOG_INFO << "Using OptiX debug mode.";
     options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
   }
+  fprintf(stderr,
+          "ccycles: OptiXDevice calling optixDeviceContextCreate for '%s'\n",
+          info.description.c_str());
+  fflush(stderr);
+  maybe_fake_kernel_crash("before_optixDeviceContextCreate");
   optix_assert(optixDeviceContextCreate(cuContext, &options, &context));
+  fprintf(stderr,
+          "ccycles: OptiXDevice optixDeviceContextCreate ok for '%s'\n",
+          info.description.c_str());
+  fflush(stderr);
 #  ifdef WITH_CYCLES_LOGGING
   optix_assert(optixDeviceContextSetLogCallback(
       context, options.logCallbackFunction, options.logCallbackData, options.logCallbackLevel));
@@ -1644,3 +1682,4 @@ void OptiXDevice::update_launch_params(size_t offset, void *data, size_t data_si
 CCL_NAMESPACE_END
 
 #endif /* WITH_OPTIX */
+
