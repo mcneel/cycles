@@ -144,6 +144,8 @@ $buildConfig = switch ($buildMode) {
 
 $wrappersConfig = if ($buildMode -eq "hybrid" -or $buildMode -eq "minimal") { "RelWithDebInfo" } else { $null }
 $isMinimalMode = ($buildMode -eq "minimal")
+$script:SvnRetryCount = 500
+$script:SvnRetryDelaySeconds = 1
 
 function Test-RequiredLibContent {
     param([Parameter(Mandatory = $true)][string]$LibPath)
@@ -167,6 +169,17 @@ function Get-CyclesLibrariesVersion {
     return $versionMatch.Matches[0].Groups[1].Value.Trim('"')
 }
 
+function Get-SvnRetryDelaySeconds {
+    return $script:SvnRetryDelaySeconds
+}
+
+function Invoke-SvnCommand {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+
+    & svn @Arguments 2>&1 | Out-Host
+    return $LASTEXITCODE
+}
+
 function Ensure-SvnLib {
     param(
         [Parameter(Mandatory = $true)][string]$LibName,
@@ -183,19 +196,41 @@ function Ensure-SvnLib {
         New-Item -Path $libRoot -ItemType Directory -Force | Out-Null
     }
 
-    if (Test-Path (Join-Path $libPath ".svn")) {
-        & svn --non-interactive cleanup $libPath | Out-Host
-        & svn --non-interactive update $libPath | Out-Host
-    }
-    else {
-        & svn --non-interactive checkout --force "$SvnLibBaseUrl/$LibName" $libPath | Out-Host
+    $maxAttempts = $script:SvnRetryCount + 1
+    $lastSvnExitCode = 0
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        $workingCopyExists = Test-Path (Join-Path $libPath ".svn")
+        $operation = if ($workingCopyExists) { "update" } else { "checkout" }
+        Write-Log "[SVN] $LibName attempt $attempt/$maxAttempts ($operation)."
+
+        if ($workingCopyExists) {
+            $cleanupExitCode = Invoke-SvnCommand -Arguments @("--non-interactive", "cleanup", $libPath)
+            if ($cleanupExitCode -ne 0) {
+                $lastSvnExitCode = $cleanupExitCode
+            }
+            else {
+                $lastSvnExitCode = Invoke-SvnCommand -Arguments @("--non-interactive", "update", $libPath)
+            }
+        }
+        else {
+            $lastSvnExitCode = Invoke-SvnCommand -Arguments @("--non-interactive", "checkout", "--force", "$SvnLibBaseUrl/$LibName", $libPath)
+        }
+
+        if ($lastSvnExitCode -eq 0 -and (Test-RequiredLibContent -LibPath $libPath)) {
+            Write-Log "[SVN] $LibName ready."
+            return
+        }
+
+        if ($attempt -lt $maxAttempts) {
+            $reason = if ($lastSvnExitCode -ne 0) { "svn exit code $lastSvnExitCode" } else { "required files are still missing" }
+            $delaySeconds = Get-SvnRetryDelaySeconds
+            Write-Log "[SVN] $LibName attempt $attempt/$maxAttempts failed ($reason). Retrying in $delaySeconds seconds."
+            Start-Sleep -Seconds $delaySeconds
+        }
     }
 
-    if ($LASTEXITCODE -ne 0 -or -not (Test-RequiredLibContent -LibPath $libPath)) {
-        throw "Failed to prepare SVN library '$LibName'."
-    }
-
-    Write-Log "[SVN] $LibName ready."
+    throw "Failed to prepare SVN library '$LibName' after $maxAttempts attempt(s)."
 }
 
 function Remove-DirectorySafe {
@@ -392,6 +427,7 @@ try {
     Write-Log "HIP build dir: $hipBuildDir"
     Write-Log "Rhino branch root: $rhinoBranchRoot"
     Write-Log "Docker volume: $dockerVolume"
+    Write-Log "SVN retries after first failure: $script:SvnRetryCount (fixed $script:SvnRetryDelaySeconds second delay)."
     Write-Log "Allowed cleanup paths: $($script:AllowedCleanupPaths -join ', ')"
 
     if ($guardErrors.Count -gt 0) {
@@ -404,7 +440,9 @@ try {
         }
         $cyclesLibVersion = Get-CyclesLibrariesVersion
         $svnLibBaseUrl = "https://svn.blender.org/svnroot/bf-blender/tags/blender-$cyclesLibVersion-release/lib"
-        Ensure-SvnLib -LibName "linux_x86_64_glibc_228" -SvnLibBaseUrl $svnLibBaseUrl
+        if (-not $isMinimalMode) {
+            Ensure-SvnLib -LibName "linux_x86_64_glibc_228" -SvnLibBaseUrl $svnLibBaseUrl
+        }
         Ensure-SvnLib -LibName "win64_vc15" -SvnLibBaseUrl $svnLibBaseUrl
     }
 
