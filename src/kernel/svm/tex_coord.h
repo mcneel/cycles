@@ -350,6 +350,8 @@ ccl_device_inline void decal_data_read(KernelGlobals kg,
   uint decal_map_side;
   uint type = node.y;
   uint out_offset = node.z;
+  const bool suppress_for_solid_backface =
+      ((sd->object_flag & SD_OBJECT_IS_SOLID) != 0) && ((sd->flag & SD_BACKFACING) != 0);
 
   float3 uv = stack_load_float3(stack, out_offset);
 
@@ -411,6 +413,7 @@ ccl_device_inline void decal_data_read(KernelGlobals kg,
     decal->cur_uv.x = uv.x;
     decal->cur_uv.y = uv.y;
     decal->data = map_to_uv(data, *decal);
+    decal->on_correct_side = !suppress_for_solid_backface;
   }
   else {
 
@@ -448,6 +451,10 @@ ccl_device_inline void decal_data_read(KernelGlobals kg,
           decal->on_correct_side = inside;
         } break;
       }
+    }
+
+    if (suppress_for_solid_backface) {
+      decal->on_correct_side = false;
     }
   }
 
@@ -696,7 +703,9 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
       DecalData decal;
       decal_data_read(kg, sd, stack, node, &offset, &decal, 0);
       data = decal.data;
-      // data = map_to_uv(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
       break;
     }
     case NODE_TEXCO_ENV_DECAL_PLANAR: {
@@ -888,7 +897,9 @@ ccl_device_noinline int svm_node_tex_coord_bump_dx(KernelGlobals kg,
       DecalData decal;
       decal_data_read(kg, sd, stack, node, &offset, &decal, 0);
       data = decal.data;
-      // data = map_to_uv(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
       break;
     }
     case NODE_TEXCO_ENV_DECAL_PLANAR: {
@@ -1083,7 +1094,9 @@ ccl_device_noinline int svm_node_tex_coord_bump_dy(KernelGlobals kg,
       DecalData decal;
       decal_data_read(kg, sd, stack, node, &offset, &decal, 0);
       data = decal.data;
-      // data = map_to_uv(data, decal);
+      if (!decal.on_correct_side) {
+        data.z = -1.0f;
+      }
       break;
     }
     case NODE_TEXCO_ENV_DECAL_PLANAR: {

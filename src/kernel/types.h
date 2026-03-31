@@ -874,6 +874,8 @@ enum ShaderDataObjectFlag {
   SD_OBJECT_HAS_VOLUME_MOTION = (1 << 11),
   /* object is mesh lamp, but doesn't cast shadows */
   SD_OBJECT_LIGHT_NO_CAST_SHADOWS = (1 << 12),
+  /* object represents solid geometry */
+  SD_OBJECT_IS_SOLID = (1 << 13),
 
   /* object is using caustics */
   SD_OBJECT_CAUSTICS = (SD_OBJECT_CAUSTICS_CASTER | SD_OBJECT_CAUSTICS_RECEIVER),
@@ -882,7 +884,7 @@ enum ShaderDataObjectFlag {
                      SD_OBJECT_NEGATIVE_SCALE | SD_OBJECT_HAS_VOLUME |
                      SD_OBJECT_INTERSECTS_VOLUME | SD_OBJECT_SHADOW_CATCHER |
                      SD_OBJECT_HAS_VOLUME_ATTRIBUTES | SD_OBJECT_CAUSTICS |
-                     SD_OBJECT_HAS_VOLUME_MOTION)
+                     SD_OBJECT_HAS_VOLUME_MOTION | SD_OBJECT_IS_SOLID)
 };
 
 typedef struct ccl_align(16) ShaderData

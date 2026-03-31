@@ -148,6 +148,18 @@ void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Obj
 	}
 }
 
+void cycles_scene_object_set_is_solid(ccl::Session* session_id, ccl::Object* object, bool is_solid)
+{
+	ASSERT(object);
+
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		object->set_is_solid(is_solid);
+		object->tag_update(sce);
+		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
+	}
+}
+
 void cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id, ccl::Object* object, bool mesh_light_no_cast_shadow)
 {
 	ASSERT(object);

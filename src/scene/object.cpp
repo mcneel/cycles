@@ -90,6 +90,7 @@ NODE_DEFINE(Object)
   SOCKET_STRING(asset_name, "Asset Name", ustring());
 
   SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
+  SOCKET_BOOLEAN(is_solid, "Solid", false);
   SOCKET_BOOLEAN(mesh_light_no_cast_shadow, "Mesh Light No Cast Shadow", false);
 
   SOCKET_BOOLEAN(is_caustics_caster, "Cast Shadow Caustics", false);
@@ -568,6 +569,9 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   /* Object flag. */
   if (ob->use_holdout) {
     flag |= SD_OBJECT_HOLDOUT_MASK;
+  }
+  if (ob->is_solid) {
+    flag |= SD_OBJECT_IS_SOLID;
   }
   state->object_flag[ob->index] = flag;
   state->object_volume_step[ob->index] = FLT_MAX;

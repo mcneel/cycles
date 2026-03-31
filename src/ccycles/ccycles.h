@@ -249,6 +249,11 @@ CCL_CAPI void CDECL cycles_scene_object_set_shader(ccl::Session* session_id, ccl
  */
 CCL_CAPI void CDECL cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object*, bool is_shadowcatcher);
 /**
+ * Set is_solid flag for object
+ * \ingroup ccycles_object
+ */
+CCL_CAPI void CDECL cycles_scene_object_set_is_solid(ccl::Session* session_id, ccl::Object*, bool is_solid);
+/**
  * Set mesh_light_no_cast_shadow flag for object. This is to signal that this mesh light shouldn't cast shadows.
  * \ingroup ccycles_object
  */
