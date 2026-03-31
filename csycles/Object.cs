@@ -163,6 +163,17 @@ namespace ccl
 		}
 
 		/// <summary>
+		/// Set to true if this object represents solid geometry.
+		/// </summary>
+		public bool IsSolid
+		{
+			set
+			{
+				CSycles.object_set_is_solid(Client.Scene.Id, ObjectPtr, value);
+			}
+		}
+
+		/// <summary>
 		/// Set to true to force mesh light to not cast shadows.
 		/// </summary>
 		public bool MeshLightNoCastShadow

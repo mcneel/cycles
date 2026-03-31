@@ -77,6 +77,13 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		private static extern void cycles_scene_object_set_is_solid(IntPtr sessionId, IntPtr objectId, bool is_solid);
+		public static void object_set_is_solid(IntPtr sessionId, IntPtr objectId, bool is_solid)
+		{
+			cycles_scene_object_set_is_solid(sessionId, objectId, is_solid);
+		}
+
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_scene_object_set_mesh_light_no_cast_shadow(IntPtr sessionId, IntPtr objectId, bool mesh_light_no_cast_shadow);
 		public static void object_set_mesh_light_no_cast_shadow(IntPtr sessionId, IntPtr objectId, bool mesh_light_no_cast_shadow)
 		{
