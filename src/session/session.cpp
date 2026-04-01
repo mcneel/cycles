@@ -3,6 +3,7 @@
 
 #include <limits.h>
 #include <string.h>
+#include <cstdio>
 
 #include "device/cpu/device.h"
 #include "device/device.h"
@@ -34,26 +35,66 @@ CCL_NAMESPACE_BEGIN
 Session::Session(const SessionParams &params_, const SceneParams &scene_params)
     : params(params_), render_scheduler_(tile_manager_, params)
 {
+  fprintf(stderr,
+          "ccycles: Session ctor enter device_type=%s desc='%s' id='%s' num=%d threads=%d background=%d experimental=%d\n",
+          Device::string_from_type(params.device.type).c_str(),
+          params.device.description.c_str(),
+          params.device.id.c_str(),
+          params.device.num,
+          params.threads,
+          (int)params.background,
+          (int)params.experimental);
+  fflush(stderr);
+
+  fprintf(stderr, "ccycles: Session ctor calling TaskScheduler::init threads=%d\n", params.threads);
+  fflush(stderr);
   TaskScheduler::init(params.threads);
+  fprintf(stderr, "ccycles: Session ctor TaskScheduler::init ok\n");
+  fflush(stderr);
 
   delayed_reset_.do_reset = false;
 
   pause_ = false;
   new_work_added_ = false;
 
+  fprintf(stderr, "ccycles: Session ctor calling Device::create\n");
+  fflush(stderr);
   device = Device::create(params.device, stats, profiler);
+  fprintf(stderr, "ccycles: Session ctor Device::create ok device=%p\n", (void *)device);
+  fflush(stderr);
 
-  if (device->have_error()) {
+  const bool device_has_error = device->have_error();
+  fprintf(stderr, "ccycles: Session ctor device->have_error=%d\n", (int)device_has_error);
+  fflush(stderr);
+  if (device_has_error) {
+    fprintf(stderr, "ccycles: Session ctor device error='%s'\n", device->error_message().c_str());
+    fflush(stderr);
     progress.set_error(device->error_message());
   }
 
+  fprintf(stderr, "ccycles: Session ctor calling new Scene\n");
+  fflush(stderr);
   scene = new Scene(scene_params, device);
+  fprintf(stderr,
+          "ccycles: Session ctor new Scene ok scene=%p camera=%p integrator=%p\n",
+          (void *)scene,
+          (void *)scene->camera,
+          (void *)scene->integrator);
+  fflush(stderr);
 
   /* Configure path tracer. */
+  fprintf(stderr, "ccycles: Session ctor calling PathTrace create\n");
+  fflush(stderr);
   path_trace_ = make_unique<PathTrace>(
       device, scene->film, scene->dscene, render_scheduler_, tile_manager_);
+  fprintf(stderr, "ccycles: Session ctor PathTrace create ok path_trace=%p\n", (void *)path_trace_.get());
+  fflush(stderr);
   path_trace_->set_progress(&progress);
+  fprintf(stderr, "ccycles: Session ctor set_progress ok\n");
+  fflush(stderr);
   path_trace_->progress_update_cb = [&]() { update_status_time(); };
+  fprintf(stderr, "ccycles: Session ctor progress callback set\n");
+  fflush(stderr);
 
   tile_manager_.full_buffer_written_cb = [&](string_view filename) {
     if (!full_buffer_written_cb) {
@@ -61,9 +102,17 @@ Session::Session(const SessionParams &params_, const SceneParams &scene_params)
     }
     full_buffer_written_cb(filename);
   };
+  fprintf(stderr, "ccycles: Session ctor full_buffer_written callback set\n");
+  fflush(stderr);
 
   /* Create session thread. */
+  fprintf(stderr, "ccycles: Session ctor creating session thread\n");
+  fflush(stderr);
   session_thread_ = new thread(function_bind(&Session::thread_run, this));
+  fprintf(stderr, "ccycles: Session ctor session thread created thread=%p\n", (void *)session_thread_);
+  fflush(stderr);
+  fprintf(stderr, "ccycles: Session ctor exit\n");
+  fflush(stderr);
 }
 
 Session::~Session()
