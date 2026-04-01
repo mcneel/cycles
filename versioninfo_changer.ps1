@@ -1,12 +1,17 @@
+[CmdletBinding()]
+param(
+    [string]$RhinoBranchName
+)
+
 $bd = [System.DateTime]::UtcNow
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$rhinoBranchRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\..\..\..\.."))
-$rhinoBranchName = Split-Path -Leaf $rhinoBranchRoot
-if ($rhinoBranchName -notmatch '^(\d+)\.x$') {
-    throw "Could not determine Rhino branch major version from '$rhinoBranchName'. Expected format like '8.x' or '9.x'."
-}
-$rhinoMajorVersion = $Matches[1]
+. (Join-Path $scriptRoot "rhino_branch_info.ps1")
+
+$branchInfo = Resolve-RhinoBranchInfo -StartPath $scriptRoot -RhinoBranchName $RhinoBranchName
+$rhinoBranchRoot = $branchInfo.BranchRoot
+$rhinoBranchName = $branchInfo.BranchName
+$rhinoMajorVersion = $branchInfo.MajorVersion
 
 $yy = $bd.ToString("yy")
 $doy = $bd.DayOfYear.ToString("D3")
@@ -16,7 +21,7 @@ $bmm = $bd.Minute.ToString("D2")
 $dotted = "$rhinoMajorVersion.0.$yy$doy.$bhr$bmm" + "1"
 $commas = $dotted.Replace(".", ",")
 
-Write-Host "-> branch: $rhinoBranchName (major $rhinoMajorVersion)"
+Write-Host "-> branch: $rhinoBranchName (major $rhinoMajorVersion, source $($branchInfo.Source))"
 Write-Host "-> $dotted"
 Write-Host "-> $commas"
 
