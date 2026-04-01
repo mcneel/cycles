@@ -2,12 +2,16 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet("release", "debug", "release_debuggable", "hybrid", "minimal")]
-    [string]$BuildType = "release"
+    [string]$BuildType = "release",
+    [string]$RhinoBranchName
 )
 
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+. (Join-Path $scriptRoot "..\rhino_branch_info.ps1")
+
+$branchInfo = Resolve-RhinoBranchInfo -StartPath $scriptRoot -RhinoBranchName $RhinoBranchName
 $logPath = Join-Path $scriptRoot "make_rhino_all.log"
 try {
     if (Test-Path $logPath) {
@@ -125,10 +129,11 @@ $dpcppRoot = "..\lib\win64_vc15\dpcpp"
 $levelZeroRoot = "..\lib\win64_vc15\level-zero"
 $msvcRedistDir = "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Redist/MSVC/14.29.30133"
 $windowsKitsDir = "C:/Program Files (x86)/Windows Kits/10"
-$rhinoBranchRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..\..\..\..\..\.."))
-$rhinoBranchName = Split-Path -Leaf $rhinoBranchRoot
+$rhinoBranchRoot = $branchInfo.BranchRoot
+$rhinoBranchName = $branchInfo.BranchName
+$rhinoMajorVersion = $branchInfo.MajorVersion
 $dockerHostRoot = $rhinoBranchRoot -replace '\\', '/'
-$dockerContainerRoot = "/rhino/rhino-$rhinoBranchName"
+$dockerContainerRoot = "/rhino/repo"
 $dockerVolume = "${dockerHostRoot}:$dockerContainerRoot"
 
 $buildMode = $BuildType.ToLowerInvariant()
@@ -426,6 +431,7 @@ try {
     Write-Log "Install dir: $installDir"
     Write-Log "HIP build dir: $hipBuildDir"
     Write-Log "Rhino branch root: $rhinoBranchRoot"
+    Write-Log "Rhino branch: $rhinoBranchName (major $rhinoMajorVersion, source $($branchInfo.Source))"
     Write-Log "Docker volume: $dockerVolume"
     Write-Log "SVN retries after first failure: $script:SvnRetryCount (fixed $script:SvnRetryDelaySeconds second delay)."
     Write-Log "Allowed cleanup paths: $($script:AllowedCleanupPaths -join ', ')"
@@ -534,7 +540,7 @@ try {
     Invoke-TimedStage -Name "Update Version Info" -Action {
         Push-Location ([System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..")))
         try {
-            & powershell -NoProfile -ExecutionPolicy Bypass -File ".\versioninfo_changer.ps1" | Out-Host
+            & powershell -NoProfile -ExecutionPolicy Bypass -File ".\versioninfo_changer.ps1" -RhinoBranchName $rhinoBranchName | Out-Host
             if ($LASTEXITCODE -ne 0) {
                 Write-Log "WARNING: versioninfo_changer.ps1 failed with code $LASTEXITCODE."
             }
