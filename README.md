@@ -36,6 +36,7 @@ Ensure both the **Mac** and the **Windows** sections are completed.
 1. **For Apple Silicon devices:**
    - Ensure you have the universal binaries.
      Download them [here](https://drive.google.com/file/d/10UxUQBOm9kRH1y6GN1NXLdFU4dpu-dCq/view?usp=sharing).
+   - Use the Terminal to delete the quarantine attribute from the zip-file: `xattr -d com.apple.quarantine darwin_universal.zip`.
    - Unzip the binaries to `RDK/cycles/lib/darwin_universal`.
 
 2. **For non-Apple Silicon devices:**
