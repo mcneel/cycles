@@ -31,6 +31,10 @@ add_definitions(-DCCL_CAPI_DLL)
 
 list(APPEND LIB ${OPENIMAGEIO_LIBRARIES})
 
+if(WIN32)
+  list(APPEND LIB dbghelp)
+endif()
+
 if(WITH_ALEMBIC)
   add_definitions(-DWITH_ALEMBIC)
   list(APPEND INC_SYS

@@ -1,33 +1,66 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("release", "debug", "release_debuggable", "hybrid", "minimal")]
+    [ValidateSet("release", "debug", "release_debuggable", "hybrid", "minimal", "wrapper")]
     [string]$BuildType = "release"
 )
 
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$logPath = Join-Path $scriptRoot "make_rhino_all.log"
-try {
-    if (Test-Path $logPath) {
-        Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+$preferredLogPath = Join-Path $scriptRoot "make_rhino_all.log"
+$fallbackLogPath = Join-Path $scriptRoot ("make_rhino_all-{0}-{1}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"), $PID)
+$logPath = $null
+$logStartupMessage = $null
+$transcriptStarted = $false
+
+foreach ($candidateLogPath in @($preferredLogPath, $fallbackLogPath)) {
+    try {
+        if (Test-Path $candidateLogPath) {
+            Remove-Item -LiteralPath $candidateLogPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+    catch {
+    }
+
+    try {
+        Start-Transcript -Path $candidateLogPath -Force | Out-Null
+        $logPath = $candidateLogPath
+        $transcriptStarted = $true
+        if ($candidateLogPath -ne $preferredLogPath) {
+            $logStartupMessage = "Primary log file '$preferredLogPath' was busy; using fallback log '$candidateLogPath'."
+        }
+        break
+    }
+    catch {
+        try {
+            Set-Content -LiteralPath $candidateLogPath -Value @() -ErrorAction Stop
+            $logPath = $candidateLogPath
+            if ($candidateLogPath -eq $preferredLogPath) {
+                $logStartupMessage = "Transcript could not start for '$candidateLogPath'; using direct file logging."
+            }
+            else {
+                $logStartupMessage = "Primary log file '$preferredLogPath' was busy; using fallback log '$candidateLogPath' without transcript."
+            }
+            break
+        }
+        catch {
+        }
     }
 }
-catch {
-}
 
-$transcriptStarted = $false
-try {
-    Start-Transcript -Path $logPath -Force | Out-Null
-    $transcriptStarted = $true
-}
-catch {
+if (-not $logPath) {
+    $logStartupMessage = "Could not open a writable log file. Continuing with console-only logging."
 }
 
 $script:LogPath = $logPath
 $script:TranscriptStarted = $transcriptStarted
+$script:LogWriteWarningShown = $false
 $script:StageTimings = New-Object System.Collections.Generic.List[object]
+
+if ($logStartupMessage) {
+    Write-Host $logStartupMessage
+}
 
 function Write-Log {
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Message)
@@ -35,8 +68,16 @@ function Write-Log {
     $line = "{0} {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Message
     Write-Host $line
 
-    if (-not $script:TranscriptStarted) {
-        Add-Content -LiteralPath $script:LogPath -Value $line
+    if (-not $script:TranscriptStarted -and $script:LogPath) {
+        try {
+            Add-Content -LiteralPath $script:LogPath -Value $line -ErrorAction Stop
+        }
+        catch {
+            if (-not $script:LogWriteWarningShown) {
+                Write-Warning "Unable to write to log file '$($script:LogPath)': $($_.Exception.Message)"
+                $script:LogWriteWarningShown = $true
+            }
+        }
     }
 }
 
@@ -139,11 +180,13 @@ $buildConfig = switch ($buildMode) {
     "release_debuggable" { "RelWithDebInfo" }
     "hybrid" { "Release" }
     "minimal" { "Release" }
+    "wrapper" { "RelWithDebInfo" }
     default { throw "Unsupported build mode '$BuildType'." }
 }
 
 $wrappersConfig = if ($buildMode -eq "hybrid" -or $buildMode -eq "minimal") { "RelWithDebInfo" } else { $null }
 $isMinimalMode = ($buildMode -eq "minimal")
+$isWrapperOnlyMode = ($buildMode -eq "wrapper")
 
 function Test-RequiredLibContent {
     param([Parameter(Mandatory = $true)][string]$LibPath)
@@ -280,6 +323,38 @@ function Copy-AllOutputs {
     Copy-KernelArtifacts
 }
 
+function Copy-WrapperOutputsFromBuild {
+    param([Parameter(Mandatory = $true)][string]$Config)
+
+    New-Item -ItemType Directory -Path $dllDest -Force | Out-Null
+
+    $wrapperDllSource = Join-Path $buildDir "bin\$Config\ccycles.dll"
+    if (-not (Test-Path $wrapperDllSource)) {
+        throw "Expected wrapper DLL was not found: '$wrapperDllSource'."
+    }
+
+    $wrapperDllDest = Join-Path $dllDest "ccycles.dll"
+    Copy-Item -LiteralPath $wrapperDllSource -Destination $wrapperDllDest -Force
+    $wrapperStamp = (Get-Item -LiteralPath $wrapperDllDest).LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+    Write-Log "Copied wrapper-only ccycles.dll ($wrapperStamp)."
+
+    $wrapperPdbSource = Join-Path $buildDir "bin\$Config\ccycles.pdb"
+    if (Test-Path $wrapperPdbSource) {
+        $wrapperPdbDest = Join-Path $dllDest "ccycles.pdb"
+        Copy-Item -LiteralPath $wrapperPdbSource -Destination $wrapperPdbDest -Force
+        $pdbStamp = (Get-Item -LiteralPath $wrapperPdbDest).LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+        Write-Log "Copied wrapper-only ccycles.pdb ($pdbStamp)."
+    }
+    else {
+        Write-Log "WARNING: Missing '$wrapperPdbSource'."
+    }
+
+    $kernelLibPath = Join-Path $dllDest "lib"
+    if (-not (Test-Path $kernelLibPath)) {
+        Write-Log "WARNING: Wrapper mode reuses existing kernel artifacts, but '$kernelLibPath' was not found."
+    }
+}
+
 function Promote-DebuggableWrappersToInstall {
     param([Parameter(Mandatory = $true)][string]$WrapperConfig)
 
@@ -384,6 +459,9 @@ try {
     if ($isMinimalMode) {
         Write-Log "Minimal mode: ccycles.dll only (CUDA/OptiX/HIP/oneAPI disabled, hybrid-style wrapper promotion enabled)."
     }
+    elseif ($isWrapperOnlyMode) {
+        Write-Log "Wrapper mode: GPU-enabled ccycles.dll only (skips install, kernel packaging, version update, and Docker HIP)."
+    }
     if ($wrappersConfig) {
         Write-Log "Wrapper override config: $wrappersConfig"
     }
@@ -409,6 +487,11 @@ try {
     }
 
     Invoke-TimedStage -Name "Clean Build Folders" -Action {
+        if ($isWrapperOnlyMode) {
+            Write-Log "Skipping clean step in wrapper mode to preserve incremental build outputs."
+            return
+        }
+
         Remove-DirectorySafe -Path $buildDir
         Remove-DirectorySafe -Path $installDir
         Remove-DirectorySafe -Path $hipBuildDir
@@ -439,6 +522,18 @@ try {
                 "-DWITH_CYCLES_ONEAPI_BINARIES=OFF"
             )
         }
+        elseif ($isWrapperOnlyMode) {
+            $cmakeArgs += @(
+                "-DWITH_CYCLES_DEVICE_CUDA=ON",
+                "-DWITH_CYCLES_DEVICE_OPTIX=ON",
+                "-DWITH_CYCLES_CUDA_BINARIES=OFF",
+                "-DOPTIX_ROOT_DIR=$optixRoot",
+                "-DWITH_CYCLES_DEVICE_HIP=ON",
+                "-DWITH_CYCLES_HIP_BINARIES=OFF",
+                "-DWITH_CYCLES_DEVICE_ONEAPI=OFF",
+                "-DWITH_CYCLES_ONEAPI_BINARIES=OFF"
+            )
+        }
         else {
             $cmakeArgs += @(
                 "-DWITH_CYCLES_CUDA_BINARIES=ON",
@@ -457,7 +552,12 @@ try {
 
         Push-Location $buildDir
         try {
-            & $cmakeExe --build . --target install --config $buildConfig | Out-Host
+            if ($isWrapperOnlyMode) {
+                & $cmakeExe --build . --target ccycles --config $buildConfig | Out-Host
+            }
+            else {
+                & $cmakeExe --build . --target install --config $buildConfig | Out-Host
+            }
             $buildExitCode = $LASTEXITCODE
         }
         finally {
@@ -465,6 +565,9 @@ try {
         }
 
         if ($buildExitCode -ne 0) {
+            if ($isWrapperOnlyMode) {
+                throw "CMake wrapper build failed with code $buildExitCode."
+            }
             throw "CMake build/install failed with code $buildExitCode."
         }
 
@@ -490,10 +593,17 @@ try {
             $pdbCandidates += $wrappersConfig
         }
         $pdbCandidates += $buildConfig
-        Promote-CcyclesPdbToInstall -ConfigCandidates $pdbCandidates
+        if (-not $isWrapperOnlyMode) {
+            Promote-CcyclesPdbToInstall -ConfigCandidates $pdbCandidates
+        }
     }
 
     Invoke-TimedStage -Name "Update Version Info" -Action {
+        if ($isWrapperOnlyMode) {
+            Write-Log "Skipping version info update in wrapper mode."
+            return
+        }
+
         Push-Location ([System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..")))
         try {
             & powershell -NoProfile -ExecutionPolicy Bypass -File ".\versioninfo_changer.ps1" | Out-Host
@@ -507,12 +617,21 @@ try {
     }
 
     Invoke-TimedStage -Name "Copy Build Outputs" -Action {
+        if ($isWrapperOnlyMode) {
+            Copy-WrapperOutputsFromBuild -Config $buildConfig
+            return
+        }
+
         Copy-AllOutputs
     }
 
     Invoke-TimedStage -Name "Docker HIP Build" -Action {
         if ($isMinimalMode) {
             Write-Log "Skipping Docker HIP step in minimal mode."
+            return
+        }
+        if ($isWrapperOnlyMode) {
+            Write-Log "Skipping Docker HIP step in wrapper mode."
             return
         }
 

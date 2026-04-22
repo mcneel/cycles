@@ -57,7 +57,31 @@ static void execute_optix_task(TaskPool &pool, OptixTask task, OptixResult &fail
 static void maybe_fake_kernel_crash(const char *stage)
 {
   const char *configured_stage = getenv("RHINO_FAKE_KERNEL_CRASH_STAGE");
-  if (configured_stage == nullptr || strcmp(configured_stage, stage) != 0) {
+  if (configured_stage == nullptr) {
+    return;
+  }
+
+  const size_t stage_length = strlen(stage);
+  const bool exact_match = strcmp(configured_stage, stage) == 0;
+  const bool access_violation_match =
+      strncmp(configured_stage, stage, stage_length) == 0 &&
+      strcmp(configured_stage + stage_length, "_av") == 0;
+  if (!exact_match && !access_violation_match) {
+    return;
+  }
+
+  if (access_violation_match) {
+    fprintf(stderr,
+            "ccycles: intentionally simulating access violation at stage=%s\n",
+            configured_stage);
+    fflush(stderr);
+
+#ifdef _WIN32
+    volatile unsigned int *invalid_address = reinterpret_cast<volatile unsigned int *>(1);
+    *invalid_address = 0xC0DEFACEu;
+#else
+    abort();
+#endif
     return;
   }
 

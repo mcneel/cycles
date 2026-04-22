@@ -25,7 +25,17 @@ limitations under the License.
 namespace fs = std::filesystem;
 
 #ifdef _WIN32
+#ifndef NOGDI
+#define NOGDI
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
+#include <DbgHelp.h>
 #include <eh.h>
 #include <exception>
 #else
@@ -60,6 +70,183 @@ private:
 
 #ifdef _WIN32
 static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyclesPassOutput>> *passes, CCSession* ccsession);
+
+static INIT_ONCE g_symbol_handler_once = INIT_ONCE_STATIC_INIT;
+static bool g_symbol_handler_initialized = false;
+
+static BOOL CALLBACK initialize_symbol_handler(PINIT_ONCE, PVOID, PVOID *)
+{
+	HANDLE process = GetCurrentProcess();
+	DWORD options = SymGetOptions();
+	options |= SYMOPT_DEFERRED_LOADS | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME;
+	SymSetOptions(options);
+	g_symbol_handler_initialized = SymInitialize(process, nullptr, TRUE) == TRUE;
+	if (!g_symbol_handler_initialized) {
+		fprintf(stderr,
+			"ccycles: SymInitialize failed error=%lu\n",
+			(unsigned long)GetLastError());
+		fflush(stderr);
+	}
+
+	return TRUE;
+}
+
+static bool ensure_symbol_handler()
+{
+	InitOnceExecuteOnce(&g_symbol_handler_once, initialize_symbol_handler, nullptr, nullptr);
+	return g_symbol_handler_initialized;
+}
+
+static void log_exception_context(const char *stage, const CONTEXT *context)
+{
+	if (context == nullptr) {
+		fprintf(stderr, "ccycles: %s context is null\n", stage);
+		fflush(stderr);
+		return;
+	}
+
+#if defined(_M_X64) || defined(__x86_64__)
+	fprintf(stderr,
+		"ccycles: %s registers rip=%p rsp=%p rbp=%p rax=%p rbx=%p rcx=%p rdx=%p rsi=%p rdi=%p\n",
+		stage,
+		(void *)context->Rip,
+		(void *)context->Rsp,
+		(void *)context->Rbp,
+		(void *)context->Rax,
+		(void *)context->Rbx,
+		(void *)context->Rcx,
+		(void *)context->Rdx,
+		(void *)context->Rsi,
+		(void *)context->Rdi);
+	fflush(stderr);
+#elif defined(_M_IX86)
+	fprintf(stderr,
+		"ccycles: %s registers eip=%p esp=%p ebp=%p eax=%p ebx=%p ecx=%p edx=%p esi=%p edi=%p\n",
+		stage,
+		(void *)(uintptr_t)context->Eip,
+		(void *)(uintptr_t)context->Esp,
+		(void *)(uintptr_t)context->Ebp,
+		(void *)(uintptr_t)context->Eax,
+		(void *)(uintptr_t)context->Ebx,
+		(void *)(uintptr_t)context->Ecx,
+		(void *)(uintptr_t)context->Edx,
+		(void *)(uintptr_t)context->Esi,
+		(void *)(uintptr_t)context->Edi);
+	fflush(stderr);
+#else
+	fprintf(stderr, "ccycles: %s register logging not implemented for this architecture\n", stage);
+	fflush(stderr);
+#endif
+}
+
+static void log_symbolized_frame(const char *stage, unsigned int frame_index, DWORD64 address)
+{
+	HANDLE process = GetCurrentProcess();
+	char symbol_buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME] = {};
+	SYMBOL_INFO *symbol = reinterpret_cast<SYMBOL_INFO *>(symbol_buffer);
+	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+	symbol->MaxNameLen = MAX_SYM_NAME;
+
+	DWORD64 displacement = 0;
+	const BOOL has_symbol = SymFromAddr(process, address, &displacement, symbol);
+
+	IMAGEHLP_LINE64 line = {};
+	line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+	DWORD line_displacement = 0;
+	const BOOL has_line = SymGetLineFromAddr64(process, address, &line_displacement, &line);
+
+	IMAGEHLP_MODULE64 module = {};
+	module.SizeOfStruct = sizeof(IMAGEHLP_MODULE64);
+	const BOOL has_module = SymGetModuleInfo64(process, address, &module);
+
+	fprintf(stderr, "ccycles: %s frame[%02u] %p", stage, frame_index, (void *)address);
+	if (has_module) {
+		fprintf(stderr, " %s", module.ModuleName);
+	}
+	if (has_symbol) {
+		fprintf(stderr, "!%s+0x%llX", symbol->Name, (unsigned long long)displacement);
+	}
+	if (has_line) {
+		fprintf(stderr, " [%s:%lu]", line.FileName, (unsigned long)line.LineNumber);
+	}
+	fprintf(stderr, "\n");
+	fflush(stderr);
+}
+
+static void log_native_stack_trace(const char *stage, const CONTEXT *context_record)
+{
+	if (context_record == nullptr) {
+		fprintf(stderr, "ccycles: %s cannot capture stack without context\n", stage);
+		fflush(stderr);
+		return;
+	}
+
+	if (!ensure_symbol_handler()) {
+		return;
+	}
+
+	CONTEXT context = *context_record;
+	STACKFRAME64 frame = {};
+	DWORD machine_type = 0;
+
+#if defined(_M_X64) || defined(__x86_64__)
+	machine_type = IMAGE_FILE_MACHINE_AMD64;
+	frame.AddrPC.Offset = context.Rip;
+	frame.AddrFrame.Offset = context.Rbp;
+	frame.AddrStack.Offset = context.Rsp;
+#elif defined(_M_IX86)
+	machine_type = IMAGE_FILE_MACHINE_I386;
+	frame.AddrPC.Offset = context.Eip;
+	frame.AddrFrame.Offset = context.Ebp;
+	frame.AddrStack.Offset = context.Esp;
+#else
+	fprintf(stderr, "ccycles: %s stack walking not implemented for this architecture\n", stage);
+	fflush(stderr);
+	return;
+#endif
+
+	frame.AddrPC.Mode = AddrModeFlat;
+	frame.AddrFrame.Mode = AddrModeFlat;
+	frame.AddrStack.Mode = AddrModeFlat;
+
+	fprintf(stderr, "ccycles: %s native stack trace begin\n", stage);
+	fflush(stderr);
+
+	HANDLE process = GetCurrentProcess();
+	HANDLE thread = GetCurrentThread();
+	for (unsigned int frame_index = 0; frame_index < 64; ++frame_index) {
+		const BOOL ok = StackWalk64(
+			machine_type,
+			process,
+			thread,
+			&frame,
+			&context,
+			nullptr,
+			SymFunctionTableAccess64,
+			SymGetModuleBase64,
+			nullptr);
+		if (!ok) {
+			fprintf(stderr,
+				"ccycles: %s stack walk stopped frame=%u error=%lu\n",
+				stage,
+				frame_index,
+				(unsigned long)GetLastError());
+			fflush(stderr);
+			break;
+		}
+
+		if (frame.AddrPC.Offset == 0) {
+			fprintf(stderr, "ccycles: %s stack walk reached null pc at frame=%u\n", stage, frame_index);
+			fflush(stderr);
+			break;
+		}
+
+		log_symbolized_frame(stage, frame_index, frame.AddrPC.Offset);
+	}
+
+	fprintf(stderr, "ccycles: %s native stack trace end\n", stage);
+	fflush(stderr);
+}
 
 static const char *seh_exception_code_name(DWORD code)
 {
@@ -150,31 +337,74 @@ static int log_seh_exception(const char *stage, EXCEPTION_POINTERS *exception_in
 		fflush(stderr);
 	}
 
+	log_exception_context(stage, exception_info->ContextRecord);
+	log_native_stack_trace(stage, exception_info->ContextRecord);
+
 	return EXCEPTION_EXECUTE_HANDLER;
+}
+
+typedef void (*seh_logged_operation_fn)(void *context);
+
+static bool run_with_seh_logging(const char *stage,
+	                             seh_logged_operation_fn operation,
+	                             void *context)
+{
+	__try {
+		operation(context);
+		return true;
+	}
+	__except (log_seh_exception(stage, GetExceptionInformation())) {
+		return false;
+	}
+}
+
+struct CreateSessionWithSehLoggingContext {
+	const ccl::SessionParams *params;
+	const ccl::SceneParams *scene_params;
+	ccl::Session *session;
+};
+
+static void create_session_operation(void *context)
+{
+	CreateSessionWithSehLoggingContext *args =
+		static_cast<CreateSessionWithSehLoggingContext *>(context);
+	args->session = new ccl::Session(*args->params, *args->scene_params);
 }
 
 static ccl::Session *create_session_with_seh_logging(const ccl::SessionParams &params,
 	                                                 const ccl::SceneParams &scene_params)
 {
-	__try {
-		return new ccl::Session(params, scene_params);
-	}
-	__except (log_seh_exception("cycles_session_create new Session", GetExceptionInformation())) {
+	CreateSessionWithSehLoggingContext context = {&params, &scene_params, nullptr};
+	if (!run_with_seh_logging("cycles_session_create new Session",
+	                         create_session_operation,
+	                         &context)) {
 		return nullptr;
 	}
+
+	return context.session;
+}
+
+struct PrepSessionWithSehLoggingContext {
+	ccl::Session *session;
+	std::vector<std::unique_ptr<CCyclesPassOutput>> *passes;
+	CCSession *ccsession;
+};
+
+static void prep_session_operation(void *context)
+{
+	PrepSessionWithSehLoggingContext *args =
+		static_cast<PrepSessionWithSehLoggingContext *>(context);
+	prep_session(args->session, args->passes, args->ccsession);
 }
 
 static bool prep_session_with_seh_logging(ccl::Session *session,
 	                                      std::vector<std::unique_ptr<CCyclesPassOutput>> *passes,
 	                                      CCSession *ccsession)
 {
-	__try {
-		prep_session(session, passes, ccsession);
-		return true;
-	}
-	__except (log_seh_exception("cycles_session_create prep_session", GetExceptionInformation())) {
-		return false;
-	}
+	PrepSessionWithSehLoggingContext context = {session, passes, ccsession};
+	return run_with_seh_logging("cycles_session_create prep_session",
+	                           prep_session_operation,
+	                           &context);
 }
 #endif
 
@@ -941,7 +1171,27 @@ CCL_CAPI void CDECL cycles_session_cancel(ccl::Session* session_id, const char *
 
 CCL_CAPI void CDECL cycles_session_quickcancel(ccl::Session* sessionPtr)
 {
-	sessionPtr->cancel(true);
+	if (sessionPtr == nullptr) {
+		fprintf(stderr, "ccycles: cycles_session_quickcancel received null session\n");
+		fflush(stderr);
+		return;
+	}
+
+	ccl::thread_scoped_lock lock(session_mutex);
+	auto found = std::find_if(
+		sessions.cbegin(), sessions.cend(), [sessionPtr](CCSession *candidate) {
+			return candidate != nullptr && candidate->session == sessionPtr;
+		});
+	if (found == sessions.cend() || *found == nullptr || (*found)->session == nullptr) {
+		fprintf(
+			stderr,
+			"ccycles: cycles_session_quickcancel ignoring unknown session=%p\n",
+			(void *)sessionPtr);
+		fflush(stderr);
+		return;
+	}
+
+	(*found)->session->cancel(true);
 }
 
 CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
