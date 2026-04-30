@@ -20,6 +20,7 @@
 #include "scene/tables.h"
 
 #include "util/foreach.h"
+#include "util/log.h"
 #include "util/murmurhash.h"
 #include "util/task.h"
 #include "util/transform.h"
@@ -897,61 +898,67 @@ void ShaderManager::init_xyz_transforms()
   is_rec709 = true;
 
 #ifdef WITH_OCIO
-  /* Get from OpenColorO config if it has the required roles. */
-  OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
-  if (!(config && config->hasRole("scene_linear"))) {
-    return;
-  }
-
-  Transform xyz_to_rgb;
-
-  if (config->hasRole("aces_interchange")) {
-    /* Standard OpenColorIO role, defined as ACES AP0 (ACES2065-1). */
-    Transform aces_to_rgb;
-    if (!to_scene_linear_transform(config, "aces_interchange", aces_to_rgb)) {
+  try {
+    /* Get from OpenColorO config if it has the required roles. */
+    OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
+    if (!(config && config->hasRole("scene_linear"))) {
       return;
     }
 
-    /* This is the OpenColorIO builtin transform:
-     * UTILITY - ACES-AP0_to_CIE-XYZ-D65_BFD. */
-    const Transform ACES_AP0_to_xyz_D65 = make_transform(0.938280f,
-                                                         -0.004451f,
-                                                         0.016628f,
-                                                         0.000000f,
-                                                         0.337369f,
-                                                         0.729522f,
-                                                         -0.066890f,
-                                                         0.000000f,
-                                                         0.001174f,
-                                                         -0.003711f,
-                                                         1.091595f,
-                                                         0.000000f);
-    const Transform xyz_to_aces = transform_inverse(ACES_AP0_to_xyz_D65);
-    xyz_to_rgb = aces_to_rgb * xyz_to_aces;
-  }
-  else if (config->hasRole("XYZ")) {
-    /* Custom role used before the standard existed. */
-    if (!to_scene_linear_transform(config, "XYZ", xyz_to_rgb)) {
+    Transform xyz_to_rgb;
+
+    if (config->hasRole("aces_interchange")) {
+      /* Standard OpenColorIO role, defined as ACES AP0 (ACES2065-1). */
+      Transform aces_to_rgb;
+      if (!to_scene_linear_transform(config, "aces_interchange", aces_to_rgb)) {
+        return;
+      }
+
+      /* This is the OpenColorIO builtin transform:
+       * UTILITY - ACES-AP0_to_CIE-XYZ-D65_BFD. */
+      const Transform ACES_AP0_to_xyz_D65 = make_transform(0.938280f,
+                                                           -0.004451f,
+                                                           0.016628f,
+                                                           0.000000f,
+                                                           0.337369f,
+                                                           0.729522f,
+                                                           -0.066890f,
+                                                           0.000000f,
+                                                           0.001174f,
+                                                           -0.003711f,
+                                                           1.091595f,
+                                                           0.000000f);
+      const Transform xyz_to_aces = transform_inverse(ACES_AP0_to_xyz_D65);
+      xyz_to_rgb = aces_to_rgb * xyz_to_aces;
+    }
+    else if (config->hasRole("XYZ")) {
+      /* Custom role used before the standard existed. */
+      if (!to_scene_linear_transform(config, "XYZ", xyz_to_rgb)) {
+        return;
+      }
+    }
+    else {
+      /* No reference role found to determine XYZ. */
       return;
     }
+
+    xyz_to_r = float4_to_float3(xyz_to_rgb.x);
+    xyz_to_g = float4_to_float3(xyz_to_rgb.y);
+    xyz_to_b = float4_to_float3(xyz_to_rgb.z);
+
+    const Transform rgb_to_xyz = transform_inverse(xyz_to_rgb);
+    rgb_to_y = float4_to_float3(rgb_to_xyz.y);
+
+    const Transform rec709_to_rgb = xyz_to_rgb * transform_inverse(xyz_to_rec709);
+    rec709_to_r = float4_to_float3(rec709_to_rgb.x);
+    rec709_to_g = float4_to_float3(rec709_to_rgb.y);
+    rec709_to_b = float4_to_float3(rec709_to_rgb.z);
+    is_rec709 = transform_equal_threshold(xyz_to_rgb, xyz_to_rec709, 0.0001f);
   }
-  else {
-    /* No reference role found to determine XYZ. */
-    return;
+  catch (const OCIO::Exception &exception) {
+    VLOG_WARNING << "OpenColorIO config could not be loaded during ShaderManager startup; "
+                 << "falling back to built-in Rec.709 transforms: " << exception.what();
   }
-
-  xyz_to_r = float4_to_float3(xyz_to_rgb.x);
-  xyz_to_g = float4_to_float3(xyz_to_rgb.y);
-  xyz_to_b = float4_to_float3(xyz_to_rgb.z);
-
-  const Transform rgb_to_xyz = transform_inverse(xyz_to_rgb);
-  rgb_to_y = float4_to_float3(rgb_to_xyz.y);
-
-  const Transform rec709_to_rgb = xyz_to_rgb * transform_inverse(xyz_to_rec709);
-  rec709_to_r = float4_to_float3(rec709_to_rgb.x);
-  rec709_to_g = float4_to_float3(rec709_to_rgb.y);
-  rec709_to_b = float4_to_float3(rec709_to_rgb.z);
-  is_rec709 = transform_equal_threshold(xyz_to_rgb, xyz_to_rec709, 0.0001f);
 #endif
 }
 
