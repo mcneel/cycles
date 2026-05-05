@@ -67,6 +67,18 @@ void cycles_initialise(unsigned int mask)
 	}
 }
 
+unsigned int cycles_failed_gpus_mask()
+{
+	return ccl::Device::failed_gpus_mask();
+}
+
+const char* cycles_gpu_init_error(unsigned int device_type)
+{
+	static std::string last_error;
+	last_error = ccl::Device::gpu_init_error(static_cast<ccl::DeviceType>(device_type));
+	return last_error.c_str();
+}
+
 void cycles_debug_set_cpu_allow_qbvh(unsigned int state)
 {
 	assert(false);

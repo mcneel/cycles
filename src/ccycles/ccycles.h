@@ -114,6 +114,22 @@ typedef void(CDECL *LOGGER_FUNC_CB)(const char* msg);
 CCL_CAPI void CDECL cycles_initialise(unsigned int mask = ccl::DEVICE_MASK_ALL);
 
 /**
+ * After cycles_initialise, returns a bitmask (DeviceTypeMask) of GPUs whose
+ * initialisation threw. Surviving GPUs are still listed in the device vector;
+ * this lets managed callers report or persist which ones failed.
+ * \ingroup ccycles
+ */
+CCL_CAPI unsigned int CDECL cycles_failed_gpus_mask();
+
+/**
+ * Error message captured for the given DeviceType during the last
+ * cycles_initialise call. Returns an empty string if that GPU did not fail.
+ * The pointer is valid until the next cycles_initialise.
+ * \ingroup ccycles
+ */
+CCL_CAPI const char* CDECL cycles_gpu_init_error(unsigned int device_type);
+
+/**
  * Initialise paths for Cycles to look in (pre-compiled kernels, cached kernels, kernel code)
  * \ingroup ccycles
  */
