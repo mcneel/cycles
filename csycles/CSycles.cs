@@ -154,6 +154,13 @@ namespace ccl
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_initialise(uint mask);
+
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		private static extern uint cycles_failed_gpus_mask();
+
+		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+		private static extern IntPtr cycles_gpu_init_error(uint device_type);
+
 		/// <summary>
 		/// Initialise the Cycles render engine.
 		///
@@ -168,6 +175,24 @@ namespace ccl
 		{
 			LoadCCycles();
 			cycles_initialise((uint)mask);
+		}
+
+		/// <summary>
+		/// Bitmask (DeviceTypeMask) of GPUs whose init threw during the most
+		/// recent <see cref="initialise"/> call. Zero if everything succeeded.
+		/// </summary>
+		public static DeviceTypeMask failed_gpus_mask()
+		{
+			return (DeviceTypeMask)cycles_failed_gpus_mask();
+		}
+
+		/// <summary>
+		/// Error message captured for the given GPU during the most recent
+		/// <see cref="initialise"/> call. Empty if that GPU did not fail.
+		/// </summary>
+		public static string gpu_init_error(DeviceType type)
+		{
+			return Marshal.PtrToStringAnsi(cycles_gpu_init_error((uint)type)) ?? string.Empty;
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
