@@ -221,6 +221,42 @@ public:
 };
 #endif
 
+struct GpuInitFailure {
+  DeviceType type;
+  string message;
+};
+
+static std::vector<GpuInitFailure> g_gpu_init_failures;
+
+uint Device::failed_gpus_mask()
+{
+  uint mask = 0;
+  for (const GpuInitFailure &f : g_gpu_init_failures) {
+    mask |= (1u << f.type);
+  }
+  return mask;
+}
+
+string Device::gpu_init_error(DeviceType type)
+{
+  for (const GpuInitFailure &f : g_gpu_init_failures) {
+    if (f.type == type) return f.message;
+  }
+  return "";
+}
+
+static void record_gpu_failure(DeviceType type, const string &message)
+{
+  g_gpu_init_failures.push_back({type, message});
+}
+
+static string crash_message(const CyclesDriverCrashException &e)
+{
+  ostringstream oss;
+  oss << "driver crash (code 0x" << std::hex << e.VDENumber() << ")";
+  return oss.str();
+}
+
 vector<DeviceInfo> Device::available_devices(uint mask)
 {
   /* Lazy initialize devices. On some platforms OpenCL or CUDA drivers can
@@ -228,6 +264,8 @@ vector<DeviceInfo> Device::available_devices(uint mask)
    * we don't want to do any initialization until the user chooses to. */
   thread_scoped_lock lock(device_mutex);
   vector<DeviceInfo> devices;
+
+  g_gpu_init_failures.clear();
 
 #ifdef _WIN32
   CrashTranslatorHelper se_translator(crash_translator_function);
@@ -248,7 +286,12 @@ vector<DeviceInfo> Device::available_devices(uint mask)
               }
           }
       }
-      catch (CyclesDriverCrashException&) {}
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_CUDA, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_CUDA, e.what());
+      }
   }
 #endif
 
@@ -265,7 +308,12 @@ vector<DeviceInfo> Device::available_devices(uint mask)
               devices.push_back(info);
           }
       }
-      catch (CyclesDriverCrashException&) {}
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_OPTIX, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_OPTIX, e.what());
+      }
   }
 #endif
 
@@ -282,7 +330,12 @@ vector<DeviceInfo> Device::available_devices(uint mask)
               devices.push_back(info);
           }
       }
-      catch (CyclesDriverCrashException&) {}
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_HIP, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_HIP, e.what());
+      }
   }
 #endif
 
@@ -299,7 +352,12 @@ vector<DeviceInfo> Device::available_devices(uint mask)
               devices.push_back(info);
           }
       }
-      catch (CyclesDriverCrashException&) {}
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_ONEAPI, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_ONEAPI, e.what());
+      }
   }
 #endif
 
@@ -329,7 +387,12 @@ vector<DeviceInfo> Device::available_devices(uint mask)
           devices.push_back(info);
         }
       }
-      catch (CyclesDriverCrashException&) {}
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_METAL, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_METAL, e.what());
+      }
   }
 #endif
 
