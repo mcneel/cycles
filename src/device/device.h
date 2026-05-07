@@ -284,6 +284,10 @@ class Device {
   static string string_from_type(DeviceType type);
   static vector<DeviceType> available_types();
   static vector<DeviceInfo> available_devices(uint device_type_mask = DEVICE_MASK_ALL);
+
+  static uint failed_gpus_mask();
+  static string gpu_init_error(DeviceType type);
+
   static DeviceInfo dummy_device(const string &error_msg = "");
   static string device_capabilities(uint device_type_mask = DEVICE_MASK_ALL);
   static DeviceInfo get_multi_device(const vector<DeviceInfo> &subdevices,
