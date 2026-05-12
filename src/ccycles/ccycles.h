@@ -265,6 +265,17 @@ CCL_CAPI void CDECL cycles_scene_object_set_shader(ccl::Session* session_id, ccl
  */
 CCL_CAPI void CDECL cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object*, bool is_shadowcatcher);
 /**
+ * Set is_caustics_caster flag for object. Refractive/transmissive objects through which
+ * Manifold Next Event Estimation should evaluate caustic shadow rays.
+ * \ingroup ccycles_object
+ */
+CCL_CAPI void CDECL cycles_scene_object_set_is_caustics_caster(ccl::Session* session_id, ccl::Object*, bool is_caustics_caster);
+/**
+ * Set is_caustics_receiver flag for object. Surfaces that should receive caustics via MNEE.
+ * \ingroup ccycles_object
+ */
+CCL_CAPI void CDECL cycles_scene_object_set_is_caustics_receiver(ccl::Session* session_id, ccl::Object*, bool is_caustics_receiver);
+/**
  * Set is_solid flag for object
  * \ingroup ccycles_object
  */
@@ -514,6 +525,7 @@ CCL_CAPI void CDECL cycles_light_set_spot_angle(ccl::Session *session_id, ccl::L
 CCL_CAPI void CDECL cycles_light_set_spot_smooth(ccl::Session *session_id, ccl::Light *light_id, float spot_smooth);
 CCL_CAPI void CDECL cycles_light_set_cast_shadow(ccl::Session *session_id, ccl::Light *light_id, unsigned int cast_shadow);
 CCL_CAPI void CDECL cycles_light_set_use_mis(ccl::Session *session_id, ccl::Light *light_id, unsigned int use_mis);
+CCL_CAPI void CDECL cycles_light_set_use_caustics(ccl::Session *session_id, ccl::Light *light_id, unsigned int use_caustics);
 CCL_CAPI void CDECL cycles_light_set_samples(ccl::Session *session_id, ccl::Light *light_id, unsigned int samples);
 CCL_CAPI void CDECL cycles_light_set_max_bounces(ccl::Session *session_id, ccl::Light *light_id, unsigned int max_bounces);
 CCL_CAPI void CDECL cycles_light_set_map_resolution(ccl::Session *session_id, ccl::Light *light_id, unsigned int map_resolution);

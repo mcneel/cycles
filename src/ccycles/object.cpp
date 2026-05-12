@@ -148,6 +148,30 @@ void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Obj
 	}
 }
 
+void cycles_scene_object_set_is_caustics_caster(ccl::Session* session_id, ccl::Object* object, bool is_caustics_caster)
+{
+	ASSERT(object);
+
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		object->set_is_caustics_caster(is_caustics_caster);
+		object->tag_update(sce);
+		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
+	}
+}
+
+void cycles_scene_object_set_is_caustics_receiver(ccl::Session* session_id, ccl::Object* object, bool is_caustics_receiver)
+{
+	ASSERT(object);
+
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		object->set_is_caustics_receiver(is_caustics_receiver);
+		object->tag_update(sce);
+		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
+	}
+}
+
 void cycles_scene_object_set_is_solid(ccl::Session* session_id, ccl::Object* object, bool is_solid)
 {
 	ASSERT(object);

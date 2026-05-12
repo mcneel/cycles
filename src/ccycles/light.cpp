@@ -47,6 +47,11 @@ void cycles_light_set_use_mis(ccl::Session *session_id, ccl::Light *light, unsig
 	light->set_use_mis(use_mis == 1);
 }
 
+void cycles_light_set_use_caustics(ccl::Session *session_id, ccl::Light *light, unsigned int use_caustics)
+{
+	light->set_use_caustics(use_caustics == 1);
+}
+
 void cycles_light_set_samples(ccl::Session *session_id, ccl::Light *light, unsigned int samples)
 {
 	light->set_max_bounces((int)samples);
