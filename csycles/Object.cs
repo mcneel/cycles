@@ -133,6 +133,14 @@ namespace ccl
 		}
 
 		/// <summary>
+		/// Set the object Planar mapping.
+		/// </summary>
+		public void SetPlanarUvwMapping(bool hasMapping, bool capped, Transform xform)
+		{
+			CSycles.object_set_planar_uvw_mapping(Client.Scene.Id, ObjectPtr, hasMapping, capped, xform);
+		}
+
+		/// <summary>
 		/// Set the visibility of this object to specific rays.
 		/// </summary>
 		public PathRay Visibility
