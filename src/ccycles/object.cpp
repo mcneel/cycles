@@ -224,6 +224,33 @@ void cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object* ob
 		i, j, k, l);
 }
 
+void cycles_scene_object_set_planar_uvw_mapping(ccl::Session* session_id, ccl::Object* object,
+	unsigned int has_mapping,
+	unsigned int capped,
+	float a, float b, float c, float d,
+	float e, float f, float g, float h,
+	float i, float j, float k, float l
+	)
+{
+	ASSERT(object);
+
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		if (has_mapping) {
+			ccl::Transform xform = ccl::make_transform(a, b, c, d, e, f, g, h, i, j, k, l);
+			object->set_planar_uvw_xform(xform);
+			object->set_use_planar_uvw(true);
+			object->set_planar_uvw_capped(capped != 0);
+		}
+		else {
+			object->set_planar_uvw_xform(ccl::transform_identity());
+			object->set_use_planar_uvw(false);
+			object->set_planar_uvw_capped(false);
+		}
+		object->tag_update(sce);
+	}
+}
+
 
 void cycles_object_set_pass_id(ccl::Session* session_id, ccl::Object* object, int pass_id)
 {

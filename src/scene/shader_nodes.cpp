@@ -4254,8 +4254,7 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
     }
     else {
       int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
-      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
-      //compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+      compiler.add_node(texco_node, NODE_TEXCO_UV_MAYBE_PLANAR, compiler.stack_assign(out), attr);
     }
   }
 

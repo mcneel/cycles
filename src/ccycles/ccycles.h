@@ -245,6 +245,16 @@ CCL_CAPI void CDECL cycles_scene_object_set_ocs_frame(ccl::Session* session_id, 
 	float i, float j, float k, float l
 	);
 /**
+ * Set the object Planar mapping .
+ */
+CCL_CAPI void CDECL cycles_scene_object_set_planar_uvw_mapping(ccl::Session* session_id, ccl::Object*,
+	unsigned int has_mapping,
+	unsigned int capped,
+	float a, float b, float c, float d,
+	float e, float f, float g, float h,
+	float i, float j, float k, float l
+	);
+/**
  * Set object mesh
  * \ingroup ccycles_object
  */

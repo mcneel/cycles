@@ -1301,6 +1301,10 @@ typedef struct KernelObject {
   bool use_ocs_frame;
   Transform ocs_frame; /* OCS frame for controlling WCS and WCS Box. */
   Transform ocs_frame_normal; /* OCS frame for controlling WCS and WCS Box normals. */
+
+  bool use_planar_uvw;
+  bool planar_uvw_capped;
+  Transform planar_uvw_xform;
   /* Rhino properties end */
 
 } KernelObject;

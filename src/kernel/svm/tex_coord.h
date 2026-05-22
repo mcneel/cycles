@@ -739,6 +739,34 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
       }
       break;
     }
+    case NODE_TEXCO_UV_MAYBE_PLANAR: {
+      const uint attr_id = node.w;
+      if (sd->object != OBJECT_NONE &&
+          kernel_data_fetch(objects, sd->object).use_planar_uvw) {
+        Transform tfm = kernel_data_fetch(objects, sd->object).planar_uvw_xform;
+        data = transform_point(&tfm, sd->P);
+        if (!kernel_data_fetch(objects, sd->object).planar_uvw_capped) {
+          data.z = 0.0f;
+        }
+      }
+      else if (sd->object != OBJECT_NONE) {
+        AttributeDescriptor desc = find_attribute(kg, sd, attr_id);
+        if (desc.offset == ATTR_STD_NOT_FOUND) {
+          data = zero_float3();
+        }
+        else if (desc.type == NODE_ATTR_FLOAT2) {
+          float2 f = primitive_surface_attribute_float2(kg, sd, desc, NULL, NULL);
+          data = make_float3(f.x, f.y, 0.0f);
+        }
+        else {
+          data = primitive_surface_attribute_float3(kg, sd, desc, NULL, NULL);
+        }
+      }
+      else {
+        data = zero_float3();
+      }
+      break;
+    }
   }
 
   stack_store_float3(stack, out_offset, data);
@@ -930,6 +958,37 @@ ccl_device_noinline int svm_node_tex_coord_bump_dx(KernelGlobals kg,
       data = map_to_cylinder_section(data, decal);
       if (!decal.on_correct_side) {
         data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_UV_MAYBE_PLANAR: {
+      const uint attr_id = node.w;
+      if (sd->object != OBJECT_NONE &&
+          kernel_data_fetch(objects, sd->object).use_planar_uvw) {
+        Transform tfm = kernel_data_fetch(objects, sd->object).planar_uvw_xform;
+        data = transform_point(&tfm, svm_node_bump_P_dx(sd));
+        if (!kernel_data_fetch(objects, sd->object).planar_uvw_capped) {
+          data.z = 0.0f;
+        }
+      }
+      else if (sd->object != OBJECT_NONE) {
+        AttributeDescriptor desc = find_attribute(kg, sd, attr_id);
+        if (desc.offset == ATTR_STD_NOT_FOUND) {
+          data = zero_float3();
+        }
+        else if (desc.type == NODE_ATTR_FLOAT2) {
+          float2 dx;
+          float2 f = primitive_surface_attribute_float2(kg, sd, desc, &dx, NULL);
+          data = make_float3(f.x + dx.x, f.y + dx.y, 0.0f);
+        }
+        else {
+          float3 dx;
+          float3 f = primitive_surface_attribute_float3(kg, sd, desc, &dx, NULL);
+          data = f + dx;
+        }
+      }
+      else {
+        data = zero_float3();
       }
       break;
     }
@@ -1127,6 +1186,37 @@ ccl_device_noinline int svm_node_tex_coord_bump_dy(KernelGlobals kg,
       data = map_to_cylinder_section(data, decal);
       if (!decal.on_correct_side) {
         data.z = -1.0f;
+      }
+      break;
+    }
+    case NODE_TEXCO_UV_MAYBE_PLANAR: {
+      const uint attr_id = node.w;
+      if (sd->object != OBJECT_NONE &&
+          kernel_data_fetch(objects, sd->object).use_planar_uvw) {
+        Transform tfm = kernel_data_fetch(objects, sd->object).planar_uvw_xform;
+        data = transform_point(&tfm, svm_node_bump_P_dy(sd));
+        if (!kernel_data_fetch(objects, sd->object).planar_uvw_capped) {
+          data.z = 0.0f;
+        }
+      }
+      else if (sd->object != OBJECT_NONE) {
+        AttributeDescriptor desc = find_attribute(kg, sd, attr_id);
+        if (desc.offset == ATTR_STD_NOT_FOUND) {
+          data = zero_float3();
+        }
+        else if (desc.type == NODE_ATTR_FLOAT2) {
+          float2 dy;
+          float2 f = primitive_surface_attribute_float2(kg, sd, desc, NULL, &dy);
+          data = make_float3(f.x + dy.x, f.y + dy.y, 0.0f);
+        }
+        else {
+          float3 dy;
+          float3 f = primitive_surface_attribute_float3(kg, sd, desc, NULL, &dy);
+          data = f + dy;
+        }
+      }
+      else {
+        data = zero_float3();
       }
       break;
     }

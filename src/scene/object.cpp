@@ -109,6 +109,10 @@ NODE_DEFINE(Object)
   SOCKET_TRANSFORM(ocs_frame, "OCS Frame", transform_identity());
   SOCKET_TRANSFORM(ocs_frame_normal, "OCS Frame Normal", transform_identity());
 
+  SOCKET_BOOLEAN(use_planar_uvw, "Use Planar UVW", false);
+  SOCKET_TRANSFORM(planar_uvw_xform, "Planar UVW Transform", transform_identity());
+  SOCKET_BOOLEAN(planar_uvw_capped, "Planar UVW Capped", false);
+
   return type;
 }
 
@@ -447,6 +451,9 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.ocs_frame = ob->ocs_frame;
   kobject.ocs_frame_normal = ob->ocs_frame_normal;
   kobject.use_ocs_frame = ob->use_ocs_frame;
+  kobject.planar_uvw_xform = ob->planar_uvw_xform;
+  kobject.use_planar_uvw = ob->use_planar_uvw;
+  kobject.planar_uvw_capped = ob->planar_uvw_capped;
   kobject.volume_density = object_volume_density(tfm, geom);
   kobject.color[0] = color.x;
   kobject.color[1] = color.y;

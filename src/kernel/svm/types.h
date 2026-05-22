@@ -128,6 +128,7 @@ typedef enum NodeTexCoord {
   NODE_TEXCO_ENV_DECAL_PLANAR,
   NODE_TEXCO_ENV_DECAL_SPHERICAL,
   NODE_TEXCO_ENV_DECAL_CYLINDRICAL,
+  NODE_TEXCO_UV_MAYBE_PLANAR,
 } NodeTexCoord;
 
 typedef enum NodeImageDecalProjection {
