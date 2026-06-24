@@ -352,6 +352,14 @@ CCL_CAPI void CDECL cycles_shader_set_heterogeneous_volume(ccl::Session *session
 		shader_id->set_heterogeneous_volume(heterogeneous_volume == 1);
 }
 
+CCL_CAPI void CDECL cycles_shader_set_has_volume_connected(ccl::Session *session_id,
+											ccl::Shader *shader_id,
+											unsigned int has_volume_connected)
+{
+	if (shader_id)
+		shader_id->has_volume_connected = (has_volume_connected == 1);
+}
+
 CCL_CAPI ccl::ShaderNode* CDECL cycles_add_shader_node(ccl::Shader *shader_id,
 										const char *node_type_name,
 										const char *name)
