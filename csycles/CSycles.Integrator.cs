@@ -211,7 +211,9 @@ namespace ccl
 			cycles_integrator_set_light_sampling_threshold(sessionId, value);
 		}
 
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		// The native export has an 'integrators' typo (ccycles integrator.cpp); point at the
+		// actual entry point rather than renaming the export, which would need a ccycles rebuild.
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, EntryPoint = "cycles_integrators_set_use_light_tree")]
 		private static extern void cycles_integrator_set_use_light_tree(IntPtr sessionId, bool value);
 		public static void integrator_set_use_light_tree(IntPtr sessionId, bool value)
 		{
