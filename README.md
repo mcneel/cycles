@@ -43,7 +43,7 @@ Ensure both the **Mac** and the **Windows** sections are completed.
    - Navigate to `RDK/cycles/cycles`.
    - Run the command `make update`.
 
-3. Go to `RDK/cycles/cycles` and run `make release`.
+3. Go to `RDK/cycles/cycles` and run `make clean && make release`.
 
 4. Execute `cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/`.
 
