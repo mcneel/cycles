@@ -650,6 +650,16 @@ void MetalKernelPipeline::compile()
     metalbin_name = path_join(metalbin_name, local_md5.get_hex() + ".bin");
 
     metalbin_path = path_cache_get(path_join("kernels", metalbin_name));
+
+    /* @(metalbin_path.c_str()) (-stringWithUTF8String:) returns nil for an empty
+     * or non-UTF-8 path, and [NSURL fileURLWithPath:nil] then raises an uncaught
+     * exception on this background compile thread, terminating the process
+     * (RH-97035). If the cache path can't be represented as a string, skip the
+     * binary archive so compilation proceeds (uncached) instead of crashing. */
+    use_binary_archive = !metalbin_path.empty() && @(metalbin_path.c_str()) != nil;
+  }
+
+  if (use_binary_archive) {
     path_create_directories(metalbin_path);
 
     /* Check if shader binary exists on disk, and if so, update the file timestamp for LRU purging
