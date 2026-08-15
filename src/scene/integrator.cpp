@@ -83,6 +83,8 @@ NODE_DEFINE(Integrator)
   SOCKET_BOOLEAN(caustics_refractive, "Refractive Caustics", true);
   SOCKET_FLOAT(filter_glossy, "Filter Glossy", 0.0f);
 
+  SOCKET_BOOLEAN(clip_all_rays, "Clip All Rays", false);
+
   SOCKET_BOOLEAN(use_direct_light, "Use Direct Light", true);
   SOCKET_BOOLEAN(use_indirect_light, "Use Indirect Light", true);
   SOCKET_BOOLEAN(use_diffuse, "Use Diffuse", true);
@@ -199,12 +201,22 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
     }
   }
 
+  /* RH-95655: when clipping planes must cut shadow rays too (Product preset),
+   * route every shadow ray through the shadow_all traversal that skips clipped
+   * hits. The opaque shadow fast path (scene_intersect) has no per-hit clip
+   * test, so it would keep clipped geometry occluding direct light. */
+  if (clip_all_rays) {
+    kintegrator->transparent_shadows = true;
+  }
+
   kintegrator->volume_max_steps = volume_max_steps;
   kintegrator->volume_step_rate = volume_step_rate;
 
   kintegrator->caustics_reflective = caustics_reflective;
   kintegrator->caustics_refractive = caustics_refractive;
   kintegrator->filter_glossy = (filter_glossy == 0.0f) ? FLT_MAX : 1.0f / filter_glossy;
+
+  kintegrator->clip_all_rays = clip_all_rays ? 1 : 0;
 
   kintegrator->filter_closures = 0;
   if (!use_direct_light) {

@@ -20,6 +20,21 @@ ccl_device_inline bool intersection_ray_valid(ccl_private const Ray *ray)
   return isfinite_safe(ray->P.x) && isfinite_safe(ray->D.x) && len_squared(ray->D) != 0.0f;
 }
 
+/* Rhino RH-95655: test whether a world-space point lies on the clipped-away
+ * side (negative half-space) of any clipping plane. Used to make clipped
+ * geometry invisible not only to camera rays (see path_clip_ray) but also to
+ * indirect and shadow rays when the Product render preset enables clip_all_rays. */
+ccl_device_inline bool point_is_clipped(KernelGlobals kg, const float3 P)
+{
+  for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+    const float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
+    if (cpeq.x * P.x + cpeq.y * P.y + cpeq.z * P.z + cpeq.w < 0.0f) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /* Offset intersection distance by the smallest possible amount, to skip
  * intersections at this distance. This works in cases where the ray start
  * position is unchanged and only tmin is updated, since for self

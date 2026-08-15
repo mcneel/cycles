@@ -182,6 +182,14 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
     return optixIgnoreIntersection();
   }
 
+  /* RH-95655: ignore hits on the clipped-away side so clipped geometry does not
+   * block direct light (Product preset). ray is the world-space Cycles ray and
+   * optixGetRayTmax() is in that ray's parameterization. */
+  if (kernel_data.integrator.clip_all_rays &&
+      point_is_clipped(nullptr, ray->P + optixGetRayTmax() * ray->D)) {
+    return optixIgnoreIntersection();
+  }
+
 #  ifndef __TRANSPARENT_SHADOWS__
   /* No transparent shadows support compiled in, make opaque. */
   optixSetPayload_5(true);

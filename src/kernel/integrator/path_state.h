@@ -257,7 +257,11 @@ ccl_device_forceinline bool path_clip_ray(
 {
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
 
-  if ((path_flag & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+  /* Camera rays are always clipped. When clip_all_rays is set (Product preset,
+   * RH-95655) indirect bounces are clipped too, so clipped geometry stops
+   * contributing to and occluding indirect lighting. */
+  if (kernel_data.integrator.clip_all_rays ||
+      (path_flag & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
     for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
       float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
       float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;

@@ -45,6 +45,11 @@ struct MetalRTIntersectionShadowPayload {
   short num_hits;
   short num_recorded_hits;
   bool result;
+  /* RH-95655: world-space ray, so the shadow intersection function can compute
+   * the world hit point for the clip test. Metal's [[origin]]/[[direction]] are
+   * in the primitive's (object) space under a non-identity object transform. */
+  float3 ray_P;
+  float3 ray_D;
 };
 
 /* Scene intersection. */
@@ -291,6 +296,8 @@ ccl_device_intersect bool scene_intersect_shadow_all(KernelGlobals kg,
   payload.throughput = 1.0f;
   payload.result = false;
   payload.state = state;
+  payload.ray_P = ray->P;
+  payload.ray_D = ray->D;
 
   uint ray_mask = visibility & 0xFF;
   if (0 == ray_mask && (visibility & ~0xFF) != 0) {
