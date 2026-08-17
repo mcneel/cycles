@@ -368,7 +368,7 @@ vector<DeviceInfo> Device::available_devices(uint mask)
       try {
           if (!(devices_initialized_mask & DEVICE_MASK_OPTIX)) {
               if (device_optix_init()) {
-                  device_optix_info(cuda_devices, optix_devices);
+                  device_optix_info(cuda_devices(), optix_devices());
               }
               devices_initialized_mask |= DEVICE_MASK_OPTIX;
           }
