@@ -62,9 +62,10 @@ CCL_CAPI void CDECL cycles_session_params_set_background(ccl::SessionParams* ses
 
 CCL_CAPI void CDECL cycles_session_params_set_experimental(ccl::SessionParams* session_params_id, unsigned int experimental)
 {
-	if (auto search = session_params.find(session_params_id); search != session_params.end()) {
-		(*search)->experimental = experimental != 0;
-	}
+	/* SessionParams::experimental was removed in 5.2. The entry point is kept
+	 * so csycles and RhinoCycles keep linking; it no longer does anything. */
+	(void)session_params_id;
+	(void)experimental;
 }
 
 CCL_CAPI void CDECL cycles_session_params_set_samples(ccl::SessionParams* session_params_id, int samples)

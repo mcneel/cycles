@@ -249,6 +249,50 @@ class CCyclesDisplayDriver : public ccl::DisplayDriver {
 		std::vector<std::unique_ptr<CCyclesPassOutput>> *passes;
 };
 
+/* Rhino light handle.
+ *
+ * Cycles 5.2 made Light abstract, with PointLight / SpotLight / AreaLight /
+ * SunLight / BackgroundLight subclasses, and moved a light's position and
+ * orientation onto an Object transform rather than co/dir/axisu/axisv sockets.
+ *
+ * The Rhino C API creates a light first and sets its type afterwards, which is
+ * no longer possible because the type decides the class. This handle buffers
+ * the properties, builds the concrete light and its Object once the type is
+ * known, and forwards everything after that. csycles treats these handles as
+ * opaque IntPtr, so the C# side is unaffected.
+ *
+ * NOTE: the transform composed in flush() reproduces the pre-5.2 co/dir/axisu/
+ * axisv semantics. It needs checking against real scenes - light placement is
+ * exactly the sort of thing that compiles cleanly and renders wrongly. */
+struct CCyclesLight {
+	ccl::Session *session{nullptr};
+	ccl::Light *light{nullptr};
+	ccl::Object *object{nullptr};
+	ccl::Shader *shader{nullptr};
+
+	ccl::LightType type{ccl::LIGHT_POINT};
+	bool type_set{false};
+
+	ccl::float3 co{ccl::zero_float3()};
+	ccl::float3 dir{ccl::make_float3(0.0f, 0.0f, -1.0f)};
+	ccl::float3 axisu{ccl::make_float3(1.0f, 0.0f, 0.0f)};
+	ccl::float3 axisv{ccl::make_float3(0.0f, 1.0f, 0.0f)};
+
+	float size{0.0f};
+	float angle{0.009180f};
+	float spot_angle{0.0f};
+	float spot_smooth{0.0f};
+	float sizeu{0.0f};
+	float sizev{0.0f};
+	int map_resolution{0};
+	int max_bounces{0};
+	bool cast_shadow{true};
+	bool use_mis{true};
+
+	/* Creates the concrete light plus its Object, or updates them. */
+	void flush();
+};
+
 class CCSession final {
 public:
 	unsigned int id{ 0 };

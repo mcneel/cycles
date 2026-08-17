@@ -27,7 +27,7 @@ using namespace OIIO;
 
 ccl::Geometry *cycles_scene_add_mesh(ccl::Session *session, ccl::Shader *shader_id)
 {
-	ccl::Scene* sce = session->scene;
+	ccl::Scene* sce = session->scene.get();
 	if(sce)
 	{
 		ccl::Geometry* mesh = sce->create_node<ccl::Mesh>();
@@ -47,7 +47,7 @@ ccl::Geometry *cycles_scene_add_mesh(ccl::Session *session, ccl::Shader *shader_
 
 void cycles_geometry_set_shader(ccl::Session *session, ccl::Geometry *mesh_id, ccl::Shader *shader_id)
 {
-	ccl::Scene* sce = session->scene;
+	ccl::Scene* sce = session->scene.get();
 	if(sce) {
 
 		ccl::array<ccl::Node *>& used_shaders = mesh_id->get_used_shaders();
@@ -85,7 +85,7 @@ void cycles_geometry_clear(ccl::Session* session, ccl::Geometry* geometry)
 	assert(geometry);
 
 	#if 0
-	if (geometry && session->scene)
+	if (geometry && session->scene.get())
 	{
 		session->scene->delete_node(geometry);
 	}
@@ -171,7 +171,7 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 		{
 			ccl::float3* generated = mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_for_write<ccl::float3>();
 
-			auto& cycles_mesh_vertices = mesh->get_position_for_write();
+			ccl::packed_float3 *cycles_mesh_vertices = mesh->get_position_for_write();
 
 			for (int i = 0U, j = 0U; i < in_vcount * 3; i += 3, j++)
 			{
@@ -275,7 +275,21 @@ void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 
 		if (mesh)
 		{
-			mesh->add_triangle((int)v0, (int)v1, (int)v2, shader_id->id, smooth == 1);
+			/* 5.2 dropped Mesh::add_triangle; the triangle indices, per-face
+			 * shader and smooth flags are plain node sockets now. */
+			ccl::array<int> tris = mesh->get_triangles();
+			tris.push_back_slow((int)v0);
+			tris.push_back_slow((int)v1);
+			tris.push_back_slow((int)v2);
+			mesh->set_triangles(tris);
+
+			ccl::array<int> shaders = mesh->get_shader();
+			shaders.push_back_slow(shader_id->id);
+			mesh->set_shader(shaders);
+
+			ccl::array<bool> smooths = mesh->get_smooth();
+			smooths.push_back_slow(smooth == 1);
+			mesh->set_smooth(smooths);
 		}
 	}
 }
@@ -359,7 +373,7 @@ void cycles_mesh_set_vertex_colors(ccl::Session* session_id, ccl::Geometry* geom
 												 ccl::TypeRGBA,
 												 ccl::ATTR_ELEMENT_CORNER_BYTE);
 
-			ccl::uchar4 *cdata = attr->data_uchar4();
+			ccl::uchar4 *cdata = attr->data_for_write<ccl::uchar4>();
 
 			ccl::float4 f4;
 
@@ -440,7 +454,7 @@ static void mikk_get_position(const SMikkTSpaceContext *context,
 	const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
 	const ccl::Mesh *mesh = userdata->mesh;
 	const int vertex_index = mikk_vertex_index(mesh, face_num, vert_num);
-	const ccl::float3 vP = mesh->get_position_for_write()[vertex_index];
+	const ccl::float3 vP = mesh->get_position()[vertex_index];
 	P[0] = vP.x;
 	P[1] = vP.y;
 	P[2] = vP.z;
@@ -477,7 +491,7 @@ static void mikk_get_normal(const SMikkTSpaceContext *context, float N[3],
 	}
 	else {
 		const ccl::Mesh::Triangle tri = mesh->get_triangle(face_num);
-		vN = tri.compute_normal(&mesh->get_position_for_write()[0]);
+		vN = tri.compute_normal(mesh->get_position());
 	}
 
 	N[0] = vN.x;
@@ -515,7 +529,7 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 	ustring name_sign = ustring(std::string(uvmap_name.c_str()) + std::string(".tangent_sign"));
 
 	attr_sign = attributes.add(ccl::ATTR_STD_UV_TANGENT_SIGN, name_sign);
-	tangent_sign = attr_sign->data_float();
+	tangent_sign = attr_sign->data_for_write<float>();
 	/* Setup userdata. */
 	MikkUserData userdata(uvmap_name, mesh, tangent, tangent_sign);
 	/* Setup interface. */
@@ -700,7 +714,7 @@ void attr_create_pointiness(ccl::Mesh *mesh)
 	/* STEP 3: Blur vertices to approximate 2 ring neighborhood. */
 	ccl::AttributeSet& attributes = mesh->attributes;
 	ccl::Attribute *attr = attributes.add(ccl::ATTR_STD_POINTINESS);
-	float *data = attr->data_float();
+	float *data = attr->data_for_write<float>();
 	memcpy(data, &raw_data[0], sizeof(float) * raw_data.size());
 	memset(&counter[0], 0, sizeof(int) * counter.size());
 #if 0 // TODO FIXUP

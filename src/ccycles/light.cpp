@@ -16,103 +16,224 @@ limitations under the License.
 
 #include "internal_types.h"
 
-ccl::Light *cycles_create_light(ccl::Session* session_id, ccl::Shader *light_shader_id)
+/* Cycles 5.2 reworked lights considerably:
+ *
+ *  - Light is abstract; PointLight, SpotLight, AreaLight, SunLight and
+ *    BackgroundLight are the concrete classes, so the type must be known at
+ *    construction. The Rhino API sets it after creation.
+ *  - Lights are Geometry, created through Scene::create_node<T>() and living in
+ *    scene->geometry rather than a separate scene->lights list.
+ *  - Position and orientation come from an Object transform. The old co, dir,
+ *    axisu and axisv sockets are gone.
+ *  - set_use_glossy / set_use_transmission / set_use_camera are gone; per-light
+ *    ray visibility is expressed through light linking now.
+ *
+ * CCyclesLight (internal_types.h) absorbs the difference: it buffers the
+ * properties, then builds or updates the concrete light and its Object.
+ */
+
+void CCyclesLight::flush()
 {
-	ccl::Light* l = new ccl::Light();
-	l->set_angle(0.009180f); // use default value as in Blender UI (0.526deg)
-	l->set_shader(light_shader_id);
-	l->set_use_camera(false);
-	l->set_use_glossy(false);
-	l->set_use_transmission(true);
-	session_id->scene->lights.push_back(l);
-	return l;
+	if (session == nullptr) {
+		return;
+	}
+
+	ccl::Scene *scene = session->scene.get();
+
+	if (light == nullptr) {
+		switch (type) {
+			case ccl::LIGHT_POINT:
+				light = scene->create_node<ccl::PointLight>();
+				break;
+			case ccl::LIGHT_SPOT:
+				light = scene->create_node<ccl::SpotLight>();
+				break;
+			case ccl::LIGHT_AREA:
+				light = scene->create_node<ccl::AreaLight>();
+				break;
+			case ccl::LIGHT_SUN:
+				light = scene->create_node<ccl::SunLight>();
+				break;
+			case ccl::LIGHT_BACKGROUND:
+				light = scene->create_node<ccl::BackgroundLight>();
+				break;
+			default:
+				light = scene->create_node<ccl::PointLight>();
+				break;
+		}
+
+		object = scene->create_node<ccl::Object>();
+		object->set_geometry(light);
+	}
+
+	/* Shared properties. */
+	light->set_cast_shadow(cast_shadow);
+	light->set_use_mis(use_mis);
+	light->set_max_bounces(max_bounces);
+
+	/* Type specific properties. */
+	if (ccl::PointLight *point = dynamic_cast<ccl::PointLight *>(light)) {
+		point->set_radius(size);
+	}
+	if (ccl::SpotLight *spot = dynamic_cast<ccl::SpotLight *>(light)) {
+		spot->set_angle(spot_angle);
+		spot->set_smooth(spot_smooth);
+	}
+	if (ccl::AreaLight *area = dynamic_cast<ccl::AreaLight *>(light)) {
+		area->set_sizeu(sizeu);
+		area->set_sizev(sizev);
+	}
+	if (ccl::SunLight *sun = dynamic_cast<ccl::SunLight *>(light)) {
+		sun->set_angle(angle);
+	}
+	if (ccl::BackgroundLight *bg = dynamic_cast<ccl::BackgroundLight *>(light)) {
+		bg->set_map_resolution(map_resolution);
+	}
+
+	/* Placement. Pre-5.2 the light carried co, dir and (for area lights) axisu
+	 * and axisv directly; 5.2 takes all of it from the Object transform, with
+	 * the light pointing down local -Z.
+	 *
+	 * NOTE: verify against real scenes. This composes the same basis the old
+	 * sockets described, but a handedness or axis-order mistake here compiles
+	 * cleanly and simply renders lights in the wrong place. */
+	const ccl::float3 z = ccl::normalize(-dir);
+	ccl::float3 x = axisu;
+	ccl::float3 y = axisv;
+
+	if (ccl::len_squared(x) < 1e-12f || ccl::len_squared(y) < 1e-12f) {
+		/* Non-area lights leave axisu/axisv unset; derive any stable basis. */
+		const ccl::float3 up = (fabsf(z.z) < 0.9f) ? ccl::make_float3(0.0f, 0.0f, 1.0f) :
+		                                             ccl::make_float3(1.0f, 0.0f, 0.0f);
+		x = ccl::normalize(ccl::cross(up, z));
+		y = ccl::cross(z, x);
+	}
+	else {
+		x = ccl::normalize(x);
+		y = ccl::normalize(y);
+	}
+
+	const ccl::Transform tfm = ccl::make_transform(x.x, y.x, z.x, co.x,
+	                                               x.y, y.y, z.y, co.y,
+	                                               x.z, y.z, z.z, co.z);
+	object->set_tfm(tfm);
+
+	if (shader != nullptr) {
+		ccl::array<ccl::Node *> used_shaders;
+		used_shaders.push_back_slow(shader);
+		light->set_used_shaders(used_shaders);
+	}
+}
+
+CCyclesLight *cycles_create_light(ccl::Session *session_id, ccl::Shader *light_shader_id)
+{
+	CCyclesLight *handle = new CCyclesLight();
+	handle->session = session_id;
+	handle->shader = light_shader_id;
+	return handle;
 }
 
 /* type = 0: point, 1: sun, 2: background, 3: area, 4: spot, 5: triangle. */
-void cycles_light_set_type(ccl::Session *session_id, ccl::Light *light, light_type type)
+void cycles_light_set_type(ccl::Session *session_id, CCyclesLight *light, light_type type)
 {
-	ccl::LightType ltype = (ccl::LightType)type;
-	light->set_light_type(ltype);
-	light->set_use_glossy(true); // too many cmomplaints about lights not working
-	                             // so setting this to true by default
+	light->type = (ccl::LightType)type;
+	light->type_set = true;
+	light->flush();
 }
 
-void cycles_light_set_cast_shadow(ccl::Session *session_id, ccl::Light *light, unsigned int cast_shadow)
+void cycles_light_set_cast_shadow(ccl::Session *session_id, CCyclesLight *light, unsigned int cast_shadow)
 {
-	light->set_cast_shadow(cast_shadow == 1);
+	light->cast_shadow = (cast_shadow == 1);
+	light->flush();
 }
 
-void cycles_light_set_use_mis(ccl::Session *session_id, ccl::Light *light, unsigned int use_mis)
+void cycles_light_set_use_mis(ccl::Session *session_id, CCyclesLight *light, unsigned int use_mis)
 {
-	light->set_use_mis(use_mis == 1);
+	light->use_mis = (use_mis == 1);
+	light->flush();
 }
 
-void cycles_light_set_samples(ccl::Session *session_id, ccl::Light *light, unsigned int samples)
+void cycles_light_set_samples(ccl::Session *session_id, CCyclesLight *light, unsigned int samples)
 {
-	light->set_max_bounces((int)samples);
+	light->max_bounces = (int)samples;
+	light->flush();
 }
 
-void cycles_light_set_max_bounces(ccl::Session *session_id, ccl::Light *light, unsigned int max_bounces)
+void cycles_light_set_max_bounces(ccl::Session *session_id, CCyclesLight *light, unsigned int max_bounces)
 {
-	light->set_max_bounces(max_bounces);
+	light->max_bounces = (int)max_bounces;
+	light->flush();
 }
 
-void cycles_light_set_map_resolution(ccl::Session *session_id, ccl::Light *light, unsigned int map_resolution)
+void cycles_light_set_map_resolution(ccl::Session *session_id, CCyclesLight *light, unsigned int map_resolution)
 {
-	light->set_map_resolution(map_resolution);
+	light->map_resolution = (int)map_resolution;
+	light->flush();
 }
 
-void cycles_light_set_angle(ccl::Session *session_id, ccl::Light *light, float angle)
+void cycles_light_set_angle(ccl::Session *session_id, CCyclesLight *light, float angle)
 {
-	light->set_angle(angle);
+	light->angle = angle;
+	light->flush();
 }
 
-void cycles_light_set_spot_angle(ccl::Session *session_id, ccl::Light *light, float spot_angle)
+void cycles_light_set_spot_angle(ccl::Session *session_id, CCyclesLight *light, float spot_angle)
 {
-	light->set_spot_angle(spot_angle);
+	light->spot_angle = spot_angle;
+	light->flush();
 }
 
-void cycles_light_set_spot_smooth(ccl::Session *session_id, ccl::Light *light, float spot_smooth)
+void cycles_light_set_spot_smooth(ccl::Session *session_id, CCyclesLight *light, float spot_smooth)
 {
-	light->set_spot_smooth(spot_smooth);
+	light->spot_smooth = spot_smooth;
+	light->flush();
 }
 
-void cycles_light_set_sizeu(ccl::Session *session_id, ccl::Light *light, float sizeu)
+void cycles_light_set_sizeu(ccl::Session *session_id, CCyclesLight *light, float sizeu)
 {
-	light->set_sizeu(sizeu);
+	light->sizeu = sizeu;
+	light->flush();
 }
 
-void cycles_light_set_sizev(ccl::Session *session_id, ccl::Light *light, float sizev)
+void cycles_light_set_sizev(ccl::Session *session_id, CCyclesLight *light, float sizev)
 {
-	light->set_sizev(sizev);
+	light->sizev = sizev;
+	light->flush();
 }
 
-void cycles_light_set_axisu(ccl::Session *session_id, ccl::Light *light, float axisux, float axisuy, float axisuz)
+void cycles_light_set_axisu(ccl::Session *session_id, CCyclesLight *light, float axisux, float axisuy, float axisuz)
 {
-	light->set_axisu(ccl::make_float3(axisux, axisuy, axisuz));
+	light->axisu = ccl::make_float3(axisux, axisuy, axisuz);
+	light->flush();
 }
 
-void cycles_light_set_axisv(ccl::Session *session_id, ccl::Light *light, float axisvx, float axisvy, float axisvz)
+void cycles_light_set_axisv(ccl::Session *session_id, CCyclesLight *light, float axisvx, float axisvy, float axisvz)
 {
-	light->set_axisv(ccl::make_float3(axisvx, axisvy, axisvz));
+	light->axisv = ccl::make_float3(axisvx, axisvy, axisvz);
+	light->flush();
 }
 
-void cycles_light_set_size(ccl::Session *session_id, ccl::Light *light, float size)
+void cycles_light_set_size(ccl::Session *session_id, CCyclesLight *light, float size)
 {
-	light->set_size(size);
+	light->size = size;
+	light->flush();
 }
 
-void cycles_light_set_dir(ccl::Session *session_id, ccl::Light *light, float dirx, float diry, float dirz)
+void cycles_light_set_dir(ccl::Session *session_id, CCyclesLight *light, float dirx, float diry, float dirz)
 {
-	light->set_dir(ccl::make_float3(dirx, diry, dirz));
+	light->dir = ccl::make_float3(dirx, diry, dirz);
+	light->flush();
 }
 
-void cycles_light_set_co(ccl::Session *session_id, ccl::Light *light, float cox, float coy, float coz)
+void cycles_light_set_co(ccl::Session *session_id, CCyclesLight *light, float cox, float coy, float coz)
 {
-	light->set_co(ccl::make_float3(cox, coy, coz));
+	light->co = ccl::make_float3(cox, coy, coz);
+	light->flush();
 }
 
-void cycles_light_tag_update(ccl::Session *session_id, ccl::Light *light)
+void cycles_light_tag_update(ccl::Session *session_id, CCyclesLight *light)
 {
-	light->tag_update(session_id->scene);
+	if (light->light != nullptr) {
+		light->light->tag_update(session_id->scene.get());
+	}
 }

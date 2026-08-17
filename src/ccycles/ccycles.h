@@ -93,6 +93,10 @@ extern "C" {
 
 /***********************************/
 
+/* Rhino light handle; see internal_types.h. Opaque to callers.
+ * csycles marshals these as IntPtr. */
+struct CCyclesLight;
+
 class StringHolder
 {
 public:
@@ -517,24 +521,24 @@ enum class light_type: unsigned int {
 	Triangle,
 };
 
-CCL_CAPI ccl::Light *CDECL cycles_create_light(ccl::Session* session_id, ccl::Shader *light_shader_id);
-CCL_CAPI void CDECL cycles_light_set_type(ccl::Session *session_id, ccl::Light *light_id, light_type type);
-CCL_CAPI void CDECL cycles_light_set_angle(ccl::Session *session_id, ccl::Light *light_id, float angle);
-CCL_CAPI void CDECL cycles_light_set_spot_angle(ccl::Session *session_id, ccl::Light *light_id, float spot_angle);
-CCL_CAPI void CDECL cycles_light_set_spot_smooth(ccl::Session *session_id, ccl::Light *light_id, float spot_smooth);
-CCL_CAPI void CDECL cycles_light_set_cast_shadow(ccl::Session *session_id, ccl::Light *light_id, unsigned int cast_shadow);
-CCL_CAPI void CDECL cycles_light_set_use_mis(ccl::Session *session_id, ccl::Light *light_id, unsigned int use_mis);
-CCL_CAPI void CDECL cycles_light_set_samples(ccl::Session *session_id, ccl::Light *light_id, unsigned int samples);
-CCL_CAPI void CDECL cycles_light_set_max_bounces(ccl::Session *session_id, ccl::Light *light_id, unsigned int max_bounces);
-CCL_CAPI void CDECL cycles_light_set_map_resolution(ccl::Session *session_id, ccl::Light *light_id, unsigned int map_resolution);
-CCL_CAPI void CDECL cycles_light_set_sizeu(ccl::Session *session_id, ccl::Light *light_id, float sizeu);
-CCL_CAPI void CDECL cycles_light_set_sizev(ccl::Session *session_id, ccl::Light *light_id, float sizev);
-CCL_CAPI void CDECL cycles_light_set_axisu(ccl::Session *session_id, ccl::Light *light_id, float axisux, float axisuy, float axisuz);
-CCL_CAPI void CDECL cycles_light_set_axisv(ccl::Session *session_id, ccl::Light *light_id, float axisvx, float axisvy, float axisvz);
-CCL_CAPI void CDECL cycles_light_set_size(ccl::Session *session_id, ccl::Light *light_id, float size);
-CCL_CAPI void CDECL cycles_light_set_dir(ccl::Session *session_id, ccl::Light *light_id, float dirx, float diry, float dirz);
-CCL_CAPI void CDECL cycles_light_set_co(ccl::Session *session_id, ccl::Light *light_id, float cox, float coy, float coz);
-CCL_CAPI void CDECL cycles_light_tag_update(ccl::Session* session_id, ccl::Light *light_id);
+CCL_CAPI CCyclesLight *CDECL cycles_create_light(ccl::Session* session_id, ccl::Shader *light_shader_id);
+CCL_CAPI void CDECL cycles_light_set_type(ccl::Session *session_id, CCyclesLight *light_id, light_type type);
+CCL_CAPI void CDECL cycles_light_set_angle(ccl::Session *session_id, CCyclesLight *light_id, float angle);
+CCL_CAPI void CDECL cycles_light_set_spot_angle(ccl::Session *session_id, CCyclesLight *light_id, float spot_angle);
+CCL_CAPI void CDECL cycles_light_set_spot_smooth(ccl::Session *session_id, CCyclesLight *light_id, float spot_smooth);
+CCL_CAPI void CDECL cycles_light_set_cast_shadow(ccl::Session *session_id, CCyclesLight *light_id, unsigned int cast_shadow);
+CCL_CAPI void CDECL cycles_light_set_use_mis(ccl::Session *session_id, CCyclesLight *light_id, unsigned int use_mis);
+CCL_CAPI void CDECL cycles_light_set_samples(ccl::Session *session_id, CCyclesLight *light_id, unsigned int samples);
+CCL_CAPI void CDECL cycles_light_set_max_bounces(ccl::Session *session_id, CCyclesLight *light_id, unsigned int max_bounces);
+CCL_CAPI void CDECL cycles_light_set_map_resolution(ccl::Session *session_id, CCyclesLight *light_id, unsigned int map_resolution);
+CCL_CAPI void CDECL cycles_light_set_sizeu(ccl::Session *session_id, CCyclesLight *light_id, float sizeu);
+CCL_CAPI void CDECL cycles_light_set_sizev(ccl::Session *session_id, CCyclesLight *light_id, float sizev);
+CCL_CAPI void CDECL cycles_light_set_axisu(ccl::Session *session_id, CCyclesLight *light_id, float axisux, float axisuy, float axisuz);
+CCL_CAPI void CDECL cycles_light_set_axisv(ccl::Session *session_id, CCyclesLight *light_id, float axisvx, float axisvy, float axisvz);
+CCL_CAPI void CDECL cycles_light_set_size(ccl::Session *session_id, CCyclesLight *light_id, float size);
+CCL_CAPI void CDECL cycles_light_set_dir(ccl::Session *session_id, CCyclesLight *light_id, float dirx, float diry, float dirz);
+CCL_CAPI void CDECL cycles_light_set_co(ccl::Session *session_id, CCyclesLight *light_id, float cox, float coy, float coz);
+CCL_CAPI void CDECL cycles_light_tag_update(ccl::Session* session_id, CCyclesLight *light_id);
 
 CCL_CAPI void CDECL cycles_film_set_exposure(ccl::Session* session_id, float exposure);
 CCL_CAPI void CDECL cycles_film_set_filter(ccl::Session* session_id, unsigned int filter_type, float filter_width);

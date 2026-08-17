@@ -51,8 +51,8 @@ ccl::ShaderNode* _shader_node_find(ccl::Session* session_id, unsigned int shader
 ustring _get_colorspace(int value)
 {
 	if (value == 0) {
-		//std::cout << "setting to " << ccl::u_colorspace_raw << std::endl;
-		return ccl::u_colorspace_raw;
+		//std::cout << "setting to " << ccl::u_colorspace_data << std::endl;
+		return ccl::u_colorspace_data;
 	}
 	else {
 		//std::cout << "setting to " << ccl::u_colorspace_auto << std::endl;
@@ -67,7 +67,7 @@ extern "C" {
 CCL_CAPI ccl::Shader* CDECL cycles_create_shader(ccl::Session *session)
 {
 	ccl::Shader *shader = session->scene->create_node<ccl::Shader>();
-	shader->set_graph(new ccl::ShaderGraph());
+	shader->set_graph(ccl::make_unique<ccl::ShaderGraph>());
 	shader->set_displacement_method(ccl::DisplacementMethod::DISPLACE_TRUE);
 	shader->has_displacement = true;
 	return shader;
@@ -80,13 +80,9 @@ CCL_CAPI int CDECL cycles_shader_node_count(ccl::Shader *shader)
 
 CCL_CAPI ccl::ShaderNode* CDECL cycles_shader_node_get(ccl::Shader *shader, int idx)
 {
-	int count = 0;
-	auto it = shader->graph->nodes.cbegin();
-	while (it != shader->graph->nodes.cend() && count < shader->graph->nodes.size()) {
-		if (count == idx)
-			return *it;
-		it++;
-		count++;
+	/* 5.2: ShaderGraph::nodes is a unique_ptr_vector - indexed, not iterated. */
+	if (idx >= 0 && (size_t)idx < shader->graph->nodes.size()) {
+		return shader->graph->nodes[idx];
 	}
 
 	return nullptr;
@@ -303,7 +299,7 @@ CCL_CAPI unsigned int CDECL cycles_scene_shader_id(ccl::Session *session_id, uns
 
 CCL_CAPI void CDECL cycles_shader_new_graph(ccl::Shader *shader)
 {
-	shader->set_graph(new ccl::ShaderGraph());
+	shader->set_graph(ccl::make_unique<ccl::ShaderGraph>());
 }
 
 CCL_CAPI void CDECL cycles_shader_dump_graph(ccl::Shader *shader, const char *filename)
@@ -351,7 +347,11 @@ CCL_CAPI void CDECL cycles_shader_set_heterogeneous_volume(ccl::Session *session
 											unsigned int heterogeneous_volume)
 {
 	if (shader_id)
-		shader_id->set_heterogeneous_volume(heterogeneous_volume == 1);
+		/* 5.2 dropped Shader::heterogeneous_volume; homogeneous volumes are
+		 * expressed through the volume interpolation method instead. */
+		shader_id->set_volume_interpolation_method(
+			heterogeneous_volume == 1 ? (int)ccl::INTERPOLATION_LINEAR :
+										(int)ccl::INTERPOLATION_CLOSEST);
 }
 
 CCL_CAPI ccl::ShaderNode* CDECL cycles_add_shader_node(ccl::Shader *shader_id,
@@ -359,14 +359,16 @@ CCL_CAPI ccl::ShaderNode* CDECL cycles_add_shader_node(ccl::Shader *shader_id,
 										const char *name)
 {
 	const ccl::NodeType *node_type = ccl::NodeType::find(ustring(node_type_name));
-	ccl::ShaderNode *node = (ccl::ShaderNode *)node_type->create(node_type);
+	ccl::unique_ptr<ccl::Node> owned = node_type->create(node_type);
+	ccl::ShaderNode *node = static_cast<ccl::ShaderNode *>(owned.get());
 
 	assert(node);
 
 	if (node) {
 		node->name = ustring(name);
-		node->set_owner(shader_id->graph);
-		shader_id->graph->add(node);
+		node->set_owner(shader_id->graph.get());
+		shader_id->graph->add_node_owned(
+			ccl::unique_ptr<ccl::ShaderNode>(static_cast<ccl::ShaderNode *>(owned.release())));
 
 		if(ustring(node_type_name) == ustring("tangent")) {
 			ccl::TangentNode *tangent = dynamic_cast<ccl::TangentNode *>(node);
@@ -484,8 +486,11 @@ CCL_CAPI void CDECL cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode *sh
 		_set_texmapping_mapping(node->tex_mapping, x, y, z);
 	}
 	else if (shn_type == "musgrave_texture") {
-		ccl::MusgraveTextureNode *node = dynamic_cast<ccl::MusgraveTextureNode *>(shnode);
-		_set_texmapping_mapping(node->tex_mapping, x, y, z);
+		/* Removed in Blender 4.1, folded into the noise texture. */
+		ccl::NoiseTextureNode *node = dynamic_cast<ccl::NoiseTextureNode *>(shnode);
+		if (node != nullptr) {
+			_set_texmapping_mapping(node->tex_mapping, x, y, z);
+		}
 	}
 	else if (shn_type == "brick_texture") {
 		ccl::BrickTextureNode *node = dynamic_cast<ccl::BrickTextureNode *>(shnode);
@@ -579,8 +584,11 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		node->set_distribution((ccl::ClosureType)value);
 	}
 	else if (shntype == "anisotropic_bsdf") {
-		ccl::AnisotropicBsdfNode *node = dynamic_cast<ccl::AnisotropicBsdfNode *>(shnode);
-		node->set_distribution((ccl::ClosureType)value);
+		/* Removed in Blender 4.0, merged into the glossy BSDF. */
+		ccl::GlossyBsdfNode *node = dynamic_cast<ccl::GlossyBsdfNode *>(shnode);
+		if (node != nullptr) {
+			node->set_distribution((ccl::ClosureType)value);
+		}
 	}
 	else if (shntype == "wave_texture") {
 		if (ename == "wave") {
@@ -605,13 +613,9 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		}
 	}
 	else if (shntype == "musgrave_texture") {
-		ccl::MusgraveTextureNode *node = dynamic_cast<ccl::MusgraveTextureNode *>(shnode);
-		if (ename == "musgrave") {
-		node->set_musgrave_type((ccl::NodeMusgraveType)value);
-		}
-		else if (ename == "dimension") {
-		node->set_dimensions(value);
-		}
+		/* Removed in Blender 4.1. The noise texture that replaced it has no
+		 * musgrave_type or dimension equivalent, so these are accepted and
+		 * ignored; materials relying on them need a real migration. */
 	}
 	else if (shntype == "sky_texture") {
 		ccl::SkyTextureNode *node = dynamic_cast<ccl::SkyTextureNode *>(shnode);

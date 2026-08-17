@@ -19,7 +19,7 @@ limitations under the License.
 /* Find pointers for CCScene and ccl::Scene. Return false if either fails. */
 bool scene_find(ccl::Session* sid, ccl::Scene** sce)
 {
-	(*sce) = sid->scene;
+	(*sce) = sid->scene.get();
 	return *sce != nullptr;
 }
 
@@ -28,34 +28,21 @@ bool scene_find(ccl::Session* sid, ccl::Scene** sce)
 */
 ccl::Shader* find_shader_in_scene(ccl::Scene* sce, unsigned int shader_id)
 {
-	auto b = sce->shaders.cbegin();
-	auto e = sce->shaders.cend();
-	ccl::Shader* bg = nullptr;
-	unsigned int idx = 0;
-	while (b != e) {
-		if (idx == shader_id) {
-			bg = *b;
-			break;
-		}
-		idx++;
-		b++;
+	/* 5.2: Scene::shaders is a unique_ptr_vector - indexed, not iterated. */
+	if (shader_id < sce->shaders.size()) {
+		return sce->shaders[shader_id];
 	}
-	return bg;
+	return nullptr;
 }
 
 unsigned int get_idx_for_shader_in_scene(ccl::Scene* sce, ccl::Shader* sh)
 {
-	auto b = sce->shaders.cbegin();
-	auto e = sce->shaders.cend();
-	unsigned int idx = 0;
-	while (b != e) {
-		if (*b == sh) {
-			return idx;
+	for (size_t idx = 0; idx < sce->shaders.size(); idx++) {
+		if (sce->shaders[idx] == sh) {
+			return (unsigned int)idx;
 		}
-		idx++;
-		b++;
 	}
-	return -1;
+	return (unsigned int)-1;
 
 }
 
@@ -66,7 +53,7 @@ void CCScene::builtin_image_info(const std::string& builtin_name, void* builtin_
 	CCImage* img = static_cast<CCImage*>(builtin_data);
 	imdata.width = img->width;
 	imdata.height = img->height;
-	imdata.depth = img->depth;
+	/* ImageMetaData has no depth in 5.2; 3D image metadata was dropped. */
 	imdata.channels = img->channels;
 
 	assert(false);

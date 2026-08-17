@@ -387,11 +387,7 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 		Shader *bgsh = scene->default_background;
 		ccl::unique_ptr<ccl::ShaderGraph> graph = ccl::make_unique<ccl::ShaderGraph>();
 		ccl::OutputNode *out = graph->output();
-		ustring nodename("background_shader");
-		const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
-		ccl::unique_ptr<ccl::Node> owned_node = ntype->create(ntype);
-		ccl::ShaderNode *shn = static_cast<ccl::ShaderNode *>(owned_node.get());
-		shn->set_owner(graph.get());
+		ccl::BackgroundNode *shn = graph->create_node<ccl::BackgroundNode>();
 		{
 			std::random_device r;
 			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
@@ -400,8 +396,6 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 			bgn->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
 			bgn->set_strength(1.5f);
 		}
-		graph->add_node(ccl::unique_ptr<ccl::ShaderNode>(
-			static_cast<ccl::ShaderNode *>(owned_node.release())));
 		graph->connect(shn->output("Background"), out->input("Surface"));
 		bgsh->set_graph(std::move(graph));
 		bgsh->tag_update(scene);
@@ -411,11 +405,7 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 		auto default_surface_shader = scene->default_surface;
 		ccl::unique_ptr<ccl::ShaderGraph> graph = ccl::make_unique<ccl::ShaderGraph>();
 		auto out = graph->output();
-		ustring nodename("diffuse_bsdf");
-		const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
-		ccl::unique_ptr<ccl::Node> owned_node = ntype->create(ntype);
-		ccl::ShaderNode *shader_node = static_cast<ccl::ShaderNode *>(owned_node.get());
-		shader_node->set_owner(graph.get());
+		ccl::DiffuseBsdfNode *shader_node = graph->create_node<ccl::DiffuseBsdfNode>();
 		{
 			std::random_device r;
 			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
@@ -424,8 +414,6 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 			diff->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
 			diff->set_roughness(1.0f);
 		}
-		graph->add_node(ccl::unique_ptr<ccl::ShaderNode>(
-			static_cast<ccl::ShaderNode *>(owned_node.release())));
 		graph->connect(shader_node->output("BSDF"), out->input("Surface"));
 		default_surface_shader->set_graph(std::move(graph));
 		default_surface_shader->tag_update(scene);
@@ -458,7 +446,7 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 	session->params = *params;
 	session->params.tile_size = 512;
 	session->params.use_auto_tile = false;
-	session->params.experimental = true;
+	/* SessionParams::experimental was removed in 5.2. */
 	session->params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
 
 	session->scene_params.shadingsystem = ccl::SHADINGSYSTEM_SVM;
@@ -489,12 +477,12 @@ CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 
 CCL_CAPI void CDECL cycles_session_clear_passes(ccl::Session* session_id)
 {
-	ccl::vector<ccl::Pass*>& passes = session_id->scene->passes;
-	for (ccl::Pass *pass : passes) {
+	/* 5.2: Scene::passes is a unique_ptr_vector; index it. */
+	for (size_t pi = session_id->scene->passes.size(); pi-- > 0;) {
+		ccl::Pass *pass = session_id->scene->passes[pi];
 		session_id->scene->delete_node(pass);
 	}
 
-	passes.clear();
 
 	ccl::Session *session = nullptr;
 	CCSession *ccsess = nullptr;

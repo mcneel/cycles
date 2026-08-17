@@ -361,6 +361,14 @@ class ShaderGraph : public NodeOwner {
 
   void dump_graph(const char *filename);
 
+  /* Rhino: adds an already-created node. create_node<T>() needs the type at
+   * compile time, but the Rhino C API builds graphs from runtime node type
+   * names, so it needs a public way to hand over an owned node. */
+  void add_node_owned(unique_ptr<ShaderNode> &&node)
+  {
+    add_node(std::move(node));
+  }
+
   /* Create node from class and add it to the shader graph. */
   template<typename T, typename... Args> T *create_node(Args &&...args)
   {

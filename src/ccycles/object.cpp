@@ -20,7 +20,7 @@ limitations under the License.
 
 ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
 {
-	ccl::Scene* sce = session_id->scene;
+	ccl::Scene* sce = session_id->scene.get();
 	if(sce) 
 	{
 		auto ob = sce->create_node<ccl::Object>();
@@ -42,7 +42,7 @@ ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
 void cycles_scene_object_delete(ccl::Session* session, ccl::Object* obj)
 {
 	#if 0
-	ccl::Scene* sce = session->scene;
+	ccl::Scene* sce = session->scene.get();
 	if(sce)
 	{
 		sce->delete_node(obj);
@@ -55,7 +55,7 @@ void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* obj
 	assert(object);
 	assert(geometry);
 
-	ccl::Scene* sce = session_id->scene;
+	ccl::Scene* sce = session_id->scene.get();
 	if(sce) 
 	{
 		object->set_geometry(geometry);
@@ -96,7 +96,7 @@ void cycles_scene_object_set_shader(ccl::Session *session_id,
 {
 	assert(object);
 
-	ccl::Scene* sce = session_id->scene;
+	ccl::Scene* sce = session_id->scene.get();
 	ccl::Geometry* geometry = object->get_geometry();
 	object->set_shader(shader_id);
 
