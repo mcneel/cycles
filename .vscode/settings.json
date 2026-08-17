@@ -2,21 +2,18 @@
 	"cmake.configureOnOpen": false,
 	"C_Cpp.default.includePath":
 			["${default}",
-			 "${workspaceFolder}/ccycles",
-			 "${workspaceFolder}/glew/include",
+			 "${workspaceFolder}/cycles/src",
+			 "${workspaceFolder}/cycles/src/ccycles",
 			 "${workspaceFolder}/cycles/src/**",
 			 "${workspaceFolder}/cycles/third_party/**",
-			 "${workspaceFolder}/../../../../../big_libs/OpenImageIO-2.2.19/include",
-			 "${workspaceFolder}/../../../../../big_libs/boost",
-			 "${workspaceFolder}/../../../../../big_libs/OpenEXR-2.5.5/include",
+			 "${workspaceFolder}/cycles/lib/windows_x64/**/include",
 			 "${workspaceFolder}/**"
 			],
 	"C_Cpp.default.defines" : [
 			"CCL_NAMESPACE_BEGIN=namespace ccl {",
 			"CCL_NAMESPACE_END=}",
 			"WITH_CUDA_DYNLOAD",
-			"__CUDA_ARCH__",
-			"WITH_OPENCL"],
+			"__CUDA_ARCH__"],
 	"files.associations": {
 		"*.u3m": "json",
 		"vector": "cpp",

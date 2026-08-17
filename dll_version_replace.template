@@ -23,4 +23,8 @@ BLOCK "VarFileInfo"
 }
 }
 
-2 24 "ccycles_manifest.txt"
+// This template is now only used to stamp VERSIONINFO onto prebuilt
+// third-party DLLs that we ship but do not link (the oneAPI JIT DLL).
+// It used to also pull in ccycles_manifest.txt as resource 2; ccycles.dll now
+// gets both its VERSIONINFO and its SxS manifest at link time from
+// cycles/src/ccycles/CMakeLists.txt.

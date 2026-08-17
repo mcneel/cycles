@@ -11,21 +11,6 @@
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
-  <PropertyGroup Label="Globals">
-    <PlatformVersion Condition="'$(VisualStudioVersion)'=='14.0'">v140</PlatformVersion>
-    <PlatformVersion Condition="'$(VisualStudioVersion)'=='15.0'">v141</PlatformVersion>
-    <PlatformVersion Condition="'$(VisualStudioVersion)'&gt;='16.0'">v142</PlatformVersion>
-    <PlatformVersion Condition="'$(VisualStudioVersion)'&gt;='17.0'">v142</PlatformVersion>
-    <BoostConfig Condition="$(Configuration.Contains('Debug'))">gd-</BoostConfig>
-    <BoostConfig Condition="$(Configuration.Contains('Release'))" />
-    <OpenEXRVersion Condition="$(Configuration.Contains('Debug'))">RH-2_5_d</OpenEXRVersion>
-    <OpenEXRVersion Condition="$(Configuration.Contains('Release'))">RH-2_5</OpenEXRVersion>
-    <OpenImageIOVersion Condition="$(Configuration.Contains('Debug'))">RH_d</OpenImageIOVersion>
-    <OpenImageIOVersion Condition="$(Configuration.Contains('Release'))">RH</OpenImageIOVersion>
-    <EmbreeVersion Condition="$(Configuration.Contains('Debug'))">_RH</EmbreeVersion>
-    <EmbreeVersion Condition="$(Configuration.Contains('Release'))">_RH</EmbreeVersion>
-    <BoostToolset>$(BoostConfig)x64-RH-$(PlatformVersion)</BoostToolset>
-  </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
@@ -55,30 +40,6 @@
   <PropertyGroup>
     <RunPostBuildEvent>Always</RunPostBuildEvent>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Stand-alone Debug|AnyCPU'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\Stand-alone Debug\</OutputPath>
-    <DefineConstants Condition=" '$(OS)' == 'Windows_NT' ">DEBUG;TRACE;WIN32</DefineConstants>
-    <DefineConstants Condition=" '$(OS)' != 'Windows_NT' ">DEBUG;TRACE</DefineConstants>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <DebugType>full</DebugType>
-    <PlatformTarget>x64</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Stand-alone Release|AnyCPU'">
-    <OutputPath>bin\Stand-alone Release\</OutputPath>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <DefineConstants Condition=" '$(OS)' == 'Windows_NT' ">TRACE;WIN32</DefineConstants>
-    <DefineConstants Condition=" '$(OS)' != 'Windows_NT' ">TRACE</DefineConstants>
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>true</Optimize>
-    <PlatformTarget>x64</PlatformTarget>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -90,10 +51,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Condition="!$(Configuration.Contains('Stand-alone'))" Include="..\..\..\..\..\version.cs">
+    <Compile Include="..\..\..\..\..\version.cs">
       <Link>Properties\version.cs</Link>
     </Compile>
-    <Compile Condition="$(Configuration.Contains('Stand-alone'))" Include=".\Properties\version.cs" />
     <Compile Include="Attributes\ShaderNodeAttribute.cs" />
     <Compile Include="Background.cs" />
     <Compile Include="Colors.cs" />
@@ -232,74 +192,6 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <CCyclesDeps Include="$(ProjectDir)..\cycles\instal\**\*.*" />
-    <CCyclesDll Include="$(ProjectDir)..\cycles\build\bin\$(Configuration)\*" />
-    <OpenEXRFiles Include="$(SolutionDir)..\..\big_libs\OpenEXR-2.5.5\lib\*$(OpenEXRVersion).dll">
-      <Link>Dependencies\OpenEXRFiles\%(Filename)%(Extension)</Link>
-    </OpenEXRFiles>
-    <OpenImageIOFiles Include="$(SolutionDir)..\..\big_libs\OpenImageIO-2.2.19\lib\*$(OpenImageIOVersion).dll">
-      <Link>Dependencies\OpenImageIOFiles\%(Filename)%(Extension)</Link>
-    </OpenImageIOFiles>
-    <OpenImageIOJpegFiles Include="$(SolutionDir)..\..\big_libs\OpenImageIO-2.2.19\lib\$(Configuration)\jpeg*.*">
-      <Link>Dependencies\OpenImageIOFiles\%(Filename)%(Extension)</Link>
-    </OpenImageIOJpegFiles>
-    <BoostFiles Include="$(SolutionDir)..\..\big_libs\boost\stagerelease\lib\boost_*$(BoostToolset).dll">
-      <Link>Dependencies\BoostFiles\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </BoostFiles>
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="License\" />
   </ItemGroup>
-  <PropertyGroup Condition="'$(Configuration)' == 'Stand-alone Release' Or '$(Configuration)' == 'Stand-alone Debug'">
-    <PostBuildEvent Condition="'$(OS)' == 'Windows_NT'">
-XCopy /Y "$(TargetDir)$(ProjectName).*" "$(SolutionDir)$(OutDir)"
-XCopy /Y "$(ProjectDir)..\ccycles\x64\$(ConfigurationName)\ccycles.dll" "$(SolutionDir)$(OutDir)"
-XCopy /Y "$(ProjectDir)..\ccycles\x64\$(ConfigurationName)\ccycles.pdb" "$(SolutionDir)$(OutDir)"
-XCopy /Y "$(ProjectDir)..\OpenImageIO\x64\$(ConfigurationName)\OpenImageIOv13.dll" "$(SolutionDir)$(OutDir)"
-XCopy /Y "$(ProjectDir)..\pthreads\x64\$(ConfigurationName)\pthreads.dll" "$(SolutionDir)$(OutDir)"
-XCopy /Y "$(ProjectDir)..\boostbuild\stagerelease\lib\boost_*" "$(SolutionDir)$(OutDir)"
-
-XCopy "$(SolutionDir)lib" "$(SolutionDir)$(OutDir)lib" /Y /I /Q
-
-XCopy "$(ProjectDir)..\cycles\src\kernel\closure" "$(SolutionDir)$(OutDir)source\kernel\closure" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\filter" "$(SolutionDir)$(OutDir)source\kernel\filter" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\geom" "$(SolutionDir)$(OutDir)source\kernel\geom" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\bvh" "$(SolutionDir)$(OutDir)source\kernel\bvh" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\svm" "$(SolutionDir)$(OutDir)source\kernel\svm" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\split" "$(SolutionDir)$(OutDir)source\kernel\split" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\kernels\opencl" "$(SolutionDir)$(OutDir)source\kernel\kernels\opencl" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\kernels\cuda" "$(SolutionDir)$(OutDir)source\kernel\kernels\cuda" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\kernel\kernel*.*" "$(SolutionDir)$(OutDir)source\kernel" /Y /I /Q
-
-XCopy "$(ProjectDir)..\cycles\src\util\util_atomic.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_color.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_half.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_hash.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_math.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_math*2.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_math*3.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_math*4.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_math_fast.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_math_intersect.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_math_matrix.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_rect.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_texture.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_transform.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_types*.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-XCopy "$(ProjectDir)..\cycles\src\util\util_static_assert.h" "$(SolutionDir)$(OutDir)source\util\" /Y /I /Q
-    </PostBuildEvent>
-  </PropertyGroup>
-  <PropertyGroup>
-    <PreBuildEvent />
-  </PropertyGroup>
-  <Target Name="CopyFiles" AfterTargets="AfterBuild">
-    <Message Importance="high" Text="CCycles DLL files: @(CCyclesDll) &lt;&lt;--" />
-    <Message Importance="high" Text="Cycles dependencies files: @(CCyclesDeps) &lt;&lt;--" />
-    <Copy SourceFiles="@(CCyclesDeps)" DestinationFiles="$(SolutionDir)..\$(OutDir)Plug-ins\%(RecursiveDir)" SkipUnchangedFiles="false" />
-    <Copy SourceFiles="@(CCyclesDll)" DestinationFolder="$(SolutionDir)..\$(OutDir)Plug-ins\" SkipUnchangedFiles="false" />
-    <Copy SourceFiles="@(OpenImageIOFiles)" DestinationFolder="$(SolutionDir)..\$(OutDir)" Condition="'$(OS)' == 'Windows_NT'" />
-    <Copy SourceFiles="@(OpenImageIOJpegFiles)" DestinationFolder="$(SolutionDir)..\$(OutDir)" Condition="'$(OS)' == 'Windows_NT'" />
-    <Copy SourceFiles="@(OpenEXRFiles)" DestinationFolder="$(SolutionDir)..\$(OutDir)" Condition="'$(OS)' == 'Windows_NT'" />
-    <Copy SourceFiles="@(BoostFiles)" DestinationFolder="$(SolutionDir)..\$(OutDir)" Condition="'$(OS)' == 'Windows_NT'" />
-  </Target>
 </Project>
