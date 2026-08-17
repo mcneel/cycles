@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<!--
+  Win32 side-by-side private assembly manifest for ccycles.
+
+  Rhino loads its own copies of OpenImageIO, OpenEXR and TBB into the same
+  process as Cycles. Declaring the Cycles-side dependencies as members of a
+  private assembly makes the loader resolve these names within the ccycles
+  assembly context instead of by bare filename process-wide, so the two sets
+  can coexist.
+
+  Generated from ccycles_manifest.xml.in by CMake - do not edit the generated
+  file. The member list comes from CCYCLES_SXS_FILES in CMakeLists.txt.
+-->
+<assembly xmlns='urn:schemas-microsoft-com:asm.v1' manifestVersion='1.0'>
+  <assemblyIdentity type="win32" name="ccycles" version="@CCYCLES_ASSEMBLY_VERSION@" processorArchitecture="amd64" />
+@CCYCLES_SXS_FILE_ELEMENTS@
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level='asInvoker' uiAccess='false' />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

@@ -1,8 +1,12 @@
-// This file contains the version resources for ccycles.vcxproj
-// The version numbers and copyright information comes from the header file below.
-// Please do not modify this file unless you are certain you know what you are doing!
+// Version resources for ccycles.dll, compiled in by src/ccycles/CMakeLists.txt.
+// The version numbers and copyright information come from the header below.
+//
+// The path is relative to this file: cycles/src/ccycles -> src4. Rhino
+// generates src4/version.h during its build, so it only resolves inside a
+// Rhino tree; standalone Cycles builds fall back to the version.h next to this
+// file by defining STANDALONE.
 #if !defined(STANDALONE)
-#include "..\..\..\..\..\version.h"
+#include "..\..\..\..\..\..\..\version.h"
 #else
 #include "version.h"
 #endif
