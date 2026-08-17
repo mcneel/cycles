@@ -1,7 +1,0 @@
-[FILENAMES]
-Open=cycles\install\ccycles.dll
-SaveAs=cycles\install\ccycles.dll
-Log=cycles\install\ccycles_res.log
-[COMMANDS]
--addoverwrite cycles\install\dll_version_replace.res, VERSIONINFO,,
--addoverwrite cycles\install\dll_version_replace.res, MANIFEST,,
