@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -62,7 +63,7 @@ class OutputDriver {
     return false;
   }
 
-  /* For baking, read render pass PASS_BAKE_PRIMITIVE and PASS_BAKE_DIFFERENTIAL
+  /* For baking, read render pass PASS_BAKE_PRIMITIVE/SEED/DIFFERENTIAL
    * to determine which shading points to use for baking at each pixel. Return
    * true if any data was read. */
   virtual bool read_render_tile(const Tile & /* tile */)

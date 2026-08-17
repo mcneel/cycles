@@ -1,12 +1,15 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "kernel/film/adaptive_sampling.h"
 #include "kernel/film/write.h"
 
 #include "kernel/integrator/shadow_catcher.h"
+
+#include "kernel/sample/pattern.h"
+#include "util/atomic.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -20,33 +23,58 @@ CCL_NAMESPACE_BEGIN
  * them separately. */
 
 ccl_device_inline void bsdf_eval_init(ccl_private BsdfEval *eval,
-                                      const ClosureType closure_type,
+                                      const ccl_private ShaderClosure *sc,
+                                      const float3 wo,
                                       Spectrum value)
 {
   eval->diffuse = zero_spectrum();
   eval->glossy = zero_spectrum();
 
-  if (CLOSURE_IS_BSDF_DIFFUSE(closure_type)) {
+  if (CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
     eval->diffuse = value;
   }
-  else if (CLOSURE_IS_BSDF_GLOSSY(closure_type)) {
+  else if (CLOSURE_IS_BSDF_GLOSSY(sc->type)) {
     eval->glossy = value;
+  }
+  else if (CLOSURE_IS_GLASS(sc->type)) {
+    /* Glass can count as glossy or transmission, depending on which side we end up on. */
+    if (dot(sc->N, wo) > 0.0f) {
+      eval->glossy = value;
+    }
   }
 
   eval->sum = value;
 }
 
+ccl_device_inline void bsdf_eval_init(ccl_private BsdfEval *eval, Spectrum value)
+{
+  eval->diffuse = zero_spectrum();
+  eval->glossy = zero_spectrum();
+  eval->sum = value;
+}
+
 ccl_device_inline void bsdf_eval_accum(ccl_private BsdfEval *eval,
-                                       const ClosureType closure_type,
+                                       const ccl_private ShaderClosure *sc,
+                                       const float3 wo,
                                        Spectrum value)
 {
-  if (CLOSURE_IS_BSDF_DIFFUSE(closure_type)) {
+  if (CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
     eval->diffuse += value;
   }
-  else if (CLOSURE_IS_BSDF_GLOSSY(closure_type)) {
+  else if (CLOSURE_IS_BSDF_GLOSSY(sc->type)) {
     eval->glossy += value;
   }
+  else if (CLOSURE_IS_GLASS(sc->type)) {
+    if (dot(sc->N, wo) > 0.0f) {
+      eval->glossy += value;
+    }
+  }
 
+  eval->sum += value;
+}
+
+ccl_device_inline void bsdf_eval_accum(ccl_private BsdfEval *eval, Spectrum value)
+{
   eval->sum += value;
 }
 
@@ -55,7 +83,7 @@ ccl_device_inline bool bsdf_eval_is_zero(ccl_private BsdfEval *eval)
   return is_zero(eval->sum);
 }
 
-ccl_device_inline void bsdf_eval_mul(ccl_private BsdfEval *eval, float value)
+ccl_device_inline void bsdf_eval_mul(ccl_private BsdfEval *eval, const float value)
 {
   eval->diffuse *= value;
   eval->glossy *= value;
@@ -69,19 +97,19 @@ ccl_device_inline void bsdf_eval_mul(ccl_private BsdfEval *eval, Spectrum value)
   eval->sum *= value;
 }
 
-ccl_device_inline Spectrum bsdf_eval_sum(ccl_private const BsdfEval *eval)
+ccl_device_inline Spectrum bsdf_eval_sum(const ccl_private BsdfEval *eval)
 {
   return eval->sum;
 }
 
-ccl_device_inline Spectrum bsdf_eval_pass_diffuse_weight(ccl_private const BsdfEval *eval)
+ccl_device_inline Spectrum bsdf_eval_pass_diffuse_weight(const ccl_private BsdfEval *eval)
 {
   /* Ratio of diffuse weight to recover proportions for writing to render pass.
    * We assume reflection, transmission and volume scatter to be exclusive. */
   return safe_divide(eval->diffuse, eval->sum);
 }
 
-ccl_device_inline Spectrum bsdf_eval_pass_glossy_weight(ccl_private const BsdfEval *eval)
+ccl_device_inline Spectrum bsdf_eval_pass_glossy_weight(const ccl_private BsdfEval *eval)
 {
   /* Ratio of glossy weight to recover proportions for writing to render pass.
    * We assume reflection, transmission and volume scatter to be exclusive. */
@@ -95,7 +123,9 @@ ccl_device_inline Spectrum bsdf_eval_pass_glossy_weight(ccl_private const BsdfEv
  * to render buffers instead of using per-thread memory, and to avoid the
  * impact of clamping on other contributions. */
 
-ccl_device_forceinline void film_clamp_light(KernelGlobals kg, ccl_private Spectrum *L, int bounce)
+ccl_device_forceinline void film_clamp_light(KernelGlobals kg,
+                                             ccl_private Spectrum *L,
+                                             const int bounce)
 {
 #ifdef __KERNEL_DEBUG_NAN__
   if (!isfinite_safe(*L)) {
@@ -108,9 +138,9 @@ ccl_device_forceinline void film_clamp_light(KernelGlobals kg, ccl_private Spect
   *L = ensure_finite(*L);
 
 #ifdef __CLAMP_SAMPLE__
-  float limit = (bounce > 0) ? kernel_data.integrator.sample_clamp_indirect :
-                               kernel_data.integrator.sample_clamp_direct;
-  float sum = reduce_add(fabs(*L));
+  const float limit = (bounce > 0) ? kernel_data.integrator.sample_clamp_indirect :
+                                     kernel_data.integrator.sample_clamp_direct;
+  const float sum = reduce_add(fabs(*L));
   if (sum > limit) {
     *L *= limit / sum;
   }
@@ -128,8 +158,8 @@ ccl_device_forceinline void film_clamp_light(KernelGlobals kg, ccl_private Spect
 ccl_device_inline int film_write_sample(KernelGlobals kg,
                                         ConstIntegratorState state,
                                         ccl_global float *ccl_restrict render_buffer,
-                                        int sample,
-                                        int sample_offset)
+                                        const int sample,
+                                        const int sample_offset)
 {
   if (kernel_data.film.pass_sample_count == PASS_UNUSED) {
     return sample;
@@ -164,6 +194,27 @@ ccl_device void film_write_adaptive_buffer(KernelGlobals kg,
                                        contribution_rgb.y * 2.0f,
                                        contribution_rgb.z * 2.0f,
                                        0.0f));
+  }
+}
+
+/* Write the volume and surface contribution for volume scattering probability guiding. */
+ccl_device_inline void film_write_volume_scattering_guiding_pass(
+    KernelGlobals kg,
+    ccl_global float *ccl_restrict buffer,
+    const PathRayVisibility path_visibility,
+    const uint32_t path_flag,
+    const Spectrum contribution)
+{
+  int pass_offset = PASS_UNUSED;
+  if (path_flag & PATH_RAY_VOLUME_PRIMARY_TRANSMIT) {
+    pass_offset = kernel_data.film.pass_volume_transmit;
+  }
+  else if (path_visibility & PATH_RAY_VISIBILITY_VOLUME_SCATTER) {
+    pass_offset = kernel_data.film.pass_volume_scatter;
+  }
+
+  if (pass_offset != PASS_UNUSED) {
+    film_write_pass_spectrum(buffer + pass_offset, contribution);
   }
 }
 
@@ -228,9 +279,8 @@ ccl_device bool film_write_shadow_catcher_transparent(KernelGlobals kg,
   if (kernel_shadow_catcher_is_matte_path(path_flag)) {
     const float3 contribution_rgb = spectrum_to_rgb(contribution);
 
-    film_write_pass_float4(
-        buffer + kernel_data.film.pass_shadow_catcher_matte,
-        make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
+    film_write_pass_float4(buffer + kernel_data.film.pass_shadow_catcher_matte,
+                           make_float4(contribution_rgb, transparent));
     /* NOTE: Accumulate the combined pass and to the samples count pass, so that the adaptive
      * sampling is based on how noisy the combined pass is as if there were no catchers in the
      * scene. */
@@ -292,6 +342,7 @@ ccl_device_forceinline void film_write_shadow_catcher_bounce_data(
 
 /* Write combined pass. */
 ccl_device_inline void film_write_combined_pass(KernelGlobals kg,
+                                                const PathRayVisibility path_visibility,
                                                 const uint32_t path_flag,
                                                 const int sample,
                                                 const Spectrum contribution,
@@ -308,15 +359,18 @@ ccl_device_inline void film_write_combined_pass(KernelGlobals kg,
   }
 
   film_write_adaptive_buffer(kg, sample, contribution, buffer);
+  film_write_volume_scattering_guiding_pass(kg, buffer, path_visibility, path_flag, contribution);
 }
 
 /* Write combined pass with transparency. */
-ccl_device_inline void film_write_combined_transparent_pass(KernelGlobals kg,
-                                                            const uint32_t path_flag,
-                                                            const int sample,
-                                                            const Spectrum contribution,
-                                                            const float transparent,
-                                                            ccl_global float *ccl_restrict buffer)
+ccl_device_inline void film_write_combined_transparent_pass(
+    KernelGlobals kg,
+    const PathRayVisibility path_visibility,
+    const uint32_t path_flag,
+    const int sample,
+    const Spectrum contribution,
+    const float transparent,
+    ccl_global float *ccl_restrict buffer)
 {
 #ifdef __SHADOW_CATCHER__
   if (film_write_shadow_catcher_transparent(kg, path_flag, contribution, transparent, buffer)) {
@@ -327,12 +381,12 @@ ccl_device_inline void film_write_combined_transparent_pass(KernelGlobals kg,
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
     const float3 contribution_rgb = spectrum_to_rgb(contribution);
 
-    film_write_pass_float4(
-        buffer + kernel_data.film.pass_combined,
-        make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
+    film_write_pass_float4(buffer + kernel_data.film.pass_combined,
+                           make_float4(contribution_rgb, transparent));
   }
 
   film_write_adaptive_buffer(kg, sample, contribution, buffer);
+  film_write_volume_scattering_guiding_pass(kg, buffer, path_visibility, path_flag, contribution);
 }
 
 /* Write background or emission to appropriate pass. */
@@ -366,7 +420,8 @@ ccl_device_inline void film_write_emission_or_background_pass(
 
   const bool is_shadowcatcher = (path_flag & PATH_RAY_SHADOW_CATCHER_HIT) != 0;
   if (!is_shadowcatcher && lightgroup != LIGHTGROUP_NONE &&
-      kernel_data.film.pass_lightgroup != PASS_UNUSED) {
+      kernel_data.film.pass_lightgroup != PASS_UNUSED)
+  {
     film_write_pass_spectrum(buffer + kernel_data.film.pass_lightgroup + 3 * lightgroup,
                              contribution);
   }
@@ -449,28 +504,29 @@ ccl_device_inline void film_write_direct_light(KernelGlobals kg,
   Spectrum contribution = INTEGRATOR_STATE(state, shadow_path, throughput);
   film_clamp_light(kg, &contribution, INTEGRATOR_STATE(state, shadow_path, bounce));
 
-  const uint32_t render_pixel_index = INTEGRATOR_STATE(state, shadow_path, render_pixel_index);
-  const uint64_t render_buffer_offset = (uint64_t)render_pixel_index *
-                                        kernel_data.film.pass_stride;
-  ccl_global float *buffer = render_buffer + render_buffer_offset;
+  ccl_global float *buffer = film_pass_pixel_render_buffer_shadow(kg, state, render_buffer);
 
+  const PathRayVisibility path_visibility = INTEGRATOR_STATE(state, shadow_path, visibility);
   const uint32_t path_flag = INTEGRATOR_STATE(state, shadow_path, flag);
   const int sample = INTEGRATOR_STATE(state, shadow_path, sample);
 
   /* Ambient occlusion. */
   if (path_flag & PATH_RAY_SHADOW_FOR_AO) {
-    if ((kernel_data.kernel_features & KERNEL_FEATURE_AO_PASS) && (path_flag & PATH_RAY_CAMERA)) {
+    if ((kernel_data.kernel_features & KERNEL_FEATURE_AO_PASS) &&
+        (path_visibility & PATH_RAY_VISIBILITY_CAMERA))
+    {
       film_write_pass_spectrum(buffer + kernel_data.film.pass_ao, contribution);
     }
     if (kernel_data.kernel_features & KERNEL_FEATURE_AO_ADDITIVE) {
       const Spectrum ao_weight = INTEGRATOR_STATE(state, shadow_path, unshadowed_throughput);
-      film_write_combined_pass(kg, path_flag, sample, contribution * ao_weight, buffer);
+      film_write_combined_pass(
+          kg, path_visibility, path_flag, sample, contribution * ao_weight, buffer);
     }
     return;
   }
 
   /* Direct light shadow. */
-  film_write_combined_pass(kg, path_flag, sample, contribution, buffer);
+  film_write_combined_pass(kg, path_visibility, path_flag, sample, contribution, buffer);
 
 #ifdef __PASSES__
   if (kernel_data.film.light_pass_flag & PASS_ANY) {
@@ -548,7 +604,6 @@ ccl_device_inline void film_write_direct_light(KernelGlobals kg,
  * Otherwise we'd have to write alpha on path termination, which happens
  * in many places. */
 ccl_device_inline void film_write_transparent(KernelGlobals kg,
-                                              ConstIntegratorState state,
                                               const uint32_t path_flag,
                                               const float transparent,
                                               ccl_global float *ccl_restrict buffer)
@@ -572,7 +627,15 @@ ccl_device_inline void film_write_transparent(KernelGlobals kg,
     }
   }
 
+#ifdef __SHADOW_CATCHER__
   film_write_shadow_catcher_transparent_only(kg, path_flag, transparent, buffer);
+#endif
+
+  if (path_flag & PATH_RAY_VOLUME_PRIMARY_TRANSMIT) {
+    kernel_assert(kernel_data.film.pass_volume_transmit != PASS_UNUSED);
+    film_write_pass_spectrum(buffer + kernel_data.film.pass_volume_transmit,
+                             make_spectrum(transparent));
+  }
 }
 
 /* Write holdout to render buffer. */
@@ -583,7 +646,7 @@ ccl_device_inline void film_write_holdout(KernelGlobals kg,
                                           ccl_global float *ccl_restrict render_buffer)
 {
   ccl_global float *buffer = film_pass_pixel_render_buffer(kg, state, render_buffer);
-  film_write_transparent(kg, state, path_flag, transparent, buffer);
+  film_write_transparent(kg, path_flag, transparent, buffer);
 }
 
 /* Write background contribution to render buffer.
@@ -600,14 +663,16 @@ ccl_device_inline void film_write_background(KernelGlobals kg,
   film_clamp_light(kg, &contribution, INTEGRATOR_STATE(state, path, bounce) - 1);
 
   ccl_global float *buffer = film_pass_pixel_render_buffer(kg, state, render_buffer);
+  const PathRayVisibility path_visibility = INTEGRATOR_STATE(state, path, visibility);
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
 
   if (is_transparent_background_ray) {
-    film_write_transparent(kg, state, path_flag, transparent, buffer);
+    film_write_transparent(kg, path_flag, transparent, buffer);
   }
   else {
     const int sample = INTEGRATOR_STATE(state, path, sample);
-    film_write_combined_transparent_pass(kg, path_flag, sample, contribution, transparent, buffer);
+    film_write_combined_transparent_pass(
+        kg, path_visibility, path_flag, sample, contribution, transparent, buffer);
   }
   film_write_emission_or_background_pass(kg,
                                          state,
@@ -628,10 +693,11 @@ ccl_device_inline void film_write_volume_emission(KernelGlobals kg,
   film_clamp_light(kg, &contribution, INTEGRATOR_STATE(state, path, bounce) - 1);
 
   ccl_global float *buffer = film_pass_pixel_render_buffer(kg, state, render_buffer);
+  const PathRayVisibility path_visibility = INTEGRATOR_STATE(state, path, visibility);
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
   const int sample = INTEGRATOR_STATE(state, path, sample);
 
-  film_write_combined_pass(kg, path_flag, sample, contribution, buffer);
+  film_write_combined_pass(kg, path_visibility, path_flag, sample, contribution, buffer);
   film_write_emission_or_background_pass(
       kg, state, contribution, buffer, kernel_data.film.pass_emission, lightgroup);
 }
@@ -647,10 +713,11 @@ ccl_device_inline void film_write_surface_emission(KernelGlobals kg,
   film_clamp_light(kg, &contribution, INTEGRATOR_STATE(state, path, bounce) - 1);
 
   ccl_global float *buffer = film_pass_pixel_render_buffer(kg, state, render_buffer);
+  const PathRayVisibility path_visibility = INTEGRATOR_STATE(state, path, visibility);
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
   const int sample = INTEGRATOR_STATE(state, path, sample);
 
-  film_write_combined_pass(kg, path_flag, sample, contribution, buffer);
+  film_write_combined_pass(kg, path_visibility, path_flag, sample, contribution, buffer);
   film_write_emission_or_background_pass(
       kg, state, contribution, buffer, kernel_data.film.pass_emission, lightgroup);
 }

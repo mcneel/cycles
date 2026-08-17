@@ -1,10 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include <sstream>
-#include <string.h>
+#include <cstring>
 #include <string>
 
 /* Use string view implementation from OIIO.
@@ -16,10 +16,10 @@
 
 CCL_NAMESPACE_BEGIN
 
-using std::istringstream;
-using std::ostringstream;
+struct float2;
+struct float4;
+
 using std::string;
-using std::stringstream;
 using std::to_string;
 
 using OIIO::string_view;
@@ -44,15 +44,18 @@ bool string_endswith(string_view s, string_view end);
 string string_strip(const string &s);
 string string_remove_trademark(const string &s);
 string string_from_bool(const bool var);
+string string_hex(const uint8_t *data, const size_t size);
 string to_string(const char *str);
+string to_string(const float2 &v);
 string to_string(const float4 &v);
 string string_to_lower(const string &s);
+string string_remove_gpu_from_cpu_name(const string &s);
 
 /* Wide char strings are only used on Windows to deal with non-ASCII
  * characters in file names and such. No reason to use such strings
  * for something else at this moment.
  *
- * Please note that strings are expected to be in UTF-8 codepage, and
+ * Please note that strings are expected to be in UTF8 code-page, and
  * if ANSI is needed then explicit conversion required.
  */
 #ifdef _WIN32
@@ -63,8 +66,8 @@ string string_to_ansi(const string &str);
 #endif
 
 /* Make a string from a size in bytes in human readable form. */
-string string_human_readable_size(size_t size);
+string string_human_readable_size(const size_t size);
 /* Make a string from a unit-less quantity in human readable form. */
-string string_human_readable_number(size_t num);
+string string_human_readable_number(const size_t num);
 
 CCL_NAMESPACE_END

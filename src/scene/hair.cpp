@@ -1,5 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
+#include <algorithm>
 
 #include "bvh/bvh.h"
 
@@ -11,13 +14,35 @@
 #include "integrator/shader_eval.h"
 
 #include "util/progress.h"
+#include "util/tbb.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Hair Curve */
+void Hair::Curve::bounds_grow(const int k, const float4 *keys, BoundBox &bounds) const
+{
+  float3 P[4];
+
+  P[0] = make_float3(keys[max(first_key + k - 1, first_key)]);
+  P[1] = make_float3(keys[first_key + k]);
+  P[2] = make_float3(keys[first_key + k + 1]);
+  P[3] = make_float3(keys[min(first_key + k + 2, first_key + num_keys - 1)]);
+
+  float3 lower;
+  float3 upper;
+
+  curvebounds(&lower.x, &upper.x, P, 0);
+  curvebounds(&lower.y, &upper.y, P, 1);
+  curvebounds(&lower.z, &upper.z, P, 2);
+
+  const float mr = max(keys[1].w, keys[2].w);
+
+  bounds.grow(lower, mr);
+  bounds.grow(upper, mr);
+}
 
 void Hair::Curve::bounds_grow(const int k,
-                              const float3 *curve_keys,
+                              const packed_float3 *curve_keys,
                               const float *curve_radius,
                               BoundBox &bounds) const
 {
@@ -35,14 +60,14 @@ void Hair::Curve::bounds_grow(const int k,
   curvebounds(&lower.y, &upper.y, P, 1);
   curvebounds(&lower.z, &upper.z, P, 2);
 
-  float mr = max(curve_radius[first_key + k], curve_radius[first_key + k + 1]);
+  const float mr = max(curve_radius[first_key + k], curve_radius[first_key + k + 1]);
 
   bounds.grow(lower, mr);
   bounds.grow(upper, mr);
 }
 
 void Hair::Curve::bounds_grow(const int k,
-                              const float3 *curve_keys,
+                              const packed_float3 *curve_keys,
                               const float *curve_radius,
                               const Transform &aligned_space,
                               BoundBox &bounds) const
@@ -66,19 +91,19 @@ void Hair::Curve::bounds_grow(const int k,
   curvebounds(&lower.y, &upper.y, P, 1);
   curvebounds(&lower.z, &upper.z, P, 2);
 
-  float mr = max(curve_radius[first_key + k], curve_radius[first_key + k + 1]);
+  const float mr = max(curve_radius[first_key + k], curve_radius[first_key + k + 1]);
 
   bounds.grow(lower, mr);
   bounds.grow(upper, mr);
 }
 
-void Hair::Curve::bounds_grow(float4 keys[4], BoundBox &bounds) const
+void Hair::Curve::bounds_grow(const float4 keys[4], BoundBox &bounds) const
 {
   float3 P[4] = {
-      float4_to_float3(keys[0]),
-      float4_to_float3(keys[1]),
-      float4_to_float3(keys[2]),
-      float4_to_float3(keys[3]),
+      make_float3(keys[0]),
+      make_float3(keys[1]),
+      make_float3(keys[2]),
+      make_float3(keys[3]),
   };
 
   float3 lower;
@@ -88,18 +113,30 @@ void Hair::Curve::bounds_grow(float4 keys[4], BoundBox &bounds) const
   curvebounds(&lower.y, &upper.y, P, 1);
   curvebounds(&lower.z, &upper.z, P, 2);
 
-  float mr = max(keys[1].w, keys[2].w);
+  const float mr = max(keys[1].w, keys[2].w);
 
   bounds.grow(lower, mr);
   bounds.grow(upper, mr);
 }
 
-void Hair::Curve::motion_keys(const float3 *curve_keys,
-                              const float *curve_radius,
-                              const float3 *key_steps,
-                              size_t num_curve_keys,
-                              size_t num_steps,
-                              float time,
+/* Get position and radius arrays for a given time-ordered motion step. */
+static void hair_step_buffers(const Attribute *attr_P,
+                              const Attribute *attr_R,
+                              const size_t step,
+                              const packed_float3 *&P,
+                              const float *&R)
+{
+  /* Radius motion follows the position motion steps, if it has fewer steps the
+   * read falls back to the center radius. */
+  const int num_steps = attr_P->num_motion_steps();
+  P = attr_P->data_at_time_step<packed_float3>(step, num_steps);
+  R = attr_R->data_at_time_step<float>(step, num_steps);
+}
+
+void Hair::Curve::motion_keys(const Attribute *attr_P,
+                              const Attribute *attr_R,
+                              const size_t num_steps,
+                              const float time,
                               size_t k0,
                               size_t k1,
                               float4 r_keys[2]) const
@@ -111,21 +148,17 @@ void Hair::Curve::motion_keys(const float3 *curve_keys,
   /* Fetch vertex coordinates. */
   float4 curr_keys[2];
   float4 next_keys[2];
-  keys_for_step(
-      curve_keys, curve_radius, key_steps, num_curve_keys, num_steps, step, k0, k1, curr_keys);
-  keys_for_step(
-      curve_keys, curve_radius, key_steps, num_curve_keys, num_steps, step + 1, k0, k1, next_keys);
+  keys_for_step(attr_P, attr_R, step, k0, k1, curr_keys);
+  keys_for_step(attr_P, attr_R, step + 1, k0, k1, next_keys);
   /* Interpolate between steps. */
   r_keys[0] = (1.0f - t) * curr_keys[0] + t * next_keys[0];
   r_keys[1] = (1.0f - t) * curr_keys[1] + t * next_keys[1];
 }
 
-void Hair::Curve::cardinal_motion_keys(const float3 *curve_keys,
-                                       const float *curve_radius,
-                                       const float3 *key_steps,
-                                       size_t num_curve_keys,
-                                       size_t num_steps,
-                                       float time,
+void Hair::Curve::cardinal_motion_keys(const Attribute *attr_P,
+                                       const Attribute *attr_R,
+                                       const size_t num_steps,
+                                       const float time,
                                        size_t k0,
                                        size_t k1,
                                        size_t k2,
@@ -139,28 +172,8 @@ void Hair::Curve::cardinal_motion_keys(const float3 *curve_keys,
   /* Fetch vertex coordinates. */
   float4 curr_keys[4];
   float4 next_keys[4];
-  cardinal_keys_for_step(curve_keys,
-                         curve_radius,
-                         key_steps,
-                         num_curve_keys,
-                         num_steps,
-                         step,
-                         k0,
-                         k1,
-                         k2,
-                         k3,
-                         curr_keys);
-  cardinal_keys_for_step(curve_keys,
-                         curve_radius,
-                         key_steps,
-                         num_curve_keys,
-                         num_steps,
-                         step + 1,
-                         k0,
-                         k1,
-                         k2,
-                         k3,
-                         next_keys);
+  cardinal_keys_for_step(attr_P, attr_R, step, k0, k1, k2, k3, curr_keys);
+  cardinal_keys_for_step(attr_P, attr_R, step + 1, k0, k1, k2, k3, next_keys);
   /* Interpolate between steps. */
   r_keys[0] = (1.0f - t) * curr_keys[0] + t * next_keys[0];
   r_keys[1] = (1.0f - t) * curr_keys[1] + t * next_keys[1];
@@ -168,56 +181,25 @@ void Hair::Curve::cardinal_motion_keys(const float3 *curve_keys,
   r_keys[3] = (1.0f - t) * curr_keys[3] + t * next_keys[3];
 }
 
-void Hair::Curve::keys_for_step(const float3 *curve_keys,
-                                const float *curve_radius,
-                                const float3 *key_steps,
-                                size_t num_curve_keys,
-                                size_t num_steps,
-                                size_t step,
+void Hair::Curve::keys_for_step(const Attribute *attr_P,
+                                const Attribute *attr_R,
+                                const size_t step,
                                 size_t k0,
                                 size_t k1,
                                 float4 r_keys[2]) const
 {
   k0 = max(k0, (size_t)0);
   k1 = min(k1, (size_t)(num_keys - 1));
-  const size_t center_step = ((num_steps - 1) / 2);
-  if (step == center_step) {
-    /* Center step: regular key location. */
-    /* TODO(sergey): Consider adding make_float4(float3, float)
-     * function.
-     */
-    r_keys[0] = make_float4(curve_keys[first_key + k0].x,
-                            curve_keys[first_key + k0].y,
-                            curve_keys[first_key + k0].z,
-                            curve_radius[first_key + k0]);
-    r_keys[1] = make_float4(curve_keys[first_key + k1].x,
-                            curve_keys[first_key + k1].y,
-                            curve_keys[first_key + k1].z,
-                            curve_radius[first_key + k1]);
-  }
-  else {
-    /* Center step is not stored in this array. */
-    if (step > center_step) {
-      step--;
-    }
-    const size_t offset = first_key + step * num_curve_keys;
-    r_keys[0] = make_float4(key_steps[offset + k0].x,
-                            key_steps[offset + k0].y,
-                            key_steps[offset + k0].z,
-                            curve_radius[first_key + k0]);
-    r_keys[1] = make_float4(key_steps[offset + k1].x,
-                            key_steps[offset + k1].y,
-                            key_steps[offset + k1].z,
-                            curve_radius[first_key + k1]);
-  }
+  const packed_float3 *P;
+  const float *R;
+  hair_step_buffers(attr_P, attr_R, step, P, R);
+  r_keys[0] = make_float4(P[first_key + k0], R[first_key + k0]);
+  r_keys[1] = make_float4(P[first_key + k1], R[first_key + k1]);
 }
 
-void Hair::Curve::cardinal_keys_for_step(const float3 *curve_keys,
-                                         const float *curve_radius,
-                                         const float3 *key_steps,
-                                         size_t num_curve_keys,
-                                         size_t num_steps,
-                                         size_t step,
+void Hair::Curve::cardinal_keys_for_step(const Attribute *attr_P,
+                                         const Attribute *attr_R,
+                                         const size_t step,
                                          size_t k0,
                                          size_t k1,
                                          size_t k2,
@@ -226,49 +208,13 @@ void Hair::Curve::cardinal_keys_for_step(const float3 *curve_keys,
 {
   k0 = max(k0, (size_t)0);
   k3 = min(k3, (size_t)(num_keys - 1));
-  const size_t center_step = ((num_steps - 1) / 2);
-  if (step == center_step) {
-    /* Center step: regular key location. */
-    r_keys[0] = make_float4(curve_keys[first_key + k0].x,
-                            curve_keys[first_key + k0].y,
-                            curve_keys[first_key + k0].z,
-                            curve_radius[first_key + k0]);
-    r_keys[1] = make_float4(curve_keys[first_key + k1].x,
-                            curve_keys[first_key + k1].y,
-                            curve_keys[first_key + k1].z,
-                            curve_radius[first_key + k1]);
-    r_keys[2] = make_float4(curve_keys[first_key + k2].x,
-                            curve_keys[first_key + k2].y,
-                            curve_keys[first_key + k2].z,
-                            curve_radius[first_key + k2]);
-    r_keys[3] = make_float4(curve_keys[first_key + k3].x,
-                            curve_keys[first_key + k3].y,
-                            curve_keys[first_key + k3].z,
-                            curve_radius[first_key + k3]);
-  }
-  else {
-    /* Center step is not stored in this array. */
-    if (step > center_step) {
-      step--;
-    }
-    const size_t offset = first_key + step * num_curve_keys;
-    r_keys[0] = make_float4(key_steps[offset + k0].x,
-                            key_steps[offset + k0].y,
-                            key_steps[offset + k0].z,
-                            curve_radius[first_key + k0]);
-    r_keys[1] = make_float4(key_steps[offset + k1].x,
-                            key_steps[offset + k1].y,
-                            key_steps[offset + k1].z,
-                            curve_radius[first_key + k1]);
-    r_keys[2] = make_float4(key_steps[offset + k2].x,
-                            key_steps[offset + k2].y,
-                            key_steps[offset + k2].z,
-                            curve_radius[first_key + k2]);
-    r_keys[3] = make_float4(key_steps[offset + k3].x,
-                            key_steps[offset + k3].y,
-                            key_steps[offset + k3].z,
-                            curve_radius[first_key + k3]);
-  }
+  const packed_float3 *P;
+  const float *R;
+  hair_step_buffers(attr_P, attr_R, step, P, R);
+  r_keys[0] = make_float4(P[first_key + k0], R[first_key + k0]);
+  r_keys[1] = make_float4(P[first_key + k1], R[first_key + k1]);
+  r_keys[2] = make_float4(P[first_key + k2], R[first_key + k2]);
+  r_keys[3] = make_float4(P[first_key + k3], R[first_key + k3]);
 }
 
 /* Hair */
@@ -277,8 +223,6 @@ NODE_DEFINE(Hair)
 {
   NodeType *type = NodeType::add("hair", create, NodeType::NONE, Geometry::get_node_base_type());
 
-  SOCKET_POINT_ARRAY(curve_keys, "Curve Keys", array<float3>());
-  SOCKET_FLOAT_ARRAY(curve_radius, "Curve Radius", array<float>());
   SOCKET_INT_ARRAY(curve_first_key, "Curve First Key", array<int>());
   SOCKET_INT_ARRAY(curve_shader, "Curve Shader", array<int>());
 
@@ -287,72 +231,63 @@ NODE_DEFINE(Hair)
 
 Hair::Hair() : Geometry(get_node_type(), Geometry::HAIR)
 {
-  curve_key_offset = 0;
   curve_segment_offset = 0;
   curve_shape = CURVE_RIBBON;
+
+  add_builtin_attributes();
 }
 
-Hair::~Hair()
+Hair::~Hair() = default;
+
+void Hair::add_builtin_attributes()
 {
+  attributes.add(ATTR_STD_POSITION);
+  attributes.add(ATTR_STD_RADIUS);
 }
 
-void Hair::resize_curves(int numcurves, int numkeys)
+void Hair::resize_curves(const int numcurves, const int numkeys)
 {
-  curve_keys.resize(numkeys);
-  curve_radius.resize(numkeys);
+  Attribute *attr_P = attributes.add(ATTR_STD_POSITION);
+  attr_P->resize(numkeys);
+  Attribute *attr_R = attributes.add(ATTR_STD_RADIUS);
+  attr_R->resize(numkeys);
   curve_first_key.resize(numcurves);
   curve_shader.resize(numcurves);
 
   attributes.resize();
 }
 
-void Hair::reserve_curves(int numcurves, int numkeys)
-{
-  curve_keys.reserve(numkeys);
-  curve_radius.reserve(numkeys);
-  curve_first_key.reserve(numcurves);
-  curve_shader.reserve(numcurves);
-
-  attributes.resize(true);
-}
-
 void Hair::clear(bool preserve_shaders)
 {
   Geometry::clear(preserve_shaders);
 
-  curve_keys.clear();
-  curve_radius.clear();
   curve_first_key.clear();
   curve_shader.clear();
 
   attributes.clear();
-}
-
-void Hair::add_curve_key(float3 co, float radius)
-{
-  curve_keys.push_back_reserved(co);
-  curve_radius.push_back_reserved(radius);
-
-  tag_curve_keys_modified();
-  tag_curve_radius_modified();
-}
-
-void Hair::add_curve(int first_key, int shader)
-{
-  curve_first_key.push_back_reserved(first_key);
-  curve_shader.push_back_reserved(shader);
-
-  tag_curve_first_key_modified();
-  tag_curve_shader_modified();
+  add_builtin_attributes();
 }
 
 void Hair::copy_center_to_motion_step(const int motion_step)
 {
-  Attribute *attr_mP = attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
-  if (attr_mP) {
-    float3 *keys = &curve_keys[0];
-    size_t numkeys = curve_keys.size();
-    memcpy(attr_mP->data_float3() + motion_step * numkeys, keys, sizeof(float3) * numkeys);
+  const int attr_step = motion_step + 1;
+  const size_t numkeys = num_keys();
+
+  Attribute *attr_P = attributes.find(ATTR_STD_POSITION);
+  if (attr_P->has_motion()) {
+    std::copy_n(get_position(), numkeys, attr_P->data_for_write<packed_float3>(attr_step));
+  }
+
+  Attribute *attr_R = attributes.find(ATTR_STD_RADIUS);
+  if (attr_R->has_motion()) {
+    std::copy_n(get_radius(), numkeys, attr_R->data_for_write<float>(attr_step));
+  }
+
+  Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
+  if (attr_vN && attr_vN->has_motion()) {
+    std::copy_n(attr_vN->data<packed_normal>(),
+                numkeys,
+                attr_vN->data_for_write<packed_normal>(attr_step));
   }
 }
 
@@ -375,34 +310,57 @@ void Hair::get_uv_tiles(ustring map, unordered_set<int> &tiles)
 void Hair::compute_bounds()
 {
   BoundBox bnds = BoundBox::empty;
-  size_t curve_keys_size = curve_keys.size();
+  const size_t curve_keys_size = num_keys();
+  const packed_float3 *curve_keys_data = get_position();
+  const float *curve_radius_data = get_radius();
+  const size_t curve_num = num_curves();
 
   if (curve_keys_size > 0) {
-    for (size_t i = 0; i < curve_keys_size; i++)
-      bnds.grow(curve_keys[i], curve_radius[i]);
+    bnds.grow(parallel_reduce(
+        blocked_range<size_t>(0, curve_num),
+        BoundBox(BoundBox::empty),
+        [&](const blocked_range<size_t> &range, const BoundBox &partial_bounds) {
+          BoundBox current_bounds = partial_bounds;
+          for (size_t i = range.begin(); i < range.end(); ++i) {
+            const Curve curve = get_curve(i);
+            const int num_segments = curve.num_segments();
+            for (int k = 0; k < num_segments; k++) {
+              curve.bounds_grow(k, curve_keys_data, curve_radius_data, current_bounds);
+            }
+          }
+          return current_bounds;
+        },
+        [](const BoundBox &bounds_a, const BoundBox &bounds_b) {
+          BoundBox combined_bounds = bounds_a;
+          combined_bounds.grow(bounds_b);
+          return combined_bounds;
+        }));
 
-    Attribute *curve_attr = attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
-    if (use_motion_blur && curve_attr) {
-      size_t steps_size = curve_keys.size() * (motion_steps - 1);
-      float3 *key_steps = curve_attr->data_float3();
-
-      for (size_t i = 0; i < steps_size; i++)
-        bnds.grow(key_steps[i]);
+    const Attribute *attr_P = attributes.find(ATTR_STD_POSITION);
+    if (use_motion_blur && attr_P->has_motion()) {
+      for (int attr_step = 1; attr_step < attr_P->num_motion_steps(); attr_step++) {
+        const packed_float3 *key_step = attr_P->data<packed_float3>(attr_step);
+        for (size_t i = 0; i < curve_keys_size; i++) {
+          bnds.grow(key_step[i]);
+        }
+      }
     }
 
     if (!bnds.valid()) {
       bnds = BoundBox::empty;
 
       /* skip nan or inf coordinates */
-      for (size_t i = 0; i < curve_keys_size; i++)
-        bnds.grow_safe(curve_keys[i], curve_radius[i]);
+      for (size_t i = 0; i < curve_keys_size; i++) {
+        bnds.grow_safe(curve_keys_data[i], curve_radius_data[i]);
+      }
 
-      if (use_motion_blur && curve_attr) {
-        size_t steps_size = curve_keys.size() * (motion_steps - 1);
-        float3 *key_steps = curve_attr->data_float3();
-
-        for (size_t i = 0; i < steps_size; i++)
-          bnds.grow_safe(key_steps[i]);
+      if (use_motion_blur && attr_P->has_motion()) {
+        for (int attr_step = 1; attr_step < attr_P->num_motion_steps(); attr_step++) {
+          const packed_float3 *key_step = attr_P->data<packed_float3>(attr_step);
+          for (size_t i = 0; i < curve_keys_size; i++) {
+            bnds.grow_safe(key_step[i]);
+          }
+        }
       }
     }
   }
@@ -418,68 +376,58 @@ void Hair::compute_bounds()
 void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
 {
   /* compute uniform scale */
-  float3 c0 = transform_get_column(&tfm, 0);
-  float3 c1 = transform_get_column(&tfm, 1);
-  float3 c2 = transform_get_column(&tfm, 2);
-  float scalar = powf(fabsf(dot(cross(c0, c1), c2)), 1.0f / 3.0f);
+  const float3 c0 = transform_get_column(&tfm, 0);
+  const float3 c1 = transform_get_column(&tfm, 1);
+  const float3 c2 = transform_get_column(&tfm, 2);
+  const float scalar = powf(fabsf(dot(cross(c0, c1), c2)), 1.0f / 3.0f);
 
   /* apply transform to curve keys */
-  for (size_t i = 0; i < curve_keys.size(); i++) {
-    float3 co = transform_point(&tfm, curve_keys[i]);
-    float radius = curve_radius[i] * scalar;
+  packed_float3 *keys = get_position_for_write();
+  float *radius = get_radius_for_write();
+  const size_t numkeys = num_keys();
+  for (size_t i = 0; i < numkeys; i++) {
+    const float3 co = transform_point(&tfm, keys[i]);
+    const float r = radius[i] * scalar;
 
     /* scale for curve radius is only correct for uniform scale */
-    curve_keys[i] = co;
-    curve_radius[i] = radius;
+    keys[i] = co;
+    radius[i] = r;
   }
 
-  tag_curve_keys_modified();
-  tag_curve_radius_modified();
+  tag_position_modified();
+  tag_radius_modified();
 
   if (apply_to_motion) {
-    Attribute *curve_attr = attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+    Attribute *attr_P = attributes.find(ATTR_STD_POSITION);
+    Attribute *attr_R = attributes.find(ATTR_STD_RADIUS);
 
-    if (curve_attr) {
-      /* apply transform to motion curve keys */
-      size_t steps_size = curve_keys.size() * (motion_steps - 1);
-      float4 *key_steps = curve_attr->data_float4();
-
-      for (size_t i = 0; i < steps_size; i++) {
-        float3 co = transform_point(&tfm, float4_to_float3(key_steps[i]));
-        float radius = key_steps[i].w * scalar;
-
-        /* scale for curve radius is only correct for uniform scale */
-        key_steps[i] = float3_to_float4(co);
-        key_steps[i].w = radius;
+    if (attr_P->has_motion()) {
+      const bool has_motion_radius = attr_R->has_motion();
+      const size_t nk = num_keys();
+      for (int step = 1; step <= int(attr_P->motion.size()); step++) {
+        packed_float3 *motion_P = attr_P->data_for_write<packed_float3>(step);
+        float *motion_R = has_motion_radius ? attr_R->data_for_write<float>(step) : nullptr;
+        for (size_t i = 0; i < nk; i++) {
+          motion_P[i] = transform_point(&tfm, motion_P[i]);
+          if (motion_R) {
+            motion_R[i] *= scalar;
+          }
+        }
       }
     }
   }
 }
 
-void Hair::pack_curves(Scene *scene,
-                       float4 *curve_key_co,
-                       KernelCurve *curves,
-                       KernelCurveSegment *curve_segments)
+void Hair::pack_curves(Scene *scene, KernelCurve *curves, KernelCurveSegment *curve_segments)
 {
-  size_t curve_keys_size = curve_keys.size();
-
-  /* pack curve keys */
-  if (curve_keys_size) {
-    float3 *keys_ptr = curve_keys.data();
-    float *radius_ptr = curve_radius.data();
-
-    for (size_t i = 0; i < curve_keys_size; i++)
-      curve_key_co[i] = make_float4(keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
-  }
-
   /* pack curve segments */
   const PrimitiveType type = primitive_type();
 
-  size_t curve_num = num_curves();
+  const size_t curve_num = num_curves();
   size_t index = 0;
 
   for (size_t i = 0; i < curve_num; i++) {
-    Curve curve = get_curve(i);
+    const Curve curve = get_curve(i);
     int shader_id = curve_shader[i];
     Shader *shader = (shader_id < used_shaders.size()) ?
                          static_cast<Shader *>(used_shaders[shader_id]) :
@@ -487,7 +435,7 @@ void Hair::pack_curves(Scene *scene,
     shader_id = scene->shader_manager->get_shader_id(shader, false);
 
     curves[i].shader_id = shader_id;
-    curves[i].first_key = curve_key_offset + curve.first_key;
+    curves[i].first_key = curve.first_key;
     curves[i].num_keys = curve.num_keys;
     curves[i].type = type;
 
@@ -501,9 +449,12 @@ void Hair::pack_curves(Scene *scene,
 PrimitiveType Hair::primitive_type() const
 {
   return has_motion_blur() ?
-             ((curve_shape == CURVE_RIBBON) ? PRIMITIVE_MOTION_CURVE_RIBBON :
-                                              PRIMITIVE_MOTION_CURVE_THICK) :
-             ((curve_shape == CURVE_RIBBON) ? PRIMITIVE_CURVE_RIBBON : PRIMITIVE_CURVE_THICK);
+             ((curve_shape == CURVE_RIBBON)       ? PRIMITIVE_MOTION_CURVE_RIBBON :
+              (curve_shape == CURVE_THICK_LINEAR) ? PRIMITIVE_MOTION_CURVE_THICK_LINEAR :
+                                                    PRIMITIVE_MOTION_CURVE_THICK) :
+             ((curve_shape == CURVE_RIBBON)       ? PRIMITIVE_CURVE_RIBBON :
+              (curve_shape == CURVE_THICK_LINEAR) ? PRIMITIVE_CURVE_THICK_LINEAR :
+                                                    PRIMITIVE_CURVE_THICK);
 }
 
 /* Fill in coordinates for curve transparency shader evaluation on device. */
@@ -551,11 +502,31 @@ static void read_shader_output(float *shadow_transparency,
   is_fully_opaque = is_opaque;
 }
 
-bool Hair::need_shadow_transparency()
+bool Hair::need_shadow_transparency() const
 {
+  if (!is_traceable()) {
+    return false;
+  }
+
   for (const Node *node : used_shaders) {
     const Shader *shader = static_cast<const Shader *>(node);
     if (shader->has_surface_transparent && shader->get_use_transparent_shadow()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool Hair::need_update_shadow_transparency() const
+{
+  if (attributes.find(ATTR_STD_SHADOW_TRANSPARENCY) == nullptr) {
+    return true;
+  }
+
+  for (const Node *node : used_shaders) {
+    const Shader *shader = static_cast<const Shader *>(node);
+    if (shader->need_update_shadow_transparency) {
       return true;
     }
   }
@@ -572,12 +543,15 @@ bool Hair::update_shadow_transparency(Device *device, Scene *scene, Progress &pr
       attributes.remove(attr);
       return true;
     }
-    else {
-      return false;
-    }
+    return false;
   }
 
-  string msg = string_printf("Computing Shadow Transparency %s", name.c_str());
+  if (!is_modified() && !need_update_shadow_transparency()) {
+    /* Neither geometry nor shader is modified, no need to update. */
+    return false;
+  }
+
+  const string msg = string_printf("Computing Shadow Transparency %s", name.c_str());
   progress.set_status("Updating Hair", msg);
 
   /* Create shadow transparency attribute. */
@@ -587,7 +561,7 @@ bool Hair::update_shadow_transparency(Device *device, Scene *scene, Progress &pr
     attr = attributes.add(ATTR_STD_SHADOW_TRANSPARENCY);
   }
 
-  float *attr_data = attr->data_float();
+  float *attr_data = attr->data_for_write<float>();
 
   /* Find object index. */
   size_t object_index = OBJECT_NONE;
@@ -602,11 +576,16 @@ bool Hair::update_shadow_transparency(Device *device, Scene *scene, Progress &pr
   /* Evaluate shader on device. */
   ShaderEval shader_eval(device, progress);
   bool is_fully_opaque = false;
-  shader_eval.eval(SHADER_EVAL_CURVE_SHADOW_TRANSPARENCY,
-                   num_keys(),
-                   1,
-                   function_bind(&fill_shader_input, this, object_index, _1),
-                   function_bind(&read_shader_output, attr_data, is_fully_opaque, _1));
+  shader_eval.eval(
+      SHADER_EVAL_CURVE_SHADOW_TRANSPARENCY,
+      num_keys(),
+      1,
+      [this, object_index](device_vector<KernelShaderEvalInput> &d_input) {
+        return fill_shader_input(this, object_index, d_input);
+      },
+      [attr_data, &is_fully_opaque](const device_vector<float> &d_output) {
+        read_shader_output(attr_data, is_fully_opaque, d_output);
+      });
 
   if (is_fully_opaque) {
     attributes.remove(attr);

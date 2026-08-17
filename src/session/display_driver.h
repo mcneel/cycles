@@ -1,12 +1,89 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #include "util/half.h"
+#include "util/math_int2.h"
 #include "util/types.h"
+#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
+
+/* Info about the display device that will be used for graphics interop, so it
+ * can be verified if interop is compatible with the rendering device. */
+class GraphicsInteropDevice {
+ public:
+  enum Type {
+    NONE,
+    OPENGL,
+    VULKAN,
+    METAL,
+  };
+
+  Type type = NONE;
+  vector<uint8_t> uuid;
+};
+
+/* Handle to a native graphics API pixel buffer. If supported, the rendering device
+ * may write directly to this buffer instead of calling map_texture_buffer() and
+ * unmap_texture_buffer().
+ *
+ * This must be a pixel buffer with the specified with and height, and half float
+ * with RGBA channels. */
+class GraphicsInteropBuffer {
+ public:
+  GraphicsInteropBuffer() = default;
+  ~GraphicsInteropBuffer();
+
+  GraphicsInteropBuffer(const GraphicsInteropBuffer &other) = delete;
+  GraphicsInteropBuffer &operator=(const GraphicsInteropBuffer &other) = delete;
+  GraphicsInteropBuffer(GraphicsInteropBuffer &&other) = delete;
+  GraphicsInteropBuffer &operator=(GraphicsInteropBuffer &&other) = delete;
+
+  /* Display Driver API. */
+
+  /* Assign handle. For Vulkan, this transfers ownership of the handle. */
+  void assign(GraphicsInteropDevice::Type type, int64_t handle, size_t size);
+  /* Is a handle assigned? */
+  bool is_empty() const;
+  /* Zero memory. */
+  void zero();
+  /* Clear handle. */
+  void clear();
+
+  /* Device graphics interop API. */
+
+  /* Get type of handle. */
+  GraphicsInteropDevice::Type get_type() const;
+  /* Get size of buffer. */
+  size_t get_size() const;
+
+  /* Is there a new handle to take ownership of? */
+  bool has_new_handle() const;
+  /* Take ownership of the handle. */
+  int64_t take_handle();
+
+  /* Take ownership of zeroing the buffer. */
+  bool take_zero();
+
+ protected:
+  /* The handle is expected to be:
+   * - OpenGL: pixel buffer object ID.
+   * - Vulkan on Windows: opaque handle for VkBuffer.
+   * - Vulkan on Unix: opaque file descriptor for VkBuffer.
+   * - Metal: MTLBuffer with unified memory. */
+  GraphicsInteropDevice::Type type_ = GraphicsInteropDevice::NONE;
+  int64_t handle_ = 0;
+  bool own_handle_ = false;
+
+  /* Actual size of the memory, which must be `>= width * height * sizeof(half4)`. */
+  size_t size_ = 0;
+
+  /* Clear the entire buffer before doing partial write to it. */
+  bool need_zero_ = false;
+};
 
 /* Display driver for efficient interactive display of renders.
  *
@@ -66,45 +143,28 @@ class DisplayDriver {
    * account progressive resolution changes, which may be equal to or smaller than the params.size.
    * For efficiency, changes in this resolution should be handled without re-allocating resources,
    * but rather by using a subset of the full resolution buffer. */
-  virtual bool update_begin(const Params &params, int width, int height) = 0;
+  virtual bool update_begin(const Params &params, const int width, const int height) = 0;
   virtual void update_end() = 0;
 
   /* Optionally flush outstanding display commands before ending the render loop. */
-  virtual void flush(){};
+  virtual void flush() {};
 
   virtual half4 *map_texture_buffer() = 0;
   virtual void unmap_texture_buffer() = 0;
 
-  /* Optionally return a handle to a native graphics API texture buffer. If supported,
-   * the rendering device may write directly to this buffer instead of calling
-   * map_texture_buffer() and unmap_texture_buffer(). */
-  class GraphicsInterop {
-   public:
-    /* Dimensions of the buffer, in pixels. */
-    int buffer_width = 0;
-    int buffer_height = 0;
+  GraphicsInteropBuffer graphics_interop_buffer_;
 
-    /* OpenGL pixel buffer object. */
-    int64_t opengl_pbo_id = 0;
-
-    /* Clear the entire buffer before doing partial write to it. */
-    bool need_clear = false;
-
-    /* Enforce re-creation of the graphics interop object.
-     *
-     * When this field is true then the graphics interop will be re-created no matter what the
-     * rest of the configuration is.
-     * When this field is false the graphics interop will be re-created if the PBO or buffer size
-     * did change.
-     *
-     * This allows to ensure graphics interop is re-created when there is a possibility that an
-     * underlying PBO was re-allocated but did not change its ID. */
-    bool need_recreate = false;
-  };
-
-  virtual GraphicsInterop graphics_interop_get()
+  /* Graphics interop to avoid CPU - GPU transfer. See GraphicsInteropBuffer for details. */
+  virtual GraphicsInteropDevice graphics_interop_get_device()
   {
-    return GraphicsInterop();
+    return GraphicsInteropDevice();
+  }
+
+  virtual void graphics_interop_update_buffer() {}
+
+  GraphicsInteropBuffer &graphics_interop_get_buffer()
+  {
+    return graphics_interop_buffer_;
   }
 
   /* (De)activate graphics context required for editing or deleting the graphics interop
@@ -112,11 +172,11 @@ class DisplayDriver {
    *
    * For example, destruction of the CUDA object associated with an OpenGL requires the
    * OpenGL context to be active. */
-  virtual void graphics_interop_activate(){};
-  virtual void graphics_interop_deactivate(){};
+  virtual void graphics_interop_activate() {};
+  virtual void graphics_interop_deactivate() {};
 
   /* Clear the display buffer by filling it with zeros. */
-  virtual void clear() = 0;
+  virtual void zero() = 0;
 
   /* Draw the render using the native graphics API.
    *

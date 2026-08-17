@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #ifdef WITH_HIP
 
@@ -39,12 +40,12 @@ int HIPDeviceQueue::num_concurrent_states(const size_t state_size) const
       num_states = max((int)(num_states * factor), 1024);
     }
     else {
-      VLOG_DEVICE_STATS << "CYCLES_CONCURRENT_STATES_FACTOR evaluated to 0";
+      LOG_TRACE << "CYCLES_CONCURRENT_STATES_FACTOR evaluated to 0";
     }
   }
 
-  VLOG_DEVICE_STATS << "GPU queue concurrent states: " << num_states << ", using up to "
-                    << string_human_readable_size(num_states * state_size);
+  LOG_TRACE << "GPU queue concurrent states: " << num_states << ", using up to "
+            << string_human_readable_size(num_states * state_size);
 
   return num_states;
 }
@@ -65,15 +66,21 @@ void HIPDeviceQueue::init_execution()
 {
   /* Synchronize all textures and memory copies before executing task. */
   HIPContextScope scope(hip_device_);
-  hip_device_->load_texture_info();
+  hip_device_->load_image_info(nullptr);
   hip_device_assert(hip_device_, hipDeviceSynchronize());
 
   debug_init_execution();
 }
 
+void HIPDeviceQueue::load_image_info()
+{
+  HIPContextScope scope(hip_device_);
+  hip_device_->load_image_info(this);
+}
+
 bool HIPDeviceQueue::enqueue(DeviceKernel kernel,
                              const int work_size,
-                             DeviceKernelArguments const &args)
+                             const DeviceKernelArguments &args)
 {
   if (hip_device_->have_error()) {
     return false;
@@ -82,9 +89,17 @@ bool HIPDeviceQueue::enqueue(DeviceKernel kernel,
   debug_enqueue_begin(kernel, work_size);
 
   const HIPContextScope scope(hip_device_);
-  const HIPDeviceKernel &hip_kernel = hip_device_->kernels.get(kernel);
+
+  /* Update image info in case memory moved to host. */
+  if (hip_device_->load_image_info(nullptr)) {
+    hip_device_assert(hip_device_, hipDeviceSynchronize());
+    if (hip_device_->have_error()) {
+      return false;
+    }
+  }
 
   /* Compute kernel launch parameters. */
+  const HIPDeviceKernel &hip_kernel = hip_device_->kernels.get(kernel);
   const int num_threads_per_block = hip_kernel.num_threads_per_block;
   const int num_blocks = divide_up(work_size, num_threads_per_block);
 
@@ -117,7 +132,7 @@ bool HIPDeviceQueue::enqueue(DeviceKernel kernel,
                                        shared_mem_bytes,
                                        hip_stream_,
                                        const_cast<void **>(args.values),
-                                       0),
+                                       nullptr),
                  "enqueue");
 
   debug_enqueue_end();
@@ -140,7 +155,7 @@ bool HIPDeviceQueue::synchronize()
 
 void HIPDeviceQueue::zero_to_device(device_memory &mem)
 {
-  assert(mem.type != MEM_GLOBAL && mem.type != MEM_TEXTURE);
+  assert(mem.type != MEM_IMAGE_TEXTURE);
 
   if (mem.memory_size() == 0) {
     return;
@@ -148,21 +163,26 @@ void HIPDeviceQueue::zero_to_device(device_memory &mem)
 
   /* Allocate on demand. */
   if (mem.device_pointer == 0) {
-    hip_device_->mem_alloc(mem);
+    if (mem.type == MEM_GLOBAL) {
+      hip_device_->global_alloc(mem);
+    }
+    else {
+      hip_device_->mem_alloc(mem);
+    }
   }
 
   /* Zero memory on device. */
-  assert(mem.device_pointer != 0);
+  device_ptr d_ptr = mem.device->mem_device_ptr(mem, hip_device_);
+  assert(d_ptr != 0);
 
   const HIPContextScope scope(hip_device_);
-  assert_success(
-      hipMemsetD8Async((hipDeviceptr_t)mem.device_pointer, 0, mem.memory_size(), hip_stream_),
-      "zero_to_device");
+  assert_success(hipMemsetD8Async((hipDeviceptr_t)d_ptr, 0, mem.memory_size(), hip_stream_),
+                 "zero_to_device");
 }
 
 void HIPDeviceQueue::copy_to_device(device_memory &mem)
 {
-  assert(mem.type != MEM_GLOBAL && mem.type != MEM_TEXTURE);
+  assert(mem.type != MEM_IMAGE_TEXTURE);
 
   if (mem.memory_size() == 0) {
     return;
@@ -170,23 +190,28 @@ void HIPDeviceQueue::copy_to_device(device_memory &mem)
 
   /* Allocate on demand. */
   if (mem.device_pointer == 0) {
-    hip_device_->mem_alloc(mem);
+    if (mem.type == MEM_GLOBAL) {
+      hip_device_->global_alloc(mem);
+    }
+    else {
+      hip_device_->mem_alloc(mem);
+    }
   }
 
-  assert(mem.device_pointer != 0);
+  device_ptr d_ptr = mem.device->mem_device_ptr(mem, hip_device_);
+  assert(d_ptr != 0);
   assert(mem.host_pointer != nullptr);
 
   /* Copy memory to device. */
   const HIPContextScope scope(hip_device_);
   assert_success(
-      hipMemcpyHtoDAsync(
-          (hipDeviceptr_t)mem.device_pointer, mem.host_pointer, mem.memory_size(), hip_stream_),
+      hipMemcpyHtoDAsync((hipDeviceptr_t)d_ptr, mem.host_pointer, mem.memory_size(), hip_stream_),
       "copy_to_device");
 }
 
 void HIPDeviceQueue::copy_from_device(device_memory &mem)
 {
-  assert(mem.type != MEM_GLOBAL && mem.type != MEM_TEXTURE);
+  assert(mem.type != MEM_GLOBAL && mem.type != MEM_IMAGE_TEXTURE);
 
   if (mem.memory_size() == 0) {
     return;
@@ -201,6 +226,26 @@ void HIPDeviceQueue::copy_from_device(device_memory &mem)
       hipMemcpyDtoHAsync(
           mem.host_pointer, (hipDeviceptr_t)mem.device_pointer, mem.memory_size(), hip_stream_),
       "copy_from_device");
+}
+
+void *HIPDeviceQueue::copy_from_device_synchronized(device_memory &mem, vector<uint8_t> &storage)
+{
+  if (mem.memory_size() == 0) {
+    return nullptr;
+  }
+
+  storage.resize(mem.memory_size());
+
+  device_ptr d_ptr = mem.device->mem_device_ptr(mem, hip_device_);
+  assert(d_ptr != 0);
+
+  const HIPContextScope scope(hip_device_);
+  assert_success(
+      hipMemcpyDtoHAsync(storage.data(), (hipDeviceptr_t)d_ptr, mem.memory_size(), hip_stream_),
+      "copy_from_device_synchronized");
+
+  synchronize();
+  return storage.data();
 }
 
 void HIPDeviceQueue::assert_success(hipError_t result, const char *operation)

@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "hydra/render_delegate.h"
 #include "hydra/camera.h"
@@ -21,7 +22,6 @@
 #include "session/session.h"
 
 #include <pxr/base/tf/getenv.h>
-#include <pxr/imaging/hd/extComputation.h>
 #include <pxr/imaging/hgi/tokens.h>
 
 HDCYCLES_NAMESPACE_OPEN_SCOPE
@@ -54,7 +54,6 @@ const TfTokenVector kSupportedSPrimTypes = {
     HdPrimTypeTokens->domeLight,
     HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->sphereLight,
-    HdPrimTypeTokens->extComputation,
 };
 
 const TfTokenVector kSupportedBPrimTypes = {
@@ -107,6 +106,9 @@ SessionParams GetSessionParams(const HdRenderSettingsMap &settings)
     params.device = Device::get_multi_device(devices, params.threads, params.background);
   }
 
+  /* Set same device for denoising for now. */
+  params.denoise_device = params.device;
+
   return params;
 }
 
@@ -123,7 +125,8 @@ HdCyclesDelegate::HdCyclesDelegate(const HdRenderSettingsMap &settingsMap,
   for (const auto &setting : settingsMap) {
     // Skip over the settings known to be used for initialization only
     if (setting.first == HdCyclesRenderSettingsTokens->device ||
-        setting.first == HdCyclesRenderSettingsTokens->threads) {
+        setting.first == HdCyclesRenderSettingsTokens->threads)
+    {
       continue;
     }
 
@@ -131,9 +134,7 @@ HdCyclesDelegate::HdCyclesDelegate(const HdRenderSettingsMap &settingsMap,
   }
 }
 
-HdCyclesDelegate::~HdCyclesDelegate()
-{
-}
+HdCyclesDelegate::~HdCyclesDelegate() = default;
 
 void HdCyclesDelegate::SetDrivers(const HdDriverVector &drivers)
 {
@@ -203,20 +204,9 @@ HdRenderPassSharedPtr HdCyclesDelegate::CreateRenderPass(HdRenderIndex *index,
 }
 
 HdInstancer *HdCyclesDelegate::CreateInstancer(HdSceneDelegate *delegate,
-                                               const SdfPath &instancerId
-#if PXR_VERSION < 2102
-                                               ,
-                                               const SdfPath &parentId
-#endif
-)
+                                               const SdfPath &instancerId)
 {
-  return new HdCyclesInstancer(delegate,
-                               instancerId
-#if PXR_VERSION < 2102
-                               ,
-                               parentId
-#endif
-  );
+  return new HdCyclesInstancer(delegate, instancerId);
 }
 
 void HdCyclesDelegate::DestroyInstancer(HdInstancer *instancer)
@@ -224,46 +214,20 @@ void HdCyclesDelegate::DestroyInstancer(HdInstancer *instancer)
   delete instancer;
 }
 
-HdRprim *HdCyclesDelegate::CreateRprim(const TfToken &typeId,
-                                       const SdfPath &rprimId
-#if PXR_VERSION < 2102
-                                       ,
-                                       const SdfPath &instancerId
-#endif
-)
+HdRprim *HdCyclesDelegate::CreateRprim(const TfToken &typeId, const SdfPath &rprimId)
 {
   if (typeId == HdPrimTypeTokens->mesh) {
-    return new HdCyclesMesh(rprimId
-#if PXR_VERSION < 2102
-                            ,
-                            instancerId
-#endif
-    );
+    return new HdCyclesMesh(rprimId);
   }
   if (typeId == HdPrimTypeTokens->basisCurves) {
-    return new HdCyclesCurves(rprimId
-#if PXR_VERSION < 2102
-                              ,
-                              instancerId
-#endif
-    );
+    return new HdCyclesCurves(rprimId);
   }
   if (typeId == HdPrimTypeTokens->points) {
-    return new HdCyclesPoints(rprimId
-#if PXR_VERSION < 2102
-                              ,
-                              instancerId
-#endif
-    );
+    return new HdCyclesPoints(rprimId);
   }
 #ifdef WITH_OPENVDB
   if (typeId == HdPrimTypeTokens->volume) {
-    return new HdCyclesVolume(rprimId
-#  if PXR_VERSION < 2102
-                              ,
-                              instancerId
-#  endif
-    );
+    return new HdCyclesVolume(rprimId);
   }
 #endif
 
@@ -286,11 +250,9 @@ HdSprim *HdCyclesDelegate::CreateSprim(const TfToken &typeId, const SdfPath &spr
   }
   if (typeId == HdPrimTypeTokens->diskLight || typeId == HdPrimTypeTokens->distantLight ||
       typeId == HdPrimTypeTokens->domeLight || typeId == HdPrimTypeTokens->rectLight ||
-      typeId == HdPrimTypeTokens->sphereLight) {
+      typeId == HdPrimTypeTokens->sphereLight)
+  {
     return new HdCyclesLight(sprimId, typeId);
-  }
-  if (typeId == HdPrimTypeTokens->extComputation) {
-    return new HdExtComputation(sprimId);
   }
 
   TF_CODING_ERROR("Unknown Sprim type %s", typeId.GetText());
@@ -346,28 +308,23 @@ TfToken HdCyclesDelegate::GetMaterialBindingPurpose() const
   return HdTokens->full;
 }
 
-#if HD_API_VERSION < 41
-TfToken HdCyclesDelegate::GetMaterialNetworkSelector() const
-{
-  return _tokens->cycles;
-}
-#else
 TfTokenVector HdCyclesDelegate::GetMaterialRenderContexts() const
 {
   return {_tokens->cycles};
 }
-#endif
 
 VtDictionary HdCyclesDelegate::GetRenderStats() const
 {
   const Stats &stats = _renderParam->session->stats;
   const Progress &progress = _renderParam->session->progress;
 
-  double totalTime, renderTime;
+  double totalTime;
+  double renderTime;
   progress.get_time(totalTime, renderTime);
-  double fractionDone = progress.get_progress();
+  const double fractionDone = progress.get_progress();
 
-  std::string status, substatus;
+  std::string status;
+  std::string substatus;
   progress.get_status(status, substatus);
   if (!substatus.empty()) {
     status += " | " + substatus;
@@ -402,7 +359,8 @@ HdAovDescriptor HdCyclesDelegate::GetDefaultAovDescriptor(const TfToken &name) c
     return HdAovDescriptor(HdFormatFloat32Vec3, false, VtValue(GfVec3f(0.0f)));
   }
   if (name == HdAovTokens->primId || name == HdAovTokens->instanceId ||
-      name == HdAovTokens->elementId) {
+      name == HdAovTokens->elementId)
+  {
     return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
   }
 
@@ -411,7 +369,7 @@ HdAovDescriptor HdCyclesDelegate::GetDefaultAovDescriptor(const TfToken &name) c
 
 HdRenderSettingDescriptorList HdCyclesDelegate::GetRenderSettingDescriptors() const
 {
-  Scene *const scene = _renderParam->session->scene;
+  Scene *const scene = _renderParam->session->scene.get();
 
   HdRenderSettingDescriptorList descriptors;
 
@@ -442,7 +400,7 @@ HdRenderSettingDescriptorList HdCyclesDelegate::GetRenderSettingDescriptors() co
 
 void HdCyclesDelegate::SetRenderSetting(const PXR_NS::TfToken &key, const PXR_NS::VtValue &value)
 {
-  Scene *const scene = _renderParam->session->scene;
+  Scene *const scene = _renderParam->session->scene.get();
   Session *const session = _renderParam->session;
 
   if (key == HdCyclesRenderSettingsTokens->stageMetersPerUnit) {
@@ -460,14 +418,16 @@ void HdCyclesDelegate::SetRenderSetting(const PXR_NS::TfToken &key, const PXR_NS
     session->set_samples(samples);
   }
   else if (key == HdCyclesRenderSettingsTokens->sampleOffset) {
-    session->params.sample_offset = VtValue::Cast<int>(value).GetWithDefault(
-        session->params.sample_offset);
+    session->params.sample_subset_offset = VtValue::Cast<int>(value).GetWithDefault(
+        session->params.sample_subset_offset);
+    session->params.sample_subset_length = Integrator::MAX_SAMPLES;
+    session->params.use_sample_subset = session->params.sample_subset_offset > 0;
     ++_settingsVersion;
   }
   else {
     const std::string &keyString = key.GetString();
     if (keyString.rfind("cycles:integrator:", 0) == 0) {
-      ustring socketName(keyString, sizeof("cycles:integrator:") - 1);
+      const ustring socketName(keyString, sizeof("cycles:integrator:") - 1);
       if (const SocketType *socket = scene->integrator->type->find_input(socketName)) {
         SetNodeValue(scene->integrator, *socket, value);
         ++_settingsVersion;
@@ -478,34 +438,33 @@ void HdCyclesDelegate::SetRenderSetting(const PXR_NS::TfToken &key, const PXR_NS
 
 VtValue HdCyclesDelegate::GetRenderSetting(const TfToken &key) const
 {
-  Scene *const scene = _renderParam->session->scene;
+  Scene *const scene = _renderParam->session->scene.get();
   Session *const session = _renderParam->session;
 
   if (key == HdCyclesRenderSettingsTokens->stageMetersPerUnit) {
     return VtValue(_renderParam->GetStageMetersPerUnit());
   }
-  else if (key == HdCyclesRenderSettingsTokens->device) {
+  if (key == HdCyclesRenderSettingsTokens->device) {
     return VtValue(TfToken(Device::string_from_type(session->params.device.type)));
   }
-  else if (key == HdCyclesRenderSettingsTokens->threads) {
+  if (key == HdCyclesRenderSettingsTokens->threads) {
     return VtValue(session->params.threads);
   }
-  else if (key == HdCyclesRenderSettingsTokens->timeLimit) {
+  if (key == HdCyclesRenderSettingsTokens->timeLimit) {
     return VtValue(session->params.time_limit);
   }
-  else if (key == HdCyclesRenderSettingsTokens->samples) {
+  if (key == HdCyclesRenderSettingsTokens->samples) {
     return VtValue(session->params.samples);
   }
-  else if (key == HdCyclesRenderSettingsTokens->sampleOffset) {
-    return VtValue(session->params.sample_offset);
+  if (key == HdCyclesRenderSettingsTokens->sampleOffset) {
+    return VtValue((session->params.use_sample_subset) ? session->params.sample_subset_offset : 0);
   }
-  else {
-    const std::string &keyString = key.GetString();
-    if (keyString.rfind("cycles:integrator:", 0) == 0) {
-      ustring socketName(keyString, sizeof("cycles:integrator:") - 1);
-      if (const SocketType *socket = scene->integrator->type->find_input(socketName)) {
-        return GetNodeValue(scene->integrator, *socket);
-      }
+
+  const std::string &keyString = key.GetString();
+  if (keyString.rfind("cycles:integrator:", 0) == 0) {
+    const ustring socketName(keyString, sizeof("cycles:integrator:") - 1);
+    if (const SocketType *socket = scene->integrator->type->find_input(socketName)) {
+      return GetNodeValue(scene->integrator, *socket);
     }
   }
 

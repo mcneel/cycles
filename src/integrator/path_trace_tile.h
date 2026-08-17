@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -17,10 +18,12 @@ class PathTraceTile : public OutputDriver::Tile {
  public:
   PathTraceTile(PathTrace &path_trace);
 
-  bool get_pass_pixels(const string_view pass_name, const int num_channels, float *pixels) const;
+  bool get_pass_pixels(const string_view pass_name,
+                       const int num_channels,
+                       float *pixels) const override;
   bool set_pass_pixels(const string_view pass_name,
                        const int num_channels,
-                       const float *pixels) const;
+                       const float *pixels) const override;
   int get_sample() const;
 
  private:

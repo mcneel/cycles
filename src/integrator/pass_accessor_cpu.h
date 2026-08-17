@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -39,6 +40,7 @@ class PassAccessorCPU : public PassAccessor {
   /* Float (scalar) passes. */
   DECLARE_PASS_ACCESSOR(depth)
   DECLARE_PASS_ACCESSOR(mist)
+  DECLARE_PASS_ACCESSOR(volume_majorant)
   DECLARE_PASS_ACCESSOR(sample_count)
   DECLARE_PASS_ACCESSOR(shadow_catcher_transparent_sample_count)
   DECLARE_PASS_ACCESSOR(shadow_catcher_background_sample_count)
@@ -47,6 +49,7 @@ class PassAccessorCPU : public PassAccessor {
   /* Float3 passes. */
   DECLARE_PASS_ACCESSOR(light_path)
   DECLARE_PASS_ACCESSOR(shadow_catcher)
+  DECLARE_PASS_ACCESSOR(rgbe)
   DECLARE_PASS_ACCESSOR(float3)
 
   /* Float4 passes. */

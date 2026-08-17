@@ -1,5 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
+#pragma once
 
 #ifdef WITH_HIP
 
@@ -7,8 +10,6 @@
 #  include "device/hip/kernel.h"
 #  include "device/hip/queue.h"
 #  include "device/hip/util.h"
-
-#  include "util/map.h"
 
 #  ifdef WITH_HIP_DYNLOAD
 #    include "hipew.h"
@@ -36,13 +37,13 @@ class HIPDevice : public GPUDevice {
 
   static bool have_precompiled_kernels();
 
-  virtual BVHLayoutMask get_bvh_layout_mask() const override;
+  BVHLayoutMask get_bvh_layout_mask(uint /*kernel_features*/) const override;
 
   void set_error(const string &error) override;
 
-  HIPDevice(const DeviceInfo &info, Stats &stats, Profiler &profiler);
+  HIPDevice(const DeviceInfo &info, Stats &stats, Profiler &profiler, bool headless);
 
-  virtual ~HIPDevice();
+  ~HIPDevice() override;
 
   bool support_device(const uint /*kernel_features*/);
 
@@ -54,51 +55,56 @@ class HIPDevice : public GPUDevice {
 
   string compile_kernel(const uint kernel_features, const char *name, const char *base = "hip");
 
-  virtual bool load_kernels(const uint kernel_features) override;
+  bool load_kernels(const uint kernel_features) override;
   void reserve_local_memory(const uint kernel_features);
 
-  virtual void get_device_memory_info(size_t &total, size_t &free) override;
-  virtual bool alloc_device(void *&device_pointer, size_t size) override;
-  virtual void free_device(void *device_pointer) override;
-  virtual bool alloc_host(void *&shared_pointer, size_t size) override;
-  virtual void free_host(void *shared_pointer) override;
-  virtual void transform_host_pointer(void *&device_pointer, void *&shared_pointer) override;
-  virtual void copy_host_to_device(void *device_pointer, void *host_pointer, size_t size) override;
-
+  /* All memory types. */
   void mem_alloc(device_memory &mem) override;
-
   void mem_copy_to(device_memory &mem) override;
-
-  void mem_copy_from(device_memory &mem, size_t y, size_t w, size_t h, size_t elem) override;
-
+  void mem_move_to_host(device_memory &mem) override;
+  void mem_copy_from(
+      device_memory &mem, const size_t y, size_t w, const size_t h, size_t elem) override;
   void mem_zero(device_memory &mem) override;
-
   void mem_free(device_memory &mem) override;
 
-  device_ptr mem_alloc_sub_ptr(device_memory &mem, size_t offset, size_t /*size*/) override;
+  device_ptr mem_alloc_sub_ptr(device_memory &mem, const size_t offset, size_t /*size*/) override;
 
-  virtual void const_copy_to(const char *name, void *host, size_t size) override;
-
+  /* Global memory. */
   void global_alloc(device_memory &mem);
-
+  void global_copy_to(device_memory &mem);
   void global_free(device_memory &mem);
 
-  void tex_alloc(device_texture &mem);
+  /* Image memory. */
+  void image_alloc(device_image &mem);
+  void image_copy_to(device_image &mem);
+  void image_free(device_image &mem);
 
-  void tex_free(device_texture &mem);
+  /* Device side memory. */
+  void get_device_memory_info(size_t &total, size_t &free) override;
+  bool alloc_device(void *&device_pointer, const size_t size) override;
+  void free_device(void *device_pointer) override;
+
+  /* Shared memory. */
+  bool shared_alloc(void *&shared_pointer, const size_t size) override;
+  void shared_free(void *shared_pointer) override;
+  void *shared_to_device_pointer(const void *shared_pointer) override;
+
+  /* Memory copy. */
+  void copy_host_to_device(void *device_pointer, void *host_pointer, const size_t size) override;
+  void const_copy_to(const char *name, void *host, const size_t size) override;
 
   /* Graphics resources interoperability. */
-  virtual bool should_use_graphics_interop() override;
+  bool should_use_graphics_interop(const GraphicsInteropDevice &interop_device,
+                                   const bool log) override;
 
-  virtual unique_ptr<DeviceQueue> gpu_queue_create() override;
+  unique_ptr<DeviceQueue> gpu_queue_create() override;
 
   int get_num_multiprocessors();
   int get_max_num_threads_per_multiprocessor();
 
  protected:
   bool get_device_attribute(hipDeviceAttribute_t attribute, int *value);
-  int get_device_default_attribute(hipDeviceAttribute_t attribute, int default_value);
-  hipMemoryType get_memory_type(hipMemoryType mem_type);
+  int get_device_default_attribute(hipDeviceAttribute_t attribute, const int default_value);
 };
 
 CCL_NAMESPACE_END

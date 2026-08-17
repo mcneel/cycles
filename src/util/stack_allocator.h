@@ -1,59 +1,56 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_STACK_ALLOCATOR_H__
-#define __UTIL_STACK_ALLOCATOR_H__
+#pragma once
 
 #include <cstddef>
-#include <memory>
+
+#include "util/defines.h"
+#include "util/guarded_allocator.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Stack allocator for the use with STL. */
-template<int SIZE, typename T> class ccl_try_align(16) StackAllocator
-{
+template<int SIZE, typename T> class ccl_try_align(16) StackAllocator {
  public:
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
-  typedef T *pointer;
-  typedef const T *const_pointer;
-  typedef T &reference;
-  typedef const T &const_reference;
-  typedef T value_type;
+  using size_type = size_t;
+  using difference_type = ptrdiff_t;
+  using pointer = T *;
+  using const_pointer = const T *;
+  using reference = T &;
+  using const_reference = const T &;
+  using value_type = T;
 
   /* Allocator construction/destruction. */
 
-  StackAllocator() : pointer_(0), use_stack_(true)
-  {
-  }
+  StackAllocator() : pointer_(0), use_stack_(true) {}
 
-  StackAllocator(const StackAllocator &) : pointer_(0), use_stack_(true)
-  {
-  }
+  StackAllocator(const StackAllocator & /*unused*/) : pointer_(0), use_stack_(true) {}
 
   template<class U>
-  StackAllocator(const StackAllocator<SIZE, U> &) : pointer_(0), use_stack_(false)
+  StackAllocator(const StackAllocator<SIZE, U> & /*unused*/) : pointer_(0), use_stack_(false)
   {
   }
 
   /* Memory allocation/deallocation. */
 
-  T *allocate(size_t n, const void *hint = 0)
+  T *allocate(const size_t n, const void *hint = nullptr)
   {
     (void)hint;
     if (n == 0) {
-      return NULL;
+      return nullptr;
     }
     if (pointer_ + n >= SIZE || use_stack_ == false) {
       size_t size = n * sizeof(T);
       util_guarded_mem_alloc(size);
       T *mem;
 #ifdef WITH_BLENDER_GUARDEDALLOC
-      mem = (T *)MEM_mallocN_aligned(size, 16, "Cycles Alloc");
+      mem = (T *)MEM_new_uninitialized_aligned(size, 16, "Cycles Alloc");
 #else
       mem = (T *)malloc(size);
 #endif
-      if (mem == NULL) {
+      if (mem == nullptr) {
         throw std::bad_alloc();
       }
       return mem;
@@ -63,15 +60,15 @@ template<int SIZE, typename T> class ccl_try_align(16) StackAllocator
     return mem;
   }
 
-  void deallocate(T * p, size_t n)
+  void deallocate(T *p, const size_t n)
   {
-    if (p == NULL) {
+    if (p == nullptr) {
       return;
     }
     if (p < data_ || p >= data_ + SIZE) {
       util_guarded_mem_free(n * sizeof(T));
 #ifdef WITH_BLENDER_GUARDEDALLOC
-      MEM_freeN(p);
+      MEM_delete_void(static_cast<void *>(p));
 #else
       free(p);
 #endif
@@ -82,7 +79,7 @@ template<int SIZE, typename T> class ccl_try_align(16) StackAllocator
 
   /* Address of an reference. */
 
-  T *address(T & x) const
+  T *address(T &x) const
   {
     return &x;
   }
@@ -94,14 +91,14 @@ template<int SIZE, typename T> class ccl_try_align(16) StackAllocator
 
   /* Object construction/destruction. */
 
-  void construct(T * p, const T &val)
+  void construct(T *p, const T &val)
   {
-    if (p != NULL) {
-      new ((T *)p) T(val);
+    if (p != nullptr) {
+      new (p) T(val);
     }
   }
 
-  void destroy(T * p)
+  void destroy(T *p)
   {
     p->~T();
   }
@@ -116,27 +113,27 @@ template<int SIZE, typename T> class ccl_try_align(16) StackAllocator
   /* Rebind to other type of allocator. */
 
   template<class U> struct rebind {
-    typedef StackAllocator<SIZE, U> other;
+    using other = StackAllocator<SIZE, U>;
   };
 
   /* Operators */
 
-  template<class U> inline StackAllocator &operator=(const StackAllocator<SIZE, U> &)
+  template<class U> StackAllocator &operator=(const StackAllocator<SIZE, U> & /*unused*/)
   {
     return *this;
   }
 
-  StackAllocator<SIZE, T> &operator=(const StackAllocator &)
+  StackAllocator<SIZE, T> &operator=(const StackAllocator & /*unused*/)
   {
     return *this;
   }
 
-  inline bool operator==(StackAllocator const & /*other*/) const
+  bool operator==(const StackAllocator & /*other*/) const
   {
     return true;
   }
 
-  inline bool operator!=(StackAllocator const &other) const
+  bool operator!=(const StackAllocator &other) const
   {
     return !operator==(other);
   }
@@ -148,5 +145,3 @@ template<int SIZE, typename T> class ccl_try_align(16) StackAllocator
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_STACK_ALLOCATOR_H__ */

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "session/tile.h"
 
@@ -12,8 +13,7 @@
 #include "scene/integrator.h"
 #include "scene/scene.h"
 #include "session/session.h"
-#include "util/algorithm.h"
-#include "util/foreach.h"
+
 #include "util/log.h"
 #include "util/path.h"
 #include "util/string.h"
@@ -38,7 +38,7 @@ static std::atomic<uint64_t> g_instance_index = 0;
 /* Construct names of EXR channels which will ensure order of all channels to match exact offsets
  * in render buffers corresponding to the given passes.
  *
- * Returns `std` datatypes so that it can be assigned directly to the OIIO's `ImageSpec`. */
+ * Returns `std` data-types so that it can be assigned directly to the OIIO's `ImageSpec`. */
 static std::vector<std::string> exr_channel_names_for_passes(const BufferParams &buffer_params)
 {
   static const char *component_suffixes[] = {"R", "G", "B", "A"};
@@ -108,7 +108,7 @@ static bool node_socket_to_image_spec_atttributes(ImageSpec *image_spec,
       /* Validate that the node is consistent with the node type definition. */
       const NodeEnum &enum_values = *socket.enum_values;
       if (!enum_values.exists(value)) {
-        LOG(DFATAL) << "Node enum contains invalid value " << value;
+        LOG_DFATAL << "Node enum contains invalid value " << value;
         return false;
       }
 
@@ -134,7 +134,7 @@ static bool node_socket_to_image_spec_atttributes(ImageSpec *image_spec,
       return true;
 
     default:
-      LOG(DFATAL) << "Unhandled socket type " << socket.type << ", should never happen.";
+      LOG_DFATAL << "Unhandled socket type " << socket.type << ", should never happen.";
       return false;
   }
 }
@@ -154,7 +154,7 @@ static bool node_socket_from_image_spec_atttributes(Node *node,
       /* Validate that the node is consistent with the node type definition. */
       const NodeEnum &enum_values = *socket.enum_values;
       if (!enum_values.exists(value)) {
-        LOG(ERROR) << "Invalid enumerator value " << value;
+        LOG_ERROR << "Invalid enumerator value " << value;
         return false;
       }
 
@@ -181,7 +181,7 @@ static bool node_socket_from_image_spec_atttributes(Node *node,
       return true;
 
     default:
-      LOG(DFATAL) << "Unhandled socket type " << socket.type << ", should never happen.";
+      LOG_DFATAL << "Unhandled socket type " << socket.type << ", should never happen.";
       return false;
   }
 }
@@ -247,7 +247,7 @@ static bool buffer_params_from_image_spec_atttributes(BufferParams *buffer_param
 
   const int num_passes = image_spec.get_int_attribute(ATTR_PASSES_COUNT, 0);
   if (num_passes == 0) {
-    LOG(ERROR) << "Missing passes count attribute.";
+    LOG_ERROR << "Missing passes count attribute.";
     return false;
   }
 
@@ -285,7 +285,7 @@ static bool configure_image_spec_from_buffer(ImageSpec *image_spec,
   *image_spec = ImageSpec(
       buffer_params.width, buffer_params.height, num_channels, TypeDesc::FLOAT);
 
-  image_spec->channelnames = move(channel_names);
+  image_spec->channelnames = std::move(channel_names);
 
   if (!buffer_params_to_image_spec_atttributes(image_spec, buffer_params)) {
     return false;
@@ -319,9 +319,7 @@ TileManager::TileManager()
                            to_string(tile_manager_id);
 }
 
-TileManager::~TileManager()
-{
-}
+TileManager::~TileManager() = default;
 
 int TileManager::compute_render_tile_size(const int suggested_tile_size) const
 {
@@ -334,9 +332,9 @@ int TileManager::compute_render_tile_size(const int suggested_tile_size) const
   return min(computed_tile_size, MAX_TILE_SIZE);
 }
 
-void TileManager::reset_scheduling(const BufferParams &params, int2 tile_size)
+void TileManager::reset_scheduling(const BufferParams &params, const int2 tile_size)
 {
-  VLOG_WORK << "Using tile size of " << tile_size;
+  LOG_DEBUG << "Using tile size of " << tile_size;
 
   close_tile_output();
 
@@ -406,7 +404,7 @@ bool TileManager::next()
   return true;
 }
 
-Tile TileManager::get_tile_for_index(int index) const
+Tile TileManager::get_tile_for_index(const int index) const
 {
   /* TODO(sergey): Consider using hilbert spiral, or. maybe, even configurable. Not sure this
    * brings a lot of value since this is only applicable to BIG tiles. */
@@ -439,7 +437,7 @@ const Tile &TileManager::get_current_tile() const
   return tile_state_.current_tile;
 }
 
-const int2 TileManager::get_size() const
+int2 TileManager::get_size() const
 {
   return make_int2(buffer_params_.width, buffer_params_.height);
 }
@@ -452,24 +450,24 @@ bool TileManager::open_tile_output()
 
   write_state_.tile_out = ImageOutput::create(write_state_.filename);
   if (!write_state_.tile_out) {
-    LOG(ERROR) << "Error creating image output for " << write_state_.filename;
+    LOG_ERROR << "Error creating image output for " << write_state_.filename;
     return false;
   }
 
   if (!write_state_.tile_out->supports("tiles")) {
-    LOG(ERROR) << "Progress tile file format does not support tiling.";
+    LOG_ERROR << "Progress tile file format does not support tiling.";
     return false;
   }
 
   if (!write_state_.tile_out->open(write_state_.filename, write_state_.image_spec)) {
-    LOG(ERROR) << "Error opening tile file: " << write_state_.tile_out->geterror();
+    LOG_ERROR << "Error opening tile file: " << write_state_.tile_out->geterror();
     write_state_.tile_out = nullptr;
     return false;
   }
 
   write_state_.num_tiles_written = 0;
 
-  VLOG_WORK << "Opened tile file " << write_state_.filename;
+  LOG_DEBUG << "Opened tile file " << write_state_.filename;
 
   return true;
 }
@@ -484,11 +482,11 @@ bool TileManager::close_tile_output()
   write_state_.tile_out = nullptr;
 
   if (!success) {
-    LOG(ERROR) << "Error closing tile file.";
+    LOG_ERROR << "Error closing tile file.";
     return false;
   }
 
-  VLOG_WORK << "Tile output is closed.";
+  LOG_DEBUG << "Tile output is closed.";
 
   return true;
 }
@@ -523,7 +521,8 @@ bool TileManager::write_tile(const RenderBuffers &tile_buffers)
    * Our task reference: #93008. */
   if (tile_params.window_x || tile_params.window_y ||
       tile_params.window_width != tile_params.width ||
-      tile_params.window_height != tile_params.height) {
+      tile_params.window_height != tile_params.height)
+  {
     pixel_storage.resize(pass_stride * tile_params.window_width * tile_params.window_height);
     float *pixels_continuous = pixel_storage.data();
 
@@ -539,7 +538,7 @@ bool TileManager::write_tile(const RenderBuffers &tile_buffers)
     pixels = pixel_storage.data();
   }
 
-  VLOG_WORK << "Write tile at " << tile_x << ", " << tile_y;
+  LOG_DEBUG << "Write tile at " << tile_x << ", " << tile_y;
 
   /* The image tile sizes in the OpenEXR file are different from the size of our big tiles. The
    * write_tiles() method expects a contiguous image region that will be split into tiles
@@ -563,14 +562,15 @@ bool TileManager::write_tile(const RenderBuffers &tile_buffers)
                                           pixels,
                                           xstride,
                                           ystride,
-                                          zstride)) {
-    LOG(ERROR) << "Error writing tile " << write_state_.tile_out->geterror();
+                                          zstride))
+  {
+    LOG_ERROR << "Error writing tile " << write_state_.tile_out->geterror();
     return false;
   }
 
   ++write_state_.num_tiles_written;
 
-  VLOG_WORK << "Tile written in " << time_dt() - time_start << " seconds.";
+  LOG_DEBUG << "Tile written in " << time_dt() - time_start << " seconds.";
 
   return true;
 }
@@ -588,13 +588,14 @@ void TileManager::finish_write_tiles()
     vector<float> pixel_storage(tile_size_.x * tile_size_.y * buffer_params_.pass_stride);
 
     for (int tile_index = write_state_.num_tiles_written; tile_index < tile_state_.num_tiles;
-         ++tile_index) {
+         ++tile_index)
+    {
       const Tile tile = get_tile_for_index(tile_index);
 
       const int tile_x = tile.x + tile.window_x;
       const int tile_y = tile.y + tile.window_y;
 
-      VLOG_WORK << "Write dummy tile at " << tile_x << ", " << tile_y;
+      LOG_DEBUG << "Write dummy tile at " << tile_x << ", " << tile_y;
 
       write_state_.tile_out->write_tiles(tile_x,
                                          tile_x + tile.window_width,
@@ -613,7 +614,7 @@ void TileManager::finish_write_tiles()
     full_buffer_written_cb(write_state_.filename);
   }
 
-  VLOG_WORK << "Tile file size is "
+  LOG_DEBUG << "Tile file size is "
             << string_human_readable_number(path_file_size(write_state_.filename)) << " bytes.";
 
   /* Advance the counter upon explicit finish of the file.
@@ -630,7 +631,7 @@ bool TileManager::read_full_buffer_from_disk(const string_view filename,
 {
   unique_ptr<ImageInput> in(ImageInput::open(filename));
   if (!in) {
-    LOG(ERROR) << "Error opening tile file " << filename;
+    LOG_ERROR << "Error opening tile file " << filename;
     return false;
   }
 
@@ -648,12 +649,12 @@ bool TileManager::read_full_buffer_from_disk(const string_view filename,
 
   const int num_channels = in->spec().nchannels;
   if (!in->read_image(0, 0, 0, num_channels, TypeDesc::FLOAT, buffers->buffer.data())) {
-    LOG(ERROR) << "Error reading pixels from the tile file " << in->geterror();
+    LOG_ERROR << "Error reading pixels from the tile file " << in->geterror();
     return false;
   }
 
   if (!in->close()) {
-    LOG(ERROR) << "Error closing tile file " << in->geterror();
+    LOG_ERROR << "Error closing tile file " << in->geterror();
     return false;
   }
 

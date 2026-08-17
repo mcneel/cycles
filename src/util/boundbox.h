@@ -1,14 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_BOUNDBOX_H__
-#define __UTIL_BOUNDBOX_H__
+#pragma once
 
-#include <float.h>
-#include <math.h>
+#include <cfloat>
+#include <cmath>
 
 #include "util/math.h"
-#include "util/string.h"
 #include "util/transform.h"
 #include "util/types.h"
 
@@ -20,21 +19,15 @@ class BoundBox {
  public:
   float3 min, max;
 
-  __forceinline BoundBox()
-  {
-  }
+  __forceinline BoundBox() = default;
 
-  __forceinline BoundBox(const float3 &pt) : min(pt), max(pt)
-  {
-  }
+  __forceinline BoundBox(const float3 &pt) : min(pt), max(pt) {}
 
-  __forceinline BoundBox(const float3 &min_, const float3 &max_) : min(min_), max(max_)
-  {
-  }
+  __forceinline BoundBox(const float3 &min_, const float3 &max_) : min(min_), max(max_) {}
 
   enum empty_t { empty = 0 };
 
-  __forceinline BoundBox(empty_t)
+  __forceinline BoundBox(empty_t /*unused*/)
       : min(make_float3(FLT_MAX, FLT_MAX, FLT_MAX)), max(make_float3(-FLT_MAX, -FLT_MAX, -FLT_MAX))
   {
   }
@@ -47,17 +40,17 @@ class BoundBox {
     max = ccl::max(pt, max);
   }
 
-  __forceinline void grow(const float3 &pt, float border)
+  __forceinline void grow(const float3 &pt, const float border)
   {
-    float3 shift = make_float3(border, border, border);
+    const float3 shift = make_float3(border, border, border);
     min = ccl::min(pt - shift, min);
     max = ccl::max(pt + shift, max);
   }
 
   __forceinline void grow(const BoundBox &bbox)
   {
-    grow(bbox.min);
-    grow(bbox.max);
+    min = ccl::min(bbox.min, min);
+    max = ccl::max(bbox.max, max);
   }
 
   __forceinline void grow_safe(const float3 &pt)
@@ -70,10 +63,10 @@ class BoundBox {
     }
   }
 
-  __forceinline void grow_safe(const float3 &pt, float border)
+  __forceinline void grow_safe(const float3 &pt, const float border)
   {
     if (isfinite(pt.x) && isfinite(pt.y) && isfinite(pt.z) && isfinite(border)) {
-      float3 shift = make_float3(border, border, border);
+      const float3 shift = make_float3(border, border, border);
       min = ccl::min(pt - shift, min);
       max = ccl::max(pt + shift, max);
     }
@@ -81,8 +74,12 @@ class BoundBox {
 
   __forceinline void grow_safe(const BoundBox &bbox)
   {
-    grow_safe(bbox.min);
-    grow_safe(bbox.max);
+    if (isfinite_safe(bbox.min)) {
+      min = ccl::min(bbox.min, min);
+    }
+    if (isfinite_safe(bbox.max)) {
+      max = ccl::max(bbox.max, max);
+    }
   }
 
   __forceinline void intersect(const BoundBox &bbox)
@@ -94,8 +91,9 @@ class BoundBox {
   /* todo: avoid using this */
   __forceinline float safe_area() const
   {
-    if (!((min.x <= max.x) && (min.y <= max.y) && (min.z <= max.z)))
+    if (!((min.x <= max.x) && (min.y <= max.y) && (min.z <= max.z))) {
       return 0.0f;
+    }
 
     return area();
   }
@@ -107,7 +105,7 @@ class BoundBox {
 
   __forceinline float half_area() const
   {
-    float3 d = max - min;
+    const float3 d = max - min;
     return (d.x * d.z + d.y * d.z + d.x * d.y);
   }
 
@@ -137,6 +135,12 @@ class BoundBox {
   {
     BoundBox result = BoundBox::empty;
 
+    /* Avoid transforming empty bounding box since the code below performs per-corner transform
+     * which will convert non-valid bounds to valid. */
+    if (!valid()) {
+      return result;
+    }
+
     for (int i = 0; i < 8; i++) {
       float3 p;
 
@@ -152,7 +156,8 @@ class BoundBox {
 
   __forceinline bool intersects(const BoundBox &other)
   {
-    float3 center_diff = center() - other.center(), total_size = (size() + other.size()) * 0.5f;
+    const float3 center_diff = center() - other.center();
+    const float3 total_size = (size() + other.size()) * 0.5f;
     return fabsf(center_diff.x) <= total_size.x && fabsf(center_diff.y) <= total_size.y &&
            fabsf(center_diff.z) <= total_size.z;
   }
@@ -190,12 +195,15 @@ __forceinline BoundBox intersect(const BoundBox &a, const BoundBox &b, const Bou
 
 class BoundBox2D {
  public:
-  float left;
-  float right;
-  float bottom;
-  float top;
+  float left = 0.0f;
+  float right = 1.0f;
+  float bottom = 0.0f;
+  float top = 1.0f;
 
-  BoundBox2D() : left(0.0f), right(1.0f), bottom(0.0f), top(1.0f)
+  BoundBox2D() = default;
+
+  BoundBox2D(const float2 radius)
+      : left(-radius.x), right(radius.x), bottom(-radius.y), top(radius.y)
   {
   }
 
@@ -251,7 +259,7 @@ class BoundBox2D {
     return result;
   }
 
-  BoundBox2D clamp(float mn = 0.0f, float mx = 1.0f)
+  BoundBox2D clamp(const float mn = 0.0f, const float mx = 1.0f)
   {
     BoundBox2D result;
 
@@ -262,8 +270,18 @@ class BoundBox2D {
 
     return result;
   }
+
+  BoundBox2D offset(const float2 offset) const
+  {
+    BoundBox2D result;
+
+    result.left = left + offset.x;
+    result.right = right + offset.x;
+    result.bottom = bottom + offset.y;
+    result.top = top + offset.y;
+
+    return result;
+  }
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_BOUNDBOX_H__ */

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* Integrator State
  *
@@ -23,16 +24,14 @@
  *
  * INTEGRATOR_STATE_ARRAY(state, x, index, y): read x[index].y
  * INTEGRATOR_STATE_ARRAY_WRITE(state, x, index, y): write x[index].y
- *
- * INTEGRATOR_STATE_NULL: use to pass empty state to other functions.
  */
 
 #include "kernel/types.h"
 
 #include "util/types.h"
 
-#ifdef __PATH_GUIDING__
-#  include "util/guiding.h"
+#if defined(__PATH_GUIDING__)
+#  include "util/guiding.h"  // IWYU pragma: keep
 #endif
 
 #pragma once
@@ -44,9 +43,11 @@ CCL_NAMESPACE_BEGIN
 /* Integrator State
  *
  * CPU rendering path state with AoS layout. */
-typedef struct IntegratorShadowStateCPU {
+struct IntegratorShadowStateCPU {
 #define KERNEL_STRUCT_BEGIN(name) struct {
+#define KERNEL_STRUCT_BEGIN_PACKED(parent_struct, feature) struct {
 #define KERNEL_STRUCT_MEMBER(parent_struct, type, name, feature) type name;
+#define KERNEL_STRUCT_MEMBER_PACKED KERNEL_STRUCT_MEMBER
 #define KERNEL_STRUCT_ARRAY_MEMBER KERNEL_STRUCT_MEMBER
 #define KERNEL_STRUCT_END(name) \
   } \
@@ -57,15 +58,19 @@ typedef struct IntegratorShadowStateCPU {
 #define KERNEL_STRUCT_VOLUME_STACK_SIZE MAX_VOLUME_STACK_SIZE
 #include "kernel/integrator/shadow_state_template.h"
 #undef KERNEL_STRUCT_BEGIN
+#undef KERNEL_STRUCT_BEGIN_PACKED
 #undef KERNEL_STRUCT_MEMBER
+#undef KERNEL_STRUCT_MEMBER_PACKED
 #undef KERNEL_STRUCT_ARRAY_MEMBER
 #undef KERNEL_STRUCT_END
 #undef KERNEL_STRUCT_END_ARRAY
-} IntegratorShadowStateCPU;
+};
 
-typedef struct IntegratorStateCPU {
+struct IntegratorStateCPU {
 #define KERNEL_STRUCT_BEGIN(name) struct {
+#define KERNEL_STRUCT_BEGIN_PACKED(parent_struct, feature) struct {
 #define KERNEL_STRUCT_MEMBER(parent_struct, type, name, feature) type name;
+#define KERNEL_STRUCT_MEMBER_PACKED KERNEL_STRUCT_MEMBER
 #define KERNEL_STRUCT_ARRAY_MEMBER KERNEL_STRUCT_MEMBER
 #define KERNEL_STRUCT_END(name) \
   } \
@@ -76,7 +81,9 @@ typedef struct IntegratorStateCPU {
 #define KERNEL_STRUCT_VOLUME_STACK_SIZE MAX_VOLUME_STACK_SIZE
 #include "kernel/integrator/state_template.h"
 #undef KERNEL_STRUCT_BEGIN
+#undef KERNEL_STRUCT_BEGIN_PACKED
 #undef KERNEL_STRUCT_MEMBER
+#undef KERNEL_STRUCT_MEMBER_PACKED
 #undef KERNEL_STRUCT_ARRAY_MEMBER
 #undef KERNEL_STRUCT_END
 #undef KERNEL_STRUCT_END_ARRAY
@@ -84,22 +91,86 @@ typedef struct IntegratorStateCPU {
 
   IntegratorShadowStateCPU shadow;
   IntegratorShadowStateCPU ao;
-} IntegratorStateCPU;
+};
 
 /* Path Queue
  *
  * Keep track of which kernels are queued to be executed next in the path
  * for GPU rendering. */
-typedef struct IntegratorQueueCounter {
-  int num_queued[DEVICE_KERNEL_INTEGRATOR_NUM];
-} IntegratorQueueCounter;
+struct IntegratorQueueCounter {
+  int num_queued[DEVICE_GPU_KERNEL_INTEGRATOR_NUM];
+  int cache_miss;
+};
+
+#if defined(__INTEGRATOR_GPU_PACKED_STATE__) && defined(__KERNEL_GPU__)
+
+/* Generate wrapper structs for all integrator state fields. This allows us to access state
+ * uniformly, regardless of whether it stored in a packed struct or separate arrays. */
+#  define KERNEL_STRUCT_BEGIN(name)
+#  define KERNEL_STRUCT_MEMBER(parent_struct, type, name, feature) \
+    struct Wrapped_##parent_struct##_##name { \
+      type name; \
+    };
+#  define KERNEL_STRUCT_MEMBER_PACKED KERNEL_STRUCT_MEMBER
+#  define KERNEL_STRUCT_BEGIN_PACKED(parent_struct, feature) \
+    KERNEL_STRUCT_BEGIN(parent_struct) \
+    KERNEL_STRUCT_MEMBER(parent_struct, packed_##parent_struct, packed, feature)
+#  define KERNEL_STRUCT_ARRAY_MEMBER KERNEL_STRUCT_MEMBER
+#  define KERNEL_STRUCT_END(name)
+#  define KERNEL_STRUCT_END_ARRAY(name, cpu_size, gpu_size)
+#  define KERNEL_STRUCT_VOLUME_STACK_SIZE MAX_VOLUME_STACK_SIZE
+
+#  include "kernel/integrator/shadow_state_template.h"
+#  include "kernel/integrator/state_template.h"
+
+#  undef KERNEL_STRUCT_BEGIN
+#  undef KERNEL_STRUCT_BEGIN_PACKED
+#  undef KERNEL_STRUCT_MEMBER
+#  undef KERNEL_STRUCT_MEMBER_PACKED
+#  undef KERNEL_STRUCT_ARRAY_MEMBER
+#  undef KERNEL_STRUCT_END
+#  undef KERNEL_STRUCT_END_ARRAY
+#  undef KERNEL_STRUCT_VOLUME_STACK_SIZE
+
+#endif
 
 /* Integrator State GPU
  *
  * GPU rendering path state with SoA layout. */
-typedef struct IntegratorStateGPU {
+struct IntegratorStateGPU {
 #define KERNEL_STRUCT_BEGIN(name) struct {
-#define KERNEL_STRUCT_MEMBER(parent_struct, type, name, feature) ccl_global type *name;
+
+#ifdef __INTEGRATOR_GPU_PACKED_STATE__
+
+#  ifdef __KERNEL_GPU__
+
+/* If we've opted in to packed layouts, generate member functions that return a pointer to a
+ * wrapper type so we can access state using uniform syntax. */
+#    define KERNEL_STRUCT_MEMBER(parent_struct, type, name, feature) \
+      ccl_global Wrapped_##parent_struct##_##name *name; \
+      ccl_device_inline ccl_global Wrapped_##parent_struct##_##name *name##_fn() ccl_constant \
+      { \
+        return (ccl_global Wrapped_##parent_struct##_##name *)name; \
+      }
+#    define KERNEL_STRUCT_MEMBER_PACKED(parent_struct, type, name, feature) \
+      ccl_device_inline ccl_global packed_##parent_struct *name##_fn() ccl_constant \
+      { \
+        return (ccl_global packed_##parent_struct *)packed; \
+      }
+#  else
+#    define KERNEL_STRUCT_MEMBER(parent_struct, type, name, feature) ccl_global type *name;
+#    define KERNEL_STRUCT_MEMBER_PACKED(parent_struct, type, name, feature)
+#  endif
+
+#  define KERNEL_STRUCT_BEGIN_PACKED(parent_struct, feature) \
+    KERNEL_STRUCT_BEGIN(parent_struct) \
+    KERNEL_STRUCT_MEMBER(parent_struct, packed_##parent_struct, packed, feature)
+
+#else
+#  define KERNEL_STRUCT_MEMBER(parent_struct, type, name, feature) ccl_global type *name;
+#  define KERNEL_STRUCT_MEMBER_PACKED KERNEL_STRUCT_MEMBER
+#  define KERNEL_STRUCT_BEGIN_PACKED(parent_struct, feature) KERNEL_STRUCT_BEGIN(parent_struct)
+#endif
 #define KERNEL_STRUCT_ARRAY_MEMBER KERNEL_STRUCT_MEMBER
 #define KERNEL_STRUCT_END(name) \
   } \
@@ -114,7 +185,9 @@ typedef struct IntegratorStateGPU {
 #include "kernel/integrator/shadow_state_template.h"
 
 #undef KERNEL_STRUCT_BEGIN
+#undef KERNEL_STRUCT_BEGIN_PACKED
 #undef KERNEL_STRUCT_MEMBER
+#undef KERNEL_STRUCT_MEMBER_PACKED
 #undef KERNEL_STRUCT_ARRAY_MEMBER
 #undef KERNEL_STRUCT_END
 #undef KERNEL_STRUCT_END_ARRAY
@@ -124,20 +197,20 @@ typedef struct IntegratorStateGPU {
   ccl_global IntegratorQueueCounter *queue_counter;
 
   /* Count number of kernels queued for specific shaders. */
-  ccl_global int *sort_key_counter[DEVICE_KERNEL_INTEGRATOR_NUM];
+  ccl_global int *sort_key_counter[DEVICE_GPU_KERNEL_INTEGRATOR_NUM];
 
-  /* Index of shadow path which will be used by a next shadow path.  */
+  /* Index of shadow path which will be used by a next shadow path. */
   ccl_global int *next_shadow_path_index;
 
-  /* Index of main path which will be used by a next shadow catcher split.  */
+  /* Index of main path which will be used by a next shadow catcher split. */
   ccl_global int *next_main_path_index;
 
   /* Partition/key offsets used when writing sorted active indices. */
   ccl_global int *sort_partition_key_offsets;
 
-  /* Divisor used to partition active indices by locality when sorting by material.  */
+  /* Divisor used to partition active indices by locality when sorting by material. */
   uint sort_partition_divisor;
-} IntegratorStateGPU;
+};
 
 /* Abstraction
  *
@@ -151,12 +224,12 @@ typedef struct IntegratorStateGPU {
 
 /* Scalar access on CPU. */
 
-typedef IntegratorStateCPU *ccl_restrict IntegratorState;
-typedef const IntegratorStateCPU *ccl_restrict ConstIntegratorState;
-typedef IntegratorShadowStateCPU *ccl_restrict IntegratorShadowState;
-typedef const IntegratorShadowStateCPU *ccl_restrict ConstIntegratorShadowState;
-
-#  define INTEGRATOR_STATE_NULL nullptr
+using IntegratorState = IntegratorStateCPU *;
+using ConstIntegratorState = const IntegratorStateCPU *;
+using IntegratorShadowState = IntegratorShadowStateCPU *;
+using ConstIntegratorShadowState = const IntegratorShadowStateCPU *;
+struct IntegratorBakeState {};
+using ConstIntegratorBakeState = IntegratorBakeState;
 
 #  define INTEGRATOR_STATE(state, nested_struct, member) ((state)->nested_struct.member)
 #  define INTEGRATOR_STATE_WRITE(state, nested_struct, member) ((state)->nested_struct.member)
@@ -170,20 +243,41 @@ typedef const IntegratorShadowStateCPU *ccl_restrict ConstIntegratorShadowState;
 
 /* Array access on GPU with Structure-of-Arrays. */
 
-typedef int IntegratorState;
-typedef int ConstIntegratorState;
-typedef int IntegratorShadowState;
-typedef int ConstIntegratorShadowState;
+using IntegratorState = int;
+using ConstIntegratorState = int;
 
-#  define INTEGRATOR_STATE_NULL -1
+/* Shadow state is wrapped in a struct to support function overloading and templates. */
+struct IntegratorShadowState {
+  ccl_device_inline_method IntegratorShadowState() {}
+  ccl_device_inline_method IntegratorShadowState(int state) : state(state) {}
+  ccl_device_inline_method operator int() const
+  {
+    return state;
+  }
+  int state;
+};
+using ConstIntegratorShadowState = IntegratorShadowState;
 
-#  define INTEGRATOR_STATE(state, nested_struct, member) \
-    kernel_integrator_state.nested_struct.member[state]
+struct IntegratorBakeState {};
+using ConstIntegratorBakeState = IntegratorBakeState;
+
+#  ifdef __INTEGRATOR_GPU_PACKED_STATE__
+
+/* If we've opted in to packed layouts, we use the generated accessor functions (member##_fn) to
+ * resolve different layouts (packed vs separate). */
+#    define INTEGRATOR_STATE(state, nested_struct, member) \
+      kernel_integrator_state.nested_struct.member##_fn()[state].member
+#    define INTEGRATOR_STATE_ARRAY(state, nested_struct, array_index, member) \
+      kernel_integrator_state.nested_struct[array_index].member##_fn()[state].member
+#  else
+#    define INTEGRATOR_STATE(state, nested_struct, member) \
+      kernel_integrator_state.nested_struct.member[state]
+#    define INTEGRATOR_STATE_ARRAY(state, nested_struct, array_index, member) \
+      kernel_integrator_state.nested_struct[array_index].member[state]
+#  endif
+
 #  define INTEGRATOR_STATE_WRITE(state, nested_struct, member) \
     INTEGRATOR_STATE(state, nested_struct, member)
-
-#  define INTEGRATOR_STATE_ARRAY(state, nested_struct, array_index, member) \
-    kernel_integrator_state.nested_struct[array_index].member[state]
 #  define INTEGRATOR_STATE_ARRAY_WRITE(state, nested_struct, array_index, member) \
     INTEGRATOR_STATE_ARRAY(state, nested_struct, array_index, member)
 

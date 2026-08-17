@@ -1,5 +1,6 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2011-2022 Blender Foundation
 
 set(INC
   ..
@@ -9,11 +10,13 @@ set(INC_SYS
 )
 
 set(SRC
+  octree.cpp
   bvh.cpp
   bvh2.cpp
   binning.cpp
   build.cpp
   embree.cpp
+  hiprt.cpp
   multi.cpp
   node.cpp
   optix.cpp
@@ -34,11 +37,13 @@ if(WITH_CYCLES_DEVICE_METAL)
 endif()
 
 set(SRC_HEADERS
+  octree.h
   bvh.h
   bvh2.h
   binning.h
   build.h
   embree.h
+  hiprt.h
   multi.h
   node.h
   optix.h
@@ -50,8 +55,9 @@ set(SRC_HEADERS
 )
 
 set(LIB
-  cycles_scene
-  cycles_util
+  PUBLIC cycles_scene
+  PUBLIC cycles_util
+  PUBLIC bf::dependencies::optional::embree
 )
 
 include_directories(${INC})
@@ -61,6 +67,11 @@ if(WITH_CYCLES_EMBREE)
   list(APPEND LIB
     ${EMBREE_LIBRARIES}
   )
+  if(EMBREE_SYCL_SUPPORT)
+    list(APPEND LIB
+      ${SYCL_LIBRARIES}
+    )
+  endif()
 endif()
 
 cycles_add_library(cycles_bvh "${LIB}" ${SRC} ${SRC_HEADERS})

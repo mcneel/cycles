@@ -1,12 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #ifdef _WIN32
 // Include first to avoid "NOGDI" definition set in Cycles headers
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
 #  endif
@@ -51,10 +49,10 @@ void HdCyclesDisplayDriver::gl_context_create()
                                0,
                                64,
                                64,
-                               NULL,
-                               NULL,
-                               GetModuleHandle(NULL),
-                               NULL));
+                               nullptr,
+                               nullptr,
+                               GetModuleHandle(nullptr),
+                               nullptr));
 
     int pixelFormat = GetPixelFormat(wglGetCurrentDC());
     PIXELFORMATDESCRIPTOR pfd = {sizeof(pfd)};
@@ -71,6 +69,7 @@ void HdCyclesDisplayDriver::gl_context_create()
 
   if (!gl_pbo_id_) {
     glGenBuffers(1, &gl_pbo_id_);
+    graphics_interop_buffer_.clear();
   }
 }
 
@@ -118,13 +117,11 @@ void HdCyclesDisplayDriver::gl_context_dispose()
 #endif
 }
 
-void HdCyclesDisplayDriver::next_tile_begin()
-{
-}
+void HdCyclesDisplayDriver::next_tile_begin() {}
 
 bool HdCyclesDisplayDriver::update_begin(const Params &params,
-                                         int texture_width,
-                                         int texture_height)
+                                         int /*texture_width*/,
+                                         int /*texture_height*/)
 {
   if (!gl_context_enable()) {
     return false;
@@ -138,11 +135,12 @@ bool HdCyclesDisplayDriver::update_begin(const Params &params,
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gl_pbo_id_);
     glBufferData(GL_PIXEL_UNPACK_BUFFER,
                  sizeof(half4) * params.full_size.x * params.full_size.y,
-                 0,
+                 nullptr,
                  GL_DYNAMIC_DRAW);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     pbo_size_ = params.full_size;
+    graphics_interop_buffer_.clear();
   }
 
   need_update_ = true;
@@ -177,12 +175,12 @@ half4 *HdCyclesDisplayDriver::map_texture_buffer()
 {
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gl_pbo_id_);
 
-  const auto mapped_rgba_pixels = static_cast<half4 *>(
+  auto *const mapped_rgba_pixels = static_cast<half4 *>(
       glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY));
 
-  if (need_clear_ && mapped_rgba_pixels) {
+  if (need_zero_ && mapped_rgba_pixels) {
     memset(mapped_rgba_pixels, 0, sizeof(half4) * pbo_size_.x * pbo_size_.y);
-    need_clear_ = false;
+    need_zero_ = false;
   }
 
   return mapped_rgba_pixels;
@@ -195,17 +193,24 @@ void HdCyclesDisplayDriver::unmap_texture_buffer()
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
-DisplayDriver::GraphicsInterop HdCyclesDisplayDriver::graphics_interop_get()
+GraphicsInteropDevice HdCyclesDisplayDriver::graphics_interop_get_device()
 {
-  GraphicsInterop interop_dst;
-  interop_dst.buffer_width = pbo_size_.x;
-  interop_dst.buffer_height = pbo_size_.y;
-  interop_dst.opengl_pbo_id = gl_pbo_id_;
+  GraphicsInteropDevice interop_device;
+  interop_device.type = GraphicsInteropDevice::OPENGL;
+  return interop_device;
+}
 
-  interop_dst.need_clear = need_clear_;
-  need_clear_ = false;
+void HdCyclesDisplayDriver::graphics_interop_update_buffer()
+{
+  if (graphics_interop_buffer_.is_empty()) {
+    graphics_interop_buffer_.assign(
+        GraphicsInteropDevice::OPENGL, gl_pbo_id_, pbo_size_.x * pbo_size_.y * sizeof(half4));
+  }
 
-  return interop_dst;
+  if (need_zero_) {
+    graphics_interop_buffer_.zero();
+    need_zero_ = false;
+  }
 }
 
 void HdCyclesDisplayDriver::graphics_interop_activate()
@@ -218,17 +223,18 @@ void HdCyclesDisplayDriver::graphics_interop_deactivate()
   gl_context_disable();
 }
 
-void HdCyclesDisplayDriver::clear()
+void HdCyclesDisplayDriver::zero()
 {
-  need_clear_ = true;
+  need_zero_ = true;
 }
 
 void HdCyclesDisplayDriver::draw(const Params &params)
 {
-  const auto renderBuffer = static_cast<HdCyclesRenderBuffer *>(
+  auto *const renderBuffer = static_cast<HdCyclesRenderBuffer *>(
       _renderParam->GetDisplayAovBinding().renderBuffer);
   if (!renderBuffer ||  // Ensure this render buffer matches the texture dimensions
-      (renderBuffer->GetWidth() != params.size.x || renderBuffer->GetHeight() != params.size.y)) {
+      (renderBuffer->GetWidth() != params.size.x || renderBuffer->GetHeight() != params.size.y))
+  {
     return;
   }
 
@@ -272,7 +278,8 @@ void HdCyclesDisplayDriver::draw(const Params &params)
 
   glBindTexture(GL_TEXTURE_2D, texture->GetTextureId());
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, gl_pbo_id_);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, pbo_size_.x, pbo_size_.y, GL_RGBA, GL_HALF_FLOAT, 0);
+  glTexSubImage2D(
+      GL_TEXTURE_2D, 0, 0, 0, pbo_size_.x, pbo_size_.y, GL_RGBA, GL_HALF_FLOAT, nullptr);
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 

@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __OBJECT_H__
-#define __OBJECT_H__
+#pragma once
 
 #include "graph/node.h"
 
@@ -16,7 +16,6 @@
 #include "util/array.h"
 #include "util/boundbox.h"
 #include "util/param.h"
-#include "util/thread.h"
 #include "util/transform.h"
 #include "util/types.h"
 #include "util/vector.h"
@@ -40,7 +39,8 @@ class Object : public Node {
   NODE_DECLARE
 
   NODE_SOCKET_API(Geometry *, geometry)
-  NODE_SOCKET_API(Transform, tfm)
+  /* Use base API because we need custom setter for tfm. */
+  NODE_SOCKET_API_BASE(Transform, tfm, "tfm")
   BoundBox bounds;
   NODE_SOCKET_API(uint, random_id)
   NODE_SOCKET_API(int, pass_id)
@@ -61,6 +61,8 @@ class Object : public Node {
   NODE_SOCKET_API(bool, is_caustics_caster)
   NODE_SOCKET_API(bool, is_caustics_receiver)
 
+  NODE_SOCKET_API(bool, is_bake_target)
+
   NODE_SOCKET_API(float3, dupli_generated)
   NODE_SOCKET_API(float2, dupli_uv)
 
@@ -72,6 +74,10 @@ class Object : public Node {
   NODE_SOCKET_API(float, ao_distance)
 
   NODE_SOCKET_API(ustring, lightgroup)
+  NODE_SOCKET_API(uint, receiver_light_set)
+  NODE_SOCKET_API(uint64_t, light_set_membership)
+  NODE_SOCKET_API(uint, blocker_shadow_set)
+  NODE_SOCKET_API(uint64_t, shadow_set_membership)
 
   NODE_SOCKET_API(bool, use_ocs_frame)
   NODE_SOCKET_API(Transform, ocs_frame) /* OCS frame for controlling WCS and WCS Box. */
@@ -84,8 +90,12 @@ class Object : public Node {
   /* Set during device update. */
   bool intersects_volume;
 
+  /* Specifies the position of the object in scene->objects and
+   * in the device vectors. Gets set in device_update. */
+  int index;
+
   Object();
-  ~Object();
+  ~Object() override;
 
   void tag_update(Scene *scene);
 
@@ -95,8 +105,8 @@ class Object : public Node {
   /* Convert between normalized -1..1 motion time and index
    * in the motion array. */
   bool use_motion() const;
-  float motion_time(int step) const;
-  int motion_step(float time) const;
+  float motion_time(const int step) const;
+  int motion_step(const float time) const;
   void update_motion();
 
   /* Maximum number of motion steps supported (due to Embree). */
@@ -116,13 +126,23 @@ class Object : public Node {
   int get_device_index() const;
 
   /* Compute step size from attributes, shaders, transforms. */
-  float compute_volume_step_size() const;
+  float compute_volume_step_size(Progress &progress) const;
+
+  /* Check whether this object can be used as light-emissive. */
+  bool usable_as_light() const;
+
+  /* Check whether the object participates in light or shadow linking, either as a receiver/blocker
+   * or emitter. */
+  bool has_light_linking() const;
+  bool has_shadow_linking() const;
+
+  /* Transform of some object types need to be modified to prevent render issues. */
+  void adjust_volume_tfm(Transform &tfm);
+  void set_tfm(Transform tfm);
+  bool tfm_equals(Transform tfm);
+  void set_motion_tfm(Transform tfm, const int step_index);
 
  protected:
-  /* Specifies the position of the object in scene->objects and
-   * in the device vectors. Gets set in device_update. */
-  int index;
-
   /* Reference to the attribute map with object attributes,
    * or 0 if none. Set in update_svm_attributes. */
   size_t attr_map_offset;
@@ -161,6 +181,7 @@ class ObjectManager {
   ObjectManager();
   ~ObjectManager();
 
+  void update_interactive_motion(Scene *scene);
   void prune(Scene* scene);
 
   void device_update_clipping_planes(Device* device,
@@ -181,7 +202,7 @@ class ObjectManager {
 
   void device_free(Device *device, DeviceScene *dscene, bool force_free);
 
-  void tag_update(Scene *scene, uint32_t flag);
+  void tag_update(Scene *scene, const uint32_t flag);
 
   bool need_update() const;
 
@@ -202,5 +223,3 @@ class ObjectManager {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __OBJECT_H__ */

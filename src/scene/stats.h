@@ -1,12 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __RENDER_STATS_H__
-#define __RENDER_STATS_H__
+#pragma once
 
 #include "scene/scene.h"
 
-#include "util/stats.h"
 #include "util/string.h"
 #include "util/vector.h"
 
@@ -22,7 +21,7 @@ CCL_NAMESPACE_BEGIN
 class NamedSizeEntry {
  public:
   NamedSizeEntry();
-  NamedSizeEntry(const string &name, size_t size);
+  NamedSizeEntry(const string &name, const size_t size);
 
   string name;
   size_t size;
@@ -31,7 +30,7 @@ class NamedSizeEntry {
 class NamedTimeEntry {
  public:
   NamedTimeEntry();
-  NamedTimeEntry(const string &name, double time);
+  NamedTimeEntry(const string &name, const double time);
 
   string name;
   double time;
@@ -49,7 +48,7 @@ class NamedSizeStats {
   void add_entry(const NamedSizeEntry &entry);
 
   /* Generate full human-readable report. */
-  string full_report(int indent_level = 0);
+  string full_report(const int indent_level = 0);
 
   /* Total size of all entries. */
   size_t total_size;
@@ -72,7 +71,7 @@ class NamedTimeStats {
   }
 
   /* Generate full human-readable report. */
-  string full_report(int indent_level = 0);
+  string full_report(const int indent_level = 0);
 
   /* Total time of all entries. */
   double total_time;
@@ -92,14 +91,14 @@ class NamedTimeStats {
 class NamedNestedSampleStats {
  public:
   NamedNestedSampleStats();
-  NamedNestedSampleStats(const string &name, uint64_t samples);
+  NamedNestedSampleStats(const string &name, const uint64_t samples);
 
-  NamedNestedSampleStats &add_entry(const string &name, uint64_t samples);
+  NamedNestedSampleStats &add_entry(const string &name, const uint64_t samples);
 
   /* Updates sum_samples recursively. */
   void update_sum();
 
-  string full_report(int indent_level = 0, uint64_t total_samples = 0);
+  string full_report(const int indent_level = 0, const uint64_t total_samples = 0);
 
   string name;
 
@@ -115,7 +114,7 @@ class NamedNestedSampleStats {
  * This allows to estimate the time spent per item. */
 class NamedSampleCountPair {
  public:
-  NamedSampleCountPair(const ustring &name, uint64_t samples, uint64_t hits);
+  NamedSampleCountPair(const ustring &name, const uint64_t samples, const uint64_t hits);
 
   ustring name;
   uint64_t samples;
@@ -127,10 +126,10 @@ class NamedSampleCountStats {
  public:
   NamedSampleCountStats();
 
-  string full_report(int indent_level = 0);
-  void add(const ustring &name, uint64_t samples, uint64_t hits);
+  string full_report(const int indent_level = 0);
+  void add(const ustring &name, const uint64_t samples, const uint64_t hits);
 
-  typedef unordered_map<ustring, NamedSampleCountPair, ustringHash> entry_map;
+  using entry_map = unordered_map<ustring, NamedSampleCountPair>;
   entry_map entries;
 };
 
@@ -140,7 +139,7 @@ class MeshStats {
   MeshStats();
 
   /* Generate full human-readable report. */
-  string full_report(int indent_level = 0);
+  string full_report(const int indent_level = 0);
 
   /* Input geometry statistics, this is what is coming as an input to render
    * from. say, Blender. This does not include runtime or engine specific
@@ -149,15 +148,48 @@ class MeshStats {
   NamedSizeStats geometry;
 };
 
+/* Cumulative eviction counters for texture cache. */
+struct ImageEvictionStats {
+  int64_t tiles_loaded = 0;   /* Total tiles loaded (including reloads). */
+  int64_t tiles_evicted = 0;  /* Total tiles evicted. */
+  int64_t tiles_reloaded = 0; /* Tiles loaded that had been previously evicted. */
+  int64_t peak_loaded = 0;    /* High-water mark of simultaneously loaded tiles. */
+};
+
+/* Per-mip-level tile statistics for tiled images. */
+struct ImageMipLevelStats {
+  int width = 0;
+  int height = 0;
+  int tiles_loaded = 0;
+  int tiles_total = 0;
+};
+
+/* Per-image tile statistics for texture cache. */
+struct ImageTileStats {
+  string name;
+  vector<ImageMipLevelStats> mip_levels;
+  size_t size = 0;
+};
+
 /* Statistics about images held in memory. */
 class ImageStats {
  public:
   ImageStats();
 
   /* Generate full human-readable report. */
-  string full_report(int indent_level = 0);
+  string full_report(const int indent_level = 0);
 
-  NamedSizeStats textures;
+  /* Full image statistics. */
+  NamedSizeStats full_images;
+
+  /* Tiled image statistics. */
+  vector<ImageTileStats> tiled_images;
+  size_t tiled_images_size = 0;      /* Total size of currently loaded tiles. */
+  size_t tiled_images_peak_size = 0; /* Peak loaded tiles size. */
+  size_t overhead_size = 0;          /* Non-pixel memory overhead. */
+
+  /* Tile eviction statistics. */
+  ImageEvictionStats eviction;
 };
 
 /* Render process statistics. */
@@ -183,7 +215,7 @@ class RenderStats {
 class UpdateTimeStats {
  public:
   /* Generate full human-readable report. */
-  string full_report(int indent_level = 0);
+  string full_report(const int indent_level = 0);
 
   NamedTimeStats times;
 };
@@ -214,5 +246,3 @@ class SceneUpdateStats {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __RENDER_STATS_H__ */

@@ -1,13 +1,14 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Adapted from code copyright 2009-2010 NVIDIA Corporation
- * Modifications Copyright 2011-2022 Blender Foundation. */
+/* SPDX-FileCopyrightText: 2009-2010 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Adapted code from NVIDIA Corporation. */
 
 #include "bvh/node.h"
 
 #include "bvh/build.h"
 #include "bvh/bvh.h"
-
-#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -82,23 +83,16 @@ int BVHNode::getSubtreeSize(BVH_STAT stat) const
       assert(0); /* unknown mode */
   }
 
-  if (!is_leaf())
-    for (int i = 0; i < num_children(); i++)
+  if (!is_leaf()) {
+    for (int i = 0; i < num_children(); i++) {
       cnt += get_child(i)->getSubtreeSize(stat);
+    }
+  }
 
   return cnt;
 }
 
-void BVHNode::deleteSubtree()
-{
-  for (int i = 0; i < num_children(); i++)
-    if (get_child(i))
-      get_child(i)->deleteSubtree();
-
-  delete this;
-}
-
-float BVHNode::computeSubtreeSAHCost(const BVHParams &p, float probability) const
+float BVHNode::computeSubtreeSAHCost(const BVHParams &p, const float probability) const
 {
   float SAH = probability * p.cost(num_children(), num_triangles());
 
@@ -115,8 +109,8 @@ uint BVHNode::update_visibility()
 {
   if (!is_leaf() && visibility == 0) {
     InnerNode *inner = (InnerNode *)this;
-    BVHNode *child0 = inner->children[0];
-    BVHNode *child1 = inner->children[1];
+    BVHNode *child0 = inner->children[0].get();
+    BVHNode *child1 = inner->children[1].get();
 
     visibility = child0->update_visibility() | child1->update_visibility();
   }
@@ -128,8 +122,8 @@ void BVHNode::update_time()
 {
   if (!is_leaf()) {
     InnerNode *inner = (InnerNode *)this;
-    BVHNode *child0 = inner->children[0];
-    BVHNode *child1 = inner->children[1];
+    BVHNode *child0 = inner->children[0].get();
+    BVHNode *child1 = inner->children[1].get();
     child0->update_time();
     child1->update_time();
     time_from = min(child0->time_from, child1->time_from);
@@ -146,7 +140,9 @@ struct DumpTraversalContext {
   int id;
 };
 
-void dump_subtree(DumpTraversalContext *context, const BVHNode *node, const BVHNode *parent = NULL)
+void dump_subtree(DumpTraversalContext *context,
+                  const BVHNode *node,
+                  const BVHNode *parent = nullptr)
 {
   if (node->is_leaf()) {
     fprintf(context->stream,
@@ -160,7 +156,7 @@ void dump_subtree(DumpTraversalContext *context, const BVHNode *node, const BVHN
             node,
             context->id);
   }
-  if (parent != NULL) {
+  if (parent != nullptr) {
     fprintf(context->stream, "  node_%p -> node_%p;\n", parent, node);
   }
   context->id += 1;
@@ -175,7 +171,7 @@ void BVHNode::dump_graph(const char *filename)
 {
   DumpTraversalContext context;
   context.stream = fopen(filename, "w");
-  if (context.stream == NULL) {
+  if (context.stream == nullptr) {
     return;
   }
   context.id = 0;
@@ -187,23 +183,27 @@ void BVHNode::dump_graph(const char *filename)
 
 /* Inner Node */
 
-void InnerNode::print(int depth) const
+void InnerNode::print(const int depth) const
 {
-  for (int i = 0; i < depth; i++)
+  for (int i = 0; i < depth; i++) {
     printf("  ");
+  }
 
   printf("inner node %p\n", (void *)this);
 
-  if (children[0])
+  if (children[0]) {
     children[0]->print(depth + 1);
-  if (children[1])
+  }
+  if (children[1]) {
     children[1]->print(depth + 1);
+  }
 }
 
-void LeafNode::print(int depth) const
+void LeafNode::print(const int depth) const
 {
-  for (int i = 0; i < depth; i++)
+  for (int i = 0; i < depth; i++) {
     printf("  ");
+  }
 
   printf("leaf node %d to %d\n", lo, hi);
 }

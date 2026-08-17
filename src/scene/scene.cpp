@@ -1,16 +1,20 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "bvh/bvh.h"
+
 #include "device/device.h"
-#include "scene/alembic.h"
+
 #include "scene/background.h"
 #include "scene/bake.h"
 #include "scene/camera.h"
 #include "scene/curves.h"
+#include "scene/devicescene.h"
 #include "scene/film.h"
+#include "scene/hair.h"
 #include "scene/integrator.h"
 #include "scene/light.h"
 #include "scene/mesh.h"
@@ -20,112 +24,62 @@
 #include "scene/pointcloud.h"
 #include "scene/procedural.h"
 #include "scene/scene.h"
+#include "scene/scene_attributes.h"
 #include "scene/shader.h"
 #include "scene/svm.h"
 #include "scene/tables.h"
 #include "scene/volume.h"
+
 #include "session/session.h"
 
-#include "util/foreach.h"
 #include "util/guarded_allocator.h"
 #include "util/log.h"
 #include "util/progress.h"
 
 CCL_NAMESPACE_BEGIN
 
-DeviceScene::DeviceScene(Device *device)
-    : bvh_nodes(device, "bvh_nodes", MEM_GLOBAL),
-      bvh_leaf_nodes(device, "bvh_leaf_nodes", MEM_GLOBAL),
-      object_node(device, "object_node", MEM_GLOBAL),
-      prim_type(device, "prim_type", MEM_GLOBAL),
-      prim_visibility(device, "prim_visibility", MEM_GLOBAL),
-      prim_index(device, "prim_index", MEM_GLOBAL),
-      prim_object(device, "prim_object", MEM_GLOBAL),
-      prim_time(device, "prim_time", MEM_GLOBAL),
-      tri_verts(device, "tri_verts", MEM_GLOBAL),
-      tri_shader(device, "tri_shader", MEM_GLOBAL),
-      tri_vnormal(device, "tri_vnormal", MEM_GLOBAL),
-      tri_vindex(device, "tri_vindex", MEM_GLOBAL),
-      tri_patch(device, "tri_patch", MEM_GLOBAL),
-      tri_patch_uv(device, "tri_patch_uv", MEM_GLOBAL),
-      curves(device, "curves", MEM_GLOBAL),
-      curve_keys(device, "curve_keys", MEM_GLOBAL),
-      curve_segments(device, "curve_segments", MEM_GLOBAL),
-      patches(device, "patches", MEM_GLOBAL),
-      points(device, "points", MEM_GLOBAL),
-      points_shader(device, "points_shader", MEM_GLOBAL),
-      objects(device, "objects", MEM_GLOBAL),
-      object_motion_pass(device, "object_motion_pass", MEM_GLOBAL),
-      object_motion(device, "object_motion", MEM_GLOBAL),
-      object_flag(device, "object_flag", MEM_GLOBAL),
-      object_volume_step(device, "object_volume_step", MEM_GLOBAL),
-      object_prim_offset(device, "object_prim_offset", MEM_GLOBAL),
-      camera_motion(device, "camera_motion", MEM_GLOBAL),
-      attributes_map(device, "attributes_map", MEM_GLOBAL),
-      attributes_float(device, "attributes_float", MEM_GLOBAL),
-      attributes_float2(device, "attributes_float2", MEM_GLOBAL),
-      attributes_float3(device, "attributes_float3", MEM_GLOBAL),
-      attributes_float4(device, "attributes_float4", MEM_GLOBAL),
-      attributes_uchar4(device, "attributes_uchar4", MEM_GLOBAL),
-      light_distribution(device, "light_distribution", MEM_GLOBAL),
-      lights(device, "lights", MEM_GLOBAL),
-      light_background_marginal_cdf(device, "light_background_marginal_cdf", MEM_GLOBAL),
-      light_background_conditional_cdf(device, "light_background_conditional_cdf", MEM_GLOBAL),
-      light_tree_nodes(device, "light_tree_nodes", MEM_GLOBAL),
-      light_tree_emitters(device, "light_tree_emitters", MEM_GLOBAL),
-      light_to_tree(device, "light_to_tree", MEM_GLOBAL),
-      object_lookup_offset(device, "object_lookup_offset", MEM_GLOBAL),
-      triangle_to_tree(device, "triangle_to_tree", MEM_GLOBAL),
-      particles(device, "particles", MEM_GLOBAL),
-      svm_nodes(device, "svm_nodes", MEM_GLOBAL),
-      shaders(device, "shaders", MEM_GLOBAL),
-      lookup_table(device, "lookup_table", MEM_GLOBAL),
-      sample_pattern_lut(device, "sample_pattern_lut", MEM_GLOBAL),
-      ies_lights(device, "ies", MEM_GLOBAL),
-      clipping_planes(device, "clipping_planes", MEM_GLOBAL)
-{
-  memset((void *)&data, 0, sizeof(data));
-}
-
-Scene::Scene(const SceneParams &params_, Device *device_)
+Scene ::Scene(const SceneParams &params_, Device *device)
     : name("Scene"),
-      bvh(NULL),
-      default_surface(NULL),
-      default_volume(NULL),
-      default_light(NULL),
-      default_background(NULL),
-      default_empty(NULL),
-      device(device_),
-      dscene(new DeviceScene(device)),
+      default_surface(nullptr),
+      default_volume(nullptr),
+      default_light(nullptr),
+      default_background(nullptr),
+      default_empty(nullptr),
+      device(device),
+      dscene(device),
       params(params_),
-      update_stats(NULL),
+      update_stats(nullptr),
       kernels_loaded(false),
-      /* TODO(sergey): Check if it's indeed optimal value for the split kernel. */
+      /* TODO(sergey): Check if it's indeed optimal value for the split kernel.
+       */
       max_closure_global(1)
 {
   memset((void *)&dscene->data, 0, sizeof(dscene->data));
 
-  shader_manager = ShaderManager::create(
-      device->info.has_osl ? params.shadingsystem : SHADINGSYSTEM_SVM, device);
+  osl_manager = make_unique<OSLManager>(device);
+  shader_manager = ShaderManager::create(device->info.has_osl ? params.shadingsystem :
+                                                                SHADINGSYSTEM_SVM);
 
-  light_manager = new LightManager();
-  geometry_manager = new GeometryManager();
-  object_manager = new ObjectManager();
-  image_manager = new ImageManager(device->info);
-  particle_system_manager = new ParticleSystemManager();
-  bake_manager = new BakeManager();
-  procedural_manager = new ProceduralManager();
+  light_manager = make_unique<LightManager>();
+  geometry_manager = make_unique<GeometryManager>();
+  object_manager = make_unique<ObjectManager>();
+  image_manager = make_unique<ImageManager>(device->info, params);
+  particle_system_manager = make_unique<ParticleSystemManager>();
+  bake_manager = make_unique<BakeManager>();
+  procedural_manager = make_unique<ProceduralManager>();
+  volume_manager = make_unique<VolumeManager>();
 
   /* Create nodes after managers, since create_node() can tag the managers. */
   camera = create_node<Camera>();
   dicing_camera = create_node<Camera>();
-  lookup_tables = new LookupTables();
+  lookup_tables = make_unique<LookupTables>();
   film = create_node<Film>();
   background = create_node<Background>();
   integrator = create_node<Integrator>();
+  scene_attribute = create_node<SceneAttributes>();
 
-  film->add_default(this);
-  shader_manager->add_default(this);
+  ccl::Film::add_default(this);
+  ccl::ShaderManager::add_default(this);
 }
 
 Scene::~Scene()
@@ -135,117 +89,108 @@ Scene::~Scene()
 
 void Scene::free_memory(bool final)
 {
-  delete bvh;
-  bvh = NULL;
+  bvh.reset();
 
-  /* The order of deletion is important to make sure data is freed based on possible dependencies
-   * as the Nodes' reference counts are decremented in the destructors:
+  /* The order of deletion is important to make sure data is freed based on
+   * possible dependencies as the Nodes' reference counts are decremented in the
+   * destructors:
    *
    * - Procedurals can create and hold pointers to any other types.
    * - Objects can hold pointers to Geometries and ParticleSystems
    * - Lights and Geometries can hold pointers to Shaders.
    *
-   * Similarly, we first delete all nodes and their associated device data, and then the managers
-   * and their associated device data.
+   * Similarly, we first delete all nodes and their associated device data, and
+   * then the managers and their associated device data.
    */
-  foreach (Procedural *p, procedurals)
-    delete p;
-  foreach (Object *o, objects)
-    delete o;
-  foreach (Geometry *g, geometry)
-    delete g;
-  foreach (ParticleSystem *p, particle_systems)
-    delete p;
-  foreach (Light *l, lights)
-    delete l;
-  foreach (Pass *p, passes)
-    delete p;
-
-  geometry.clear();
-  objects.clear();
-  lights.clear();
-  particle_systems.clear();
   procedurals.clear();
+  objects.clear();
+  geometry.clear();
+  particle_systems.clear();
   passes.clear();
   clipping_planes.clear();
 
   if (device) {
-    camera->device_free(device, dscene, this);
-    film->device_free(device, dscene, this);
-    background->device_free(device, dscene);
-    integrator->device_free(device, dscene, true);
+    camera->device_free(device, &dscene, this);
+    film->device_free(device, &dscene, this);
+    background->device_free(device, &dscene);
+    integrator->device_free(device, &dscene, true);
+    scene_attribute->device_free(device, &dscene, true);
   }
 
   if (final) {
-    delete camera;
-    delete dicing_camera;
-    delete film;
-    delete background;
-    delete integrator;
+    cameras.clear();
+    integrators.clear();
+    scene_attributes.clear();
+    films.clear();
+    backgrounds.clear();
+
+    camera = nullptr;
+    dicing_camera = nullptr;
+    integrator = nullptr;
+    scene_attribute = nullptr;
+    film = nullptr;
+    background = nullptr;
   }
 
-  /* Delete Shaders after every other nodes to ensure that we do not try to decrement the reference
-   * count on some dangling pointer. */
-  foreach (Shader *s, shaders)
-    delete s;
-
+  /* Delete Shaders after every other nodes to ensure that we do not try to
+   * decrement the reference count on some dangling pointer. */
   shaders.clear();
 
-  /* Now that all nodes have been deleted, we can safely delete managers and device data. */
+  /* Now that all nodes have been deleted, we can safely delete managers and
+   * device data. */
   if (device) {
-    object_manager->device_free(device, dscene, true);
-    geometry_manager->device_free(device, dscene, true);
-    shader_manager->device_free(device, dscene, this);
-    light_manager->device_free(device, dscene);
+    object_manager->device_free(device, &dscene, true);
+    geometry_manager->device_free(device, &dscene, true);
+    shader_manager->device_free(device, &dscene, this);
+    osl_manager->device_free(device, &dscene, this);
+    light_manager->device_free(device, &dscene);
+    particle_system_manager->device_free(device, &dscene);
+    bake_manager->device_free(device, &dscene);
+    volume_manager->device_free(&dscene);
 
-    particle_system_manager->device_free(device, dscene);
-
-    bake_manager->device_free(device, dscene);
-
-    if (final)
-      image_manager->device_free(device);
-    else
-      image_manager->device_free_builtin(device);
+    if (final) {
+      image_manager->device_free(this);
+    }
+    else {
+      image_manager->device_free_builtin(this);
+    }
 
     lookup_tables->device_free(device, dscene);
   }
 
   if (final) {
-    delete lookup_tables;
-    delete object_manager;
-    delete geometry_manager;
-    delete shader_manager;
-    delete light_manager;
-    delete particle_system_manager;
-    delete image_manager;
-    delete bake_manager;
-    delete update_stats;
-    delete procedural_manager;
-    delete dscene;
+    lookup_tables.reset();
+    object_manager.reset();
+    geometry_manager.reset();
+    shader_manager.reset();
+    osl_manager.reset();
+    light_manager.reset();
+    particle_system_manager.reset();
+    image_manager.reset();
+    bake_manager.reset();
+    update_stats.reset();
+    procedural_manager.reset();
+    volume_manager.reset();
   }
 }
 
 void Scene::device_update(Device *device_, Progress &progress)
 {
-  if (!device)
+  if (!device) {
     device = device_;
-
-  bool print_stats = need_data_update();
-
-  if (update_stats) {
-    update_stats->clear();
   }
 
-  scoped_callback_timer timer([this, print_stats](double time) {
+  const bool print_stats = need_data_update();
+  bool kernels_reloaded = false;
+
+  while (true) {
     if (update_stats) {
-      update_stats->scene.times.add_entry({"device_update", time});
-
-      if (print_stats) {
-        printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
-      }
+      update_stats->clear();
     }
-  });
 
+    const scoped_callback_timer timer([this, print_stats](double time) {
+      if (update_stats) {
+        update_stats->scene.times.add_entry({"device_update", time});
   object_manager->prune(this);
   geometry_manager->prune(this);
 
@@ -259,50 +204,116 @@ void Scene::device_update(Device *device_, Progress &progress)
    * - Lookup tables are done a second time to handle film tables
    */
 
-  if (film->update_lightgroups(this)) {
-    light_manager->tag_update(this, ccl::LightManager::LIGHT_MODIFIED);
-    object_manager->tag_update(this, ccl::ObjectManager::OBJECT_MODIFIED);
-  }
-  if (film->exposure_is_modified()) {
-    integrator->tag_modified();
+        if (print_stats) {
+          printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
+        }
+      }
+    });
+
+    /* The order of updates is important, because there's dependencies between
+     * the different managers, using data computed by previous managers. */
+
+    if (film->update_lightgroups(this)) {
+      light_manager->tag_update(this, ccl::LightManager::LIGHT_MODIFIED);
+      object_manager->tag_update(this, ccl::ObjectManager::OBJECT_MODIFIED);
+      background->tag_modified();
+    }
+    if (film->exposure_is_modified()) {
+      integrator->tag_modified();
+    }
+
+    /* Compile shaders and get information about features they used. */
+    progress.set_status("Updating Shaders");
+    osl_manager->device_update_pre(device, this);
+    shader_manager->device_update_pre(device, &dscene, this, progress);
+
+    if (progress.get_cancel() || device->have_error()) {
+      return;
+    }
+
+    /* Passes. After shader manager as this depends on the shaders. */
+    film->update_passes(this);
+
+    /* Update kernel features. After shaders and passes since those affect features. */
+    update_kernel_features();
+
+    /* Load render kernels, before uploading most data to the GPU, and before displacement and
+     * background light need to run kernels.
+     *
+     * Do it outside of the scene mutex since the heavy part of the loading (i.e. kernel
+     * compilation) does not depend on the scene and some other functionality (like display
+     * driver) might be waiting on the scene mutex to synchronize display pass.
+     *
+     * This does mean the scene might have gotten updated in the meantime, in which case
+     * we have to redo the first part of the scene update. */
+    const uint kernel_features = dscene.data.kernel_features;
+    scene_updated_while_loading_kernels = false;
+    if (!kernels_loaded || loaded_kernel_features != kernel_features) {
+      mutex.unlock();
+      kernels_reloaded |= load_kernels(progress);
+      mutex.lock();
+    }
+
+    if (progress.get_cancel() || device->have_error()) {
+      return;
+    }
+
+    if (!scene_updated_while_loading_kernels) {
+      break;
+    }
   }
 
-  progress.set_status("Updating Shaders");
-  shader_manager->device_update(device, dscene, this, progress);
+  /* Upload shaders to GPU and compile OSL kernels, after kernels have been loaded. */
+  shader_manager->device_update_post(device, &dscene, this, progress);
+  osl_manager->device_update_post(device, this, progress, kernels_reloaded);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
   progress.set_status("Updating Clipping Planes");
   object_manager->device_update_clipping_planes(device, dscene, this, progress);
 
   procedural_manager->update(this, progress);
 
-  if (progress.get_cancel())
+  if (progress.get_cancel()) {
     return;
+  }
 
   progress.set_status("Updating Background");
   background->device_update(device, dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  progress.set_status("Updating Scene Attribute");
+  scene_attribute->device_update(device, &dscene, this);
+
+  if (progress.get_cancel() || device->have_error()) {
+    return;
+  }
+
+  /* Camera will be used by adaptive subdivision, so do early. */
   progress.set_status("Updating Camera");
   camera->device_update(device, dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
   geometry_manager->device_update_preprocess(device, this, progress);
-
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  /* Update objects after geometry preprocessing. */
   progress.set_status("Updating Objects");
   object_manager->device_update(device, dscene, this, progress);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
   progress.set_status("Updating Particle Systems");
   particle_system_manager->device_update(device, dscene, this, progress);
@@ -313,68 +324,101 @@ void Scene::device_update(Device *device_, Progress &progress)
   progress.set_status("Updating Lookup Tables");
   lookup_tables->device_update(device, dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  /* Camera and shaders must be ready here for adaptive subdivision and displacement. */
   progress.set_status("Updating Meshes");
   geometry_manager->device_update(device, dscene, this, progress);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  /* Update object flags with final geometry. */
   progress.set_status("Updating Objects Flags");
   object_manager->device_update_flags(device, dscene, this, progress);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  /* Update BVH primitive objects with final geometry. */
   progress.set_status("Updating Primitive Offsets");
   object_manager->device_update_prim_offsets(device, dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  /* Images last, as they should be more likely to use host memory fallback than geometry.
+   * Some images may have been uploaded early for displacement already at this point. */
   progress.set_status("Updating Images");
   image_manager->device_update(device, this, progress);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
+
+  /* Evaluate volume shader to build volume octrees. */
+  progress.set_status("Updating Volume");
+  volume_manager->device_update(device, &dscene, this, progress);
+
+  if (progress.get_cancel() || device->have_error()) {
+    return;
+  }
 
   progress.set_status("Updating Camera Volume");
-  camera->device_update_volume(device, dscene, this);
+  camera->device_update_volume(device, &dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  progress.set_status("Updating Lookup Tables");
+  lookup_tables->device_update(device, &dscene, this);
+
+  if (progress.get_cancel() || device->have_error()) {
+    return;
+  }
+
+  /* Light manager needs shaders and final meshes for triangles in light tree. */
   progress.set_status("Updating Lights");
   light_manager->device_update(device, dscene, this, progress);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
   progress.set_status("Updating Integrator");
   integrator->device_update(device, dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
   progress.set_status("Updating Film");
   film->device_update(device, dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
+  /* Update lookup tables a second time for film tables. */
   progress.set_status("Updating Lookup Tables");
   lookup_tables->device_update(device, dscene, this);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
   progress.set_status("Updating Baking");
   bake_manager->device_update(device, dscene, this, progress);
 
-  if (progress.get_cancel() || device->have_error())
+  if (progress.get_cancel() || device->have_error()) {
     return;
+  }
 
   if (device->have_error() == false) {
     dscene->data.volume_stack_size = get_volume_stack_size();
@@ -385,46 +429,57 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   device->optimize_for_scene(this);
 
-  if (print_stats) {
-    size_t mem_used = util_guarded_get_mem_used();
-    size_t mem_peak = util_guarded_get_mem_peak();
+  if (need_motion() == MOTION_PASS_INTERACTIVE) {
+    /* Swap current camera/object/vertex positions to previous positions for next frame. */
+    camera->update_interactive_motion();
+    object_manager->update_interactive_motion(this);
+    geometry_manager->update_interactive_motion(this);
+  }
 
-    VLOG_INFO << "System memory statistics after full device sync:\n"
-              << "  Usage: " << string_human_readable_number(mem_used) << " ("
-              << string_human_readable_size(mem_used) << ")\n"
-              << "  Peak: " << string_human_readable_number(mem_peak) << " ("
-              << string_human_readable_size(mem_peak) << ")";
+  if (print_stats) {
+    const size_t mem_used = util_guarded_get_mem_used();
+    const size_t mem_peak = util_guarded_get_mem_peak();
+
+    LOG_INFO << "System memory statistics after full device sync:\n"
+             << "  Usage: " << string_human_readable_number(mem_used) << " ("
+             << string_human_readable_size(mem_used) << ")\n"
+             << "  Peak: " << string_human_readable_number(mem_peak) << " ("
+             << string_human_readable_size(mem_peak) << ")";
   }
 }
 
 Scene::MotionType Scene::need_motion() const
 {
-  if (integrator->get_motion_blur())
+  if (integrator->get_motion_blur()) {
     return MOTION_BLUR;
-  else if (Pass::contains(passes, PASS_MOTION))
-    return MOTION_PASS;
-  else
-    return MOTION_NONE;
+  }
+  const bool denoiser_motion = integrator->get_use_denoise() &&
+                               (integrator->get_denoiser_passes() &
+                                (DENOISER_PASS_MOTION | DENOISER_PASS_BACKWARD_MOTION)) != 0;
+  if (denoiser_motion || (Pass::contains(passes, PASS_MOTION) ||
+                          Pass::contains(passes, PASS_DENOISING_BACKWARD_MOTION)))
+  {
+    return params.background ? MOTION_PASS : MOTION_PASS_INTERACTIVE;
+  }
+  return MOTION_NONE;
 }
 
 float Scene::motion_shutter_time()
 {
-  if (need_motion() == Scene::MOTION_PASS)
+  if (need_motion() == Scene::MOTION_PASS || need_motion() == Scene::MOTION_PASS_INTERACTIVE) {
     return 2.0f;
-  else
-    return camera->get_shuttertime();
+  }
+  return camera->get_shuttertime();
 }
 
-bool Scene::need_global_attribute(AttributeStandard std)
+bool Scene::need_global_attribute(AttributeStandard std) const
 {
-  if (std == ATTR_STD_UV)
+  if (std == ATTR_STD_UV) {
     return Pass::contains(passes, PASS_UV);
-  else if (std == ATTR_STD_MOTION_VERTEX_POSITION)
-    return need_motion() != MOTION_NONE;
-  else if (std == ATTR_STD_MOTION_VERTEX_NORMAL)
-    return need_motion() == MOTION_BLUR;
-  else if (std == ATTR_STD_VOLUME_VELOCITY || std == ATTR_STD_VOLUME_VELOCITY_X ||
-           std == ATTR_STD_VOLUME_VELOCITY_Y || std == ATTR_STD_VOLUME_VELOCITY_Z) {
+  }
+  if (std == ATTR_STD_VOLUME_VELOCITY || std == ATTR_STD_VOLUME_VELOCITY_X ||
+      std == ATTR_STD_VOLUME_VELOCITY_Y || std == ATTR_STD_VOLUME_VELOCITY_Z)
+  {
     return need_motion() != MOTION_NONE;
   }
 
@@ -433,9 +488,15 @@ bool Scene::need_global_attribute(AttributeStandard std)
 
 void Scene::need_global_attributes(AttributeRequestSet &attributes)
 {
-  for (int std = ATTR_STD_NONE; std < ATTR_STD_NUM; std++)
-    if (need_global_attribute((AttributeStandard)std))
+  for (int std = ATTR_STD_NONE; std < ATTR_STD_NUM; std++) {
+    if (need_global_attribute((AttributeStandard)std)) {
       attributes.add((AttributeStandard)std);
+    }
+  }
+
+  for (const Shader *shader : shaders) {
+    attributes.add(shader->global_attributes);
+  }
 }
 
 bool Scene::need_update()
@@ -445,12 +506,12 @@ bool Scene::need_update()
 
 bool Scene::need_data_update()
 {
-  return (background->is_modified() || image_manager->need_update() || object_manager->need_clipping_plane_update ||
-          object_manager->need_update() || geometry_manager->need_update() ||
-          light_manager->need_update() || lookup_tables->need_update() ||
-          integrator->is_modified() || shader_manager->need_update() ||
-          particle_system_manager->need_update() || bake_manager->need_update() ||
-          film->is_modified() || procedural_manager->need_update());
+  return (
+      background->is_modified() || image_manager->need_update() || object_manager->need_update() ||
+      geometry_manager->need_update() || light_manager->need_update() ||
+      lookup_tables->need_update() || integrator->is_modified() || shader_manager->need_update() ||
+      particle_system_manager->need_update() || bake_manager->need_update() ||
+      film->is_modified() || procedural_manager->need_update() || scene_attribute->is_modified());
 }
 
 bool Scene::need_reset(const bool check_camera)
@@ -460,8 +521,8 @@ bool Scene::need_reset(const bool check_camera)
 
 void Scene::reset()
 {
-  shader_manager->reset(this);
-  shader_manager->add_default(this);
+  osl_manager->reset(this);
+  ShaderManager::add_default(this);
 
   /* ensure all objects are updated */
   camera->tag_modified();
@@ -471,6 +532,7 @@ void Scene::reset()
 
   background->tag_update(this);
   integrator->tag_update(this, Integrator::UPDATE_ALL);
+  scene_attribute->tag_update(this, SceneAttributes::UPDATE_ALL);
   object_manager->tag_update(this, ObjectManager::UPDATE_ALL);
   geometry_manager->tag_update(this, GeometryManager::UPDATE_ALL);
   light_manager->tag_update(this, LightManager::UPDATE_ALL);
@@ -486,13 +548,13 @@ void Scene::device_free()
 void Scene::collect_statistics(RenderStats *stats)
 {
   geometry_manager->collect_statistics(this, stats);
-  image_manager->collect_statistics(stats);
+  image_manager->collect_statistics(stats, this);
 }
 
 void Scene::enable_update_stats()
 {
   if (!update_stats) {
-    update_stats = new SceneUpdateStats();
+    update_stats = make_unique<SceneUpdateStats>();
   }
 }
 
@@ -502,17 +564,16 @@ void Scene::update_kernel_features()
     return;
   }
 
-  thread_scoped_lock scene_lock(mutex);
-
   /* These features are not being tweaked as often as shaders,
    * so could be done selective magic for the viewport as well. */
   uint kernel_features = shader_manager->get_kernel_features(this);
 
-  bool use_motion = need_motion() == Scene::MotionType::MOTION_BLUR;
+  const bool use_motion = need_motion() == Scene::MotionType::MOTION_BLUR;
   kernel_features |= KERNEL_FEATURE_PATH_TRACING;
-  if (params.hair_shape == CURVE_THICK) {
-    kernel_features |= KERNEL_FEATURE_HAIR_THICK;
-  }
+
+  /* Track the max prim count in case the backend needs to rebuild BVHs or
+   * kernels to support different limits. */
+  size_t kernel_max_prim_count = 0;
 
   /* Figure out whether the scene will use shader ray-trace we need at least
    * one caustic light, one caustic caster and one caustic receiver to use
@@ -521,7 +582,7 @@ void Scene::update_kernel_features()
   bool has_caustics_caster = false;
   bool has_caustics_light = false;
 
-  foreach (Object *object, objects) {
+  for (Object *object : objects) {
     if (object->get_is_caustics_caster()) {
       has_caustics_caster = true;
     }
@@ -534,34 +595,43 @@ void Scene::update_kernel_features()
         kernel_features |= KERNEL_FEATURE_OBJECT_MOTION;
       }
     }
-    if (object->get_is_shadow_catcher()) {
+    if (object->get_is_shadow_catcher() && !geom->is_light()) {
       kernel_features |= KERNEL_FEATURE_SHADOW_CATCHER;
     }
-    if (geom->is_mesh()) {
-#ifdef WITH_OPENSUBDIV
-      Mesh *mesh = static_cast<Mesh *>(geom);
-      if (mesh->get_subdivision_type() != Mesh::SUBDIVISION_NONE) {
-        kernel_features |= KERNEL_FEATURE_PATCH_EVALUATION;
-      }
-#endif
-    }
-    else if (geom->is_hair()) {
-      kernel_features |= KERNEL_FEATURE_HAIR;
+    if (geom->is_hair()) {
+      const Hair *hair = static_cast<const Hair *>(geom);
+      kernel_features |= (hair->curve_shape == CURVE_RIBBON) ? KERNEL_FEATURE_HAIR_RIBBON :
+                                                               KERNEL_FEATURE_HAIR_THICK;
+      kernel_max_prim_count = max(kernel_max_prim_count, hair->num_segments());
     }
     else if (geom->is_pointcloud()) {
       kernel_features |= KERNEL_FEATURE_POINTCLOUD;
+      kernel_max_prim_count = max(kernel_max_prim_count,
+                                  static_cast<PointCloud *>(geom)->num_points());
+    }
+    else if (geom->is_mesh()) {
+      kernel_max_prim_count = max(kernel_max_prim_count,
+                                  static_cast<Mesh *>(geom)->num_triangles());
+    }
+    else if (geom->is_light()) {
+      const Light *light = static_cast<const Light *>(object->get_geometry());
+      if (light->get_use_caustics()) {
+        has_caustics_light = true;
+      }
+    }
+    if (object->has_light_linking()) {
+      kernel_features |= KERNEL_FEATURE_LIGHT_LINKING;
+    }
+    if (object->has_shadow_linking()) {
+      kernel_features |= KERNEL_FEATURE_SHADOW_LINKING;
     }
   }
 
-  foreach (Light *light, lights) {
-    if (light->get_use_caustics()) {
-      has_caustics_light = true;
-    }
-  }
-
-  dscene->data.integrator.use_caustics = false;
-  if (has_caustics_caster && has_caustics_receiver && has_caustics_light) {
-    dscene->data.integrator.use_caustics = true;
+  dscene.data.integrator.use_caustics = false;
+  if (device->info.has_mnee() && has_caustics_caster && has_caustics_receiver &&
+      has_caustics_light)
+  {
+    dscene.data.integrator.use_caustics = true;
     kernel_features |= KERNEL_FEATURE_MNEE;
   }
 
@@ -575,13 +645,25 @@ void Scene::update_kernel_features()
 
   kernel_features |= film->get_kernel_features(this);
   kernel_features |= integrator->get_kernel_features();
+  kernel_features |= camera->get_kernel_features();
 
   dscene->data.kernel_features = kernel_features;
 
-  /* Currently viewport render is faster with higher max_closures, needs investigating. */
+  /* Currently viewport render is faster with higher max_closures, needs
+   * investigating. */
   const uint max_closures = (params.background) ? get_max_closure_count() : MAX_CLOSURE;
-  dscene->data.max_closures = max_closures;
-  dscene->data.max_shaders = shaders.size();
+  dscene.data.max_closures = max_closures;
+  dscene.data.max_shaders = shaders.size();
+
+  /* Inform the device of the BVH limits. If this returns true, all BVHs
+   * and kernels need to be rebuilt. */
+  if (device->set_bvh_limits(objects.size(), kernel_max_prim_count)) {
+    kernels_loaded = false;
+    for (Geometry *geom : geometry) {
+      geom->need_update_rebuild = true;
+      geom->tag_modified();
+    }
+  }
 }
 
 bool Scene::update(Progress &progress)
@@ -597,66 +679,75 @@ bool Scene::update(Progress &progress)
   return true;
 }
 
+bool Scene::update_camera_resolution(Progress &progress, int width, int height)
+{
+  bool update_data = false;
+
+  if (camera->set_screen_size(width, height)) {
+    camera->device_update(device, &dscene, this);
+    update_data = true;
+  }
+
+  if (integrator->get_use_pixel_jitter()) {
+    integrator->tag_use_pixel_jitter_modified();
+
+    integrator->device_update(device, &dscene, this);
+    update_data = true;
+  }
+
+  if (update_data) {
+    progress.set_status("Updating Device", "Writing constant memory");
+    device->const_copy_to("data", &dscene.data, sizeof(dscene.data));
+  }
+  return update_data;
+}
+
 static void log_kernel_features(const uint features)
 {
-  VLOG_INFO << "Requested features:\n";
-  VLOG_INFO << "Use BSDF " << string_from_bool(features & KERNEL_FEATURE_NODE_BSDF) << "\n";
-  VLOG_INFO << "Use Emission " << string_from_bool(features & KERNEL_FEATURE_NODE_EMISSION)
-            << "\n";
-  VLOG_INFO << "Use Volume " << string_from_bool(features & KERNEL_FEATURE_NODE_VOLUME) << "\n";
-  VLOG_INFO << "Use Bump " << string_from_bool(features & KERNEL_FEATURE_NODE_BUMP) << "\n";
-  VLOG_INFO << "Use Voronoi " << string_from_bool(features & KERNEL_FEATURE_NODE_VORONOI_EXTRA)
-            << "\n";
-  VLOG_INFO << "Use Shader Raytrace " << string_from_bool(features & KERNEL_FEATURE_NODE_RAYTRACE)
-            << "\n";
-  VLOG_INFO << "Use MNEE" << string_from_bool(features & KERNEL_FEATURE_MNEE) << "\n";
-  VLOG_INFO << "Use Transparent " << string_from_bool(features & KERNEL_FEATURE_TRANSPARENT)
-            << "\n";
-  VLOG_INFO << "Use Denoising " << string_from_bool(features & KERNEL_FEATURE_DENOISING) << "\n";
-  VLOG_INFO << "Use Path Tracing " << string_from_bool(features & KERNEL_FEATURE_PATH_TRACING)
-            << "\n";
-  VLOG_INFO << "Use Hair " << string_from_bool(features & KERNEL_FEATURE_HAIR) << "\n";
-  VLOG_INFO << "Use Pointclouds " << string_from_bool(features & KERNEL_FEATURE_POINTCLOUD)
-            << "\n";
-  VLOG_INFO << "Use Object Motion " << string_from_bool(features & KERNEL_FEATURE_OBJECT_MOTION)
-            << "\n";
-  VLOG_INFO << "Use Baking " << string_from_bool(features & KERNEL_FEATURE_BAKING) << "\n";
-  VLOG_INFO << "Use Subsurface " << string_from_bool(features & KERNEL_FEATURE_SUBSURFACE) << "\n";
-  VLOG_INFO << "Use Volume " << string_from_bool(features & KERNEL_FEATURE_VOLUME) << "\n";
-  VLOG_INFO << "Use Patch Evaluation "
-            << string_from_bool(features & KERNEL_FEATURE_PATCH_EVALUATION) << "\n";
-  VLOG_INFO << "Use Shadow Catcher " << string_from_bool(features & KERNEL_FEATURE_SHADOW_CATCHER)
-            << "\n";
+  LOG_INFO << "Requested features:";
+  LOG_INFO << "Use BSDF " << string_from_bool(features & KERNEL_FEATURE_NODE_BSDF);
+  LOG_INFO << "Use Emission " << string_from_bool(features & KERNEL_FEATURE_NODE_EMISSION);
+  LOG_INFO << "Use Volume " << string_from_bool(features & KERNEL_FEATURE_NODE_VOLUME);
+  LOG_INFO << "Use Bump " << string_from_bool(features & KERNEL_FEATURE_NODE_BUMP);
+  LOG_INFO << "Use Voronoi " << string_from_bool(features & KERNEL_FEATURE_NODE_VORONOI_EXTRA);
+  LOG_INFO << "Use Shader Raytrace " << string_from_bool(features & KERNEL_FEATURE_NODE_RAYTRACE);
+  LOG_INFO << "Use MNEE " << string_from_bool(features & KERNEL_FEATURE_MNEE);
+  LOG_INFO << "Use Transparent " << string_from_bool(features & KERNEL_FEATURE_TRANSPARENT);
+  LOG_INFO << "Use Denoising " << string_from_bool(features & KERNEL_FEATURE_DENOISING);
+  LOG_INFO << "Use Path Tracing " << string_from_bool(features & KERNEL_FEATURE_PATH_TRACING);
+  LOG_INFO << "Use Hair " << string_from_bool(features & KERNEL_FEATURE_HAIR);
+  LOG_INFO << "Use Pointclouds " << string_from_bool(features & KERNEL_FEATURE_POINTCLOUD);
+  LOG_INFO << "Use Object Motion " << string_from_bool(features & KERNEL_FEATURE_OBJECT_MOTION);
+  LOG_INFO << "Use Baking " << string_from_bool(features & KERNEL_FEATURE_BAKING);
+  LOG_INFO << "Use Subsurface " << string_from_bool(features & KERNEL_FEATURE_SUBSURFACE);
+  LOG_INFO << "Use Volume " << string_from_bool(features & KERNEL_FEATURE_VOLUME);
+  LOG_INFO << "Use Shadow Catcher " << string_from_bool(features & KERNEL_FEATURE_SHADOW_CATCHER);
+  LOG_INFO << "Use Portal Node " << string_from_bool(features & KERNEL_FEATURE_NODE_PORTAL);
 }
 
 bool Scene::load_kernels(Progress &progress)
 {
-  update_kernel_features();
+  progress.set_status("Loading render kernels (may take a few minutes the first time)");
 
-  const uint kernel_features = dscene->data.kernel_features;
+  const scoped_timer timer;
 
-  if (!kernels_loaded || loaded_kernel_features != kernel_features) {
-    progress.set_status("Loading render kernels (may take a few minutes the first time)");
-
-    scoped_timer timer;
-
-    log_kernel_features(kernel_features);
-    if (!device->load_kernels(kernel_features)) {
-      string message = device->error_message();
-      if (message.empty())
-        message = "Failed loading render kernel, see console for errors";
-
-      progress.set_error(message);
-      progress.set_status(message);
-      progress.set_update();
-      return false;
+  const uint kernel_features = dscene.data.kernel_features;
+  log_kernel_features(kernel_features);
+  if (!device->load_kernels(kernel_features)) {
+    string message = device->error_message();
+    if (message.empty()) {
+      message = "Failed loading render kernel, see console for errors";
     }
 
-    kernels_loaded = true;
-    loaded_kernel_features = kernel_features;
-    return true;
+    progress.set_error(message);
+    progress.set_status(message);
+    progress.set_update();
+    return false;
   }
-  return false;
+
+  kernels_loaded = true;
+  loaded_kernel_features = kernel_features;
+  return true;
 }
 
 int Scene::get_max_closure_count()
@@ -671,7 +762,7 @@ int Scene::get_max_closure_count()
   for (int i = 0; i < shaders.size(); i++) {
     Shader *shader = shaders[i];
     if (shader->reference_count()) {
-      int num_closures = shader->graph->get_num_closures();
+      const int num_closures = shader->graph->get_num_closures();
       max_closures = max(max_closures, num_closures);
     }
   }
@@ -682,8 +773,8 @@ int Scene::get_max_closure_count()
      * closures discarded due to mixing or low weights. We need to limit
      * to MAX_CLOSURE as this is hardcoded in CPU/mega kernels, and it
      * avoids excessive memory usage for split kernels. */
-    VLOG_WARNING << "Maximum number of closures exceeded: " << max_closure_global << " > "
-                 << MAX_CLOSURE;
+    LOG_WARNING << "Maximum number of closures exceeded: " << max_closure_global << " > "
+                << MAX_CLOSURE;
 
     max_closure_global = MAX_CLOSURE;
   }
@@ -696,13 +787,14 @@ int Scene::get_volume_stack_size() const
   int volume_stack_size = 0;
 
   /* Space for background volume and terminator.
-   * Don't do optional here because camera ray initialization expects that there is space for
-   * at least those elements (avoiding extra condition to check if there is actual volume or not).
+   * Don't do optional here because camera ray initialization expects that there
+   * is space for at least those elements (avoiding extra condition to check if
+   * there is actual volume or not).
    */
   volume_stack_size += 2;
 
-  /* Quick non-expensive check. Can over-estimate maximum possible nested level, but does not
-   * require expensive calculation during pre-processing. */
+  /* Quick non-expensive check. Can over-estimate maximum possible nested level,
+   * but does not require expensive calculation during pre-processing. */
   bool has_volume_object = false;
   for (const Object *object : objects) {
     if (!object->get_geometry()->has_volume) {
@@ -710,10 +802,12 @@ int Scene::get_volume_stack_size() const
     }
 
     if (object->intersects_volume) {
-      /* Object intersects another volume, assume it's possible to go deeper in the stack. */
-      /* TODO(sergey): This might count nesting twice (A intersects B and B intersects A), but
-       * can't think of a computationally cheap algorithm. Dividing my 2 doesn't work because of
-       * Venn diagram example with 3 circles. */
+      /* Object intersects another volume, assume it's possible to go deeper in
+       * the stack. */
+      /* TODO(sergey): This might count nesting twice (A intersects B and B
+       * intersects A), but can't think of a computationally cheap algorithm.
+       * Dividing my 2 doesn't work because of Venn diagram example with 3
+       * circles. */
       ++volume_stack_size;
     }
     else if (!has_volume_object) {
@@ -730,7 +824,7 @@ int Scene::get_volume_stack_size() const
 
   volume_stack_size = min(volume_stack_size, MAX_VOLUME_STACK_SIZE);
 
-  VLOG_WORK << "Detected required volume stack size " << volume_stack_size;
+  LOG_DEBUG << "Detected required volume stack size " << volume_stack_size;
 
   return volume_stack_size;
 }
@@ -740,7 +834,10 @@ bool Scene::has_shadow_catcher()
   if (shadow_catcher_modified_) {
     has_shadow_catcher_ = false;
     for (Object *object : objects) {
-      if (object->get_is_shadow_catcher()) {
+      /* Shadow catcher flags on lights only controls effect on other objects, it's
+       * not catching shadows itself. This is on by default, so ignore to avoid
+       * performance impact when there is no actual shadow catcher. */
+      if (object->get_is_shadow_catcher() && !object->get_geometry()->is_light()) {
         has_shadow_catcher_ = true;
         break;
       }
@@ -757,243 +854,326 @@ void Scene::tag_shadow_catcher_modified()
   shadow_catcher_modified_ = true;
 }
 
-template<> Light *Scene::create_node<Light>()
+bool Scene::has_volume()
 {
-  Light *node = new Light();
+  has_volume_modified_ = false;
+  return dscene.data.integrator.use_volumes;
+}
+
+bool Scene::has_volume_modified() const
+{
+  return has_volume_modified_;
+}
+
+void Scene::tag_has_volume_modified()
+{
+  has_volume_modified_ = true;
+}
+
+bool Scene::use_light_mis() const
+{
+  for (const Object *object : objects) {
+    if (!object->get_geometry()->is_light()) {
+      continue;
+    }
+
+    const Light *light = static_cast<const Light *>(object->get_geometry());
+    if (light->get_is_enabled() && light->get_use_mis() && light->is_traceable()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+template<class T> T *Scene::create_light_node()
+{
+  unique_ptr<T> node = make_unique<T>();
+  T *node_ptr = node.get();
   node->set_owner(this);
-  lights.push_back(node);
+  geometry.push_back(std::move(node));
   light_manager->tag_update(this, LightManager::LIGHT_ADDED);
-  return node;
+  return node_ptr;
+}
+
+template<> PointLight *Scene::create_node<PointLight>()
+{
+  return create_light_node<PointLight>();
+}
+
+template<> SpotLight *Scene::create_node<SpotLight>()
+{
+  return create_light_node<SpotLight>();
+}
+
+template<> AreaLight *Scene::create_node<AreaLight>()
+{
+  return create_light_node<AreaLight>();
+}
+
+template<> SunLight *Scene::create_node<SunLight>()
+{
+  return create_light_node<SunLight>();
+}
+
+template<> BackgroundLight *Scene::create_node<BackgroundLight>()
+{
+  return create_light_node<BackgroundLight>();
 }
 
 template<> Mesh *Scene::create_node<Mesh>()
 {
-  Mesh *node = new Mesh();
+  unique_ptr<Mesh> node = make_unique<Mesh>();
+  Mesh *node_ptr = node.get();
   node->set_owner(this);
-  geometry.push_back(node);
+  geometry.push_back(std::move(node));
   geometry_manager->tag_update(this, GeometryManager::MESH_ADDED);
-  return node;
+  return node_ptr;
 }
 
 template<> Hair *Scene::create_node<Hair>()
 {
-  Hair *node = new Hair();
+  unique_ptr<Hair> node = make_unique<Hair>();
+  Hair *node_ptr = node.get();
   node->set_owner(this);
-  geometry.push_back(node);
+  geometry.push_back(std::move(node));
   geometry_manager->tag_update(this, GeometryManager::HAIR_ADDED);
-  return node;
+  return node_ptr;
 }
 
 template<> Volume *Scene::create_node<Volume>()
 {
-  Volume *node = new Volume();
+  unique_ptr<Volume> node = make_unique<Volume>();
+  Volume *node_ptr = node.get();
   node->set_owner(this);
-  geometry.push_back(node);
+  geometry.push_back(std::move(node));
   geometry_manager->tag_update(this, GeometryManager::MESH_ADDED);
-  return node;
+  return node_ptr;
 }
 
 template<> PointCloud *Scene::create_node<PointCloud>()
 {
-  PointCloud *node = new PointCloud();
+  unique_ptr<PointCloud> node = make_unique<PointCloud>();
+  PointCloud *node_ptr = node.get();
   node->set_owner(this);
-  geometry.push_back(node);
+  geometry.push_back(std::move(node));
   geometry_manager->tag_update(this, GeometryManager::POINT_ADDED);
-  return node;
+  return node_ptr;
 }
 
 template<> Object *Scene::create_node<Object>()
 {
-  Object *node = new Object();
+  unique_ptr<Object> node = make_unique<Object>();
+  Object *node_ptr = node.get();
   node->set_owner(this);
-  objects.push_back(node);
+  objects.push_back(std::move(node));
   object_manager->tag_update(this, ObjectManager::OBJECT_ADDED);
-  return node;
+  return node_ptr;
 }
 
 template<> ParticleSystem *Scene::create_node<ParticleSystem>()
 {
-  ParticleSystem *node = new ParticleSystem();
+  unique_ptr<ParticleSystem> node = make_unique<ParticleSystem>();
+  ParticleSystem *node_ptr = node.get();
   node->set_owner(this);
-  particle_systems.push_back(node);
+  particle_systems.push_back(std::move(node));
   particle_system_manager->tag_update(this);
-  return node;
+  return node_ptr;
 }
 
 template<> Shader *Scene::create_node<Shader>()
 {
-  Shader *node = new Shader();
+  unique_ptr<Shader> node = make_unique<Shader>();
+  Shader *node_ptr = node.get();
   node->set_owner(this);
-  shaders.push_back(node);
+  shaders.push_back(std::move(node));
   shader_manager->tag_update(this, ShaderManager::SHADER_ADDED);
-  return node;
-}
-
-template<> AlembicProcedural *Scene::create_node<AlembicProcedural>()
-{
-#ifdef WITH_ALEMBIC
-  AlembicProcedural *node = new AlembicProcedural();
-  node->set_owner(this);
-  procedurals.push_back(node);
-  procedural_manager->tag_update();
-  return node;
-#else
-  return nullptr;
-#endif
+  return node_ptr;
 }
 
 template<> Pass *Scene::create_node<Pass>()
 {
-  Pass *node = new Pass();
+  unique_ptr<Pass> node = make_unique<Pass>();
+  Pass *node_ptr = node.get();
   node->set_owner(this);
-  passes.push_back(node);
+  passes.push_back(std::move(node));
   film->tag_modified();
-  return node;
+  return node_ptr;
 }
 
-template<typename T> void delete_node_from_array(vector<T> &nodes, T node)
+template<> Camera *Scene::create_node<Camera>()
 {
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    if (nodes[i] == node) {
-      std::swap(nodes[i], nodes[nodes.size() - 1]);
-      break;
-    }
-  }
-
-  nodes.resize(nodes.size() - 1);
-
-  delete node;
+  unique_ptr<Camera> node = make_unique<Camera>();
+  Camera *node_ptr = node.get();
+  node->set_owner(this);
+  cameras.push_back(std::move(node));
+  return node_ptr;
 }
 
-template<> void Scene::delete_node_impl(Light *node)
+template<> Integrator *Scene::create_node<Integrator>()
 {
-  delete_node_from_array(lights, node);
+  unique_ptr<Integrator> node = make_unique<Integrator>();
+  Integrator *node_ptr = node.get();
+  node->set_owner(this);
+  integrators.push_back(std::move(node));
+  return node_ptr;
+}
+
+template<> SceneAttributes *Scene::create_node<SceneAttributes>()
+{
+  unique_ptr<SceneAttributes> node = make_unique<SceneAttributes>();
+  SceneAttributes *node_ptr = node.get();
+  node->set_owner(this);
+  scene_attributes.push_back(std::move(node));
+  return node_ptr;
+}
+
+template<> Background *Scene::create_node<Background>()
+{
+  unique_ptr<Background> node = make_unique<Background>();
+  Background *node_ptr = node.get();
+  node->set_owner(this);
+  backgrounds.push_back(std::move(node));
+  return node_ptr;
+}
+
+template<> Film *Scene::create_node<Film>()
+{
+  unique_ptr<Film> node = make_unique<Film>();
+  Film *node_ptr = node.get();
+  node->set_owner(this);
+  films.push_back(std::move(node));
+  return node_ptr;
+}
+
+template<> void Scene::delete_node(Light *node)
+{
+  assert(node->get_owner() == this);
+  geometry.erase_by_swap(node);
   light_manager->tag_update(this, LightManager::LIGHT_REMOVED);
 }
 
-template<> void Scene::delete_node_impl(Mesh *node)
+template<> void Scene::delete_node(Mesh *node)
 {
-  delete_node_from_array(geometry, static_cast<Geometry *>(node));
+  assert(node->get_owner() == this);
+  geometry.erase_by_swap(node);
   geometry_manager->tag_update(this, GeometryManager::MESH_REMOVED);
 }
 
-template<> void Scene::delete_node_impl(Hair *node)
+template<> void Scene::delete_node(Hair *node)
 {
-  delete_node_from_array(geometry, static_cast<Geometry *>(node));
+  assert(node->get_owner() == this);
+  geometry.erase_by_swap(node);
   geometry_manager->tag_update(this, GeometryManager::HAIR_REMOVED);
 }
 
-template<> void Scene::delete_node_impl(Volume *node)
+template<> void Scene::delete_node(Volume *node)
 {
-  delete_node_from_array(geometry, static_cast<Geometry *>(node));
+  assert(node->get_owner() == this);
+  geometry.erase_by_swap(node);
   geometry_manager->tag_update(this, GeometryManager::MESH_REMOVED);
 }
 
-template<> void Scene::delete_node_impl(PointCloud *node)
+template<> void Scene::delete_node(PointCloud *node)
 {
-  delete_node_from_array(geometry, static_cast<Geometry *>(node));
+  assert(node->get_owner() == this);
+  geometry.erase_by_swap(node);
   geometry_manager->tag_update(this, GeometryManager::POINT_REMOVED);
 }
 
-template<> void Scene::delete_node_impl(Geometry *node)
+template<> void Scene::delete_node(Geometry *node)
 {
+  assert(node->get_owner() == this);
+
   uint flag;
   if (node->is_hair()) {
     flag = GeometryManager::HAIR_REMOVED;
   }
   else {
     flag = GeometryManager::MESH_REMOVED;
-  }
-
-  delete_node_from_array(geometry, node);
-  geometry_manager->tag_update(this, flag);
-}
-
-template<> void Scene::delete_node_impl(Object *node)
-{
-  delete_node_from_array(objects, node);
-  object_manager->tag_update(this, ObjectManager::OBJECT_REMOVED);
-}
-
-template<> void Scene::delete_node_impl(ParticleSystem *node)
-{
-  delete_node_from_array(particle_systems, node);
-  particle_system_manager->tag_update(this);
-}
-
-template<> void Scene::delete_node_impl(Shader *shader)
-{
-  /* don't delete unused shaders, not supported */
-  shader->clear_reference_count();
-}
-
-template<> void Scene::delete_node_impl(Procedural *node)
-{
-  delete_node_from_array(procedurals, node);
-  procedural_manager->tag_update();
-}
-
-template<> void Scene::delete_node_impl(AlembicProcedural *node)
-{
-#ifdef WITH_ALEMBIC
-  delete_node_impl(static_cast<Procedural *>(node));
-#else
-  (void)node;
-#endif
-}
-
-template<> void Scene::delete_node_impl(Pass *node)
-{
-  delete_node_from_array(passes, node);
-  film->tag_modified();
-}
-
-template<typename T>
-static void remove_nodes_in_set(const set<T *> &nodes_set,
-                                vector<T *> &nodes_array,
-                                const NodeOwner *owner)
-{
-  size_t new_size = nodes_array.size();
-
-  for (size_t i = 0; i < new_size; ++i) {
-    T *node = nodes_array[i];
-
-    if (nodes_set.find(node) != nodes_set.end()) {
-      std::swap(nodes_array[i], nodes_array[new_size - 1]);
-
-      assert(node->get_owner() == owner);
-      delete node;
-
-      i -= 1;
-      new_size -= 1;
+    if (node->has_volume) {
+      volume_manager->tag_update({node});
     }
   }
 
-  nodes_array.resize(new_size);
-  (void)owner;
+  geometry.erase_by_swap(node);
+  geometry_manager->tag_update(this, flag);
 }
 
-template<> void Scene::delete_nodes(const set<Light *> &nodes, const NodeOwner *owner)
+template<> void Scene::delete_node(Object *node)
 {
-  remove_nodes_in_set(nodes, lights, owner);
-  light_manager->tag_update(this, LightManager::LIGHT_REMOVED);
+  assert(node->get_owner() == this);
+
+  uint flag = ObjectManager::OBJECT_REMOVED;
+  if (node->get_geometry()->has_volume) {
+    volume_manager->tag_update({node}, flag);
+  }
+
+  objects.erase_by_swap(node);
+  object_manager->tag_update(this, flag);
+}
+
+template<> void Scene::delete_node(ParticleSystem *node)
+{
+  assert(node->get_owner() == this);
+  particle_systems.erase_by_swap(node);
+  particle_system_manager->tag_update(this);
+}
+
+template<> void Scene::delete_node(Shader *node)
+{
+  assert(node->get_owner() == this);
+  /* don't delete unused shaders, not supported */
+  node->clear_reference_count();
+}
+
+template<> void Scene::delete_node(Procedural *node)
+{
+  assert(node->get_owner() == this);
+  procedurals.erase_by_swap(node);
+  procedural_manager->tag_update();
+}
+
+template<> void Scene::delete_node(Pass *node)
+{
+  assert(node->get_owner() == this);
+  passes.erase_by_swap(node);
+  film->tag_modified();
+}
+
+template<typename T> static void assert_same_owner(const set<T *> &nodes, const NodeOwner *owner)
+{
+#ifdef NDEBUG
+  (void)nodes;
+  (void)owner;
+#else
+  for (const T *node : nodes) {
+    assert(node->get_owner() == owner);
+  }
+#endif
 }
 
 template<> void Scene::delete_nodes(const set<Geometry *> &nodes, const NodeOwner *owner)
 {
-  remove_nodes_in_set(nodes, geometry, owner);
+  assert_same_owner(nodes, owner);
+  volume_manager->tag_update(nodes);
+  geometry.erase_in_set(nodes);
   geometry_manager->tag_update(this, GeometryManager::GEOMETRY_REMOVED);
+  light_manager->tag_update(this, LightManager::LIGHT_REMOVED);
 }
 
 template<> void Scene::delete_nodes(const set<Object *> &nodes, const NodeOwner *owner)
 {
-  remove_nodes_in_set(nodes, objects, owner);
+  assert_same_owner(nodes, owner);
+  volume_manager->tag_update(nodes, ObjectManager::OBJECT_REMOVED);
+  objects.erase_in_set(nodes);
   object_manager->tag_update(this, ObjectManager::OBJECT_REMOVED);
 }
 
 template<> void Scene::delete_nodes(const set<ParticleSystem *> &nodes, const NodeOwner *owner)
 {
-  remove_nodes_in_set(nodes, particle_systems, owner);
+  assert_same_owner(nodes, owner);
+  particle_systems.erase_in_set(nodes);
   particle_system_manager->tag_update(this);
 }
 
@@ -1007,13 +1187,15 @@ template<> void Scene::delete_nodes(const set<Shader *> &nodes, const NodeOwner 
 
 template<> void Scene::delete_nodes(const set<Procedural *> &nodes, const NodeOwner *owner)
 {
-  remove_nodes_in_set(nodes, procedurals, owner);
+  assert_same_owner(nodes, owner);
+  procedurals.erase_in_set(nodes);
   procedural_manager->tag_update();
 }
 
 template<> void Scene::delete_nodes(const set<Pass *> &nodes, const NodeOwner *owner)
 {
-  remove_nodes_in_set(nodes, passes, owner);
+  assert_same_owner(nodes, owner);
+  passes.erase_in_set(nodes);
   film->tag_modified();
 }
 

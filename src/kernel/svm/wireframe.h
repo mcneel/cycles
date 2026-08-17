@@ -1,12 +1,19 @@
-/* SPDX-License-Identifier: BSD-3-Clause
+/* SPDX-FileCopyrightText: 2009-2010 Sony Pictures Imageworks Inc., et al. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Adapted from Open Shading Language
- * Copyright (c) 2009-2010 Sony Pictures Imageworks Inc., et al.
- * All Rights Reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
  *
- * Modifications Copyright 2011-2022 Blender Foundation. */
+ * Adapted code from Open Shading Language. */
 
 #pragma once
+
+#include "kernel/geom/motion_triangle.h"
+#include "kernel/geom/object.h"
+#include "kernel/geom/triangle.h"
+#include "kernel/svm/node_types.h"
+#include "kernel/svm/util.h"
+#include "kernel/util/differential.h"
+#include "util/math_base.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -15,8 +22,8 @@ CCL_NAMESPACE_BEGIN
 ccl_device_inline float wireframe(KernelGlobals kg,
                                   ccl_private ShaderData *sd,
                                   const differential3 dP,
-                                  float size,
-                                  int pixel_size,
+                                  const float size,
+                                  const int pixel_size,
                                   ccl_private float3 *P)
 {
 #if defined(__HAIR__) || defined(__POINTCLOUD__)
@@ -29,13 +36,13 @@ ccl_device_inline float wireframe(KernelGlobals kg,
     float pixelwidth = 1.0f;
 
     /* Triangles */
-    int np = 3;
+    const int np = 3;
 
     if (sd->type & PRIMITIVE_MOTION) {
       motion_triangle_vertices(kg, sd->object, sd->prim, sd->time, Co);
     }
     else {
-      triangle_vertices(kg, sd->prim, Co);
+      triangle_vertices(kg, sd->object, sd->prim, Co);
     }
 
     if (!(sd->object_flag & SD_OBJECT_TRANSFORM_APPLIED)) {
@@ -47,8 +54,8 @@ ccl_device_inline float wireframe(KernelGlobals kg,
     if (pixel_size) {
       // Project the derivatives of P to the viewing plane defined
       // by I so we have a measure of how big is a pixel at this point
-      float pixelwidth_x = len(dP.dx - dot(dP.dx, sd->wi) * sd->wi);
-      float pixelwidth_y = len(dP.dy - dot(dP.dy, sd->wi) * sd->wi);
+      const float pixelwidth_x = len(dP.dx - dot(dP.dx, sd->wi) * sd->wi);
+      const float pixelwidth_y = len(dP.dy - dot(dP.dy, sd->wi) * sd->wi);
       // Take the average of both axis' length
       pixelwidth = (pixelwidth_x + pixelwidth_y) * 0.5f;
     }
@@ -58,15 +65,16 @@ ccl_device_inline float wireframe(KernelGlobals kg,
     pixelwidth *= 0.5f * size;
     pixelwidth *= pixelwidth;
     for (int i = 0; i < np; i++) {
-      int i2 = i ? i - 1 : np - 1;
-      float3 dir = *P - Co[i];
-      float3 edge = Co[i] - Co[i2];
-      float3 crs = cross(edge, dir);
+      const int i2 = i ? i - 1 : np - 1;
+      const float3 dir = *P - Co[i];
+      const float3 edge = Co[i] - Co[i2];
+      const float3 crs = cross(edge, dir);
       // At this point dot(crs, crs) / dot(edge, edge) is
       // the square of area / length(edge) == square of the
       // distance to the edge.
-      if (dot(crs, crs) < (dot(edge, edge) * pixelwidth))
+      if (dot(crs, crs) < (dot(edge, edge) * pixelwidth)) {
         return 1.0f;
+      }
     }
   }
   return 0.0f;
@@ -75,33 +83,28 @@ ccl_device_inline float wireframe(KernelGlobals kg,
 ccl_device_noinline void svm_node_wireframe(KernelGlobals kg,
                                             ccl_private ShaderData *sd,
                                             ccl_private float *stack,
-                                            uint4 node)
+                                            const ccl_global SVMNodeWireframe &ccl_restrict node)
 {
-  uint in_size = node.y;
-  uint out_fac = node.z;
-  uint use_pixel_size, bump_offset;
-  svm_unpack_node_uchar2(node.w, &use_pixel_size, &bump_offset);
-
   /* Input Data */
-  float size = stack_load_float(stack, in_size);
-  int pixel_size = (int)use_pixel_size;
+  const float size = stack_load(stack, node.in_size);
+  const int pixel_size = (int)node.use_pixel_size;
 
   /* Calculate wireframe */
   const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
-  float f = wireframe(kg, sd, dP, size, pixel_size, &sd->P);
 
-  /* TODO(sergey): Think of faster way to calculate derivatives. */
-  if (bump_offset == NODE_BUMP_OFFSET_DX) {
-    float3 Px = sd->P - dP.dx;
-    f += (f - wireframe(kg, sd, dP, size, pixel_size, &Px)) / len(dP.dx);
+  float3 P = sd->P;
+  if (node.bump_offset == NODE_BUMP_OFFSET_DX) {
+    P += dP.dx * node.bump_filter_width;
   }
-  else if (bump_offset == NODE_BUMP_OFFSET_DY) {
-    float3 Py = sd->P - dP.dy;
-    f += (f - wireframe(kg, sd, dP, size, pixel_size, &Py)) / len(dP.dy);
+  else if (node.bump_offset == NODE_BUMP_OFFSET_DY) {
+    P += dP.dy * node.bump_filter_width;
   }
 
-  if (stack_valid(out_fac))
-    stack_store_float(stack, out_fac, f);
+  const float f = wireframe(kg, sd, dP, size, pixel_size, &P);
+
+  if (stack_valid(node.out_fac_offset)) {
+    stack_store_float(stack, node.out_fac_offset, f);
+  }
 }
 
 CCL_NAMESPACE_END

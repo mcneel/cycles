@@ -1,12 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_MATH_INT2_H__
-#define __UTIL_MATH_INT2_H__
+#pragma once
 
-#ifndef __UTIL_MATH_H__
-#  error "Do not include this file directly, include util/types.h instead."
-#endif
+#include "util/defines.h"
+#include "util/types_int2.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -40,8 +39,21 @@ ccl_device_inline int2 operator/(const int2 &a, const int2 &b)
 {
   return make_int2(a.x / b.x, a.y / b.y);
 }
+
+ccl_device_inline int2 operator>>(const int2 a, const int i)
+{
+  return make_int2(a.x >> i, a.y >> i);
+}
+
+ccl_device_inline int2 operator&(const int2 a, const int2 b)
+{
+  return make_int2(a.x & b.x, a.y & b.y);
+}
+
+ccl_device_inline int2 operator^(const int2 a, const int2 b)
+{
+  return make_int2(a.x ^ b.x, a.y ^ b.y);
+}
 #endif /* !__KERNEL_METAL__ */
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_MATH_INT2_H__ */

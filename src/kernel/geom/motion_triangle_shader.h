@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* Motion Triangle Primitive
  *
@@ -8,11 +9,18 @@
  * or normals at a given ray time is a matter of interpolation of the two steps
  * between which the ray time lies.
  *
- * The extra positions and normals are stored as ATTR_STD_MOTION_VERTEX_POSITION
- * and ATTR_STD_MOTION_VERTEX_NORMAL mesh attributes.
+ * The extra positions are stored as additional motion steps in ATTR_STD_POSITION.
+ * Normals in ATTR_STD_VERTEX_NORMAL or ATTR_STD_CORNER_NORMAL.
  */
 
 #pragma once
+
+#include "kernel/globals.h"
+#include "kernel/types.h"
+
+#include "kernel/geom/motion_triangle.h"
+#include "kernel/geom/motion_triangle_intersect.h"
+#include "kernel/geom/triangle_intersect.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -21,41 +29,26 @@ CCL_NAMESPACE_BEGIN
  * normals */
 
 /* return 3 triangle vertex normals */
-ccl_device_noinline void motion_triangle_shader_setup(KernelGlobals kg,
-                                                      ccl_private ShaderData *sd,
-                                                      const float3 P,
-                                                      const float3 D,
-                                                      const float ray_t,
-                                                      const int isect_object,
-                                                      const int isect_prim,
-                                                      bool is_local)
+ccl_device_noinline void motion_triangle_shader_setup(KernelGlobals kg, ccl_private ShaderData *sd)
 {
   /* Get shader. */
-  sd->shader = object_shader(kg, sd->object);// kernel_data_fetch(tri_shader, sd->prim);
-  /* Get motion info. */
-  /* TODO(sergey): This logic is really similar to motion_triangle_vertices(),
-   * can we de-duplicate something here?
-   */
-  int numsteps, numverts;
-  object_motion_info(kg, sd->object, &numsteps, &numverts, NULL);
-  /* Figure out which steps we need to fetch and their interpolation factor. */
-  int maxstep = numsteps * 2;
-  int step = min((int)(sd->time * maxstep), maxstep - 1);
-  float t = sd->time * maxstep - step;
-  /* Find attribute. */
-  int offset = intersection_find_attribute(kg, sd->object, ATTR_STD_MOTION_VERTEX_POSITION);
-  kernel_assert(offset != ATTR_STD_NOT_FOUND);
-  /* Fetch vertex coordinates. */
-  float3 verts[3], next_verts[3];
-  uint4 tri_vindex = kernel_data_fetch(tri_vindex, sd->prim);
-  motion_triangle_verts_for_step(kg, tri_vindex, offset, numverts, numsteps, step, verts);
-  motion_triangle_verts_for_step(kg, tri_vindex, offset, numverts, numsteps, step + 1, next_verts);
-  /* Interpolate between steps. */
-  verts[0] = (1.0f - t) * verts[0] + t * next_verts[0];
-  verts[1] = (1.0f - t) * verts[1] + t * next_verts[1];
-  verts[2] = (1.0f - t) * verts[2] + t * next_verts[2];
+  /* Rhino: object-level shader rather than the per-triangle shader. */
+  sd->shader = object_shader(kg, sd->object);
+
+  /* Compute motion info. */
+  int numsteps;
+  int step;
+  float t;
+  uint3 tri_vindex;
+  motion_triangle_compute_info(
+      kg, sd->object, sd->time, sd->prim, &tri_vindex, &numsteps, &step, &t);
+
+  float3 verts[3];
+  const int numverts = kernel_data_fetch(objects, sd->object).numverts;
+  motion_triangle_vertices(kg, sd->object, tri_vindex, numsteps, numverts, step, t, verts);
+
   /* Compute refined position. */
-  sd->P = motion_triangle_point_from_uv(kg, sd, isect_object, isect_prim, sd->u, sd->v, verts);
+  sd->P = triangle_point_from_uv_and_verts(kg, sd, sd->u, sd->v, verts);
   /* Compute face normal. */
   float3 Ng;
   if (object_negative_scale_applied(sd->object_flag)) {
@@ -73,23 +66,8 @@ ccl_device_noinline void motion_triangle_shader_setup(KernelGlobals kg,
 #endif
   /* Compute smooth normal. */
   if (sd->shader & SHADER_SMOOTH_NORMAL) {
-    /* Find attribute. */
-    int offset = intersection_find_attribute(kg, sd->object, ATTR_STD_MOTION_VERTEX_NORMAL);
-    kernel_assert(offset != ATTR_STD_NOT_FOUND);
-    /* Fetch vertex coordinates. */
-    float3 normals[3], next_normals[3];
-    motion_triangle_normals_for_step(kg, tri_vindex, offset, numverts, numsteps, step, normals);
-    motion_triangle_normals_for_step(
-        kg, tri_vindex, offset, numverts, numsteps, step + 1, next_normals);
-    /* Interpolate between steps. */
-    normals[0] = (1.0f - t) * normals[0] + t * next_normals[0];
-    normals[1] = (1.0f - t) * normals[1] + t * next_normals[1];
-    normals[2] = (1.0f - t) * normals[2] + t * next_normals[2];
-    /* Interpolate between vertices. */
-    float u = sd->u;
-    float v = sd->v;
-    float w = 1.0f - u - v;
-    sd->N = (w * normals[0] + u * normals[1] + v * normals[2]);
+    sd->N = motion_triangle_smooth_normal(
+        kg, Ng, sd->object, sd->prim, tri_vindex, numsteps, step, t, sd->u, sd->v);
   }
 }
 

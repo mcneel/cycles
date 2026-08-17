@@ -1,10 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "integrator/tile.h"
 
 #include "util/log.h"
-#include "util/math.h"
+#include "util/math_base.h"
+
+#include <ostream>
 
 CCL_NAMESPACE_BEGIN
 
@@ -15,7 +18,7 @@ std::ostream &operator<<(std::ostream &os, const TileSize &tile_size)
   return os;
 }
 
-ccl_device_inline uint round_down_to_power_of_two(uint x)
+ccl_device_inline uint round_down_to_power_of_two(const uint x)
 {
   if (is_power_of_two(x)) {
     return x;
@@ -24,7 +27,7 @@ ccl_device_inline uint round_down_to_power_of_two(uint x)
   return prev_power_of_two(x);
 }
 
-ccl_device_inline uint round_up_to_power_of_two(uint x)
+ccl_device_inline uint round_up_to_power_of_two(const uint x)
 {
   if (is_power_of_two(x)) {
     return x;

@@ -1,16 +1,16 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __FILM_H__
-#define __FILM_H__
+#pragma once
 
 #include "scene/pass.h"
-#include "util/string.h"
-#include "util/vector.h"
 
 #include "kernel/types.h"
 
 #include "graph/node.h"
+
+#include "util/string.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -18,13 +18,13 @@ class Device;
 class DeviceScene;
 class Scene;
 
-typedef enum FilterType {
+enum FilterType {
   FILTER_BOX,
   FILTER_GAUSSIAN,
   FILTER_BLACKMAN_HARRIS,
 
   FILTER_NUM_TYPES,
-} FilterType;
+};
 
 class Film : public Node {
  public:
@@ -50,6 +50,11 @@ class Film : public Node {
    * shadows can be alpha-overed onto a backdrop. */
   NODE_SOCKET_API(bool, use_approximate_shadow_catcher)
 
+  NODE_SOCKET_API(bool, use_sample_count)
+
+  NODE_SOCKET_API(bool, denoising_pass_follow_reflections);
+  NODE_SOCKET_API(bool, denoising_pass_use_albedo_roughness_weighting);
+
  private:
   size_t filter_table_offset_;
   bool prev_have_uv_pass = false;
@@ -58,7 +63,7 @@ class Film : public Node {
 
  public:
   Film();
-  ~Film();
+  ~Film() override;
 
   /* add default passes to scene */
   static void add_default(Scene *scene);
@@ -70,10 +75,8 @@ class Film : public Node {
 
   bool update_lightgroups(Scene *scene);
 
-  /* Update passes so that they contain all passes required for the configured functionality.
-   *
-   * If `add_sample_count_pass` is true then the SAMPLE_COUNT pass is ensured to be added. */
-  void update_passes(Scene *scene, bool add_sample_count_pass);
+  /* Update passes so that they contain all passes required for the configured functionality. */
+  void update_passes(Scene *scene);
 
   uint get_kernel_features(const Scene *scene) const;
 
@@ -85,5 +88,3 @@ class Film : public Node {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __FILM_H__ */

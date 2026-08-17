@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "stdcycles.h"
 
@@ -9,7 +10,7 @@ shader node_camera(output vector ViewVector = vector(0.0, 0.0, 0.0),
 {
   ViewVector = (vector)transform("world", "camera", P);
 
-  ViewZDepth = fabs(ViewVector[2]);
+  ViewZDepth = ViewVector[2];
   ViewDistance = length(ViewVector);
 
   ViewVector = normalize(ViewVector);

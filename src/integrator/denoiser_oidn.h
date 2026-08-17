@@ -1,32 +1,42 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #include "integrator/denoiser.h"
+#include "integrator/denoiser_oidn_base.h"
+#include "util/openimagedenoise.h"
 #include "util/thread.h"
-#include "util/unique_ptr.h"
 
 CCL_NAMESPACE_BEGIN
 
-/* Implementation of denoising API which uses OpenImageDenoise library. */
+/* Implementation of a CPU based denoiser which uses OpenImageDenoise library. */
 class OIDNDenoiser : public Denoiser {
  public:
   /* Forwardly declared state which might be using compile-flag specific fields, such as
    * OpenImageDenoise device and filter handles. */
   class State;
 
-  OIDNDenoiser(Device *path_trace_device, const DenoiseParams &params);
+  OIDNDenoiser(Device *denoiser_device, const DenoiseParams &params);
 
-  virtual bool denoise_buffer(const BufferParams &buffer_params,
-                              RenderBuffers *render_buffers,
-                              const int num_samples,
-                              bool allow_inplace_modification) override;
+  bool denoise_buffer(const BufferParams &buffer_params,
+                      const BufferParams &denoised_buffer_params,
+                      RenderBuffers *render_buffers,
+                      int num_samples,
+                      bool allow_inplace_modification,
+                      float2 pixel_jitter) override;
+
+#ifdef WITH_OPENIMAGEDENOISE
+  OIDNDenoiserBase base_;
+
+  bool denoise_create_if_needed(const class OIDNDenoiseContext &context);
+  bool denoise_run(class OIDNDenoiseContext &context, const PassType pass_type);
+  bool commit_and_execute_filter(OIDNFilter filter);
+  void set_common_filter_params(OIDNFilter filter);
+#endif
 
  protected:
-  virtual uint get_device_type_mask() const override;
-  virtual Device *ensure_denoiser_device(Progress *progress) override;
-
   /* We only perform one denoising at a time, since OpenImageDenoise itself is multithreaded.
    * Use this mutex whenever images are passed to the OIDN and needs to be denoised. */
   static thread_mutex mutex_;

@@ -1,50 +1,50 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "util/time.h"
 
-#include <stdlib.h>
+#include <chrono>
+#include <cstdlib>
 
 #if !defined(_WIN32)
 #  include <sys/time.h>
 #  include <unistd.h>
 #endif
 
-#include "util/math.h"
 #include "util/string.h"
-#include "util/windows.h"
+
+#ifdef _WIN32
+#  include "util/windows.h"
+#endif
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#  ifdef _MSC_VER
+#    include <intrin.h>
+#  else
+#    include <x86intrin.h>
+#  endif
+#endif
 
 CCL_NAMESPACE_BEGIN
 
-#ifdef _WIN32
 double time_dt()
 {
-  __int64 frequency, counter;
-
-  QueryPerformanceFrequency((LARGE_INTEGER *)&frequency);
-  QueryPerformanceCounter((LARGE_INTEGER *)&counter);
-
-  return (double)counter / (double)frequency;
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch())
+      .count();
 }
 
-void time_sleep(double t)
+#ifdef _WIN32
+void time_sleep(const double t)
 {
   Sleep((int)(t * 1000));
 }
 #else
-double time_dt()
-{
-  struct timeval now;
-  gettimeofday(&now, NULL);
-
-  return now.tv_sec + now.tv_usec * 1e-6;
-}
-
 /* sleep t seconds */
 void time_sleep(double t)
 {
   /* get whole seconds */
-  int s = (int)t;
+  const int s = (int)t;
 
   if (s >= 1) {
     sleep(s);
@@ -54,9 +54,77 @@ void time_sleep(double t)
   }
 
   /* get microseconds */
-  int us = (int)(t * 1e6);
-  if (us > 0)
+  const int us = (int)(t * 1e6);
+  if (us > 0) {
     usleep(us);
+  }
+}
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+/* Use cntvct_el0/cntfrq_el0 registers on ARM64. */
+
+uint64_t time_fast_tick(uint32_t * /*last_cpu*/)
+{
+  /* MSVC does not define __aarch64__, or support inline ASM */
+#  if !defined(__aarch64__)
+  return _ReadStatusReg(ARM64_CNTVCT_EL0);
+#  else
+  uint64_t counter;
+  asm("mrs %x0, cntvct_el0" : "=r"(counter));
+  return counter;
+#  endif
+}
+uint64_t time_fast_frequency()
+{
+  /* MSVC does not define __aarch64__, or support inline ASM */
+#  if !defined(__aarch64__)
+  return _ReadStatusReg(ARM64_CNTFRQ_EL0);
+#  else
+  uint64_t freq;
+  asm("mrs %x0, cntfrq_el0" : "=r"(freq));
+  return freq;
+#  endif
+}
+#elif defined(__x86_64__) || defined(_M_X64)
+/* Use RDTSCP on x86-64. */
+
+uint64_t time_fast_tick(uint32_t *last_cpu)
+{
+  return __rdtscp(last_cpu);
+}
+uint64_t time_fast_frequency()
+{
+  static bool initialized = false;
+  static uint64_t frequency;
+
+  /* Unfortunately TSC does not provide a easily accessible frequency value, so roughly calibrate
+   * by sleeping a millisecond. Not ideal, but good enough for our purposes. */
+  if (!initialized) {
+    uint32_t cpu;
+    uint64_t start_tick = time_fast_tick(&cpu);
+    double start_precise = time_dt();
+    time_sleep(0.001);
+    uint64_t end_tick = time_fast_tick(&cpu);
+    double end_precise = time_dt();
+    frequency = uint64_t(double(end_tick - start_tick) / (end_precise - start_precise));
+    initialized = true;
+  }
+
+  return frequency;
+}
+#else
+/* Fall back to std::chrono::steady_clock. */
+
+uint64_t time_fast_tick(uint32_t * /*last_cpu*/)
+{
+  auto now = std::chrono::steady_clock::now();
+  auto nanoseconds = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
+  return nanoseconds.time_since_epoch().count();
+}
+uint64_t time_fast_frequency()
+{
+  return 1000000000;
 }
 #endif
 
@@ -72,9 +140,7 @@ string time_human_readable_from_seconds(const double seconds)
   if (h > 0) {
     return string_printf("%.2d:%.2d:%.2d.%.2d", h, m, s, r);
   }
-  else {
-    return string_printf("%.2d:%.2d.%.2d", m, s, r);
-  }
+  return string_printf("%.2d:%.2d.%.2d", m, s, r);
 }
 
 double time_human_readable_to_seconds(const string &time_string)
@@ -96,7 +162,7 @@ double time_human_readable_to_seconds(const string &time_string)
     /* Time string is malformed. */
     return 0.0;
   }
-  else if (fraction_tokens.size() == 1) {
+  if (fraction_tokens.size() == 1) {
     /* There is no fraction of a second specified, the rest of the code
      * handles this normally. */
   }

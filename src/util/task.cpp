@@ -1,19 +1,17 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "util/task.h"
-#include "util/foreach.h"
+
 #include "util/log.h"
-#include "util/system.h"
 #include "util/time.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Task Pool */
 
-TaskPool::TaskPool() : start_time(time_dt()), num_tasks_pushed(0)
-{
-}
+TaskPool::TaskPool() : start_time(time_dt()), num_tasks_pushed(0) {}
 
 TaskPool::~TaskPool()
 {
@@ -30,7 +28,7 @@ void TaskPool::wait_work(Summary *stats)
 {
   tbb_group.wait();
 
-  if (stats != NULL) {
+  if (stats != nullptr) {
     stats->time_total = time_dt() - start_time;
     stats->num_tasks_handled = num_tasks_pushed;
   }
@@ -57,11 +55,11 @@ bool TaskPool::canceled()
 thread_mutex TaskScheduler::mutex;
 int TaskScheduler::users = 0;
 int TaskScheduler::active_num_threads = 0;
-tbb::global_control *TaskScheduler::global_control = nullptr;
+unique_ptr<tbb::global_control> TaskScheduler::global_control;
 
-void TaskScheduler::init(int num_threads)
+void TaskScheduler::init(const int num_threads)
 {
-  thread_scoped_lock lock(mutex);
+  const thread_scoped_lock lock(mutex);
   /* Multiple cycles instances can use this task scheduler, sharing the same
    * threads, so we keep track of the number of users. */
   ++users;
@@ -70,9 +68,9 @@ void TaskScheduler::init(int num_threads)
   }
   if (num_threads > 0) {
     /* Automatic number of threads. */
-    VLOG_INFO << "Overriding number of TBB threads to " << num_threads << ".";
-    global_control = new tbb::global_control(tbb::global_control::max_allowed_parallelism,
-                                             num_threads);
+    LOG_INFO << "Overriding number of TBB threads to " << num_threads << ".";
+    global_control = make_unique<tbb::global_control>(tbb::global_control::max_allowed_parallelism,
+                                                      num_threads);
     active_num_threads = num_threads;
   }
   else {
@@ -82,11 +80,10 @@ void TaskScheduler::init(int num_threads)
 
 void TaskScheduler::exit()
 {
-  thread_scoped_lock lock(mutex);
+  const thread_scoped_lock lock(mutex);
   users--;
   if (users == 0) {
-    delete global_control;
-    global_control = nullptr;
+    global_control.reset();
     active_num_threads = 0;
   }
 }
@@ -98,7 +95,7 @@ void TaskScheduler::free_memory()
 
 int TaskScheduler::max_concurrency()
 {
-  thread_scoped_lock lock(mutex);
+  const thread_scoped_lock lock(mutex);
   return (users > 0) ? active_num_threads : tbb::this_task_arena::max_concurrency();
 }
 
@@ -110,7 +107,7 @@ DedicatedTaskPool::DedicatedTaskPool()
   do_exit = false;
   num = 0;
 
-  worker_thread = new thread(function_bind(&DedicatedTaskPool::thread_run, this));
+  worker_thread = make_unique<thread>([this] { thread_run(); });
 }
 
 DedicatedTaskPool::~DedicatedTaskPool()
@@ -121,19 +118,21 @@ DedicatedTaskPool::~DedicatedTaskPool()
   queue_cond.notify_all();
 
   worker_thread->join();
-  delete worker_thread;
+  worker_thread.reset();
 }
 
-void DedicatedTaskPool::push(TaskRunFunction &&task, bool front)
+void DedicatedTaskPool::push(TaskRunFunction &&run, bool front)
 {
   num_increase();
 
   /* add task to queue */
   queue_mutex.lock();
-  if (front)
-    queue.emplace_front(std::move(task));
-  else
-    queue.emplace_back(std::move(task));
+  if (front) {
+    queue.emplace_front(std::move(run));
+  }
+  else {
+    queue.emplace_back(std::move(run));
+  }
 
   queue_cond.notify_one();
   queue_mutex.unlock();
@@ -143,8 +142,9 @@ void DedicatedTaskPool::wait()
 {
   thread_scoped_lock num_lock(num_mutex);
 
-  while (num)
+  while (num) {
     num_cond.wait(num_lock);
+  }
 }
 
 void DedicatedTaskPool::cancel()
@@ -162,19 +162,20 @@ bool DedicatedTaskPool::canceled()
   return do_cancel;
 }
 
-void DedicatedTaskPool::num_decrease(int done)
+void DedicatedTaskPool::num_decrease(const int done)
 {
-  thread_scoped_lock num_lock(num_mutex);
+  const thread_scoped_lock num_lock(num_mutex);
   num -= done;
 
   assert(num >= 0);
-  if (num == 0)
+  if (num == 0) {
     num_cond.notify_all();
+  }
 }
 
 void DedicatedTaskPool::num_increase()
 {
-  thread_scoped_lock num_lock(num_mutex);
+  const thread_scoped_lock num_lock(num_mutex);
   num++;
   num_cond.notify_all();
 }
@@ -183,8 +184,9 @@ bool DedicatedTaskPool::thread_wait_pop(TaskRunFunction &task)
 {
   thread_scoped_lock queue_lock(queue_mutex);
 
-  while (queue.empty() && !do_exit)
+  while (queue.empty() && !do_exit) {
     queue_cond.wait(queue_lock);
+  }
 
   if (queue.empty()) {
     assert(do_exit);
@@ -224,7 +226,7 @@ void DedicatedTaskPool::clear()
   thread_scoped_lock queue_lock(queue_mutex);
 
   /* erase all tasks from the queue */
-  int done = queue.size();
+  const int done = queue.size();
   queue.clear();
 
   queue_lock.unlock();
@@ -235,9 +237,9 @@ void DedicatedTaskPool::clear()
 
 string TaskPool::Summary::full_report() const
 {
-  string report = "";
+  string report;
   report += string_printf("Total time:    %f\n", time_total);
-  report += string_printf("Tasks handled: %d\n", num_tasks_handled);
+  report += string_printf("Tasks handled: %d", num_tasks_handled);
   return report;
 }
 

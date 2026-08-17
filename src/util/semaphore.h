@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_SEMAPHORE_H__
-#define __UTIL_SEMAPHORE_H__
+#pragma once
 
 #include "util/thread.h"
 
@@ -15,9 +15,7 @@ CCL_NAMESPACE_BEGIN
 
 class thread_counting_semaphore {
  public:
-  explicit thread_counting_semaphore(const int count) : count(count)
-  {
-  }
+  explicit thread_counting_semaphore(const int count) : count(count) {}
 
   thread_counting_semaphore(const thread_counting_semaphore &) = delete;
 
@@ -32,7 +30,7 @@ class thread_counting_semaphore {
 
   void release()
   {
-    thread_scoped_lock lock(mutex);
+    const thread_scoped_lock lock(mutex);
     count++;
     condition.notify_one();
   }
@@ -44,5 +42,3 @@ class thread_counting_semaphore {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_SEMAPHORE_H__ */

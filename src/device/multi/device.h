@@ -1,10 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "util/string.h"
-#include "util/vector.h"
+#include "util/unique_ptr.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -13,6 +13,9 @@ class DeviceInfo;
 class Profiler;
 class Stats;
 
-Device *device_multi_create(const DeviceInfo &info, Stats &stats, Profiler &profiler);
+unique_ptr<Device> device_multi_create(const DeviceInfo &info,
+                                       Stats &stats,
+                                       Profiler &profiler,
+                                       bool headless);
 
 CCL_NAMESPACE_END

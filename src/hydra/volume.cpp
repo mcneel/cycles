@@ -1,11 +1,15 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "hydra/volume.h"
 #include "hydra/field.h"
 #include "hydra/geometry.inl"
+#include "hydra/util.h"
 #include "scene/volume.h"
+
+#include <pxr/imaging/hd/volumeFieldBindingSchema.h>
 
 HDCYCLES_NAMESPACE_OPEN_SCOPE
 
@@ -15,24 +19,9 @@ TF_DEFINE_PRIVATE_TOKENS(_tokens,
 );
 // clang-format on
 
-HdCyclesVolume::HdCyclesVolume(const SdfPath &rprimId
-#if PXR_VERSION < 2102
-                               ,
-                               const SdfPath &instancerId
-#endif
-                               )
-    : HdCyclesGeometry(rprimId
-#if PXR_VERSION < 2102
-                       ,
-                       instancerId
-#endif
-      )
-{
-}
+HdCyclesVolume::HdCyclesVolume(const SdfPath &rprimId) : HdCyclesGeometry(rprimId) {}
 
-HdCyclesVolume::~HdCyclesVolume()
-{
-}
+HdCyclesVolume::~HdCyclesVolume() = default;
 
 HdDirtyBits HdCyclesVolume::GetInitialDirtyBitsMask() const
 {
@@ -46,11 +35,21 @@ void HdCyclesVolume::Populate(HdSceneDelegate *sceneDelegate, HdDirtyBits dirtyB
   Scene *const scene = (Scene *)_geom->get_owner();
 
   if (dirtyBits & HdChangeTracker::DirtyVolumeField) {
-    for (const HdVolumeFieldDescriptor &field :
-         sceneDelegate->GetVolumeFieldDescriptors(GetId())) {
-      if (const auto openvdbAsset = static_cast<HdCyclesField *>(
-              sceneDelegate->GetRenderIndex().GetBprim(_tokens->openvdbAsset, field.fieldId))) {
-        const ustring name(field.fieldName.GetString());
+    const HdSceneIndexPrim prim = GetPrim(sceneDelegate, GetId());
+    HdVolumeFieldBindingSchema bindings = HdVolumeFieldBindingSchema::GetFromParent(
+        prim.dataSource);
+
+    for (const TfToken &fieldName : bindings.GetVolumeFieldBindingNames()) {
+      auto pathDs = bindings.GetVolumeFieldBinding(fieldName);
+      if (!pathDs) {
+        continue;
+      }
+      const SdfPath fieldId = pathDs->GetTypedValue(0.0f);
+
+      if (auto *const openvdbAsset = static_cast<HdCyclesField *>(
+              sceneDelegate->GetRenderIndex().GetBprim(_tokens->openvdbAsset, fieldId)))
+      {
+        const ustring name(fieldName.GetString());
 
         AttributeStandard std = ATTR_STD_NONE;
         if (name == Attribute::standard_name(ATTR_STD_VOLUME_DENSITY)) {
@@ -74,15 +73,17 @@ void HdCyclesVolume::Populate(HdSceneDelegate *sceneDelegate, HdDirtyBits dirtyB
 
         // Skip attributes that are not needed
         if ((std != ATTR_STD_NONE && _geom->need_attribute(scene, std)) ||
-            _geom->need_attribute(scene, name)) {
+            _geom->need_attribute(scene, name))
+        {
           Attribute *const attr = (std != ATTR_STD_NONE) ?
                                       _geom->attributes.add(std) :
-                                      _geom->attributes.add(
-                                          name, TypeDesc::TypeFloat, ATTR_ELEMENT_VOXEL);
-          attr->data_voxel() = openvdbAsset->GetImageHandle();
+                                      _geom->attributes.add(name, TypeFloat, ATTR_ELEMENT_VOXEL);
+          attr->data_voxel_for_write() = openvdbAsset->GetImageHandle();
         }
       }
     }
+
+    _geom->merge_grids(scene);
 
     rebuild = true;
   }

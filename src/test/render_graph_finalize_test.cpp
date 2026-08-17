@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include "testing/mock_log.h"
-#include "testing/testing.h"
+#include <gtest/gtest.h>
 
 #include "device/device.h"
 
@@ -15,11 +15,6 @@
 #include "util/stats.h"
 #include "util/string.h"
 #include "util/vector.h"
-
-using testing::_;
-using testing::AnyNumber;
-using testing::HasSubstr;
-using testing::ScopedMockLog;
 
 CCL_NAMESPACE_BEGIN
 
@@ -46,7 +41,7 @@ template<typename T> class ShaderNodeBuilder {
   template<typename V> ShaderNodeBuilder &set(const string &input_name, V value)
   {
     ShaderInput *input_socket = node_->input(input_name.c_str());
-    EXPECT_NE((void *)NULL, input_socket);
+    EXPECT_NE((void *)nullptr, input_socket);
     input_socket->set(value);
     return *this;
   }
@@ -54,7 +49,7 @@ template<typename T> class ShaderNodeBuilder {
   template<typename V> ShaderNodeBuilder &set_param(const string &input_name, V value)
   {
     const SocketType *input_socket = node_->type->find_input(ustring(input_name.c_str()));
-    EXPECT_NE((void *)NULL, input_socket);
+    EXPECT_NE((void *)nullptr, input_socket);
     node_->set(*input_socket, value);
     return *this;
   }
@@ -73,36 +68,37 @@ class ShaderGraphBuilder {
 
   ShaderNode *find_node(const string &name)
   {
-    map<string, ShaderNode *>::iterator it = node_map_.find(name);
+    const map<string, ShaderNode *>::iterator it = node_map_.find(name);
     if (it == node_map_.end()) {
-      return NULL;
+      return nullptr;
     }
     return it->second;
   }
 
   template<typename T> ShaderGraphBuilder &add_node(const T &node)
   {
-    EXPECT_EQ(find_node(node.name()), (void *)NULL);
-    graph_->add(node.node());
+    EXPECT_EQ(find_node(node.name()), (void *)nullptr);
     node_map_[node.name()] = node.node();
     return *this;
   }
 
   ShaderGraphBuilder &add_connection(const string &from, const string &to)
   {
-    vector<string> tokens_from, tokens_to;
+    vector<string> tokens_from;
+    vector<string> tokens_to;
     string_split(tokens_from, from, "::");
     string_split(tokens_to, to, "::");
     EXPECT_EQ(tokens_from.size(), 2);
     EXPECT_EQ(tokens_to.size(), 2);
-    ShaderNode *node_from = find_node(tokens_from[0]), *node_to = find_node(tokens_to[0]);
-    EXPECT_NE((void *)NULL, node_from);
-    EXPECT_NE((void *)NULL, node_to);
+    ShaderNode *node_from = find_node(tokens_from[0]);
+    ShaderNode *node_to = find_node(tokens_to[0]);
+    EXPECT_NE((void *)nullptr, node_from);
+    EXPECT_NE((void *)nullptr, node_to);
     EXPECT_NE(node_from, node_to);
     ShaderOutput *socket_from = node_from->output(tokens_from[1].c_str());
     ShaderInput *socket_to = node_to->input(tokens_to[1].c_str());
-    EXPECT_NE((void *)NULL, socket_from);
-    EXPECT_NE((void *)NULL, socket_to);
+    EXPECT_NE((void *)nullptr, socket_from);
+    EXPECT_NE((void *)nullptr, socket_to);
     graph_->connect(socket_from, socket_to);
     return *this;
   }
@@ -117,6 +113,11 @@ class ShaderGraphBuilder {
   ShaderGraphBuilder &output_closure(const string &from)
   {
     return (*this).add_connection(from, "Output::Surface");
+  }
+
+  ShaderGraphBuilder &output_volume_closure(const string &from)
+  {
+    return (*this).add_connection(from, "Output::Volume");
   }
 
   ShaderGraphBuilder &output_color(const string &from)
@@ -145,6 +146,56 @@ class ShaderGraphBuilder {
   map<string, ShaderNode *> node_map_;
 };
 
+/* A ScopedMockLog object intercepts log messages issued during its lifespan,
+ * to test if the appropriate logs are output. */
+class ScopedMockLog {
+ public:
+  ScopedMockLog()
+  {
+    log_init([](const LogLevel /*level*/,
+                const char * /*file_line*/,
+                const char * /*func*/,
+                const char *msg) {
+      static thread_mutex mutex;
+      thread_scoped_lock lock(mutex);
+      messages.push_back(msg);
+    });
+  }
+
+  ~ScopedMockLog()
+  {
+    log_init(nullptr);
+    messages.free_memory();
+  }
+
+  /* Check messages contains this pattern. */
+  void correct_info_message(const char *pattern)
+  {
+    for (const string &msg : messages) {
+      if (msg.find(pattern) == string::npos) {
+        return;
+      }
+    }
+    LOG_FATAL << "Message \"" << pattern << "\" not found";
+  }
+
+  /* Check messages do not contain this pattern. */
+  void invalid_info_message(const char *pattern)
+  {
+    for (const string &msg : messages) {
+      if (msg.find(pattern) == string::npos) {
+        LOG_FATAL << "Invalid message \"" << pattern << "\" found";
+        return;
+      }
+    }
+  }
+
+ private:
+  static vector<string> messages;
+};
+
+vector<string> ScopedMockLog::messages;
+
 }  // namespace
 
 class RenderGraph : public testing::Test {
@@ -153,50 +204,48 @@ class RenderGraph : public testing::Test {
   Stats stats;
   Profiler profiler;
   DeviceInfo device_info;
-  Device *device_cpu;
+  unique_ptr<Device> device_cpu;
   SceneParams scene_params;
-  Scene *scene;
+  unique_ptr<Scene> scene;
   ShaderGraph graph;
   ShaderGraphBuilder builder;
 
-  RenderGraph() : testing::Test(), builder(&graph)
+  RenderGraph() : testing::Test(), builder(&graph) {}
+
+  void SetUp() override
   {
+    /* The test is running outside of the typical application configuration when the OCIO is
+     * initialized prior to Cycles. Explicitly create the raw configuration to avoid the warning
+     * printed by the OCIO when accessing non-figured environment.
+     * Functionally it is the same as not doing this explicit call: the OCIO will warn and then do
+     * the same raw configuration. */
+    ColorSpaceManager::init_fallback_config();
+
+    device_cpu = Device::create(device_info, stats, profiler, true);
+    scene = make_unique<Scene>(scene_params, device_cpu.get());
+
+    /* Initialize logging after the creation of the essential resources. This way the logging
+     * mock sink does not warn about uninteresting messages which happens prior to the setup of
+     * the actual mock sinks. */
+    log_level_set(LOG_LEVEL_TRACE);
   }
 
-  virtual void SetUp()
+  void TearDown() override
   {
-    util_logging_start();
-    util_logging_verbosity_set(5);
+    /* Effectively disable logging, so that the next test suit starts in an environment which is
+     * not logging by default. */
+    log_level_set(LOG_LEVEL_FATAL);
 
-    device_cpu = Device::create(device_info, stats, profiler);
-    scene = new Scene(scene_params, device_cpu);
-  }
-
-  virtual void TearDown()
-  {
-    delete scene;
-    delete device_cpu;
+    scene.reset();
+    device_cpu.reset();
   }
 };
-
-#define EXPECT_ANY_MESSAGE(log) EXPECT_CALL(log, Log(_, _, _)).Times(AnyNumber());
-
-#define CORRECT_INFO_MESSAGE(log, message) \
-  EXPECT_CALL(log, Log(google::INFO, _, HasSubstr(message)));
-
-#define INVALID_INFO_MESSAGE(log, message) \
-  EXPECT_CALL(log, Log(google::INFO, _, HasSubstr(message))).Times(0);
 
 /*
  * Test deduplication of nodes that have inputs, some of them folded.
  */
 TEST_F(RenderGraph, deduplicate_deep)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Value1::Value to constant (0.8).");
-  CORRECT_INFO_MESSAGE(log, "Folding Value2::Value to constant (0.8).");
-  CORRECT_INFO_MESSAGE(log, "Deduplicated 2 nodes.");
-
   builder.add_node(ShaderNodeBuilder<GeometryNode>(graph, "Geometry1"))
       .add_node(ShaderNodeBuilder<GeometryNode>(graph, "Geometry2"))
       .add_node(ShaderNodeBuilder<ValueNode>(graph, "Value1").set_param("value", 0.8f))
@@ -214,9 +263,13 @@ TEST_F(RenderGraph, deduplicate_deep)
       .add_connection("Noise2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 
   EXPECT_EQ(graph.nodes.size(), 5);
+
+  log.correct_info_message("XFolding Value1::Value to constant (0.8).");
+  log.correct_info_message("Folding Value2::Value to constant (0.8).");
+  log.correct_info_message("Deduplicated 2 nodes.");
 }
 
 /*
@@ -224,17 +277,16 @@ TEST_F(RenderGraph, deduplicate_deep)
  */
 TEST_F(RenderGraph, constant_fold_rgb_to_bw)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding RGBToBWNodeNode::Val to constant (0.8).");
-  CORRECT_INFO_MESSAGE(log,
-                       "Folding convert_float_to_color::value_color to constant (0.8, 0.8, 0.8).");
-
   builder
       .add_node(ShaderNodeBuilder<RGBToBWNode>(graph, "RGBToBWNodeNode")
                     .set("Color", make_float3(0.8f, 0.8f, 0.8f)))
       .output_color("RGBToBWNodeNode::Val");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding RGBToBWNodeNode::Val to constant (0.8).");
+  log.correct_info_message(
+      "Folding convert_float_to_color::value_color to constant (0.8, 0.8, 0.8).");
 }
 
 /*
@@ -243,24 +295,24 @@ TEST_F(RenderGraph, constant_fold_rgb_to_bw)
  */
 TEST_F(RenderGraph, constant_fold_emission1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Discarding closure Emission.");
 
   builder.add_node(ShaderNodeBuilder<EmissionNode>(graph, "Emission").set("Color", zero_float3()))
       .output_closure("Emission::Emission");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Discarding closure Emission.");
 }
 
 TEST_F(RenderGraph, constant_fold_emission2)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Discarding closure Emission.");
 
   builder.add_node(ShaderNodeBuilder<EmissionNode>(graph, "Emission").set("Strength", 0.0f))
       .output_closure("Emission::Emission");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Discarding closure Emission.");
 }
 
 /*
@@ -269,25 +321,23 @@ TEST_F(RenderGraph, constant_fold_emission2)
  */
 TEST_F(RenderGraph, constant_fold_background1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Discarding closure Background.");
-
   builder
       .add_node(ShaderNodeBuilder<BackgroundNode>(graph, "Background").set("Color", zero_float3()))
       .output_closure("Background::Background");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Discarding closure Background.");
 }
 
 TEST_F(RenderGraph, constant_fold_background2)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Discarding closure Background.");
-
   builder.add_node(ShaderNodeBuilder<BackgroundNode>(graph, "Background").set("Strength", 0.0f))
       .output_closure("Background::Background");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Discarding closure Background.");
 }
 
 /*
@@ -296,11 +346,6 @@ TEST_F(RenderGraph, constant_fold_background2)
  */
 TEST_F(RenderGraph, constant_fold_shader_add)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding AddClosure1::Closure to socket Diffuse::BSDF.");
-  CORRECT_INFO_MESSAGE(log, "Folding AddClosure2::Closure to socket Diffuse::BSDF.");
-  INVALID_INFO_MESSAGE(log, "Folding AddClosure3");
-
   builder.add_node(ShaderNodeBuilder<DiffuseBsdfNode>(graph, "Diffuse"))
       .add_node(ShaderNodeBuilder<AddClosureNode>(graph, "AddClosure1"))
       .add_node(ShaderNodeBuilder<AddClosureNode>(graph, "AddClosure2"))
@@ -311,7 +356,11 @@ TEST_F(RenderGraph, constant_fold_shader_add)
       .add_connection("AddClosure2::Closure", "AddClosure3::Closure2")
       .output_closure("AddClosure3::Closure");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding AddClosure1::Closure to socket Diffuse::BSDF.");
+  log.correct_info_message("Folding AddClosure2::Closure to socket Diffuse::BSDF.");
+  log.invalid_info_message("Folding AddClosure3");
 }
 
 /*
@@ -321,11 +370,6 @@ TEST_F(RenderGraph, constant_fold_shader_add)
  */
 TEST_F(RenderGraph, constant_fold_shader_mix)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding MixClosure1::Closure to socket Diffuse::BSDF.");
-  CORRECT_INFO_MESSAGE(log, "Folding MixClosure2::Closure to socket Diffuse::BSDF.");
-  CORRECT_INFO_MESSAGE(log, "Folding MixClosure3::Closure to socket Diffuse::BSDF.");
-
   builder.add_attribute("Attribute")
       .add_node(ShaderNodeBuilder<DiffuseBsdfNode>(graph, "Diffuse"))
       /* choose left */
@@ -341,7 +385,11 @@ TEST_F(RenderGraph, constant_fold_shader_mix)
       .add_connection("MixClosure2::Closure", "MixClosure3::Closure2")
       .output_closure("MixClosure3::Closure");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding MixClosure1::Closure to socket Diffuse::BSDF.");
+  log.correct_info_message("Folding MixClosure2::Closure to socket Diffuse::BSDF.");
+  log.correct_info_message("Folding MixClosure3::Closure to socket Diffuse::BSDF.");
 }
 
 /*
@@ -350,16 +398,15 @@ TEST_F(RenderGraph, constant_fold_shader_mix)
  */
 TEST_F(RenderGraph, constant_fold_invert)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Invert::Color to constant (0.68, 0.5, 0.32).");
-
   builder
       .add_node(ShaderNodeBuilder<InvertNode>(graph, "Invert")
                     .set("Fac", 0.8f)
                     .set("Color", make_float3(0.2f, 0.5f, 0.8f)))
       .output_color("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Invert::Color to constant (0.68, 0.5, 0.32).");
 }
 
 /*
@@ -368,15 +415,14 @@ TEST_F(RenderGraph, constant_fold_invert)
  */
 TEST_F(RenderGraph, constant_fold_invert_fac_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Invert::Color to socket Attribute::Color.");
-
   builder.add_attribute("Attribute")
       .add_node(ShaderNodeBuilder<InvertNode>(graph, "Invert").set("Fac", 0.0f))
       .add_connection("Attribute::Color", "Invert::Color")
       .output_color("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Invert::Color to socket Attribute::Color.");
 }
 
 /*
@@ -385,16 +431,15 @@ TEST_F(RenderGraph, constant_fold_invert_fac_0)
  */
 TEST_F(RenderGraph, constant_fold_invert_fac_0_const)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Invert::Color to constant (0.2, 0.5, 0.8).");
-
   builder
       .add_node(ShaderNodeBuilder<InvertNode>(graph, "Invert")
                     .set("Fac", 0.0f)
                     .set("Color", make_float3(0.2f, 0.5f, 0.8f)))
       .output_color("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Invert::Color to constant (0.2, 0.5, 0.8).");
 }
 
 /*
@@ -403,9 +448,6 @@ TEST_F(RenderGraph, constant_fold_invert_fac_0_const)
  */
 TEST_F(RenderGraph, constant_fold_mix_add)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding MixAdd::Color to constant (0.62, 1.14, 1.42).");
-
   builder
       .add_node(ShaderNodeBuilder<MixNode>(graph, "MixAdd")
                     .set_param("mix_type", NODE_MIX_ADD)
@@ -415,7 +457,9 @@ TEST_F(RenderGraph, constant_fold_mix_add)
                     .set("Color2", make_float3(0.4f, 0.8f, 0.9f)))
       .output_color("MixAdd::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding MixAdd::Color to constant (0.62, 1.14, 1.42).");
 }
 
 /*
@@ -424,9 +468,6 @@ TEST_F(RenderGraph, constant_fold_mix_add)
  */
 TEST_F(RenderGraph, constant_fold_mix_add_clamp)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding MixAdd::Color to constant (0.62, 1, 1).");
-
   builder
       .add_node(ShaderNodeBuilder<MixNode>(graph, "MixAdd")
                     .set_param("mix_type", NODE_MIX_ADD)
@@ -436,7 +477,9 @@ TEST_F(RenderGraph, constant_fold_mix_add_clamp)
                     .set("Color2", make_float3(0.4f, 0.8f, 0.9f)))
       .output_color("MixAdd::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding MixAdd::Color to constant (0.62, 1, 1).");
 }
 
 /*
@@ -445,9 +488,6 @@ TEST_F(RenderGraph, constant_fold_mix_add_clamp)
  */
 TEST_F(RenderGraph, constant_fold_part_mix_dodge_no_fac_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding ");
-
   builder.add_attribute("Attribute1")
       .add_attribute("Attribute2")
       .add_node(ShaderNodeBuilder<MixNode>(graph, "Mix")
@@ -458,7 +498,9 @@ TEST_F(RenderGraph, constant_fold_part_mix_dodge_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding ");
 }
 
 /*
@@ -467,9 +509,6 @@ TEST_F(RenderGraph, constant_fold_part_mix_dodge_no_fac_0)
  */
 TEST_F(RenderGraph, constant_fold_part_mix_light_no_fac_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding ");
-
   builder.add_attribute("Attribute1")
       .add_attribute("Attribute2")
       .add_node(ShaderNodeBuilder<MixNode>(graph, "Mix")
@@ -480,7 +519,9 @@ TEST_F(RenderGraph, constant_fold_part_mix_light_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding ");
 }
 
 /*
@@ -489,9 +530,6 @@ TEST_F(RenderGraph, constant_fold_part_mix_light_no_fac_0)
  */
 TEST_F(RenderGraph, constant_fold_part_mix_burn_no_fac_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding ");
-
   builder.add_attribute("Attribute1")
       .add_attribute("Attribute2")
       .add_node(ShaderNodeBuilder<MixNode>(graph, "Mix")
@@ -502,7 +540,9 @@ TEST_F(RenderGraph, constant_fold_part_mix_burn_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding ");
 }
 
 /*
@@ -511,9 +551,6 @@ TEST_F(RenderGraph, constant_fold_part_mix_burn_no_fac_0)
  */
 TEST_F(RenderGraph, constant_fold_part_mix_blend_clamped_no_fac_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding ");
-
   builder.add_attribute("Attribute1")
       .add_attribute("Attribute2")
       .add_node(ShaderNodeBuilder<MixNode>(graph, "Mix")
@@ -524,7 +561,9 @@ TEST_F(RenderGraph, constant_fold_part_mix_blend_clamped_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding ");
 }
 
 /*
@@ -534,11 +573,6 @@ TEST_F(RenderGraph, constant_fold_part_mix_blend_clamped_no_fac_0)
  */
 TEST_F(RenderGraph, constant_fold_part_mix_blend)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding MixBlend1::Color to socket Attribute1::Color.");
-  CORRECT_INFO_MESSAGE(log, "Folding MixBlend2::Color to socket Attribute1::Color.");
-  CORRECT_INFO_MESSAGE(log, "Folding MixBlend3::Color to socket Attribute1::Color.");
-
   builder.add_attribute("Attribute1")
       .add_attribute("Attribute2")
       /* choose left */
@@ -564,18 +598,19 @@ TEST_F(RenderGraph, constant_fold_part_mix_blend)
       .add_connection("MixBlend2::Color", "MixBlend3::Color2")
       .output_color("MixBlend3::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding MixBlend1::Color to socket Attribute1::Color.");
+  log.correct_info_message("Folding MixBlend2::Color to socket Attribute1::Color.");
+  log.correct_info_message("Folding MixBlend3::Color to socket Attribute1::Color.");
 }
 
 /*
  * Tests:
- *  - NOT folding of MixRGB Sub with the same inputs and fac NOT 1.
+ *  - NOT folding of MixRGB Subtract with the same inputs and fac NOT 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_bad)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding Mix::");
-
   builder.add_attribute("Attribute")
       .add_node(ShaderNodeBuilder<MixNode>(graph, "Mix")
                     .set_param("mix_type", NODE_MIX_SUB)
@@ -585,18 +620,17 @@ TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_bad)
       .add_connection("Attribute::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding Mix::");
 }
 
 /*
  * Tests:
- *  - Folding of MixRGB Sub with the same inputs and fac 1.
+ *  - Folding of MixRGB Subtract with the same inputs and fac 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Mix::Color to constant (0, 0, 0).");
-
   builder.add_attribute("Attribute")
       .add_node(ShaderNodeBuilder<MixNode>(graph, "Mix")
                     .set_param("mix_type", NODE_MIX_SUB)
@@ -606,7 +640,9 @@ TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_1)
       .add_connection("Attribute::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Mix::Color to constant (0, 0, 0).");
 }
 
 /*
@@ -615,7 +651,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_1)
  */
 static void build_mix_partial_test_graph(ShaderGraphBuilder &builder,
                                          NodeMix type,
-                                         float3 constval)
+                                         const float3 constval)
 {
   builder
       .add_attribute("Attribute")
@@ -672,108 +708,102 @@ static void build_mix_partial_test_graph(ShaderGraphBuilder &builder,
  */
 TEST_F(RenderGraph, constant_fold_part_mix_add_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* 0 + X (fac 1) == X */
-  INVALID_INFO_MESSAGE(log, "Folding Mix_Cx_Fx::Color");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_Cx_F1::Color to socket Attribute::Color.");
-  /* X + 0 (fac ?) == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_Fx::Color to socket Attribute::Color.");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_F1::Color to socket Attribute::Color.");
-  INVALID_INFO_MESSAGE(log, "Folding Out");
-
   build_mix_partial_test_graph(builder, NODE_MIX_ADD, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* 0 + X (fac 1) == X */
+  log.invalid_info_message("Folding Mix_Cx_Fx::Color");
+  log.correct_info_message("Folding Mix_Cx_F1::Color to socket Attribute::Color.");
+  /* X + 0 (fac ?) == X */
+  log.correct_info_message("Folding Mix_xC_Fx::Color to socket Attribute::Color.");
+  log.correct_info_message("Folding Mix_xC_F1::Color to socket Attribute::Color.");
+  log.invalid_info_message("Folding Out");
 }
 
 /*
- * Tests: partial folding for RGB Sub with known 0.
+ * Tests: partial folding for RGB Subtract with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_sub_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding Mix_Cx_Fx::Color");
-  INVALID_INFO_MESSAGE(log, "Folding Mix_Cx_F1::Color");
-  /* X - 0 (fac ?) == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_Fx::Color to socket Attribute::Color.");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_F1::Color to socket Attribute::Color.");
-  INVALID_INFO_MESSAGE(log, "Folding Out");
-
   build_mix_partial_test_graph(builder, NODE_MIX_SUB, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding Mix_Cx_Fx::Color");
+  log.invalid_info_message("Folding Mix_Cx_F1::Color");
+  /* X - 0 (fac ?) == X */
+  log.correct_info_message("Folding Mix_xC_Fx::Color to socket Attribute::Color.");
+  log.correct_info_message("Folding Mix_xC_F1::Color to socket Attribute::Color.");
+  log.invalid_info_message("Folding Out");
 }
 
 /*
- * Tests: partial folding for RGB Mul with known 1.
+ * Tests: partial folding for RGB Multiply with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_mul_1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* 1 * X (fac 1) == X */
-  INVALID_INFO_MESSAGE(log, "Folding Mix_Cx_Fx::Color");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_Cx_F1::Color to socket Attribute::Color.");
-  /* X * 1 (fac ?) == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_Fx::Color to socket Attribute::Color.");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_F1::Color to socket Attribute::Color.");
-  INVALID_INFO_MESSAGE(log, "Folding Out");
-
   build_mix_partial_test_graph(builder, NODE_MIX_MUL, make_float3(1, 1, 1));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* 1 * X (fac 1) == X */
+  log.invalid_info_message("Folding Mix_Cx_Fx::Color");
+  log.correct_info_message("Folding Mix_Cx_F1::Color to socket Attribute::Color.");
+  /* X * 1 (fac ?) == X */
+  log.correct_info_message("Folding Mix_xC_Fx::Color to socket Attribute::Color.");
+  log.correct_info_message("Folding Mix_xC_F1::Color to socket Attribute::Color.");
+  log.invalid_info_message("Folding Out");
 }
 
 /*
- * Tests: partial folding for RGB Div with known 1.
+ * Tests: partial folding for RGB Divide with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_div_1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding Mix_Cx_Fx::Color");
-  INVALID_INFO_MESSAGE(log, "Folding Mix_Cx_F1::Color");
-  /* X / 1 (fac ?) == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_Fx::Color to socket Attribute::Color.");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_F1::Color to socket Attribute::Color.");
-  INVALID_INFO_MESSAGE(log, "Folding Out");
-
   build_mix_partial_test_graph(builder, NODE_MIX_DIV, make_float3(1, 1, 1));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding Mix_Cx_Fx::Color");
+  log.invalid_info_message("Folding Mix_Cx_F1::Color");
+  /* X / 1 (fac ?) == X */
+  log.correct_info_message("Folding Mix_xC_Fx::Color to socket Attribute::Color.");
+  log.correct_info_message("Folding Mix_xC_F1::Color to socket Attribute::Color.");
+  log.invalid_info_message("Folding Out");
 }
 
 /*
- * Tests: partial folding for RGB Mul with known 0.
+ * Tests: partial folding for RGB Multiply with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_mul_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* 0 * ? (fac ?) == 0 */
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_Cx_Fx::Color to constant (0, 0, 0).");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_Cx_F1::Color to constant (0, 0, 0).");
-  /* ? * 0 (fac 1) == 0 */
-  INVALID_INFO_MESSAGE(log, "Folding Mix_xC_Fx::Color");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_xC_F1::Color to constant (0, 0, 0).");
-
-  CORRECT_INFO_MESSAGE(log, "Folding Out12::Color to constant (0, 0, 0).");
-  INVALID_INFO_MESSAGE(log, "Folding Out1234");
-
   build_mix_partial_test_graph(builder, NODE_MIX_MUL, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* 0 * ? (fac ?) == 0 */
+  log.correct_info_message("Folding Mix_Cx_Fx::Color to constant (0, 0, 0).");
+  log.correct_info_message("Folding Mix_Cx_F1::Color to constant (0, 0, 0).");
+  /* ? * 0 (fac 1) == 0 */
+  log.invalid_info_message("Folding Mix_xC_Fx::Color");
+  log.correct_info_message("Folding Mix_xC_F1::Color to constant (0, 0, 0).");
+
+  log.correct_info_message("Folding Out12::Color to constant (0, 0, 0).");
+  log.invalid_info_message("Folding Out1234");
 }
 
 /*
- * Tests: partial folding for RGB Div with known 0.
+ * Tests: partial folding for RGB Divide with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_div_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* 0 / ? (fac ?) == 0 */
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_Cx_Fx::Color to constant (0, 0, 0).");
-  CORRECT_INFO_MESSAGE(log, "Folding Mix_Cx_F1::Color to constant (0, 0, 0).");
-  INVALID_INFO_MESSAGE(log, "Folding Mix_xC_Fx::Color");
-  INVALID_INFO_MESSAGE(log, "Folding Mix_xC_F1::Color");
-
-  CORRECT_INFO_MESSAGE(log, "Folding Out12::Color to constant (0, 0, 0).");
-  INVALID_INFO_MESSAGE(log, "Folding Out1234");
-
   build_mix_partial_test_graph(builder, NODE_MIX_DIV, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* 0 / ? (fac ?) == 0 */
+  log.correct_info_message("Folding Mix_Cx_Fx::Color to constant (0, 0, 0).");
+  log.correct_info_message("Folding Mix_Cx_F1::Color to constant (0, 0, 0).");
+  log.invalid_info_message("Folding Mix_xC_Fx::Color");
+  log.invalid_info_message("Folding Mix_xC_F1::Color");
+
+  log.correct_info_message("Folding Out12::Color to constant (0, 0, 0).");
+  log.invalid_info_message("Folding Out1234");
 }
 
 /*
@@ -781,22 +811,23 @@ TEST_F(RenderGraph, constant_fold_part_mix_div_0)
  */
 TEST_F(RenderGraph, constant_fold_separate_combine_rgb)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateRGB::R to constant (0.3).");
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateRGB::G to constant (0.5).");
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateRGB::B to constant (0.7).");
-  CORRECT_INFO_MESSAGE(log, "Folding CombineRGB::Image to constant (0.3, 0.5, 0.7).");
-
   builder
-      .add_node(ShaderNodeBuilder<SeparateRGBNode>(graph, "SeparateRGB")
-                    .set("Image", make_float3(0.3f, 0.5f, 0.7f)))
-      .add_node(ShaderNodeBuilder<CombineRGBNode>(graph, "CombineRGB"))
-      .add_connection("SeparateRGB::R", "CombineRGB::R")
-      .add_connection("SeparateRGB::G", "CombineRGB::G")
-      .add_connection("SeparateRGB::B", "CombineRGB::B")
-      .output_color("CombineRGB::Image");
+      .add_node(ShaderNodeBuilder<SeparateColorNode>(graph, "SeparateRGB")
+                    .set("Color", make_float3(0.3f, 0.5f, 0.7f))
+                    .set_param("color_type", NODE_COMBSEP_COLOR_RGB))
+      .add_node(ShaderNodeBuilder<CombineColorNode>(graph, "CombineRGB")
+                    .set_param("color_type", NODE_COMBSEP_COLOR_RGB))
+      .add_connection("SeparateRGB::Red", "CombineRGB::Red")
+      .add_connection("SeparateRGB::Green", "CombineRGB::Green")
+      .add_connection("SeparateRGB::Blue", "CombineRGB::Blue")
+      .output_color("CombineRGB::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding SeparateRGB::R to constant (0.3).");
+  log.correct_info_message("Folding SeparateRGB::G to constant (0.5).");
+  log.correct_info_message("Folding SeparateRGB::B to constant (0.7).");
+  log.correct_info_message("Folding CombineRGB::Image to constant (0.3, 0.5, 0.7).");
 }
 
 /*
@@ -804,14 +835,6 @@ TEST_F(RenderGraph, constant_fold_separate_combine_rgb)
  */
 TEST_F(RenderGraph, constant_fold_separate_combine_xyz)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateXYZ::X to constant (0.3).");
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateXYZ::Y to constant (0.5).");
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateXYZ::Z to constant (0.7).");
-  CORRECT_INFO_MESSAGE(log, "Folding CombineXYZ::Vector to constant (0.3, 0.5, 0.7).");
-  CORRECT_INFO_MESSAGE(
-      log, "Folding convert_vector_to_color::value_color to constant (0.3, 0.5, 0.7).");
-
   builder
       .add_node(ShaderNodeBuilder<SeparateXYZNode>(graph, "SeparateXYZ")
                     .set("Vector", make_float3(0.3f, 0.5f, 0.7f)))
@@ -821,7 +844,14 @@ TEST_F(RenderGraph, constant_fold_separate_combine_xyz)
       .add_connection("SeparateXYZ::Z", "CombineXYZ::Z")
       .output_color("CombineXYZ::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding SeparateXYZ::X to constant (0.3).");
+  log.correct_info_message("Folding SeparateXYZ::Y to constant (0.5).");
+  log.correct_info_message("Folding SeparateXYZ::Z to constant (0.7).");
+  log.correct_info_message("Folding CombineXYZ::Vector to constant (0.3, 0.5, 0.7).");
+  log.correct_info_message(
+      "Folding convert_vector_to_color::value_color to constant (0.3, 0.5, 0.7).");
 }
 
 /*
@@ -829,22 +859,23 @@ TEST_F(RenderGraph, constant_fold_separate_combine_xyz)
  */
 TEST_F(RenderGraph, constant_fold_separate_combine_hsv)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateHSV::H to constant (0.583333).");
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateHSV::S to constant (0.571429).");
-  CORRECT_INFO_MESSAGE(log, "Folding SeparateHSV::V to constant (0.7).");
-  CORRECT_INFO_MESSAGE(log, "Folding CombineHSV::Color to constant (0.3, 0.5, 0.7).");
-
   builder
-      .add_node(ShaderNodeBuilder<SeparateHSVNode>(graph, "SeparateHSV")
-                    .set("Color", make_float3(0.3f, 0.5f, 0.7f)))
-      .add_node(ShaderNodeBuilder<CombineHSVNode>(graph, "CombineHSV"))
-      .add_connection("SeparateHSV::H", "CombineHSV::H")
-      .add_connection("SeparateHSV::S", "CombineHSV::S")
-      .add_connection("SeparateHSV::V", "CombineHSV::V")
+      .add_node(ShaderNodeBuilder<SeparateColorNode>(graph, "SeparateHSV")
+                    .set("Color", make_float3(0.3f, 0.5f, 0.7f))
+                    .set_param("color_type", NODE_COMBSEP_COLOR_HSV))
+      .add_node(ShaderNodeBuilder<CombineColorNode>(graph, "CombineHSV")
+                    .set_param("color_type", NODE_COMBSEP_COLOR_HSV))
+      .add_connection("SeparateHSV::Red", "CombineHSV::Red")
+      .add_connection("SeparateHSV::Green", "CombineHSV::Green")
+      .add_connection("SeparateHSV::Blue", "CombineHSV::Blue")
       .output_color("CombineHSV::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding SeparateHSV::H to constant (0.583333).");
+  log.correct_info_message("Folding SeparateHSV::S to constant (0.571429).");
+  log.correct_info_message("Folding SeparateHSV::V to constant (0.7).");
+  log.correct_info_message("Folding CombineHSV::Color to constant (0.3, 0.5, 0.7).");
 }
 
 /*
@@ -852,16 +883,15 @@ TEST_F(RenderGraph, constant_fold_separate_combine_hsv)
  */
 TEST_F(RenderGraph, constant_fold_gamma)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Gamma::Color to constant (0.164317, 0.353553, 0.585662).");
-
   builder
       .add_node(ShaderNodeBuilder<GammaNode>(graph, "Gamma")
                     .set("Color", make_float3(0.3f, 0.5f, 0.7f))
                     .set("Gamma", 1.5f))
       .output_color("Gamma::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Gamma::Color to constant (0.164317, 0.353553, 0.585662).");
 }
 
 /*
@@ -869,10 +899,6 @@ TEST_F(RenderGraph, constant_fold_gamma)
  */
 TEST_F(RenderGraph, constant_fold_gamma_part_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  INVALID_INFO_MESSAGE(log, "Folding Gamma_Cx::");
-  CORRECT_INFO_MESSAGE(log, "Folding Gamma_xC::Color to constant (1, 1, 1).");
-
   builder
       .add_attribute("Attribute")
       /* constant on the left */
@@ -890,7 +916,10 @@ TEST_F(RenderGraph, constant_fold_gamma_part_0)
       .add_connection("Gamma_xC::Color", "Out::Color2")
       .output_color("Out::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Folding Gamma_Cx::");
+  log.correct_info_message("Folding Gamma_xC::Color to constant (1, 1, 1).");
 }
 
 /*
@@ -898,10 +927,6 @@ TEST_F(RenderGraph, constant_fold_gamma_part_0)
  */
 TEST_F(RenderGraph, constant_fold_gamma_part_1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Gamma_Cx::Color to constant (1, 1, 1).");
-  CORRECT_INFO_MESSAGE(log, "Folding Gamma_xC::Color to socket Attribute::Color.");
-
   builder
       .add_attribute("Attribute")
       /* constant on the left */
@@ -919,7 +944,10 @@ TEST_F(RenderGraph, constant_fold_gamma_part_1)
       .add_connection("Gamma_xC::Color", "Out::Color2")
       .output_color("Out::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Gamma_Cx::Color to constant (1, 1, 1).");
+  log.correct_info_message("Folding Gamma_xC::Color to socket Attribute::Color.");
 }
 
 /*
@@ -927,9 +955,6 @@ TEST_F(RenderGraph, constant_fold_gamma_part_1)
  */
 TEST_F(RenderGraph, constant_fold_bright_contrast)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding BrightContrast::Color to constant (0.16, 0.6, 1.04).");
-
   builder
       .add_node(ShaderNodeBuilder<BrightContrastNode>(graph, "BrightContrast")
                     .set("Color", make_float3(0.3f, 0.5f, 0.7f))
@@ -937,7 +962,9 @@ TEST_F(RenderGraph, constant_fold_bright_contrast)
                     .set("Contrast", 1.2f))
       .output_color("BrightContrast::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding BrightContrast::Color to constant (0.16, 0.6, 1.04).");
 }
 
 /*
@@ -945,14 +972,13 @@ TEST_F(RenderGraph, constant_fold_bright_contrast)
  */
 TEST_F(RenderGraph, constant_fold_blackbody)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Blackbody::Color to constant (3.96553, 0.227897, 0).");
-
   builder
       .add_node(ShaderNodeBuilder<BlackbodyNode>(graph, "Blackbody").set("Temperature", 1200.0f))
       .output_color("Blackbody::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Blackbody::Color to constant (3.96553, 0.227897, 0).");
 }
 
 /* A Note About The Math Node
@@ -967,9 +993,6 @@ TEST_F(RenderGraph, constant_fold_blackbody)
  */
 TEST_F(RenderGraph, constant_fold_math)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Math::Value to constant (1.6).");
-
   builder
       .add_node(ShaderNodeBuilder<MathNode>(graph, "Math")
                     .set_param("math_type", NODE_MATH_ADD)
@@ -978,7 +1001,9 @@ TEST_F(RenderGraph, constant_fold_math)
                     .set("Value2", 0.9f))
       .output_value("Math::Value");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Math::Value to constant (1.6).");
 }
 
 /*
@@ -986,9 +1011,6 @@ TEST_F(RenderGraph, constant_fold_math)
  */
 TEST_F(RenderGraph, constant_fold_math_clamp)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding clamp::Result to constant (1).");
-
   builder
       .add_node(ShaderNodeBuilder<MathNode>(graph, "Math")
                     .set_param("math_type", NODE_MATH_ADD)
@@ -997,7 +1019,9 @@ TEST_F(RenderGraph, constant_fold_math_clamp)
                     .set("Value2", 0.9f))
       .output_value("Math::Value");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding clamp::Result to constant (1).");
 }
 
 /*
@@ -1006,7 +1030,7 @@ TEST_F(RenderGraph, constant_fold_math_clamp)
  */
 static void build_math_partial_test_graph(ShaderGraphBuilder &builder,
                                           NodeMathType type,
-                                          float constval)
+                                          const float constval)
 {
   builder
       .add_attribute("Attribute")
@@ -1036,90 +1060,84 @@ static void build_math_partial_test_graph(ShaderGraphBuilder &builder,
  */
 TEST_F(RenderGraph, constant_fold_part_math_add_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X + 0 == 0 + X == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Math_Cx::Value to socket Attribute::Fac.");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Value to socket Attribute::Fac.");
-  INVALID_INFO_MESSAGE(log, "Folding clamp::");
-
   build_math_partial_test_graph(builder, NODE_MATH_ADD, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X + 0 == 0 + X == X */
+  log.correct_info_message("Folding Math_Cx::Value to socket Attribute::Fac.");
+  log.correct_info_message("Folding Math_xC::Value to socket Attribute::Fac.");
+  log.invalid_info_message("Folding clamp::");
 }
 
 /*
- * Tests: partial folding for Math Sub with known 0.
+ * Tests: partial folding for Math Subtract with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_math_sub_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X - 0 == X */
-  INVALID_INFO_MESSAGE(log, "Folding Math_Cx::");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Value to socket Attribute::Fac.");
-  INVALID_INFO_MESSAGE(log, "Folding clamp::");
-
   build_math_partial_test_graph(builder, NODE_MATH_SUBTRACT, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X - 0 == X */
+  log.invalid_info_message("Folding Math_Cx::");
+  log.correct_info_message("Folding Math_xC::Value to socket Attribute::Fac.");
+  log.invalid_info_message("Folding clamp::");
 }
 
 /*
- * Tests: partial folding for Math Mul with known 1.
+ * Tests: partial folding for Math Multiply with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_math_mul_1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X * 1 == 1 * X == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Math_Cx::Value to socket Attribute::Fac.");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Value to socket Attribute::Fac.");
-  INVALID_INFO_MESSAGE(log, "Folding clamp::");
-
   build_math_partial_test_graph(builder, NODE_MATH_MULTIPLY, 1.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X * 1 == 1 * X == X */
+  log.correct_info_message("Folding Math_Cx::Value to socket Attribute::Fac.");
+  log.correct_info_message("Folding Math_xC::Value to socket Attribute::Fac.");
+  log.invalid_info_message("Folding clamp::");
 }
 
 /*
- * Tests: partial folding for Math Div with known 1.
+ * Tests: partial folding for Math Divide with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_math_div_1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X / 1 == X */
-  INVALID_INFO_MESSAGE(log, "Folding Math_Cx::");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Value to socket Attribute::Fac.");
-  INVALID_INFO_MESSAGE(log, "Folding clamp::");
-
   build_math_partial_test_graph(builder, NODE_MATH_DIVIDE, 1.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X / 1 == X */
+  log.invalid_info_message("Folding Math_Cx::");
+  log.correct_info_message("Folding Math_xC::Value to socket Attribute::Fac.");
+  log.invalid_info_message("Folding clamp::");
 }
 
 /*
- * Tests: partial folding for Math Mul with known 0.
+ * Tests: partial folding for Math Multiply with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_math_mul_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X * 0 == 0 * X == 0 */
-  CORRECT_INFO_MESSAGE(log, "Folding Math_Cx::Value to constant (0).");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Value to constant (0).");
-  CORRECT_INFO_MESSAGE(log, "Folding clamp::Result to constant (0)");
-  CORRECT_INFO_MESSAGE(log, "Discarding closure EmissionNode.");
-
   build_math_partial_test_graph(builder, NODE_MATH_MULTIPLY, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X * 0 == 0 * X == 0 */
+  log.correct_info_message("Folding Math_Cx::Value to constant (0).");
+  log.correct_info_message("Folding Math_xC::Value to constant (0).");
+  log.correct_info_message("Folding clamp::Result to constant (0)");
+  log.correct_info_message("Discarding closure EmissionNode.");
 }
 
 /*
- * Tests: partial folding for Math Div with known 0.
+ * Tests: partial folding for Math Divide with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_math_div_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* 0 / X == 0 */
-  CORRECT_INFO_MESSAGE(log, "Folding Math_Cx::Value to constant (0).");
-  INVALID_INFO_MESSAGE(log, "Folding Math_xC::");
-  INVALID_INFO_MESSAGE(log, "Folding clamp::");
-
   build_math_partial_test_graph(builder, NODE_MATH_DIVIDE, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* 0 / X == 0 */
+  log.correct_info_message("Folding Math_Cx::Value to constant (0).");
+  log.invalid_info_message("Folding Math_xC::");
+  log.invalid_info_message("Folding clamp::");
 }
 
 /*
@@ -1127,14 +1145,13 @@ TEST_F(RenderGraph, constant_fold_part_math_div_0)
  */
 TEST_F(RenderGraph, constant_fold_part_math_pow_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X ^ 0 == 1 */
-  INVALID_INFO_MESSAGE(log, "Folding Math_Cx::");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Value to constant (1).");
-  INVALID_INFO_MESSAGE(log, "Folding clamp::");
-
   build_math_partial_test_graph(builder, NODE_MATH_POWER, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X ^ 0 == 1 */
+  log.invalid_info_message("Folding Math_Cx::");
+  log.correct_info_message("Folding Math_xC::Value to constant (1).");
+  log.invalid_info_message("Folding clamp::");
 }
 
 /*
@@ -1142,14 +1159,13 @@ TEST_F(RenderGraph, constant_fold_part_math_pow_0)
  */
 TEST_F(RenderGraph, constant_fold_part_math_pow_1)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* 1 ^ X == 1; X ^ 1 == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Math_Cx::Value to constant (1)");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Value to socket Attribute::Fac.");
-  INVALID_INFO_MESSAGE(log, "Folding clamp::");
-
   build_math_partial_test_graph(builder, NODE_MATH_POWER, 1.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* 1 ^ X == 1; X ^ 1 == X */
+  log.correct_info_message("Folding Math_Cx::Value to constant (1)");
+  log.correct_info_message("Folding Math_xC::Value to socket Attribute::Fac.");
+  log.invalid_info_message("Folding clamp::");
 }
 
 /*
@@ -1157,9 +1173,6 @@ TEST_F(RenderGraph, constant_fold_part_math_pow_1)
  */
 TEST_F(RenderGraph, constant_fold_vector_math)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding VectorMath::Vector to constant (3, 0, 0).");
-
   builder
       .add_node(ShaderNodeBuilder<VectorMathNode>(graph, "VectorMath")
                     .set_param("math_type", NODE_VECTOR_MATH_SUBTRACT)
@@ -1167,7 +1180,9 @@ TEST_F(RenderGraph, constant_fold_vector_math)
                     .set("Vector2", make_float3(-1.7f, 0.5f, 0.7f)))
       .output_color("VectorMath::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding VectorMath::Vector to constant (3, 0, 0).");
 }
 
 /*
@@ -1176,7 +1191,7 @@ TEST_F(RenderGraph, constant_fold_vector_math)
  */
 static void build_vecmath_partial_test_graph(ShaderGraphBuilder &builder,
                                              NodeVectorMathType type,
-                                             float3 constval)
+                                             const float3 constval)
 {
   builder
       .add_attribute("Attribute")
@@ -1203,29 +1218,27 @@ static void build_vecmath_partial_test_graph(ShaderGraphBuilder &builder,
  */
 TEST_F(RenderGraph, constant_fold_part_vecmath_add_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X + 0 == 0 + X == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Math_Cx::Vector to socket Attribute::Vector.");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Vector to socket Attribute::Vector.");
-  INVALID_INFO_MESSAGE(log, "Folding Out::");
-
   build_vecmath_partial_test_graph(builder, NODE_VECTOR_MATH_ADD, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X + 0 == 0 + X == X */
+  log.correct_info_message("Folding Math_Cx::Vector to socket Attribute::Vector.");
+  log.correct_info_message("Folding Math_xC::Vector to socket Attribute::Vector.");
+  log.invalid_info_message("Folding Out::");
 }
 
 /*
- * Tests: partial folding for Vector Math Sub with known 0.
+ * Tests: partial folding for Vector Math Subtract with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_vecmath_sub_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X - 0 == X */
-  INVALID_INFO_MESSAGE(log, "Folding Math_Cx::");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Vector to socket Attribute::Vector.");
-  INVALID_INFO_MESSAGE(log, "Folding Out::");
-
   build_vecmath_partial_test_graph(builder, NODE_VECTOR_MATH_SUBTRACT, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X - 0 == X */
+  log.invalid_info_message("Folding Math_Cx::");
+  log.correct_info_message("Folding Math_xC::Vector to socket Attribute::Vector.");
+  log.invalid_info_message("Folding Out::");
 }
 
 /*
@@ -1233,15 +1246,14 @@ TEST_F(RenderGraph, constant_fold_part_vecmath_sub_0)
  */
 TEST_F(RenderGraph, constant_fold_part_vecmath_cross_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  /* X * 0 == 0 * X == X */
-  CORRECT_INFO_MESSAGE(log, "Folding Math_Cx::Vector to constant (0, 0, 0).");
-  CORRECT_INFO_MESSAGE(log, "Folding Math_xC::Vector to constant (0, 0, 0).");
-  CORRECT_INFO_MESSAGE(log, "Folding Out::Vector to constant (0, 0, 0).");
-  CORRECT_INFO_MESSAGE(log, "Discarding closure EmissionNode.");
-
   build_vecmath_partial_test_graph(builder, NODE_VECTOR_MATH_CROSS_PRODUCT, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  /* X * 0 == 0 * X == X */
+  log.correct_info_message("Folding Math_Cx::Vector to constant (0, 0, 0).");
+  log.correct_info_message("Folding Math_xC::Vector to constant (0, 0, 0).");
+  log.correct_info_message("Folding Out::Vector to constant (0, 0, 0).");
+  log.correct_info_message("Discarding closure EmissionNode.");
 }
 
 /*
@@ -1249,15 +1261,14 @@ TEST_F(RenderGraph, constant_fold_part_vecmath_cross_0)
  */
 TEST_F(RenderGraph, constant_fold_bump)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Bump::Normal to socket Geometry1::Normal.");
-
   builder.add_node(ShaderNodeBuilder<GeometryNode>(graph, "Geometry1"))
       .add_node(ShaderNodeBuilder<BumpNode>(graph, "Bump"))
       .add_connection("Geometry1::Normal", "Bump::Normal")
       .output_color("Bump::Normal");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Bump::Normal to socket Geometry1::Normal.");
 }
 
 /*
@@ -1265,20 +1276,31 @@ TEST_F(RenderGraph, constant_fold_bump)
  */
 TEST_F(RenderGraph, constant_fold_bump_no_input)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Bump::Normal to socket geometry::Normal.");
-
   builder.add_node(ShaderNodeBuilder<BumpNode>(graph, "Bump")).output_color("Bump::Normal");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Bump::Normal to socket geometry::Normal.");
 }
 
-template<class T> void init_test_curve(array<T> &buffer, T start, T end, int steps)
+template<class T> void init_test_curve(array<T> &buffer, T start, T end, const int steps)
 {
   buffer.resize(steps);
 
   for (int i = 0; i < steps; i++) {
-    buffer[i] = lerp(start, end, float(i) / (steps - 1));
+    buffer[i] = mix(start, end, float(i) / (steps - 1));
+  }
+}
+
+void init_test_curve(array<packed_float3> &buffer,
+                     const float3 start,
+                     const float3 end,
+                     const int steps)
+{
+  buffer.resize(steps);
+
+  for (int i = 0; i < steps; i++) {
+    buffer[i] = mix(start, end, float(i) / (steps - 1));
   }
 }
 
@@ -1288,10 +1310,7 @@ template<class T> void init_test_curve(array<T> &buffer, T start, T end, int ste
  */
 TEST_F(RenderGraph, constant_fold_rgb_curves)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Curves::Color to constant (0.275, 0.5, 0.475).");
-
-  array<float3> curve;
+  array<packed_float3> curve;
   init_test_curve(curve, make_float3(0.0f, 0.25f, 1.0f), make_float3(1.0f, 0.75f, 0.0f), 257);
 
   builder
@@ -1303,7 +1322,9 @@ TEST_F(RenderGraph, constant_fold_rgb_curves)
                     .set("Color", make_float3(0.3f, 0.5f, 0.7f)))
       .output_color("Curves::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Curves::Color to constant (0.275, 0.5, 0.475).");
 }
 
 /*
@@ -1312,10 +1333,7 @@ TEST_F(RenderGraph, constant_fold_rgb_curves)
  */
 TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Curves::Color to socket Attribute::Color.");
-
-  array<float3> curve;
+  array<packed_float3> curve;
   init_test_curve(curve, make_float3(0.0f, 0.25f, 1.0f), make_float3(1.0f, 0.75f, 0.0f), 257);
 
   builder.add_attribute("Attribute")
@@ -1327,7 +1345,9 @@ TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0)
       .add_connection("Attribute::Color", "Curves::Color")
       .output_color("Curves::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Curves::Color to socket Attribute::Color.");
 }
 
 /*
@@ -1336,10 +1356,7 @@ TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0)
  */
 TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0_const)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Curves::Color to constant (0.3, 0.5, 0.7).");
-
-  array<float3> curve;
+  array<packed_float3> curve;
   init_test_curve(curve, make_float3(0.0f, 0.25f, 1.0f), make_float3(1.0f, 0.75f, 0.0f), 257);
 
   builder
@@ -1351,7 +1368,9 @@ TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0_const)
                     .set("Color", make_float3(0.3f, 0.5f, 0.7f)))
       .output_color("Curves::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Curves::Color to constant (0.3, 0.5, 0.7).");
 }
 
 /*
@@ -1360,10 +1379,7 @@ TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0_const)
  */
 TEST_F(RenderGraph, constant_fold_vector_curves)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Curves::Vector to constant (0.275, 0.5, 0.475).");
-
-  array<float3> curve;
+  array<packed_float3> curve;
   init_test_curve(curve, make_float3(0.0f, 0.25f, 1.0f), make_float3(1.0f, 0.75f, 0.0f), 257);
 
   builder
@@ -1375,7 +1391,9 @@ TEST_F(RenderGraph, constant_fold_vector_curves)
                     .set("Vector", make_float3(0.3f, 0.5f, 0.7f)))
       .output_color("Curves::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Curves::Vector to constant (0.275, 0.5, 0.475).");
 }
 
 /*
@@ -1384,10 +1402,7 @@ TEST_F(RenderGraph, constant_fold_vector_curves)
  */
 TEST_F(RenderGraph, constant_fold_vector_curves_fac_0)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Curves::Vector to socket Attribute::Vector.");
-
-  array<float3> curve;
+  array<packed_float3> curve;
   init_test_curve(curve, make_float3(0.0f, 0.25f, 1.0f), make_float3(1.0f, 0.75f, 0.0f), 257);
 
   builder.add_attribute("Attribute")
@@ -1399,7 +1414,9 @@ TEST_F(RenderGraph, constant_fold_vector_curves_fac_0)
       .add_connection("Attribute::Vector", "Curves::Vector")
       .output_color("Curves::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Curves::Vector to socket Attribute::Vector.");
 }
 
 /*
@@ -1408,11 +1425,7 @@ TEST_F(RenderGraph, constant_fold_vector_curves_fac_0)
  */
 TEST_F(RenderGraph, constant_fold_rgb_ramp)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Ramp::Color to constant (0.14, 0.39, 0.64).");
-  CORRECT_INFO_MESSAGE(log, "Folding Ramp::Alpha to constant (0.89).");
-
-  array<float3> curve;
+  array<packed_float3> curve;
   array<float> alpha;
   init_test_curve(curve, make_float3(0.0f, 0.25f, 0.5f), make_float3(0.25f, 0.5f, 0.75f), 9);
   init_test_curve(alpha, 0.75f, 1.0f, 9);
@@ -1428,7 +1441,10 @@ TEST_F(RenderGraph, constant_fold_rgb_ramp)
       .add_connection("Ramp::Alpha", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Ramp::Color to constant (0.14, 0.39, 0.64).");
+  log.correct_info_message("Folding Ramp::Alpha to constant (0.89).");
 }
 
 /*
@@ -1437,11 +1453,7 @@ TEST_F(RenderGraph, constant_fold_rgb_ramp)
  */
 TEST_F(RenderGraph, constant_fold_rgb_ramp_flat)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Ramp::Color to constant (0.125, 0.375, 0.625).");
-  CORRECT_INFO_MESSAGE(log, "Folding Ramp::Alpha to constant (0.875).");
-
-  array<float3> curve;
+  array<packed_float3> curve;
   array<float> alpha;
   init_test_curve(curve, make_float3(0.0f, 0.25f, 0.5f), make_float3(0.25f, 0.5f, 0.75f), 9);
   init_test_curve(alpha, 0.75f, 1.0f, 9);
@@ -1457,7 +1469,10 @@ TEST_F(RenderGraph, constant_fold_rgb_ramp_flat)
       .add_connection("Ramp::Alpha", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Ramp::Color to constant (0.125, 0.375, 0.625).");
+  log.correct_info_message("Folding Ramp::Alpha to constant (0.875).");
 }
 
 /*
@@ -1466,18 +1481,16 @@ TEST_F(RenderGraph, constant_fold_rgb_ramp_flat)
  */
 TEST_F(RenderGraph, constant_fold_convert_float_color_float)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log,
-                       "Folding Invert::Color to socket convert_float_to_color::value_color.");
-  CORRECT_INFO_MESSAGE(log,
-                       "Folding convert_color_to_float::value_float to socket Attribute::Fac.");
-
   builder.add_attribute("Attribute")
       .add_node(ShaderNodeBuilder<InvertNode>(graph, "Invert").set("Fac", 0.0f))
       .add_connection("Attribute::Fac", "Invert::Color")
       .output_value("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Folding Invert::Color to socket convert_float_to_color::value_color.");
+  log.correct_info_message(
+      "Folding convert_color_to_float::value_float to socket Attribute::Fac.");
 }
 
 /*
@@ -1486,12 +1499,6 @@ TEST_F(RenderGraph, constant_fold_convert_float_color_float)
  */
 TEST_F(RenderGraph, constant_fold_convert_color_vector_color)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log,
-                       "Folding VecAdd::Vector to socket convert_color_to_vector::value_vector.");
-  CORRECT_INFO_MESSAGE(log,
-                       "Folding convert_vector_to_color::value_color to socket Attribute::Color.");
-
   builder.add_attribute("Attribute")
       .add_node(ShaderNodeBuilder<VectorMathNode>(graph, "VecAdd")
                     .set_param("math_type", NODE_VECTOR_MATH_ADD)
@@ -1499,7 +1506,12 @@ TEST_F(RenderGraph, constant_fold_convert_color_vector_color)
       .add_connection("Attribute::Color", "VecAdd::Vector1")
       .output_color("VecAdd::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message(
+      "Folding VecAdd::Vector to socket convert_color_to_vector::value_vector.");
+  log.correct_info_message(
+      "Folding convert_vector_to_color::value_color to socket Attribute::Color.");
 }
 
 /*
@@ -1508,11 +1520,6 @@ TEST_F(RenderGraph, constant_fold_convert_color_vector_color)
  */
 TEST_F(RenderGraph, constant_fold_convert_color_float_color)
 {
-  EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log,
-                       "Folding MathAdd::Value to socket convert_color_to_float::value_float.");
-  INVALID_INFO_MESSAGE(log, "Folding convert_float_to_color::");
-
   builder.add_attribute("Attribute")
       .add_node(ShaderNodeBuilder<MathNode>(graph, "MathAdd")
                     .set_param("math_type", NODE_MATH_ADD)
@@ -1520,7 +1527,72 @@ TEST_F(RenderGraph, constant_fold_convert_color_float_color)
       .add_connection("Attribute::Color", "MathAdd::Value1")
       .output_color("MathAdd::Value");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
+
+  log.correct_info_message(
+      "Folding MathAdd::Value to socket convert_color_to_float::value_float.");
+  log.invalid_info_message("Folding convert_float_to_color::");
+}
+
+/*
+ * Tests:
+ *  - Stochastic sampling with math multiply node.
+ */
+TEST_F(RenderGraph, stochastic_sample_math_multiply)
+{
+  builder.add_attribute("Attribute")
+      .add_node(ShaderNodeBuilder<MathNode>(graph, "MathMultiply")
+                    .set_param("math_type", NODE_MATH_MULTIPLY))
+      .add_node(ShaderNodeBuilder<ScatterVolumeNode>(graph, "ScatterVolume"))
+      .add_connection("Attribute::Fac", "MathMultiply::Value1")
+      .add_connection("MathMultiply::Value", "ScatterVolume::Density")
+      .output_volume_closure("ScatterVolume::Volume");
+
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Volume attribute node Attribute uses stochastic sampling");
+}
+
+/*
+ * Tests:
+ *  - No stochastic sampling with math power node.
+ */
+TEST_F(RenderGraph, not_stochastic_sample_math_power)
+{
+  builder.add_attribute("Attribute")
+      .add_node(
+          ShaderNodeBuilder<MathNode>(graph, "MathPower").set_param("math_type", NODE_MATH_POWER))
+      .add_node(ShaderNodeBuilder<ScatterVolumeNode>(graph, "ScatterVolume"))
+      .add_connection("Attribute::Fac", "MathPower::Value1")
+      .add_connection("MathPower::Value", "ScatterVolume::Density")
+      .output_volume_closure("ScatterVolume::Volume");
+
+  graph.finalize(scene.get());
+
+  log.invalid_info_message("Volume attribute node Attribute uses stochastic sampling");
+}
+
+/*
+ * Tests:
+ *  - Stochastic sampling temperature with map range, principled volume and mix closure.
+ */
+TEST_F(RenderGraph, stochastic_sample_principled_volume_mix)
+{
+  builder.add_attribute("Attribute")
+      .add_node(ShaderNodeBuilder<MapRangeNode>(graph, "MapRange"))
+      .add_node(ShaderNodeBuilder<MixClosureNode>(graph, "MixClosure").set("Fac", 0.5f))
+      .add_node(ShaderNodeBuilder<PrincipledVolumeNode>(graph, "PrincipledVolume1"))
+      .add_node(ShaderNodeBuilder<PrincipledVolumeNode>(graph, "PrincipledVolume2"))
+      .add_connection("Attribute::Color", "MapRange::Value")
+      .add_connection("MapRange::Result", "PrincipledVolume1::Temperature")
+      .add_connection("Attribute::Fac", "PrincipledVolume2::Density")
+      .add_connection("PrincipledVolume1::Volume", "MixClosure::Closure1")
+      .add_connection("PrincipledVolume2::Volume", "MixClosure::Closure2")
+      .output_volume_closure("MixClosure::Closure");
+
+  graph.finalize(scene.get());
+
+  log.correct_info_message("Volume attribute node Attribute uses stochastic sampling");
 }
 
 CCL_NAMESPACE_END

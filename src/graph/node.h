@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -8,8 +9,8 @@
 #include "graph/node_type.h"
 
 #include "util/array.h"
-#include "util/map.h"
 #include "util/param.h"
+#include "util/types.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -37,7 +38,7 @@ struct Transform;
   void tag_##name##_modified() \
   { \
     const SocketType *socket = get_##name##_socket(); \
-    socket_modified |= socket->modified_flag_bit; \
+    socket_modified.set(socket->modified_flag_bit); \
   } \
   type_ const &get_##name() const \
   { \
@@ -93,11 +94,12 @@ struct Node {
 
   /* set values */
   void set(const SocketType &input, bool value);
-  void set(const SocketType &input, int value);
-  void set(const SocketType &input, uint value);
-  void set(const SocketType &input, float value);
-  void set(const SocketType &input, float2 value);
-  void set(const SocketType &input, float3 value);
+  void set(const SocketType &input, const int value);
+  void set(const SocketType &input, const uint value);
+  void set(const SocketType &input, const uint64_t value);
+  void set(const SocketType &input, const float value);
+  void set(const SocketType &input, const float2 value);
+  void set(const SocketType &input, const float3 value);
   void set(const SocketType &input, const char *value);
   void set(const SocketType &input, ustring value);
   void set(const SocketType &input, const Transform &value);
@@ -105,7 +107,7 @@ struct Node {
 
   /* Implicitly cast enums and enum classes to integer, which matches an internal way of how
    * enumerator values are stored and accessed in a generic API. */
-  template<class ValueType, typename std::enable_if_t<std::is_enum_v<ValueType>> * = nullptr>
+  template<class ValueType, std::enable_if_t<std::is_enum_v<ValueType>, bool> = true>
   void set(const SocketType &input, const ValueType &value)
   {
     static_assert(sizeof(ValueType) <= sizeof(int), "Enumerator type should fit int");
@@ -118,7 +120,7 @@ struct Node {
   void set(const SocketType &input, array<int> &value);
   void set(const SocketType &input, array<float> &value);
   void set(const SocketType &input, array<float2> &value);
-  void set(const SocketType &input, array<float3> &value);
+  void set(const SocketType &input, array<packed_float3> &value);
   void set(const SocketType &input, array<ustring> &value);
   void set(const SocketType &input, array<Transform> &value);
   void set(const SocketType &input, array<Node *> &value);
@@ -127,6 +129,7 @@ struct Node {
   bool get_bool(const SocketType &input) const;
   int get_int(const SocketType &input) const;
   uint get_uint(const SocketType &input) const;
+  uint64_t get_uint64(const SocketType &input) const;
   float get_float(const SocketType &input) const;
   float2 get_float2(const SocketType &input) const;
   float3 get_float3(const SocketType &input) const;
@@ -139,7 +142,7 @@ struct Node {
   const array<int> &get_int_array(const SocketType &input) const;
   const array<float> &get_float_array(const SocketType &input) const;
   const array<float2> &get_float2_array(const SocketType &input) const;
-  const array<float3> &get_float3_array(const SocketType &input) const;
+  const array<packed_float3> &get_float3_array(const SocketType &input) const;
   const array<ustring> &get_string_array(const SocketType &input) const;
   const array<Transform> &get_transform_array(const SocketType &input) const;
   const array<Node *> &get_node_array(const SocketType &input) const;
@@ -147,9 +150,9 @@ struct Node {
   /* generic values operations */
   bool has_default_value(const SocketType &input) const;
   void set_default_value(const SocketType &input);
-  bool equals_value(const Node &other, const SocketType &input) const;
-  void copy_value(const SocketType &input, const Node &other, const SocketType &other_input);
-  void set_value(const SocketType &input, const Node &other, const SocketType &other_input);
+  bool equals_value(const Node &other, const SocketType &socket) const;
+  void copy_value(const SocketType &socket, const Node &other, const SocketType &other_socket);
+  void set_value(const SocketType &socket, const Node &other, const SocketType &other_socket);
 
   /* equals */
   bool equals(const Node &other) const;

@@ -1,33 +1,18 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "hydra/pointcloud.h"
 #include "hydra/geometry.inl"
+#include "hydra/util.h"
 #include "scene/pointcloud.h"
-
-#include <pxr/imaging/hd/extComputationUtils.h>
 
 HDCYCLES_NAMESPACE_OPEN_SCOPE
 
-HdCyclesPoints::HdCyclesPoints(const SdfPath &rprimId
-#if PXR_VERSION < 2102
-                               ,
-                               const SdfPath &instancerId
-#endif
-                               )
-    : HdCyclesGeometry(rprimId
-#if PXR_VERSION < 2102
-                       ,
-                       instancerId
-#endif
-      )
-{
-}
+HdCyclesPoints::HdCyclesPoints(const SdfPath &rprimId) : HdCyclesGeometry(rprimId) {}
 
-HdCyclesPoints::~HdCyclesPoints()
-{
-}
+HdCyclesPoints::~HdCyclesPoints() = default;
 
 HdDirtyBits HdCyclesPoints::GetInitialDirtyBitsMask() const
 {
@@ -73,23 +58,9 @@ void HdCyclesPoints::Populate(HdSceneDelegate *sceneDelegate, HdDirtyBits dirtyB
 
 void HdCyclesPoints::PopulatePoints(HdSceneDelegate *sceneDelegate)
 {
-  VtValue value;
-
-  for (const HdExtComputationPrimvarDescriptor &desc :
-       sceneDelegate->GetExtComputationPrimvarDescriptors(GetId(), HdInterpolationVertex)) {
-    if (desc.name == HdTokens->points) {
-      auto valueStore = HdExtComputationUtils::GetComputedPrimvarValues({desc}, sceneDelegate);
-      const auto valueStoreIt = valueStore.find(desc.name);
-      if (valueStoreIt != valueStore.end()) {
-        value = std::move(valueStoreIt->second);
-      }
-      break;
-    }
-  }
-
-  if (value.IsEmpty()) {
-    value = GetPrimvar(sceneDelegate, HdTokens->points);
-  }
+  const HdSceneIndexPrim prim = GetPrim(sceneDelegate, GetId());
+  const HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(prim.dataSource);
+  const VtValue value = ReadPrimvar(primvars, HdTokens->points);
 
   if (!value.IsHolding<VtVec3fArray>()) {
     TF_WARN("Invalid points data for %s", GetId().GetText());
@@ -97,21 +68,21 @@ void HdCyclesPoints::PopulatePoints(HdSceneDelegate *sceneDelegate)
   }
 
   const auto &points = value.UncheckedGet<VtVec3fArray>();
+  static_assert(sizeof(GfVec3f) == sizeof(packed_float3));
 
-  array<float3> pointsDataCycles;
-  pointsDataCycles.reserve(points.size());
+  _geom->resize(int(points.size()));
 
-  for (const GfVec3f &point : points) {
-    pointsDataCycles.push_back_reserved(make_float3(point[0], point[1], point[2]));
-  }
-
-  _geom->set_points(pointsDataCycles);
+  std::copy_n(reinterpret_cast<const packed_float3 *>(points.data()),
+              points.size(),
+              _geom->get_position_for_write());
 }
 
 void HdCyclesPoints::PopulateWidths(HdSceneDelegate *sceneDelegate)
 {
-  VtValue value = GetPrimvar(sceneDelegate, HdTokens->widths);
-  const HdInterpolation interpolation = GetPrimvarInterpolation(sceneDelegate, HdTokens->widths);
+  const HdSceneIndexPrim prim = GetPrim(sceneDelegate, GetId());
+  const HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(prim.dataSource);
+  const VtValue value = ReadPrimvar(primvars, HdTokens->widths);
+  const HdInterpolation interpolation = ReadPrimvarInterpolation(primvars, HdTokens->widths);
 
   if (!value.IsHolding<VtFloatArray>()) {
     TF_WARN("Invalid widths data for %s", GetId().GetText());
@@ -119,9 +90,7 @@ void HdCyclesPoints::PopulateWidths(HdSceneDelegate *sceneDelegate)
   }
 
   const auto &widths = value.UncheckedGet<VtFloatArray>();
-
-  array<float> radiusDataCycles;
-  radiusDataCycles.reserve(_geom->num_points());
+  float *radius = _geom->get_radius_for_write();
 
   if (interpolation == HdInterpolationConstant) {
     TF_VERIFY(widths.size() == 1);
@@ -129,23 +98,24 @@ void HdCyclesPoints::PopulateWidths(HdSceneDelegate *sceneDelegate)
     const float constantRadius = widths[0] * 0.5f;
 
     for (size_t i = 0; i < _geom->num_points(); ++i) {
-      radiusDataCycles.push_back_reserved(constantRadius);
+      radius[i] = constantRadius;
     }
   }
   else if (interpolation == HdInterpolationVertex) {
     TF_VERIFY(widths.size() == _geom->num_points());
 
     for (size_t i = 0; i < _geom->num_points(); ++i) {
-      radiusDataCycles.push_back_reserved(widths[i] * 0.5f);
+      radius[i] = widths[i] * 0.5f;
     }
   }
-
-  _geom->set_radius(radiusDataCycles);
 }
 
 void HdCyclesPoints::PopulatePrimvars(HdSceneDelegate *sceneDelegate)
 {
   Scene *const scene = (Scene *)_geom->get_owner();
+
+  const HdSceneIndexPrim prim = GetPrim(sceneDelegate, GetId());
+  const HdPrimvarsSchema primvars = HdPrimvarsSchema::GetFromParent(prim.dataSource);
 
   const std::pair<HdInterpolation, AttributeElement> interpolations[] = {
       std::make_pair(HdInterpolationVertex, ATTR_ELEMENT_VERTEX),
@@ -153,34 +123,35 @@ void HdCyclesPoints::PopulatePrimvars(HdSceneDelegate *sceneDelegate)
   };
 
   for (const auto &interpolation : interpolations) {
-    for (const HdPrimvarDescriptor &desc :
-         GetPrimvarDescriptors(sceneDelegate, interpolation.first)) {
+    for (const TfToken &primvarName : PrimvarNamesAtInterpolation(primvars, interpolation.first)) {
       // Skip special primvars that are handled separately
-      if (desc.name == HdTokens->points || desc.name == HdTokens->widths) {
+      if (primvarName == HdTokens->points || primvarName == HdTokens->widths) {
         continue;
       }
 
-      VtValue value = GetPrimvar(sceneDelegate, desc.name);
+      const VtValue value = ReadPrimvar(primvars, primvarName);
       if (value.IsEmpty()) {
         continue;
       }
 
-      const ustring name(desc.name.GetString());
+      const TfToken role = ReadPrimvarRole(primvars, primvarName);
+      const ustring name(primvarName.GetString());
 
       AttributeStandard std = ATTR_STD_NONE;
-      if (desc.role == HdPrimvarRoleTokens->textureCoordinate) {
+      if (role == HdPrimvarRoleTokens->textureCoordinate) {
         std = ATTR_STD_UV;
       }
       else if (interpolation.first == HdInterpolationVertex) {
-        if (desc.name == HdTokens->displayColor || desc.role == HdPrimvarRoleTokens->color) {
+        if (primvarName == HdTokens->displayColor || role == HdPrimvarRoleTokens->color) {
           std = ATTR_STD_VERTEX_COLOR;
         }
-        else if (desc.name == HdTokens->normals) {
+        else if (primvarName == HdTokens->normals) {
           std = ATTR_STD_VERTEX_NORMAL;
         }
       }
-      else if (desc.name == HdTokens->displayColor &&
-               interpolation.first == HdInterpolationConstant) {
+      else if (primvarName == HdTokens->displayColor &&
+               interpolation.first == HdInterpolationConstant)
+      {
         if (value.IsHolding<VtVec3fArray>() && value.GetArraySize() == 1) {
           const GfVec3f color = value.UncheckedGet<VtVec3fArray>()[0];
           _instances[0]->set_color(make_float3(color[0], color[1], color[2]));
@@ -189,7 +160,8 @@ void HdCyclesPoints::PopulatePrimvars(HdSceneDelegate *sceneDelegate)
 
       // Skip attributes that are not needed
       if ((std != ATTR_STD_NONE && _geom->need_attribute(scene, std)) ||
-          _geom->need_attribute(scene, name)) {
+          _geom->need_attribute(scene, name))
+      {
         ApplyPrimvars(_geom->attributes, name, value, interpolation.second, std);
       }
     }

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "device/denoise.h"
 
@@ -47,12 +48,26 @@ const NodeEnum *DenoiseParams::get_prefilter_enum()
   return &prefilter_enum;
 }
 
+const NodeEnum *DenoiseParams::get_quality_enum()
+{
+  static NodeEnum quality_enum;
+
+  if (quality_enum.empty()) {
+    quality_enum.insert("high", DENOISER_QUALITY_HIGH);
+    quality_enum.insert("balanced", DENOISER_QUALITY_BALANCED);
+    quality_enum.insert("fast", DENOISER_QUALITY_FAST);
+  }
+
+  return &quality_enum;
+}
+
 NODE_DEFINE(DenoiseParams)
 {
   NodeType *type = NodeType::add("denoise_params", create);
 
   const NodeEnum *type_enum = get_type_enum();
   const NodeEnum *prefilter_enum = get_prefilter_enum();
+  const NodeEnum *quality_enum = get_quality_enum();
 
   SOCKET_BOOLEAN(use, "Use", false);
 
@@ -60,18 +75,16 @@ NODE_DEFINE(DenoiseParams)
 
   SOCKET_INT(start_sample, "Start Sample", 0);
 
-  SOCKET_BOOLEAN(use_pass_albedo, "Use Pass Albedo", true);
-  SOCKET_BOOLEAN(use_pass_normal, "Use Pass Normal", false);
-
+  SOCKET_INT(passes, "Passes", DENOISER_PASS_ALBEDO | DENOISER_PASS_NORMAL);
   SOCKET_BOOLEAN(temporally_stable, "Temporally Stable", false);
 
   SOCKET_ENUM(prefilter, "Prefilter", *prefilter_enum, DENOISER_PREFILTER_FAST);
+  SOCKET_ENUM(quality, "Quality", *quality_enum, DENOISER_QUALITY_HIGH);
+  SOCKET_FLOAT(upscale_factor, "Upscale Factor", 1.0f);
 
   return type;
 }
 
-DenoiseParams::DenoiseParams() : Node(get_node_type())
-{
-}
+DenoiseParams::DenoiseParams() : Node(get_node_type()) {}
 
 CCL_NAMESPACE_END

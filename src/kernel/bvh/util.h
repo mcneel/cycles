@@ -1,11 +1,16 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
+#include "kernel/globals.h"
+#include "kernel/integrator/state.h"
+#include "kernel/types.h"
+
 CCL_NAMESPACE_BEGIN
 
-ccl_device_inline bool intersection_ray_valid(ccl_private const Ray *ray)
+ccl_device_inline bool intersection_ray_valid(const ccl_private Ray *ray)
 {
   /* NOTE: Due to some vectorization code  non-finite origin point might
    * cause lots of false-positive intersections which will overflow traversal
@@ -17,20 +22,42 @@ ccl_device_inline bool intersection_ray_valid(ccl_private const Ray *ray)
    * Scene intersection may also called with empty rays for conditional trace
    * calls that evaluate to false, so filter those out.
    */
-  return isfinite_safe(ray->P.x) && isfinite_safe(ray->D.x) && len_squared(ray->D) != 0.0f;
+  return isfinite_safe(ray->P.x) && isfinite_safe(ray->D.x) && len_squared(ray->D) != 0.0f &&
+         ray->tmin < FLT_MAX;
 }
 
 /* Offset intersection distance by the smallest possible amount, to skip
  * intersections at this distance. This works in cases where the ray start
  * position is unchanged and only tmin is updated, since for self
- * intersection we'll be comparing against the exact same distances. */
+ * intersection we'll be comparing against the exact same distances.
+ *
+ * Always returns normalized floating point value. */
 ccl_device_forceinline float intersection_t_offset(const float t)
 {
   /* This is a simplified version of `nextafterf(t, FLT_MAX)`, only dealing with
    * non-negative and finite t. */
   kernel_assert(t >= 0.0f && isfinite_safe(t));
-  const uint32_t bits = (t == 0.0f) ? 1 : __float_as_uint(t) + 1;
-  return __uint_as_float(bits);
+
+  /* Special handling of zero, which also includes handling of denormal values:
+   * always return smallest normalized value. If a denormalized zero is returned
+   * it will cause false-positive intersection detection with a distance of 0.
+   *
+   * The check relies on the fact that comparison of denormal values with zero
+   * returns true. */
+  if (t == 0.0f) {
+    /* The exact bit value of this should be 0x1p-126, but hex floating point values notation is
+     * not available in CUDA/OptiX. */
+    return FLT_MIN;
+  }
+
+  const uint32_t bits = __float_as_uint(t) + 1;
+  const float result = __uint_as_float(bits);
+
+  /* Assert that the calculated value is indeed considered to be offset from the
+   * original value. */
+  kernel_assert(result > t);
+
+  return result;
 }
 
 /* Ray offset to avoid self intersection.
@@ -63,12 +90,13 @@ ccl_device int intersections_compare(const void *a, const void *b)
   const Intersection *isect_a = (const Intersection *)a;
   const Intersection *isect_b = (const Intersection *)b;
 
-  if (isect_a->t < isect_b->t)
+  if (isect_a->t < isect_b->t) {
     return -1;
-  else if (isect_a->t > isect_b->t)
+  }
+  if (isect_a->t > isect_b->t) {
     return 1;
-  else
-    return 0;
+  }
+  return 0;
 }
 #endif
 
@@ -81,7 +109,7 @@ ccl_device_inline void sort_intersections_and_normals(ccl_private Intersection *
   bool swapped;
   do {
     swapped = false;
-    for (int j = 0; j < num_hits - 1; ++j) {
+    for (uint j = 0; j < num_hits - 1; ++j) {
       if (hits[j].t > hits[j + 1].t) {
         Intersection tmp_hit = hits[j];
         float3 tmp_Ng = Ng[j];
@@ -145,13 +173,13 @@ ccl_device_forceinline int intersection_get_shader_from_isect_prim(KernelGlobals
 }
 
 ccl_device_forceinline int intersection_get_shader(
-    KernelGlobals kg, ccl_private const Intersection *ccl_restrict isect)
+    KernelGlobals kg, const ccl_private Intersection *ccl_restrict isect)
 {
   return intersection_get_shader_from_isect_prim(kg, isect->prim, isect->object, isect->type);
 }
 
-ccl_device_forceinline int intersection_get_object_flags(
-    KernelGlobals kg, ccl_private const Intersection *ccl_restrict isect)
+ccl_device_forceinline uint
+intersection_get_object_flags(KernelGlobals kg, const ccl_private Intersection *ccl_restrict isect)
 {
   return kernel_data_fetch(object_flag, isect->object);
 }
@@ -170,10 +198,8 @@ ccl_device_inline int intersection_find_attribute(KernelGlobals kg,
       if (UNLIKELY(attr_map.element == 0)) {
         return (int)ATTR_STD_NOT_FOUND;
       }
-      else {
-        /* Chain jump to a different part of the table. */
-        attr_offset = attr_map.offset;
-      }
+      /* Chain jump to a different part of the table. */
+      attr_offset = attr_map.offset;
     }
     else {
       attr_offset += ATTR_PRIM_TYPES;
@@ -182,7 +208,7 @@ ccl_device_inline int intersection_find_attribute(KernelGlobals kg,
   }
 
   /* return result */
-  return (attr_map.element == ATTR_ELEMENT_NONE) ? (int)ATTR_STD_NOT_FOUND : (int)attr_map.offset;
+  return (attr_map.element == ATTR_ELEMENT_NONE) ? (int)ATTR_STD_NOT_FOUND : attr_map.offset;
 }
 
 /* Transparent Shadows */
@@ -211,14 +237,14 @@ ccl_device_inline float intersection_curve_shadow_transparency(
   return (1.0f - u) * f0 + u * f1;
 }
 
-ccl_device_inline bool intersection_skip_self(ccl_private const RaySelfPrimitives &self,
+ccl_device_inline bool intersection_skip_self(const ccl_ray_data RaySelfPrimitives &self,
                                               const int object,
                                               const int prim)
 {
   return (self.prim == prim) && (self.object == object);
 }
 
-ccl_device_inline bool intersection_skip_self_shadow(ccl_private const RaySelfPrimitives &self,
+ccl_device_inline bool intersection_skip_self_shadow(const ccl_ray_data RaySelfPrimitives &self,
                                                      const int object,
                                                      const int prim)
 {
@@ -226,10 +252,62 @@ ccl_device_inline bool intersection_skip_self_shadow(ccl_private const RaySelfPr
          ((self.light_prim == prim) && (self.light_object == object));
 }
 
-ccl_device_inline bool intersection_skip_self_local(ccl_private const RaySelfPrimitives &self,
+ccl_device_inline bool intersection_skip_self_local(const ccl_ray_data RaySelfPrimitives &self,
                                                     const int prim)
 {
   return (self.prim == prim);
+}
+
+#ifdef __SHADOW_LINKING__
+ccl_device_inline uint64_t
+ray_get_shadow_set_membership(KernelGlobals kg, const ccl_ray_data RaySelfPrimitives &self)
+{
+  if (self.light_object != OBJECT_NONE) {
+    return kernel_data_fetch(objects, self.light_object).shadow_set_membership;
+  }
+
+  return LIGHT_LINK_MASK_ALL;
+}
+#endif
+
+ccl_device_inline bool intersection_skip_shadow_link(KernelGlobals kg,
+                                                     const ccl_ray_data RaySelfPrimitives &self,
+                                                     const int isect_object)
+{
+#ifdef __SHADOW_LINKING__
+  if (!(kernel_data.kernel_features & KERNEL_FEATURE_SHADOW_LINKING)) {
+    return false;
+  }
+
+  const uint64_t set_membership = ray_get_shadow_set_membership(kg, self);
+  if (set_membership == LIGHT_LINK_MASK_ALL) {
+    return false;
+  }
+
+  const uint blocker_set = kernel_data_fetch(objects, isect_object).blocker_shadow_set;
+  return ((uint64_t(1) << uint64_t(blocker_set)) & set_membership) == 0;
+#else
+  return false;
+#endif
+}
+
+/* Check whether an intersection denoted by its object and primitive is to be skipped due to it
+ * being already recoded.
+ * The situation when primitive is already recoded happens when BVH spatial splits are used. */
+ccl_device_forceinline bool intersection_skip_shadow_already_recoded(IntegratorShadowState state,
+                                                                     const int object,
+                                                                     const int prim,
+                                                                     const uint num_hits)
+{
+  const uint num_recorded_hits = min(num_hits, INTEGRATOR_SHADOW_ISECT_SIZE);
+  for (uint i = 0; i < num_recorded_hits; ++i) {
+    const int isect_object = INTEGRATOR_STATE_ARRAY(state, shadow_isect, i, object);
+    const int isect_prim = INTEGRATOR_STATE_ARRAY(state, shadow_isect, i, prim);
+    if (object == isect_object && prim == isect_prim) {
+      return true;
+    }
+  }
+  return false;
 }
 
 CCL_NAMESPACE_END

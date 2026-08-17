@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "device/dummy/device.h"
-
 #include "device/device.h"
 #include "device/queue.h"
 
@@ -12,49 +12,43 @@ CCL_NAMESPACE_BEGIN
 
 class DummyDevice : public Device {
  public:
-  DummyDevice(const DeviceInfo &info_, Stats &stats_, Profiler &profiler_)
-      : Device(info_, stats_, profiler_)
+  DummyDevice(const DeviceInfo &info_, Stats &stats_, Profiler &profiler_, bool headless_)
+      : Device(info_, stats_, profiler_, headless_)
   {
     error_msg = info.error_msg;
   }
 
-  ~DummyDevice()
-  {
-  }
+  ~DummyDevice() override = default;
 
-  virtual BVHLayoutMask get_bvh_layout_mask() const override
+  BVHLayoutMask get_bvh_layout_mask(uint /*kernel_features*/) const override
   {
     return 0;
   }
 
-  virtual void mem_alloc(device_memory &) override
+  void mem_alloc(device_memory & /*mem*/) override {}
+
+  void mem_copy_to(device_memory & /*mem*/) override {}
+
+  void mem_move_to_host(device_memory & /*mem*/) override {}
+
+  void mem_copy_from(
+      device_memory & /*mem*/, size_t /*y*/, size_t /*w*/, size_t /*h*/, size_t /*elem*/) override
   {
   }
 
-  virtual void mem_copy_to(device_memory &) override
-  {
-  }
+  void mem_zero(device_memory & /*mem*/) override {}
 
-  virtual void mem_copy_from(device_memory &, size_t, size_t, size_t, size_t) override
-  {
-  }
+  void mem_free(device_memory & /*mem*/) override {}
 
-  virtual void mem_zero(device_memory &) override
-  {
-  }
-
-  virtual void mem_free(device_memory &) override
-  {
-  }
-
-  virtual void const_copy_to(const char *, void *, size_t) override
-  {
-  }
+  void const_copy_to(const char * /*name*/, void * /*host*/, size_t /*size*/) override {}
 };
 
-Device *device_dummy_create(const DeviceInfo &info, Stats &stats, Profiler &profiler)
+unique_ptr<Device> device_dummy_create(const DeviceInfo &info,
+                                       Stats &stats,
+                                       Profiler &profiler,
+                                       bool headless)
 {
-  return new DummyDevice(info, stats, profiler);
+  return make_unique<DummyDevice>(info, stats, profiler, headless);
 }
 
 CCL_NAMESPACE_END

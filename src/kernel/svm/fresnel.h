@@ -1,23 +1,24 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
+
+#include "kernel/closure/bsdf_util.h"
+
+#include "kernel/svm/node_types.h"
+#include "kernel/svm/util.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Fresnel Node */
 
 ccl_device_noinline void svm_node_fresnel(ccl_private ShaderData *sd,
-                                          ccl_private float *stack,
-                                          uint ior_offset,
-                                          uint ior_value,
-                                          uint node)
+                                          ccl_private float *ccl_restrict stack,
+                                          const ccl_global SVMNodeFresnel &ccl_restrict node)
 {
-  uint normal_offset, out_offset;
-  svm_unpack_node_uchar2(node, &normal_offset, &out_offset);
-  float eta = (stack_valid(ior_offset)) ? stack_load_float(stack, ior_offset) :
-                                          __uint_as_float(ior_value);
-  float3 normal_in = stack_valid(normal_offset) ? stack_load_float3(stack, normal_offset) : sd->N;
+  float eta = stack_load(stack, node.ior);
+  const float3 normal_in = stack_load_float3_default(stack, node.normal_offset, sd->N);
 
   eta = fmaxf(eta, 1e-5f);
   //eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
@@ -25,31 +26,24 @@ ccl_device_noinline void svm_node_fresnel(ccl_private ShaderData *sd,
       normal_in = -normal_in;
   }
 
-  float f = fresnel_dielectric_cos(dot(sd->wi, normal_in), eta);
+  const float f = fresnel_dielectric_cos(dot(sd->wi, normal_in), eta);
 
-  stack_store_float(stack, out_offset, f);
+  stack_store_float(stack, node.out_offset, f);
 }
 
 /* Layer Weight Node */
 
 ccl_device_noinline void svm_node_layer_weight(ccl_private ShaderData *sd,
-                                               ccl_private float *stack,
-                                               uint4 node)
+                                               ccl_private float *ccl_restrict stack,
+                                               const ccl_global SVMNodeLayerWeight &ccl_restrict
+                                                   node)
 {
-  uint blend_offset = node.y;
-  uint blend_value = node.z;
-
-  uint type, normal_offset, out_offset;
-  svm_unpack_node_uchar3(node.w, &type, &normal_offset, &out_offset);
-
-  float blend = (stack_valid(blend_offset)) ? stack_load_float(stack, blend_offset) :
-                                              __uint_as_float(blend_value);
-  float3 normal_in = (stack_valid(normal_offset)) ? stack_load_float3(stack, normal_offset) :
-                                                    sd->N;
+  float blend = stack_load(stack, node.blend);
+  const float3 normal_in = stack_load_float3_default(stack, node.normal_offset, sd->N);
 
   float f;
 
-  if (type == NODE_LAYER_WEIGHT_FRESNEL) {
+  if (node.weight_type == NODE_LAYER_WEIGHT_FRESNEL) {
     float eta = fmaxf(1.0f - blend, 1e-5f);
     eta = (sd->flag & SD_BACKFACING) ? eta : 1.0f / eta;
 
@@ -68,7 +62,7 @@ ccl_device_noinline void svm_node_layer_weight(ccl_private ShaderData *sd,
     f = 1.0f - f;
   }
 
-  stack_store_float(stack, out_offset, f);
+  stack_store_float(stack, node.out_offset, f);
 }
 
 CCL_NAMESPACE_END

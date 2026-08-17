@@ -1,172 +1,102 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "scene/image_vdb.h"
 
+#include "util/image_metadata.h"
 #include "util/log.h"
+#include "util/nanovdb.h"
 #include "util/openvdb.h"
+#include "util/types_image.h"
 
 #ifdef WITH_OPENVDB
 #  include <openvdb/tools/Dense.h>
-#endif
-#ifdef WITH_NANOVDB
-#  include <nanovdb/util/OpenToNanoVDB.h>
 #endif
 
 CCL_NAMESPACE_BEGIN
 
 #ifdef WITH_OPENVDB
-struct NumChannelsOp {
-  int num_channels = 0;
-
-  template<typename GridType, typename FloatGridType, typename FloatDataType, int channels>
-  bool operator()(const openvdb::GridBase::ConstPtr &)
-  {
-    num_channels = channels;
-    return true;
-  }
-};
-
-struct ToDenseOp {
-  openvdb::CoordBBox bbox;
-  void *pixels;
-
-  template<typename GridType, typename FloatGridType, typename FloatDataType, int channels>
-  bool operator()(const openvdb::GridBase::ConstPtr &grid)
-  {
-    openvdb::tools::Dense<FloatDataType, openvdb::tools::LayoutXYZ> dense(bbox,
-                                                                          (FloatDataType *)pixels);
-    openvdb::tools::copyToDense(*openvdb::gridConstPtrCast<GridType>(grid), dense);
-    return true;
-  }
-};
-
-#  ifdef WITH_NANOVDB
-struct ToNanoOp {
-  nanovdb::GridHandle<> nanogrid;
-  int precision;
-
-  template<typename GridType, typename FloatGridType, typename FloatDataType, int channels>
-  bool operator()(const openvdb::GridBase::ConstPtr &grid)
-  {
-    if constexpr (!std::is_same_v<GridType, openvdb::MaskGrid>) {
-      try {
-        FloatGridType floatgrid(*openvdb::gridConstPtrCast<GridType>(grid));
-        if constexpr (std::is_same_v<FloatGridType, openvdb::FloatGrid>) {
-          if (precision == 0) {
-            nanogrid = nanovdb::openToNanoVDB<nanovdb::HostBuffer,
-                                              typename FloatGridType::TreeType,
-                                              nanovdb::FpN>(floatgrid);
-            return true;
-          }
-          else if (precision == 16) {
-            nanogrid = nanovdb::openToNanoVDB<nanovdb::HostBuffer,
-                                              typename FloatGridType::TreeType,
-                                              nanovdb::Fp16>(floatgrid);
-            return true;
-          }
-        }
-
-        nanogrid = nanovdb::openToNanoVDB(floatgrid);
-      }
-      catch (const std::exception &e) {
-        VLOG_WARNING << "Error converting OpenVDB to NanoVDB grid: " << e.what();
-      }
-      return true;
-    }
-    else {
-      return false;
-    }
-  }
-};
-#  endif
-
-VDBImageLoader::VDBImageLoader(openvdb::GridBase::ConstPtr grid_, const string &grid_name)
-    : grid_name(grid_name), grid(grid_)
+VDBImageLoader::VDBImageLoader(openvdb::GridBase::ConstPtr grid_,
+                               const string &grid_name,
+                               const float clipping)
+    : grid_name(grid_name), clipping(clipping), grid(grid_)
 {
 }
 #endif
 
-VDBImageLoader::VDBImageLoader(const string &grid_name) : grid_name(grid_name)
+VDBImageLoader::VDBImageLoader(const string &grid_name, const float clipping)
+    : grid_name(grid_name), clipping(clipping)
 {
 }
 
-VDBImageLoader::~VDBImageLoader()
-{
-}
+VDBImageLoader::~VDBImageLoader() = default;
 
-bool VDBImageLoader::load_metadata(const ImageDeviceFeatures &features, ImageMetaData &metadata)
+bool VDBImageLoader::load_metadata(ImageMetaData &metadata,
+                                   const ImageLoaderParams & /*params*/,
+                                   Progress & /*progress*/)
 {
-#ifdef WITH_OPENVDB
+#ifdef WITH_NANOVDB
+  load_grid();
+
+  if (!grid) {
+    return false;
+  }
+
+  /* Convert to the few float types that we know. */
+  grid = openvdb_convert_to_known_type(grid);
   if (!grid) {
     return false;
   }
 
   /* Get number of channels from type. */
-  NumChannelsOp op;
-  if (!openvdb::grid_type_operation(grid, op)) {
+  metadata.channels = openvdb_num_channels(grid);
+
+  /* Convert OpenVDB to NanoVDB grid. */
+  nanogrid = openvdb_to_nanovdb(grid, precision, clipping);
+  if (!nanogrid) {
+    grid.reset();
     return false;
   }
-
-  metadata.channels = op.num_channels;
-
-  /* Set data type. */
-#  ifdef WITH_NANOVDB
-  if (features.has_nanovdb) {
-    /* NanoVDB expects no inactive leaf nodes. */
-#    if 0
-    openvdb::FloatGrid &pruned_grid = *openvdb::gridPtrCast<openvdb::FloatGrid>(grid);
-    openvdb::tools::pruneInactive(pruned_grid.tree());
-    nanogrid = nanovdb::openToNanoVDB(pruned_grid);
-#    endif
-    ToNanoOp op;
-    op.precision = precision;
-    if (!openvdb::grid_type_operation(grid, op)) {
-      return false;
-    }
-    nanogrid = std::move(op.nanogrid);
-  }
-#  endif
 
   /* Set dimensions. */
   bbox = grid->evalActiveVoxelBoundingBox();
   if (bbox.empty()) {
+    metadata.type = IMAGE_DATA_TYPE_NANOVDB_EMPTY;
+    metadata.nanovdb_byte_size = 1;
+    grid.reset();
+    return true;
+  }
+
+  if (metadata.channels == 1) {
+    if (precision == 0) {
+      metadata.type = IMAGE_DATA_TYPE_NANOVDB_FPN;
+    }
+    else if (precision == 16) {
+      metadata.type = IMAGE_DATA_TYPE_NANOVDB_FP16;
+    }
+    else {
+      metadata.type = IMAGE_DATA_TYPE_NANOVDB_FLOAT;
+    }
+  }
+  else if (metadata.channels == 3) {
+    metadata.type = IMAGE_DATA_TYPE_NANOVDB_FLOAT3;
+  }
+  else if (metadata.channels == 4) {
+    metadata.type = IMAGE_DATA_TYPE_NANOVDB_FLOAT4;
+  }
+  else {
+    grid.reset();
     return false;
   }
 
-  openvdb::Coord dim = bbox.dim();
-  metadata.width = dim.x();
-  metadata.height = dim.y();
-  metadata.depth = dim.z();
-
-#  ifdef WITH_NANOVDB
-  if (nanogrid) {
-    metadata.byte_size = nanogrid.size();
-    if (metadata.channels == 1) {
-      if (precision == 0) {
-        metadata.type = IMAGE_DATA_TYPE_NANOVDB_FPN;
-      }
-      else if (precision == 16) {
-        metadata.type = IMAGE_DATA_TYPE_NANOVDB_FP16;
-      }
-      else {
-        metadata.type = IMAGE_DATA_TYPE_NANOVDB_FLOAT;
-      }
-    }
-    else {
-      metadata.type = IMAGE_DATA_TYPE_NANOVDB_FLOAT3;
-    }
-  }
-  else
+#  if NANOVDB_MAJOR_VERSION_NUMBER > 32 || \
+      (NANOVDB_MAJOR_VERSION_NUMBER == 32 && NANOVDB_MINOR_VERSION_NUMBER >= 9)
+  /* size() was deprecated in this version. */
+  metadata.nanovdb_byte_size = nanogrid.bufferSize();
+#  else
+  metadata.nanovdb_byte_size = nanogrid.size();
 #  endif
-  {
-    if (metadata.channels == 1) {
-      metadata.type = IMAGE_DATA_TYPE_FLOAT;
-    }
-    else {
-      metadata.type = IMAGE_DATA_TYPE_FLOAT4;
-    }
-  }
 
   /* Set transform from object space to voxel index. */
   openvdb::math::Mat4f grid_matrix = grid->transform().baseMap()->getAffineMap()->getMat4();
@@ -177,53 +107,36 @@ bool VDBImageLoader::load_metadata(const ImageDeviceFeatures &features, ImageMet
     }
   }
 
-  Transform texture_to_index;
-#  ifdef WITH_NANOVDB
-  if (nanogrid) {
-    texture_to_index = transform_identity();
-  }
-  else
-#  endif
-  {
-    openvdb::Coord min = bbox.min();
-    texture_to_index = transform_translate(min.x(), min.y(), min.z()) *
-                       transform_scale(dim.x(), dim.y(), dim.z());
-  }
-
-  metadata.transform_3d = transform_inverse(index_to_object * texture_to_index);
+  metadata.transform_3d = transform_inverse(index_to_object);
   metadata.use_transform_3d = true;
 
-#  ifndef WITH_NANOVDB
-  (void)features;
-#  endif
+  /* Only NanoGrid needed now, free OpenVDB grid. */
+  grid.reset();
+
   return true;
 #else
   (void)metadata;
-  (void)features;
   return false;
 #endif
 }
 
-bool VDBImageLoader::load_pixels(const ImageMetaData &, void *pixels, const size_t, const bool)
+bool VDBImageLoader::load_pixels(const ImageMetaData &metadata, void *pixels)
 {
-#ifdef WITH_OPENVDB
-#  ifdef WITH_NANOVDB
+#ifdef WITH_NANOVDB
+  if (metadata.type == IMAGE_DATA_TYPE_NANOVDB_EMPTY) {
+    memset(pixels, 0, metadata.nanovdb_byte_size);
+    return true;
+  }
   if (nanogrid) {
-    memcpy(pixels, nanogrid.data(), nanogrid.size());
+    memcpy(pixels, nanogrid.data(), metadata.nanovdb_byte_size);
+    return true;
   }
-  else
-#  endif
-  {
-    ToDenseOp op;
-    op.pixels = pixels;
-    op.bbox = bbox;
-    openvdb::grid_type_operation(grid, op);
-  }
-  return true;
 #else
+  (void)metadata;
   (void)pixels;
-  return false;
 #endif
+
+  return false;
 }
 
 string VDBImageLoader::name() const
@@ -235,7 +148,7 @@ bool VDBImageLoader::equals(const ImageLoader &other) const
 {
 #ifdef WITH_OPENVDB
   const VDBImageLoader &other_loader = (const VDBImageLoader &)other;
-  return grid == other_loader.grid;
+  return grid && grid == other_loader.grid;
 #else
   (void)other;
   return true;
@@ -263,6 +176,90 @@ openvdb::GridBase::ConstPtr VDBImageLoader::get_grid()
 {
   return grid;
 }
+
+template<typename GridType>
+openvdb::GridBase::ConstPtr create_grid(const float *voxels,
+                                        const size_t width,
+                                        const size_t height,
+                                        const size_t depth,
+                                        Transform transform_3d,
+                                        const float clipping)
+{
+  using ValueType = typename GridType::ValueType;
+  openvdb::GridBase::ConstPtr grid;
+
+  const openvdb::CoordBBox dense_bbox(0, 0, 0, width - 1, height - 1, depth - 1);
+
+  typename GridType::Ptr sparse = GridType::create(ValueType(0.0f));
+  if (dense_bbox.empty()) {
+    return sparse;
+  }
+
+  const openvdb::tools::Dense<const ValueType, openvdb::tools::MemoryLayout::LayoutXYZ> dense(
+      dense_bbox, reinterpret_cast<const ValueType *>(voxels));
+
+  openvdb::tools::copyFromDense(dense, *sparse, ValueType(clipping));
+
+  /* Compute index to world matrix. */
+  const float3 voxel_size = make_float3(1.0f / width, 1.0f / height, 1.0f / depth);
+
+  transform_3d = transform_inverse(transform_3d);
+
+  const openvdb::Mat4R index_to_world_mat((double)(voxel_size.x * transform_3d[0][0]),
+                                          0.0,
+                                          0.0,
+                                          0.0,
+                                          0.0,
+                                          (double)(voxel_size.y * transform_3d[1][1]),
+                                          0.0,
+                                          0.0,
+                                          0.0,
+                                          0.0,
+                                          (double)(voxel_size.z * transform_3d[2][2]),
+                                          0.0,
+                                          (double)transform_3d[0][3],
+                                          (double)transform_3d[1][3],
+                                          (double)transform_3d[2][3],
+                                          1.0);
+
+  const openvdb::math::Transform::Ptr index_to_world_tfm =
+      openvdb::math::Transform::createLinearTransform(index_to_world_mat);
+
+  sparse->setTransform(index_to_world_tfm);
+
+  return sparse;
+}
 #endif
+
+void VDBImageLoader::grid_from_dense_voxels(const size_t width,
+                                            const size_t height,
+                                            const size_t depth,
+                                            const int channels,
+                                            const float *voxels,
+                                            Transform transform_3d)
+{
+#ifdef WITH_OPENVDB
+  /* TODO: Create NanoVDB grid directly? */
+  if (channels == 1) {
+    grid = create_grid<openvdb::FloatGrid>(voxels, width, height, depth, transform_3d, clipping);
+  }
+  else if (channels == 3) {
+    grid = create_grid<openvdb::Vec3fGrid>(voxels, width, height, depth, transform_3d, clipping);
+  }
+  else if (channels == 4) {
+    grid = create_grid<openvdb::Vec4fGrid>(voxels, width, height, depth, transform_3d, clipping);
+  }
+
+  /* Clipping already applied, no need to do it again. */
+  clipping = 0.0f;
+#else
+  (void)width;
+  (void)height;
+  (void)depth;
+  (void)channels;
+  (void)voxels;
+  (void)transform_3d;
+#endif
+}
 
 CCL_NAMESPACE_END

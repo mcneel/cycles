@@ -1,15 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "integrator/pass_accessor.h"
 
-#include "session/buffers.h"
-#include "util/log.h"
-
-// clang-format off
-#include "kernel/device/cpu/compat.h"
 #include "kernel/types.h"
-// clang-format on
+#include "session/buffers.h"
+
+#include "util/log.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -30,20 +28,14 @@ PassAccessor::PassAccessInfo::PassAccessInfo(const BufferPass &pass)
  * Pass destination.
  */
 
-PassAccessor::Destination::Destination(float *pixels, int num_components)
+PassAccessor::Destination::Destination(float *pixels, const int num_components)
     : pixels(pixels), num_components(num_components)
 {
 }
 
-PassAccessor::Destination::Destination(const PassType pass_type, half4 *pixels)
-    : Destination(pass_type)
+PassAccessor::Destination::Destination(const PassType pass_type, const PassMode pass_mode)
 {
-  pixels_half_rgba = pixels;
-}
-
-PassAccessor::Destination::Destination(const PassType pass_type)
-{
-  const PassInfo pass_info = Pass::get_info(pass_type);
+  const PassInfo pass_info = Pass::get_info(pass_type, pass_mode);
   num_components = pass_info.num_components;
 }
 
@@ -51,7 +43,7 @@ PassAccessor::Destination::Destination(const PassType pass_type)
  * Pass source.
  */
 
-PassAccessor::Source::Source(const float *pixels, int num_components)
+PassAccessor::Source::Source(const float *pixels, const int num_components)
     : pixels(pixels), num_components(num_components)
 {
 }
@@ -60,7 +52,9 @@ PassAccessor::Source::Source(const float *pixels, int num_components)
  * Pass accessor.
  */
 
-PassAccessor::PassAccessor(const PassAccessInfo &pass_access_info, float exposure, int num_samples)
+PassAccessor::PassAccessor(const PassAccessInfo &pass_access_info,
+                           const float exposure,
+                           const int num_samples)
     : pass_access_info_(pass_access_info), exposure_(exposure), num_samples_(num_samples)
 {
 }
@@ -132,12 +126,16 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
   const PassType type = pass_access_info_.type;
   const PassMode mode = pass_access_info_.mode;
   const PassInfo pass_info = Pass::get_info(
-      type, pass_access_info_.include_albedo, pass_access_info_.is_lightgroup);
+      type, mode, pass_access_info_.include_albedo, pass_access_info_.is_lightgroup);
   int num_written_components = pass_info.num_components;
 
   if (pass_info.num_components == 1) {
+    if (is_volume_guiding_pass(type)) {
+      get_pass_rgbe(render_buffers, buffer_params, destination);
+      num_written_components = 3;
+    }
     /* Single channel passes. */
-    if (mode == PassMode::DENOISED) {
+    else if (mode == PassMode::DENOISED) {
       /* Denoised passes store their final pixels, no need in special calculation. */
       get_pass_float(render_buffers, buffer_params, destination);
     }
@@ -146,6 +144,9 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
     }
     else if (type == PASS_MIST) {
       get_pass_mist(render_buffers, buffer_params, destination);
+    }
+    else if (type == PASS_VOLUME_MAJORANT) {
+      get_pass_volume_majorant(render_buffers, buffer_params, destination);
     }
     else if (type == PASS_SAMPLE_COUNT) {
       get_pass_sample_count(render_buffers, buffer_params, destination);
@@ -186,7 +187,8 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
     }
     else if ((pass_info.divide_type != PASS_NONE || pass_info.direct_type != PASS_NONE ||
               pass_info.indirect_type != PASS_NONE) &&
-             mode != PassMode::DENOISED) {
+             mode != PassMode::DENOISED)
+    {
       /* RGB lighting passes that need to divide out color and/or sum direct and indirect.
        * These can also optionally write alpha like the combined pass. */
       get_pass_light_path(render_buffers, buffer_params, destination);
@@ -200,7 +202,8 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
 
         /* Use alpha for colors passes. */
         if (type == PASS_DIFFUSE_COLOR || type == PASS_GLOSSY_COLOR ||
-            type == PASS_TRANSMISSION_COLOR) {
+            type == PASS_TRANSMISSION_COLOR)
+        {
           num_written_components = destination.num_components;
         }
       }
@@ -210,7 +213,8 @@ bool PassAccessor::get_render_tile_pixels(const RenderBuffers *render_buffers,
           get_pass_float3(render_buffers, buffer_params, destination);
         }
         else if (type == PASS_COMBINED || type == PASS_SHADOW_CATCHER ||
-                 type == PASS_SHADOW_CATCHER_MATTE) {
+                 type == PASS_SHADOW_CATCHER_MATTE)
+        {
           /* Passes with transparency as 4th component. */
           get_pass_combined(render_buffers, buffer_params, destination);
         }
@@ -231,9 +235,10 @@ void PassAccessor::init_kernel_film_convert(KernelFilmConvert *kfilm_convert,
                                             const BufferParams &buffer_params,
                                             const Destination &destination) const
 {
+  const PassType type = pass_access_info_.type;
   const PassMode mode = pass_access_info_.mode;
-  const PassInfo &pass_info = Pass::get_info(
-      pass_access_info_.type, pass_access_info_.include_albedo, pass_access_info_.is_lightgroup);
+  const PassInfo pass_info = Pass::get_info(
+      type, mode, pass_access_info_.include_albedo, pass_access_info_.is_lightgroup);
 
   kfilm_convert->pass_offset = pass_access_info_.offset;
   kfilm_convert->pass_stride = buffer_params.pass_stride;
@@ -265,11 +270,19 @@ void PassAccessor::init_kernel_film_convert(KernelFilmConvert *kfilm_convert,
   /* Background is not denoised, so always use noisy pass. */
   kfilm_convert->pass_background = buffer_params.get_pass_offset(PASS_BACKGROUND);
 
-  if (pass_info.use_filter) {
-    kfilm_convert->scale = num_samples_ != 0 ? 1.0f / num_samples_ : 0.0f;
+  /* If we have a sample count pass, we must perform the division in the kernel instead
+   * (unless the sample count pass is the one being read). */
+  const bool divide_by_samples = (type == PASS_SAMPLE_COUNT) ||
+                                 (kfilm_convert->pass_sample_count == PASS_UNUSED);
+  if (pass_info.use_filter && divide_by_samples) {
+    kfilm_convert->scale = num_samples_ != 0 ? pass_info.scale / num_samples_ : 0.0f;
   }
   else {
-    kfilm_convert->scale = 1.0f;
+    kfilm_convert->scale = pass_info.scale;
+
+    if (!pass_access_info_.use_sample_count) {
+      kfilm_convert->pass_use_filter = false;
+    }
   }
 
   if (pass_info.use_exposure) {
@@ -299,8 +312,10 @@ bool PassAccessor::set_render_tile_pixels(RenderBuffers *render_buffers, const S
     return false;
   }
 
-  const PassInfo pass_info = Pass::get_info(
-      pass_access_info_.type, pass_access_info_.include_albedo, pass_access_info_.is_lightgroup);
+  const PassInfo pass_info = Pass::get_info(pass_access_info_.type,
+                                            pass_access_info_.mode,
+                                            pass_access_info_.include_albedo,
+                                            pass_access_info_.is_lightgroup);
 
   const BufferParams &buffer_params = render_buffers->params;
 

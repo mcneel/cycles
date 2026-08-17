@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "stdcycles.h"
 
@@ -9,6 +10,7 @@ shader node_texture_coordinate(
     int from_dupli = 0,
     int use_transform = 0,
     string bump_offset = "center",
+    float bump_filter_width = BUMP_FILTER_WIDTH,
     matrix object_itfm = matrix(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
 
     output point Generated = point(0.0, 0.0, 0.0),
@@ -22,7 +24,12 @@ shader node_texture_coordinate(
   if (is_background) {
     Generated = P;
     UV = point(0.0, 0.0, 0.0);
-    Object = P;
+    if (use_transform) {
+      Object = transform(object_itfm, P);
+    }
+    else {
+      Object = P;
+    }
     point Pcam = transform("camera", "world", point(0, 0, 0));
     Camera = transform("camera", P + Pcam);
     getattribute("NDC", Window);
@@ -47,7 +54,11 @@ shader node_texture_coordinate(
       if (!getattribute("geom:generated", Generated)) {
         Generated = transform("object", P);
       }
-      getattribute("geom:uv", UV);
+      float is_light;
+      getattribute("object:is_light", is_light);
+      if (!getattribute("geom:uv", UV) && is_light) {
+        UV = point(1.0 - u - v, u, 0.0);
+      }
     }
 
     if (use_transform) {
@@ -57,28 +68,34 @@ shader node_texture_coordinate(
       Object = transform("object", P);
     }
     Camera = transform("camera", P);
-    Window = transform("NDC", P);
-    Normal = transform("world", "object", N);
+    getattribute("NDC", Window);
+    Normal = normalize(transform("world", "object", N));
     Reflection = -reflect(I, N);
   }
 
   if (bump_offset == "dx") {
     if (!from_dupli) {
-      Generated += Dx(Generated);
-      UV += Dx(UV);
+      Generated += Dx(Generated) * bump_filter_width;
+      UV += Dx(UV) * bump_filter_width;
     }
-    Object += Dx(Object);
-    Camera += Dx(Camera);
-    Window += Dx(Window);
+    Object += Dx(Object) * bump_filter_width;
+    Camera += Dx(Camera) * bump_filter_width;
+    Window += Dx(Window) * bump_filter_width;
+    if (getattribute("geom:bump_map_normal", Normal)) {
+      Normal = normalize(Normal + Dx(Normal) * bump_filter_width);
+    }
   }
   else if (bump_offset == "dy") {
     if (!from_dupli) {
-      Generated += Dy(Generated);
-      UV += Dy(UV);
+      Generated += Dy(Generated) * bump_filter_width;
+      UV += Dy(UV) * bump_filter_width;
     }
-    Object += Dy(Object);
-    Camera += Dy(Camera);
-    Window += Dy(Window);
+    Object += Dy(Object) * bump_filter_width;
+    Camera += Dy(Camera) * bump_filter_width;
+    Window += Dy(Window) * bump_filter_width;
+    if (getattribute("geom:bump_map_normal", Normal)) {
+      Normal = normalize(Normal + Dy(Normal) * bump_filter_width);
+    }
   }
 
   Window[2] = 0.0;

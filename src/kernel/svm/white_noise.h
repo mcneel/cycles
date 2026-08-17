@@ -1,27 +1,25 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
+#include "kernel/svm/node_types.h"
+#include "kernel/svm/util.h"
+#include "util/hash.h"
+
 CCL_NAMESPACE_BEGIN
 
-ccl_device_noinline void svm_node_tex_white_noise(KernelGlobals kg,
-                                                  ccl_private ShaderData *sd,
-                                                  ccl_private float *stack,
-                                                  uint dimensions,
-                                                  uint inputs_stack_offsets,
-                                                  uint ouptuts_stack_offsets)
+ccl_device_noinline void svm_node_tex_white_noise(
+    ccl_private float *ccl_restrict stack,
+    const ccl_global SVMNodeTexWhiteNoise &ccl_restrict node)
 {
-  uint vector_stack_offset, w_stack_offset, value_stack_offset, color_stack_offset;
-  svm_unpack_node_uchar2(inputs_stack_offsets, &vector_stack_offset, &w_stack_offset);
-  svm_unpack_node_uchar2(ouptuts_stack_offsets, &value_stack_offset, &color_stack_offset);
+  const float3 vector = stack_load(stack, node.vector);
+  const float w = stack_load(stack, node.w);
 
-  float3 vector = stack_load_float3(stack, vector_stack_offset);
-  float w = stack_load_float(stack, w_stack_offset);
-
-  if (stack_valid(color_stack_offset)) {
+  if (stack_valid(node.color_offset)) {
     float3 color;
-    switch (dimensions) {
+    switch (node.dimensions) {
       case 1:
         color = hash_float_to_float3(w);
         break;
@@ -32,19 +30,19 @@ ccl_device_noinline void svm_node_tex_white_noise(KernelGlobals kg,
         color = hash_float3_to_float3(vector);
         break;
       case 4:
-        color = hash_float4_to_float3(make_float4(vector.x, vector.y, vector.z, w));
+        color = hash_float4_to_float3(make_float4(vector, w));
         break;
       default:
         color = make_float3(1.0f, 0.0f, 1.0f);
         kernel_assert(0);
         break;
     }
-    stack_store_float3(stack, color_stack_offset, color);
+    stack_store_float3(stack, node.color_offset, color);
   }
 
-  if (stack_valid(value_stack_offset)) {
+  if (stack_valid(node.value_offset)) {
     float value;
-    switch (dimensions) {
+    switch (node.dimensions) {
       case 1:
         value = hash_float_to_float(w);
         break;
@@ -55,14 +53,14 @@ ccl_device_noinline void svm_node_tex_white_noise(KernelGlobals kg,
         value = hash_float3_to_float(vector);
         break;
       case 4:
-        value = hash_float4_to_float(make_float4(vector.x, vector.y, vector.z, w));
+        value = hash_float4_to_float(make_float4(vector, w));
         break;
       default:
         value = 0.0f;
         kernel_assert(0);
         break;
     }
-    stack_store_float(stack, value_stack_offset, value);
+    stack_store_float(stack, node.value_offset, value);
   }
 }
 

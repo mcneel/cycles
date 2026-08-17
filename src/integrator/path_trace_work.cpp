@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "device/device.h"
 
@@ -7,8 +8,10 @@
 #include "integrator/path_trace_work.h"
 #include "integrator/path_trace_work_cpu.h"
 #include "integrator/path_trace_work_gpu.h"
+
 #include "scene/film.h"
 #include "scene/scene.h"
+
 #include "session/buffers.h"
 
 #include "kernel/types.h"
@@ -18,7 +21,7 @@ CCL_NAMESPACE_BEGIN
 unique_ptr<PathTraceWork> PathTraceWork::create(Device *device,
                                                 Film *film,
                                                 DeviceScene *device_scene,
-                                                bool *cancel_requested_flag)
+                                                const bool *cancel_requested_flag)
 {
   if (device->info.type == DEVICE_CPU) {
     return make_unique<PathTraceWorkCPU>(device, film, device_scene, cancel_requested_flag);
@@ -34,32 +37,34 @@ unique_ptr<PathTraceWork> PathTraceWork::create(Device *device,
 PathTraceWork::PathTraceWork(Device *device,
                              Film *film,
                              DeviceScene *device_scene,
-                             bool *cancel_requested_flag)
+                             const bool *cancel_requested_flag)
     : device_(device),
       film_(film),
       device_scene_(device_scene),
       buffers_(make_unique<RenderBuffers>(device)),
       effective_buffer_params_(buffers_->params),
+      effective_denoised_buffer_params_(buffers_->params),
       cancel_requested_flag_(cancel_requested_flag)
 {
 }
 
-PathTraceWork::~PathTraceWork()
-{
-}
+PathTraceWork::~PathTraceWork() = default;
 
 RenderBuffers *PathTraceWork::get_render_buffers()
 {
   return buffers_.get();
 }
 
-void PathTraceWork::set_effective_buffer_params(const BufferParams &effective_full_params,
-                                                const BufferParams &effective_big_tile_params,
-                                                const BufferParams &effective_buffer_params)
+void PathTraceWork::set_effective_buffer_params(
+    const BufferParams &effective_big_tile_params,
+    const BufferParams &effective_buffer_params,
+    const BufferParams &effective_denoised_big_tile_params,
+    const BufferParams &effective_denoised_buffer_params)
 {
-  effective_full_params_ = effective_full_params;
   effective_big_tile_params_ = effective_big_tile_params;
   effective_buffer_params_ = effective_buffer_params;
+  effective_denoised_big_tile_params_ = effective_denoised_big_tile_params;
+  effective_denoised_buffer_params_ = effective_denoised_buffer_params;
 }
 
 bool PathTraceWork::has_multiple_works() const
@@ -112,12 +117,16 @@ void PathTraceWork::copy_from_render_buffers(const RenderBuffers *render_buffers
 
 void PathTraceWork::copy_from_denoised_render_buffers(const RenderBuffers *render_buffers)
 {
-  const int64_t width = effective_buffer_params_.width;
-  const int64_t offset_y = effective_buffer_params_.full_y - effective_big_tile_params_.full_y;
+  const int64_t width = effective_denoised_buffer_params_.width;
+  const int64_t offset_y = effective_denoised_buffer_params_.full_y -
+                           effective_denoised_big_tile_params_.full_y;
   const int64_t offset = offset_y * width;
 
-  render_buffers_host_copy_denoised(
-      buffers_.get(), effective_buffer_params_, render_buffers, effective_buffer_params_, offset);
+  render_buffers_host_copy_denoised(buffers_.get(),
+                                    effective_denoised_buffer_params_,
+                                    render_buffers,
+                                    effective_denoised_buffer_params_,
+                                    offset);
 
   copy_render_buffers_to_device();
 }
@@ -155,6 +164,11 @@ PassAccessor::PassAccessInfo PathTraceWork::get_display_pass_access_info(PassMod
   const BufferParams &params = buffers_->params;
 
   const BufferPass *display_pass = params.get_actual_display_pass(film_->get_display_pass());
+  if (display_pass == nullptr) {
+    /* Happens when interactive session changes display pass but render
+     * buffer does not contain it yet. */
+    return PassAccessor::PassAccessInfo();
+  }
 
   PassAccessor::PassAccessInfo pass_access_info;
   pass_access_info.type = display_pass->type;
@@ -174,21 +188,38 @@ PassAccessor::PassAccessInfo PathTraceWork::get_display_pass_access_info(PassMod
   pass_access_info.use_approximate_shadow_catcher_background =
       kfilm.use_approximate_shadow_catcher && !kbackground.transparent;
 
+  if (pass_access_info.mode == PassMode::DENOISED &&
+      (effective_denoised_buffer_params_.width != effective_buffer_params_.width ||
+       effective_denoised_buffer_params_.height != effective_buffer_params_.height))
+  {
+    /* Avoid using sample count to filter pass after upscaling, since it is stored at a different
+     * resolution. The denoiser should have applied scaling again in this case. */
+    pass_access_info.use_sample_count = false;
+    pass_access_info.use_approximate_shadow_catcher_background = false;
+  }
+
   pass_access_info.show_active_pixels = film_->get_show_active_pixels();
 
   return pass_access_info;
 }
 
 PassAccessor::Destination PathTraceWork::get_display_destination_template(
-    const PathTraceDisplay *display) const
+    const PathTraceDisplay *display, const PassMode mode) const
 {
-  PassAccessor::Destination destination(film_->get_display_pass());
+  PassAccessor::Destination destination(film_->get_display_pass(), mode);
+
+  const BufferParams &effective_big_tile_params = (mode == PassMode::DENOISED) ?
+                                                      effective_denoised_big_tile_params_ :
+                                                      effective_big_tile_params_;
+  const BufferParams &effective_buffer_params = (mode == PassMode::DENOISED) ?
+                                                    effective_denoised_buffer_params_ :
+                                                    effective_buffer_params_;
 
   const int2 display_texture_size = display->get_texture_size();
-  const int texture_x = effective_buffer_params_.full_x - effective_big_tile_params_.full_x +
-                        effective_buffer_params_.window_x - effective_big_tile_params_.window_x;
-  const int texture_y = effective_buffer_params_.full_y - effective_big_tile_params_.full_y +
-                        effective_buffer_params_.window_y - effective_big_tile_params_.window_y;
+  const int texture_x = effective_buffer_params.full_x - effective_big_tile_params.full_x +
+                        effective_buffer_params.window_x - effective_big_tile_params.window_x;
+  const int texture_y = effective_buffer_params.full_y - effective_big_tile_params.full_y +
+                        effective_buffer_params.window_y - effective_big_tile_params.window_y;
 
   destination.offset = texture_y * display_texture_size.x + texture_x;
   destination.stride = display_texture_size.x;

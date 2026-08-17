@@ -1,11 +1,14 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "kernel/geom/geom.h"
+#include "kernel/integrator/surface_shader.h"
 
 #include "kernel/camera/camera.h"
+
+#include "kernel/geom/primitive.h"
 
 #include "kernel/film/cryptomatte_passes.h"
 #include "kernel/film/write.h"
@@ -13,9 +16,9 @@
 CCL_NAMESPACE_BEGIN
 
 ccl_device_inline size_t film_write_cryptomatte_pass(ccl_global float *ccl_restrict buffer,
-                                                     size_t depth,
-                                                     float id,
-                                                     float matte_weight)
+                                                     const size_t depth,
+                                                     const float id,
+                                                     const float matte_weight)
 {
   film_write_cryptomatte_slots(buffer, depth * 2, id, matte_weight);
   return depth * 4;
@@ -23,7 +26,7 @@ ccl_device_inline size_t film_write_cryptomatte_pass(ccl_global float *ccl_restr
 
 ccl_device_inline void film_write_data_passes(KernelGlobals kg,
                                               IntegratorState state,
-                                              ccl_private const ShaderData *sd,
+                                              const ccl_private ShaderData *sd,
                                               ccl_global float *ccl_restrict render_buffer)
 {
 #ifdef __PASSES__
@@ -67,10 +70,12 @@ ccl_device_inline void film_write_data_passes(KernelGlobals kg,
       }
     }
 
-    if (!(sd->flag & SD_TRANSPARENT) || kernel_data.film.pass_alpha_threshold == 0.0f ||
-        average(surface_shader_alpha(kg, sd)) >= kernel_data.film.pass_alpha_threshold) {
+    if (!(sd->flag & (SD_TRANSPARENT | SD_RAY_PORTAL)) ||
+        kernel_data.film.pass_alpha_threshold == 0.0f ||
+        average(surface_shader_alpha(sd)) >= kernel_data.film.pass_alpha_threshold)
+    {
       if (flag & PASSMASK(NORMAL)) {
-        const float3 normal = surface_shader_average_normal(kg, sd);
+        const float3 normal = surface_shader_average_normal(sd);
         film_write_pass_float3(buffer + kernel_data.film.pass_normal, normal);
       }
       if (flag & PASSMASK(ROUGHNESS)) {
@@ -94,7 +99,7 @@ ccl_device_inline void film_write_data_passes(KernelGlobals kg,
   if (kernel_data.film.cryptomatte_passes) {
     const Spectrum throughput = INTEGRATOR_STATE(state, path, throughput);
     const float matte_weight = average(throughput) *
-                               (1.0f - average(surface_shader_transparency(kg, sd)));
+                               (1.0f - average(surface_shader_transparency(sd)));
     if (matte_weight > 0.0f) {
       ccl_global float *cryptomatte_buffer = buffer + kernel_data.film.pass_cryptomatte;
       if (kernel_data.film.cryptomatte_passes & CRYPT_OBJECT) {
@@ -141,18 +146,22 @@ ccl_device_inline void film_write_data_passes(KernelGlobals kg,
     /* Falloff */
     const float mist_falloff = kernel_data.film.mist_falloff;
 
-    if (mist_falloff == 1.0f)
+    if (mist_falloff == 1.0f) {
       ;
-    else if (mist_falloff == 2.0f)
+    }
+    else if (mist_falloff == 2.0f) {
       mist = mist * mist;
-    else if (mist_falloff == 0.5f)
+    }
+    else if (mist_falloff == 0.5f) {
       mist = sqrtf(mist);
-    else
+    }
+    else {
       mist = powf(mist, mist_falloff);
+    }
 
     /* Modulate by transparency */
     const Spectrum throughput = INTEGRATOR_STATE(state, path, throughput);
-    const Spectrum alpha = surface_shader_alpha(kg, sd);
+    const Spectrum alpha = surface_shader_alpha(sd);
     const float mist_output = (1.0f - mist) * average(throughput * alpha);
 
     /* Note that the final value in the render buffer we want is 1 - mist_output,
@@ -201,6 +210,12 @@ ccl_device_inline void film_write_data_passes_background(
       if (flag & PASSMASK(POSITION)) {
         film_overwrite_pass_float3(buffer + kernel_data.film.pass_position, zero_float3());
       }
+    }
+
+    if (flag & PASSMASK(MOTION)) {
+      const float4 speed = camera_motion_vector_direction(kg, INTEGRATOR_STATE(state, ray, D));
+      film_write_pass_float4(buffer + kernel_data.film.pass_motion, speed);
+      film_write_pass_float(buffer + kernel_data.film.pass_motion_weight, 1.0f);
     }
   }
 #endif

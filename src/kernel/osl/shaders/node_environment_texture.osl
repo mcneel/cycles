@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "node_color.h"
 #include "stdcycles.h"
@@ -55,7 +56,7 @@ shader node_environment_texture(
 
   /* todo: use environment for better texture filtering of equirectangular */
   Color = (color)texture(
-      filename, p[0], 1.0 - p[1], "wrap", "periodic", "interp", interpolation, "alpha", Alpha);
+      filename, p[0], p[1], "wrap", "periodic", "interp", interpolation, "alpha", Alpha);
 
   if (ignore_alpha) {
     Alpha = 1.0;

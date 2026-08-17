@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -23,34 +24,61 @@ class MetalDevice : public Device {
  public:
   id<MTLDevice> mtlDevice = nil;
   id<MTLLibrary> mtlLibrary[PSO_NUM] = {nil};
-  id<MTLArgumentEncoder> mtlBufferKernelParamsEncoder =
-      nil; /* encoder used for fetching device pointers from MTLBuffers */
+  id<MTLCommandQueue> mtlComputeCommandQueue = nil;
   id<MTLCommandQueue> mtlGeneralCommandQueue = nil;
-  id<MTLArgumentEncoder> mtlAncillaryArgEncoder =
-      nil; /* encoder used for fetching device pointers from MTLBuffers */
+  id<MTLCounterSampleBuffer> mtlCounterSampleBuffer = nil;
   string source[PSO_NUM];
   string kernels_md5[PSO_NUM];
   string global_defines_md5[PSO_NUM];
 
   bool capture_enabled = false;
 
-  KernelParamsMetal launch_params = {0};
+  /* Argument buffer for static data. */
+  id<MTLBuffer> launch_params_buffer = nil;
+  KernelParamsMetal *launch_params = nullptr;
 
-  /* MetalRT members ----------------------------------*/
-  BVHMetal *bvhMetalRT = nullptr;
+  /* MetalRT members ---------------------------------- */
+  bool use_metalrt = false;
+  bool use_metalrt_extended_limits = false;
   bool motion_blur = false;
-  id<MTLArgumentEncoder> mtlASArgEncoder =
-      nil; /* encoder used for fetching device pointers from MTLAccelerationStructure */
-  /*---------------------------------------------------*/
+  bool use_pcmi = false;
 
-  MetalGPUVendor device_vendor;
+  id<MTLBuffer> blas_buffer = nil;
 
-  uint kernel_features;
-  MTLResourceOptions default_storage_mode;
+  API_AVAILABLE(macos(11.0))
+  vector<id<MTLAccelerationStructure>> unique_blas_array;
+
+  API_AVAILABLE(macos(11.0))
+  vector<id<MTLAccelerationStructure>> blas_array;
+
+  API_AVAILABLE(macos(11.0))
+  id<MTLAccelerationStructure> accel_struct = nil;
+
+  /* Residency sets -----------------------------------*/
+  void prepare_residency();
+  void metal_mem_alloc(id<MTLResource> allocation);
+  void metal_mem_free(id<MTLResource> allocation);
+
+  /* For externally-owned resources (e.g. graphics interop buffers) which need to be resident for
+   * kernels to access them, but shouldn't be included in our stats. */
+  void add_to_residency_set(id<MTLResource> allocation);
+  void remove_from_residency_set(id<MTLResource> allocation);
+
+  bool mtlResidencySet_enabled = false;
+#  if defined(MAC_OS_VERSION_15_0)
+  API_AVAILABLE(macos(15.0), ios(18.0))
+  id<MTLResidencySet> mtlResidencySet = nil;
+  bool mtlResidencySet_dirty = false;
+  /* Guards mtlResidencySet mutations (may be reached from multiple threads). */
+  std::mutex mtlResidencySet_mutex;
+#  endif
+
+  uint kernel_features = 0;
+  bool using_nanovdb = false;
   int max_threads_per_threadgroup;
 
   int mtlDevId = 0;
-  bool first_error = true;
+  bool has_error = false;
 
   struct MetalMem {
     device_memory *mem = nullptr;
@@ -60,27 +88,18 @@ class MetalDevice : public Device {
     uint64_t offset = 0;
     uint64_t size = 0;
     void *hostPtr = nullptr;
-    bool use_UMA = false; /* If true, UMA memory in shared_pointer is being used. */
   };
-  typedef map<device_memory *, unique_ptr<MetalMem>> MetalMemMap;
+  using MetalMemMap = map<device_memory *, unique_ptr<MetalMem>>;
   MetalMemMap metal_mem_map;
   std::vector<id<MTLResource>> delayed_free_list;
   std::recursive_mutex metal_mem_map_mutex;
 
   /* Bindless Textures */
-  device_vector<TextureInfo> texture_info;
-  bool need_texture_info;
-  id<MTLArgumentEncoder> mtlTextureArgEncoder = nil;
-  id<MTLBuffer> texture_bindings_2d = nil;
-  id<MTLBuffer> texture_bindings_3d = nil;
-  std::vector<id<MTLTexture>> texture_slot_map;
+  bool is_texture(const KernelImageInfo &info);
+  device_vector<KernelImageInfo> image_info;
+  id<MTLBuffer> image_bindings = nil;
+  std::vector<id<MTLResource>> image_info_id_map;
 
-  /* BLAS encoding & lookup */
-  id<MTLArgumentEncoder> mtlBlasArgEncoder = nil;
-  id<MTLBuffer> blas_buffer = nil;
-  id<MTLBuffer> blas_lookup_buffer = nil;
-
-  bool use_metalrt = false;
   MetalPipelineType kernel_specialization_level = PSO_GENERIC;
 
   int device_id = 0;
@@ -88,22 +107,22 @@ class MetalDevice : public Device {
   static thread_mutex existing_devices_mutex;
   static std::map<int, MetalDevice *> active_device_ids;
 
-  static bool is_device_cancelled(int device_id);
+  static bool is_device_cancelled(const int device_id);
 
-  static MetalDevice *get_device_by_ID(int device_idID,
+  static MetalDevice *get_device_by_ID(const int device_idID,
                                        thread_scoped_lock &existing_devices_mutex_lock);
 
-  virtual bool is_ready(string &status) const override;
+  bool is_ready(string &status) const override;
 
-  virtual void cancel() override;
+  void cancel() override;
 
-  virtual BVHLayoutMask get_bvh_layout_mask() const override;
+  BVHLayoutMask get_bvh_layout_mask(uint /*kernel_features*/) const override;
 
   void set_error(const string &error) override;
 
-  MetalDevice(const DeviceInfo &info, Stats &stats, Profiler &profiler);
+  MetalDevice(const DeviceInfo &info, Stats &stats, Profiler &profiler, bool headless);
 
-  virtual ~MetalDevice();
+  ~MetalDevice() override;
 
   bool support_device(const uint /*kernel_features*/);
 
@@ -117,30 +136,35 @@ class MetalDevice : public Device {
                            const uint kernel_features,
                            string *source = nullptr);
 
-  bool make_source_and_check_if_compile_needed(MetalPipelineType pso_type);
+  void refresh_source_and_kernels_md5(MetalPipelineType pso_type);
 
   void make_source(MetalPipelineType pso_type, const uint kernel_features);
 
-  virtual bool load_kernels(const uint kernel_features) override;
+  bool load_kernels(const uint kernel_features) override;
 
-  void load_texture_info();
+  void load_image_info();
 
   void erase_allocation(device_memory &mem);
 
-  virtual bool should_use_graphics_interop() override;
+  bool should_use_graphics_interop(const GraphicsInteropDevice &interop_device,
+                                   const bool log) override;
 
-  virtual unique_ptr<DeviceQueue> gpu_queue_create() override;
+  void *get_native_buffer(device_ptr ptr) override;
 
-  virtual void build_bvh(BVH *bvh, Progress &progress, bool refit) override;
+  unique_ptr<DeviceQueue> gpu_queue_create() override;
 
-  virtual void optimize_for_scene(Scene *scene) override;
+  void build_bvh(BVH *bvh, Progress &progress, bool refit) override;
 
-  static void compile_and_load(int device_id, MetalPipelineType pso_type);
+  bool set_bvh_limits(size_t instance_count, size_t max_prim_count) override;
+
+  void optimize_for_scene(Scene *scene) override;
+
+  static void compile_and_load(const int device_id, MetalPipelineType pso_type);
 
   /* ------------------------------------------------------------------ */
   /* low-level memory management */
 
-  bool max_working_set_exceeded(size_t safety_margin = 8 * 1024 * 1024) const;
+  bool max_working_set_exceeded(const size_t safety_margin = 8 * 1024 * 1024) const;
 
   MetalMem *generic_alloc(device_memory &mem);
 
@@ -152,31 +176,40 @@ class MetalDevice : public Device {
 
   void mem_copy_to(device_memory &mem) override;
 
+  void mem_move_to_host(device_memory &mem) override;
+
   void mem_copy_from(device_memory &mem)
   {
     mem_copy_from(mem, -1, -1, -1, -1);
   }
-  void mem_copy_from(device_memory &mem, size_t y, size_t w, size_t h, size_t elem) override;
+  void mem_copy_from(
+      device_memory &mem, const size_t y, size_t w, const size_t h, size_t elem) override;
+
+  void mem_or_from_device(device_memory &mem) override;
 
   void mem_zero(device_memory &mem) override;
 
   void mem_free(device_memory &mem) override;
 
-  device_ptr mem_alloc_sub_ptr(device_memory &mem, size_t offset, size_t /*size*/) override;
+  device_ptr mem_alloc_sub_ptr(device_memory &mem, const size_t offset, size_t /*size*/) override;
 
-  virtual void const_copy_to(const char *name, void *host, size_t size) override;
+  void const_copy_to(const char *name, void *host, const size_t size) override;
 
   void global_alloc(device_memory &mem);
-
   void global_free(device_memory &mem);
 
-  void tex_alloc(device_texture &mem);
+  void image_alloc(device_image &mem);
+  void image_alloc_as_buffer(device_image &mem);
+  void image_copy_to(device_image &mem);
+  void image_free(device_image &mem);
 
-  void tex_alloc_as_buffer(device_texture &mem);
-
-  void tex_free(device_texture &mem);
+  bool has_unified_memory() const override;
 
   void flush_delayed_free_list();
+
+  void free_bvh();
+
+  void update_bvh(BVHMetal *bvh_metal);
 };
 
 CCL_NAMESPACE_END

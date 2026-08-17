@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __BUFFERS_H__
-#define __BUFFERS_H__
+#pragma once
 
 #include "device/memory.h"
 #include "graph/node.h"
@@ -10,10 +10,9 @@
 
 #include "kernel/types.h"
 
-#include "util/half.h"
 #include "util/string.h"
-#include "util/thread.h"
-#include "util/types.h"
+#include "util/unique_ptr.h"
+#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -43,17 +42,17 @@ class BufferPass : public Node {
   BufferPass &operator=(BufferPass &&other) = default;
   BufferPass &operator=(const BufferPass &other) = default;
 
-  ~BufferPass() = default;
+  ~BufferPass() override = default;
 
   PassInfo get_info() const;
 
-  inline bool operator==(const BufferPass &other) const
+  bool operator==(const BufferPass &other) const
   {
     return type == other.type && mode == other.mode && name == other.name &&
            include_albedo == other.include_albedo && lightgroup == other.lightgroup &&
            offset == other.offset;
   }
-  inline bool operator!=(const BufferPass &other) const
+  bool operator!=(const BufferPass &other) const
   {
     return !(*this == other);
   }
@@ -72,7 +71,7 @@ class BufferParams : public Node {
   int height = 0;
 
   /* Windows defines which part of the buffers is visible. The part outside of the window is
-   * considered an "overscan".
+   * considered an `overscan`.
    *
    * Window X and Y are relative to the position of the buffer in the full buffer. */
   int window_x = 0;
@@ -109,7 +108,7 @@ class BufferParams : public Node {
   BufferParams &operator=(BufferParams &&other) = default;
   BufferParams &operator=(const BufferParams &other) = default;
 
-  ~BufferParams() = default;
+  ~BufferParams() override = default;
 
   /* Pre-calculate all fields which depends on the passes.
    *
@@ -118,7 +117,7 @@ class BufferParams : public Node {
    * The `update_passes()` without parameters updates offsets and strides which are stored outside
    * of the passes. */
   void update_passes();
-  void update_passes(const vector<Pass *> &scene_passes);
+  void update_passes(const unique_ptr_vector<Pass> &scene_passes);
 
   /* Returns PASS_UNUSED if there is no such pass in the buffer. */
   int get_pass_offset(PassType type, PassMode mode = PassMode::NOISY) const;
@@ -184,5 +183,3 @@ void render_buffers_host_copy_denoised(RenderBuffers *dst,
                                        const size_t src_offset = 0);
 
 CCL_NAMESPACE_END
-
-#endif /* __BUFFERS_H__ */

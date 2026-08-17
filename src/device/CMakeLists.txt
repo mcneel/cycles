@@ -1,11 +1,13 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2011-2022 Blender Foundation
 
 set(INC
   ..
 )
 
-set(INC_SYS )
+set(INC_SYS
+)
 
 if(WITH_CYCLES_DEVICE_OPTIX OR WITH_CYCLES_DEVICE_CUDA)
   if(NOT WITH_CUDA_DYNLOAD)
@@ -32,8 +34,6 @@ set(SRC_CPU
   cpu/kernel.cpp
   cpu/kernel.h
   cpu/kernel_function.h
-  cpu/kernel_thread_globals.cpp
-  cpu/kernel_thread_globals.h
 )
 
 set(SRC_CUDA
@@ -66,11 +66,20 @@ set(SRC_HIP
   hip/util.h
 )
 
+set(SRC_HIPRT
+  hiprt/device_impl.cpp
+  hiprt/device_impl.h
+  hiprt/queue.cpp
+  hiprt/queue.h
+)
+
 set(SRC_ONEAPI
   oneapi/device_impl.cpp
   oneapi/device_impl.h
   oneapi/device.cpp
   oneapi/device.h
+  oneapi/graphics_interop.cpp
+  oneapi/graphics_interop.h
   oneapi/queue.cpp
   oneapi/queue.h
 )
@@ -92,6 +101,8 @@ set(SRC_METAL
   metal/device.h
   metal/device_impl.mm
   metal/device_impl.h
+  metal/graphics_interop.mm
+  metal/graphics_interop.h
   metal/kernel.mm
   metal/kernel.h
   metal/queue.mm
@@ -124,6 +135,7 @@ set(SRC
   ${SRC_CPU}
   ${SRC_CUDA}
   ${SRC_HIP}
+  ${SRC_HIPRT}
   ${SRC_DUMMY}
   ${SRC_MULTI}
   ${SRC_OPTIX}
@@ -131,31 +143,37 @@ set(SRC
 )
 
 set(LIB
-  cycles_kernel
-  cycles_util
+  PUBLIC cycles_kernel
+  PUBLIC cycles_util
+  PRIVATE bf::dependencies::optional::openimagedenoise
+  PRIVATE bf::dependencies::optional::osl
 )
 
 if(WITH_CYCLES_DEVICE_OPTIX OR WITH_CYCLES_DEVICE_CUDA)
   if(WITH_CUDA_DYNLOAD)
     list(APPEND LIB
-      extern_cuew
+      PRIVATE extern_cuew
     )
   else()
     list(APPEND LIB
-      ${CUDA_CUDA_LIBRARY}
+      PRIVATE ${CUDA_CUDA_LIBRARY}
     )
   endif()
 endif()
 
 if(WITH_CYCLES_DEVICE_HIP AND WITH_HIP_DYNLOAD)
   list(APPEND LIB
-    extern_hipew
+    PRIVATE extern_hipew
   )
+endif()
+
+if(WITH_CYCLES_DEVICE_HIPRT)
+  list(APPEND LIB ${HIPRT_LIBRARIES})
 endif()
 
 if(WITH_CYCLES_DEVICE_METAL)
   list(APPEND LIB
-    ${METAL_LIBRARY}
+    PRIVATE ${METAL_LIBRARY}
   )
   list(APPEND SRC
     ${SRC_METAL}
@@ -163,37 +181,53 @@ if(WITH_CYCLES_DEVICE_METAL)
 endif()
 
 if(WITH_CYCLES_DEVICE_ONEAPI)
-  if(WITH_CYCLES_ONEAPI_HOST_TASK_EXECUTION)
-    add_definitions(-DWITH_ONEAPI_SYCL_HOST_TASK)
-  endif()
   if(WITH_CYCLES_ONEAPI_BINARIES)
     set(cycles_kernel_oneapi_lib_suffix "_aot")
   else()
     set(cycles_kernel_oneapi_lib_suffix "_jit")
   endif()
   if(WIN32)
-    set(cycles_kernel_oneapi_lib ${CMAKE_CURRENT_BINARY_DIR}/../kernel/cycles_kernel_oneapi${cycles_kernel_oneapi_lib_suffix}.lib)
+    set(cycles_kernel_oneapi_lib ${CMAKE_CURRENT_BINARY_DIR}/../kernel/device/oneapi/cycles_kernel_oneapi${cycles_kernel_oneapi_lib_suffix}.lib)
   else()
-    set(cycles_kernel_oneapi_lib ${CMAKE_CURRENT_BINARY_DIR}/../kernel/libcycles_kernel_oneapi${cycles_kernel_oneapi_lib_suffix}.so)
+    set(cycles_kernel_oneapi_lib ${CMAKE_CURRENT_BINARY_DIR}/../kernel/device/oneapi/libcycles_kernel_oneapi${cycles_kernel_oneapi_lib_suffix}.so)
   endif()
-  list(APPEND LIB ${cycles_kernel_oneapi_lib})
-  if(WIN32)
-    list(APPEND LIB debug ${SYCL_LIBRARY_DEBUG} optimized ${SYCL_LIBRARY})
-  else()
-    list(APPEND LIB ${SYCL_LIBRARY})
-  endif()
+  list(APPEND LIB
+    PRIVATE ${cycles_kernel_oneapi_lib}
+    ${SYCL_LIBRARIES}
+  )
   list(APPEND SRC
     ${SRC_ONEAPI}
   )
   list(APPEND INC_SYS
     ${SYCL_INCLUDE_DIR}
   )
-endif()
 
-if(WITH_OPENIMAGEDENOISE)
-  list(APPEND LIB
-    ${OPENIMAGEDENOISE_LIBRARIES}
-  )
+  # Test for the presence of sycl::ext::oneapi::experimental::unmap_external_linear_memory (necessary for interop).
+  # https://github.com/intel/llvm/blob/sycl/sycl/doc/extensions/experimental/sycl_ext_oneapi_bindless_images.asciidoc
+  include(CheckCXXSourceCompiles)
+  set(CMAKE_REQUIRED_INCLUDES "${SYCL_INCLUDE_DIR}")
+  set(CMAKE_REQUIRED_LIBRARIES "${SYCL_LIBRARIES}")
+  check_cxx_source_compiles("
+      #include <sycl/ext/oneapi/bindless_images.hpp>
+      int main()
+      {
+          sycl::queue sycl_queue{sycl::gpu_selector_v};
+          sycl::ext::oneapi::experimental::unmap_external_linear_memory(nullptr, sycl_queue);
+      }
+  " SYCL_UNMAP_EXTERNAL_LINEAR_MEMORY_SUPPORTED)
+  if(SYCL_UNMAP_EXTERNAL_LINEAR_MEMORY_SUPPORTED)
+    foreach(FILE ${SRC_ONEAPI})
+      set_source_files_properties(
+          ${FILE} PROPERTIES COMPILE_DEFINITIONS "SYCL_LINEAR_MEMORY_INTEROP_AVAILABLE"
+      )
+    endforeach()
+  else()
+    message(WARNING
+      "The installed SYCL version does not support unmap_external_linear_memory. "
+      "Upgrade to oneAPI >= 2025.3 or DPC++ >= 6.2 to support Vulkan-oneAPI interoperability.")
+  endif()
+  unset(CMAKE_REQUIRED_INCLUDES)
+  unset(CMAKE_REQUIRED_LIBRARIES)
 endif()
 
 include_directories(${INC})
@@ -215,6 +249,7 @@ source_group("cpu" FILES ${SRC_CPU})
 source_group("cuda" FILES ${SRC_CUDA})
 source_group("dummy" FILES ${SRC_DUMMY})
 source_group("hip" FILES ${SRC_HIP})
+source_group("hiprt" FILES ${SRC_HIPRT})
 source_group("multi" FILES ${SRC_MULTI})
 source_group("metal" FILES ${SRC_METAL})
 source_group("optix" FILES ${SRC_OPTIX})

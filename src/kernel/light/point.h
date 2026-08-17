@@ -1,112 +1,181 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
+#include "kernel/globals.h"
+
+#include "kernel/geom/object.h"
+
 #include "kernel/light/common.h"
+
+#include "util/defines.h"
+#include "util/math_intersect.h"
 
 CCL_NAMESPACE_BEGIN
 
-template<bool in_volume_segment>
 ccl_device_inline bool point_light_sample(const ccl_global KernelLight *klight,
-                                          const float randu,
-                                          const float randv,
+                                          const float2 rand,
                                           const float3 P,
+                                          const float3 N,
+                                          const int shader_flags,
                                           ccl_private LightSample *ls)
 {
-  float3 center = klight->co;
-  float radius = klight->spot.radius;
-  /* disk oriented normal */
-  const float3 lightN = normalize(P - center);
-  ls->P = center;
+  const float r_sq = sqr(klight->spot.radius);
 
-  if (radius > 0.0f) {
-    ls->P += disk_light_sample(lightN, randu, randv) * radius;
+  float3 lightN = P - klight->co;
+  const float d_sq = len_squared(lightN);
+  const float d = sqrtf(d_sq);
+  lightN /= d;
+
+  ls->eval_fac = klight->spot.eval_fac;
+
+  if (klight->spot.is_sphere) {
+    /* Spherical light geometry. */
+    float cos_theta;
+    if (d_sq > r_sq) {
+      /* Outside sphere. */
+      const float one_minus_cos = sin_sqr_to_one_minus_cos(r_sq / d_sq);
+      ls->D = sample_uniform_cone(-lightN, one_minus_cos, rand, &cos_theta, &ls->pdf);
+    }
+    else {
+      /* Inside sphere. */
+      const bool has_transmission = (shader_flags & SD_BSDF_HAS_TRANSMISSION);
+      if (has_transmission) {
+        ls->D = sample_uniform_sphere(rand);
+        ls->pdf = M_1_2PI_F * 0.5f;
+      }
+      else {
+        sample_cos_hemisphere(N, rand, &ls->D, &ls->pdf);
+      }
+      cos_theta = -dot(ls->D, lightN);
+    }
+
+    /* Law of cosines. */
+    ls->t = d * cos_theta -
+            copysignf(safe_sqrtf(r_sq - d_sq + d_sq * sqr(cos_theta)), d_sq - r_sq);
+
+    /* Remap sampled point onto the sphere to prevent precision issues with small radius. */
+    ls->P = P + ls->D * ls->t;
+    ls->Ng = normalize(ls->P - klight->co);
+    ls->P = ls->Ng * klight->spot.radius + klight->co;
   }
-  ls->pdf = klight->spot.invarea;
+  else {
+    /* Point light with ad-hoc radius based on oriented disk. */
+    ls->P = klight->co;
+    if (r_sq > 0.0f) {
+      ls->P += disk_light_sample(lightN, rand) * klight->spot.radius;
+    }
 
-  ls->D = normalize_len(ls->P - P, &ls->t);
-  /* we set the light normal to the outgoing direction to support texturing */
-  ls->Ng = -ls->D;
+    ls->D = safe_normalize_len(ls->P - P, &ls->t);
+    ls->Ng = -ls->D;
 
-  ls->eval_fac = M_1_PI_F * 0.25f * klight->spot.invarea;
-  if (!in_volume_segment && ls->eval_fac == 0.0f) {
-    return false;
+    /* PDF. */
+    const float invarea = (r_sq > 0.0f) ? 1.0f / (r_sq * M_PI_F) : 1.0f;
+    ls->pdf = invarea * light_pdf_area_to_solid_angle(lightN, -ls->D, ls->t);
   }
 
-  float2 uv = map_to_sphere(ls->Ng);
-  ls->u = uv.x;
-  ls->v = uv.y;
-  ls->pdf *= lamp_light_pdf(lightN, -ls->D, ls->t);
   return true;
 }
 
-ccl_device_forceinline void point_light_update_position(const ccl_global KernelLight *klight,
-                                                        ccl_private LightSample *ls,
-                                                        const float3 P)
+ccl_device_forceinline float sphere_light_pdf(
+    const float d_sq, const float r_sq, const float3 N, const float3 D, const uint32_t path_flag)
 {
-  ls->D = normalize_len(ls->P - P, &ls->t);
-  ls->Ng = -ls->D;
+  if (d_sq > r_sq) {
+    return M_1_2PI_F / sin_sqr_to_one_minus_cos(r_sq / d_sq);
+  }
 
-  float2 uv = map_to_sphere(ls->Ng);
-  ls->u = uv.x;
-  ls->v = uv.y;
+  const bool has_transmission = (path_flag & PATH_RAY_MIS_HAD_TRANSMISSION);
+  return has_transmission ? M_1_2PI_F * 0.5f : pdf_cos_hemisphere(N, D);
+}
 
-  float invarea = klight->spot.invarea;
-  ls->eval_fac = (0.25f * M_1_PI_F) * invarea;
-  ls->pdf = invarea;
+ccl_device_forceinline float2 point_light_uv(KernelGlobals kg,
+                                             const ccl_global KernelLight *klight,
+                                             const float3 Ng)
+{
+  /* Texture coordinates. */
+  const Transform itfm = lamp_get_inverse_transform(kg, klight);
+  const float2 uv = map_to_sphere(transform_direction(&itfm, Ng));
+  /* NOTE: Return barycentric coordinates in the same notation as Embree and OptiX. */
+  return make_float2(uv.y, 1.0f - uv.x - uv.y);
+}
+
+ccl_device_forceinline void point_light_mnee_sample_update(const ccl_global KernelLight *klight,
+                                                           ccl_private LightSample *ls,
+                                                           const float3 P,
+                                                           const float3 N,
+                                                           const uint32_t path_flag)
+{
+  ls->D = safe_normalize_len(ls->P - P, &ls->t);
+
+  const float radius = klight->spot.radius;
+
+  if (klight->spot.is_sphere) {
+    const float d_sq = len_squared(P - klight->co);
+    const float r_sq = sqr(radius);
+    const float t_sq = sqr(ls->t);
+
+    /* NOTE : preserve pdf in area measure. */
+    const float jacobian_solid_angle_to_area = 0.5f * fabsf(d_sq - r_sq - t_sq) /
+                                               (radius * ls->t * t_sq);
+    ls->pdf = sphere_light_pdf(d_sq, r_sq, N, ls->D, path_flag) * jacobian_solid_angle_to_area;
+
+    ls->Ng = normalize(ls->P - klight->co);
+  }
+  else {
+    /* NOTE : preserve pdf in area measure. */
+    ls->pdf = ls->eval_fac * 4.0f * M_PI_F;
+
+    ls->Ng = -ls->D;
+  }
 }
 
 ccl_device_inline bool point_light_intersect(const ccl_global KernelLight *klight,
                                              const ccl_private Ray *ccl_restrict ray,
                                              ccl_private float *t)
 {
-  /* Sphere light (aka, aligned disk light). */
-  const float3 lightP = klight->co;
   const float radius = klight->spot.radius;
   if (radius == 0.0f) {
     return false;
   }
 
-  /* disk oriented normal */
-  const float3 lightN = normalize(ray->P - lightP);
+  if (klight->spot.is_sphere) {
+    float3 P;
+    return ray_sphere_intersect(ray->P, ray->D, ray->tmin, ray->tmax, klight->co, radius, &P, t);
+  }
+
   float3 P;
-  return ray_disk_intersect(ray->P, ray->D, ray->tmin, ray->tmax, lightP, lightN, radius, &P, t);
+  const float3 diskN = normalize(ray->P - klight->co);
+  return ray_disk_intersect(
+      ray->P, ray->D, ray->tmin, ray->tmax, klight->co, diskN, radius, &P, t);
 }
 
-ccl_device_inline bool point_light_sample_from_intersection(
-    const ccl_global KernelLight *klight,
-    ccl_private const Intersection *ccl_restrict isect,
-    const float3 ray_P,
-    const float3 ray_D,
-    ccl_private LightSample *ccl_restrict ls)
+ccl_device_inline LightEval
+point_light_eval_from_intersection(const ccl_global KernelLight *klight,
+                                   const float3 ray_P,
+                                   const float3 ray_D,
+                                   const float t,
+                                   const float3 N,
+                                   const uint32_t path_flag)
 {
-  const float3 lighN = normalize(ray_P - klight->co);
+  const float r_sq = sqr(klight->spot.radius);
 
-  /* We set the light normal to the outgoing direction to support texturing. */
-  ls->Ng = -ls->D;
+  LightEval light_eval = {klight->spot.eval_fac, 0.0f};
 
-  float invarea = klight->spot.invarea;
-  ls->eval_fac = (0.25f * M_1_PI_F) * invarea;
-  ls->pdf = invarea;
-
-  if (ls->eval_fac == 0.0f) {
-    return false;
-  }
-
-  float2 uv = map_to_sphere(ls->Ng);
-  ls->u = uv.x;
-  ls->v = uv.y;
-
-  /* compute pdf */
-  if (ls->t != FLT_MAX) {
-    ls->pdf *= lamp_light_pdf(lighN, -ls->D, ls->t);
+  if (klight->spot.is_sphere) {
+    const float d_sq = len_squared(ray_P - klight->co);
+    light_eval.pdf = sphere_light_pdf(d_sq, r_sq, N, ray_D, path_flag);
   }
   else {
-    ls->pdf = 0.f;
+    if (t != FLT_MAX) {
+      const float3 lightN = normalize(ray_P - klight->co);
+      const float invarea = (r_sq > 0.0f) ? 1.0f / (r_sq * M_PI_F) : 1.0f;
+      light_eval.pdf = invarea * light_pdf_area_to_solid_angle(lightN, -ray_D, t);
+    }
   }
 
-  return true;
+  return light_eval;
 }
 
 template<bool in_volume_segment>
@@ -117,18 +186,36 @@ ccl_device_forceinline bool point_light_tree_parameters(const ccl_global KernelL
                                                         ccl_private float2 &distance,
                                                         ccl_private float3 &point_to_centroid)
 {
+  float min_distance;
+  point_to_centroid = safe_normalize_len(centroid - P, &min_distance);
+  distance = min_distance * one_float2();
+
   if (in_volume_segment) {
     cos_theta_u = 1.0f; /* Any value in [-1, 1], irrelevant since theta = 0 */
     return true;
   }
-  float min_distance;
-  point_to_centroid = safe_normalize_len(centroid - P, &min_distance);
 
   const float radius = klight->spot.radius;
-  const float hypotenus = sqrtf(sqr(radius) + sqr(min_distance));
-  cos_theta_u = min_distance / hypotenus;
 
-  distance = make_float2(hypotenus, min_distance);
+  if (klight->spot.is_sphere) {
+    if (min_distance > radius) {
+      /* Equivalent to a disk light with the same angular span. */
+      cos_theta_u = cos_from_sin(radius / min_distance);
+      distance.x = min_distance / cos_theta_u;
+    }
+    else {
+      /* Similar to background light. */
+      cos_theta_u = -1.0f;
+      /* HACK: pack radiance scaling in the distance. */
+      distance = one_float2() * radius / M_SQRT2_F;
+    }
+  }
+  else {
+    const float hypotenus = sqrtf(sqr(radius) + sqr(min_distance));
+    cos_theta_u = min_distance / hypotenus;
+
+    distance.x = hypotenus;
+  }
 
   return true;
 }

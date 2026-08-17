@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "hydra/render_buffer.h"
 #include "hydra/session.h"
@@ -11,13 +12,9 @@
 
 HDCYCLES_NAMESPACE_OPEN_SCOPE
 
-HdCyclesRenderBuffer::HdCyclesRenderBuffer(const SdfPath &bprimId) : HdRenderBuffer(bprimId)
-{
-}
+HdCyclesRenderBuffer::HdCyclesRenderBuffer(const SdfPath &bprimId) : HdRenderBuffer(bprimId) {}
 
-HdCyclesRenderBuffer::~HdCyclesRenderBuffer()
-{
-}
+HdCyclesRenderBuffer::~HdCyclesRenderBuffer() = default;
 
 void HdCyclesRenderBuffer::Finalize(HdRenderParam *renderParam)
 {
@@ -28,7 +25,9 @@ void HdCyclesRenderBuffer::Finalize(HdRenderParam *renderParam)
   HdRenderBuffer::Finalize(renderParam);
 }
 
-bool HdCyclesRenderBuffer::Allocate(const GfVec3i &dimensions, HdFormat format, bool multiSampled)
+bool HdCyclesRenderBuffer::Allocate(const GfVec3i &dimensions,
+                                    HdFormat format,
+                                    bool /*multiSampled*/)
 {
   if (dimensions[2] != 1) {
     TF_RUNTIME_ERROR("HdCyclesRenderBuffer::Allocate called with dimensions that are not 2D.");
@@ -94,9 +93,7 @@ bool HdCyclesRenderBuffer::IsMapped() const
   return _mapped != 0;
 }
 
-void HdCyclesRenderBuffer::Resolve()
-{
-}
+void HdCyclesRenderBuffer::Resolve() {}
 
 bool HdCyclesRenderBuffer::IsConverged() const
 {
@@ -130,31 +127,31 @@ void HdCyclesRenderBuffer::SetResource(const VtValue &resource)
 namespace {
 
 struct SimpleConversion {
-  static float convert(float value)
+  static float convert(const float value)
   {
     return value;
   }
 };
 struct IdConversion {
-  static int32_t convert(float value)
+  static int32_t convert(const float value)
   {
     return static_cast<int32_t>(value) - 1;
   }
 };
 struct UInt8Conversion {
-  static uint8_t convert(float value)
+  static uint8_t convert(const float value)
   {
     return static_cast<uint8_t>(value * 255.f);
   }
 };
 struct SInt8Conversion {
-  static int8_t convert(float value)
+  static int8_t convert(const float value)
   {
     return static_cast<int8_t>(value * 127.f);
   }
 };
 struct HalfConversion {
-  static half convert(float value)
+  static half convert(const float value)
   {
     return float_to_half_image(value);
   }
@@ -163,10 +160,10 @@ struct HalfConversion {
 template<typename SrcT, typename DstT, typename Convertor = SimpleConversion>
 void writePixels(const SrcT *srcPtr,
                  const GfVec2i &srcSize,
-                 int srcChannelCount,
+                 const int srcChannelCount,
                  DstT *dstPtr,
                  const GfVec2i &dstSize,
-                 int dstChannelCount,
+                 const int dstChannelCount,
                  const Convertor &convertor = {})
 {
   const auto writeSize = GfVec2i(GfMin(srcSize[0], dstSize[0]), GfMin(srcSize[1], dstSize[1]));
@@ -188,7 +185,7 @@ void writePixels(const SrcT *srcPtr,
 void HdCyclesRenderBuffer::WritePixels(const float *srcPixels,
                                        const PXR_NS::GfVec2i &srcOffset,
                                        const GfVec2i &srcDims,
-                                       int srcChannels,
+                                       const int srcChannels,
                                        bool isId)
 {
   uint8_t *dstPixels = _data.data();

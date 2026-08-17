@@ -1,73 +1,54 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #include "kernel/svm/mapping_util.h"
+#include "kernel/svm/node_types.h"
+#include "kernel/svm/util.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Mapping Node */
 
-ccl_device_noinline void svm_node_mapping(KernelGlobals kg,
-                                          ccl_private ShaderData *sd,
-                                          ccl_private float *stack,
-                                          uint type,
-                                          uint inputs_stack_offsets,
-                                          uint result_stack_offset)
+template<typename Float3Type>
+ccl_device_noinline void svm_node_mapping(ccl_private float *ccl_restrict stack,
+                                          const ccl_global SVMNodeMapping &ccl_restrict node)
 {
-  uint vector_stack_offset, location_stack_offset, rotation_stack_offset, scale_stack_offset;
-  svm_unpack_node_uchar4(inputs_stack_offsets,
-                         &vector_stack_offset,
-                         &location_stack_offset,
-                         &rotation_stack_offset,
-                         &scale_stack_offset);
+  const float3 location = stack_load(stack, node.location);
+  const float3 rotation = stack_load(stack, node.rotation);
+  const float3 scale = stack_load(stack, node.scale);
 
-  float3 vector = stack_load_float3(stack, vector_stack_offset);
-  float3 location = stack_load_float3(stack, location_stack_offset);
-  float3 rotation = stack_load_float3(stack, rotation_stack_offset);
-  float3 scale = stack_load_float3(stack, scale_stack_offset);
-
-  float3 result = svm_mapping((NodeMappingType)type, vector, location, rotation, scale);
-  stack_store_float3(stack, result_stack_offset, result);
+  const Float3Type vector = stack_load<Float3Type>(stack, node.vector);
+  const Float3Type result = svm_mapping(node.mapping_type, vector, location, rotation, scale);
+  stack_store(stack, node.result_offset, result);
 }
 
 /* Texture Mapping */
 
-ccl_device_noinline int svm_node_texture_mapping(KernelGlobals kg,
-                                                 ccl_private ShaderData *sd,
-                                                 ccl_private float *stack,
-                                                 uint vec_offset,
-                                                 uint out_offset,
-                                                 int offset)
+template<typename Float3Type>
+ccl_device_noinline void svm_node_texture_mapping(
+    ccl_private float *ccl_restrict stack,
+    const ccl_global SVMNodeTextureMapping &ccl_restrict node)
 {
-  float3 v = stack_load_float3(stack, vec_offset);
+  const Float3Type v = stack_load<Float3Type>(stack, node.vec_offset);
+  const Transform tfm = make_transform(node.tfm);
 
-  Transform tfm;
-  tfm.x = read_node_float(kg, &offset);
-  tfm.y = read_node_float(kg, &offset);
-  tfm.z = read_node_float(kg, &offset);
-
-  float3 r = transform_point(&tfm, v);
-  stack_store_float3(stack, out_offset, r);
-  return offset;
+  const Float3Type r = transform_point(&tfm, v);
+  stack_store(stack, node.out_offset, r);
 }
 
-ccl_device_noinline int svm_node_min_max(KernelGlobals kg,
-                                         ccl_private ShaderData *sd,
-                                         ccl_private float *stack,
-                                         uint vec_offset,
-                                         uint out_offset,
-                                         int offset)
+ccl_device_noinline void svm_node_min_max(ccl_private float *ccl_restrict stack,
+                                          const ccl_global SVMNodeMinMax &ccl_restrict node)
 {
-  float3 v = stack_load_float3(stack, vec_offset);
+  const float3 v = stack_load_float3(stack, node.vec_offset);
 
-  float3 mn = float4_to_float3(read_node_float(kg, &offset));
-  float3 mx = float4_to_float3(read_node_float(kg, &offset));
+  const float3 mn = node.mn;
+  const float3 mx = node.mx;
 
-  float3 r = min(max(mn, v), mx);
-  stack_store_float3(stack, out_offset, r);
-  return offset;
+  const float3 r = min(max(mn, v), mx);
+  stack_store_float3(stack, node.out_offset, r);
 }
 
 CCL_NAMESPACE_END

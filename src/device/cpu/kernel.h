@@ -1,15 +1,15 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #include "device/cpu/kernel_function.h"
 #include "util/half.h"
-#include "util/types.h"
 
 CCL_NAMESPACE_BEGIN
 
-struct KernelGlobalsCPU;
+struct ThreadKernelGlobalsCPU;
 struct KernelFilmConvert;
 struct IntegratorStateCPU;
 struct TileInfo;
@@ -19,75 +19,78 @@ class CPUKernels {
   /* Integrator. */
 
   using IntegratorFunction =
-      CPUKernelFunction<void (*)(const KernelGlobalsCPU *kg, IntegratorStateCPU *state)>;
-  using IntegratorShadeFunction = CPUKernelFunction<void (*)(
-      const KernelGlobalsCPU *kg, IntegratorStateCPU *state, ccl_global float *render_buffer)>;
-  using IntegratorInitFunction = CPUKernelFunction<bool (*)(const KernelGlobalsCPU *kg,
+      CPUKernelFunction<void (*)(const ThreadKernelGlobalsCPU *kg, IntegratorStateCPU *state)>;
+  using IntegratorShadeFunction = CPUKernelFunction<void (*)(const ThreadKernelGlobalsCPU *kg,
+                                                             IntegratorStateCPU *state,
+                                                             ccl_global float *render_buffer)>;
+  using IntegratorInitFunction = CPUKernelFunction<bool (*)(const ThreadKernelGlobalsCPU *kg,
                                                             IntegratorStateCPU *state,
                                                             KernelWorkTile *tile,
                                                             ccl_global float *render_buffer)>;
 
   IntegratorInitFunction integrator_init_from_camera;
   IntegratorInitFunction integrator_init_from_bake;
-  IntegratorShadeFunction integrator_intersect_closest;
-  IntegratorFunction integrator_intersect_shadow;
-  IntegratorFunction integrator_intersect_subsurface;
-  IntegratorFunction integrator_intersect_volume_stack;
-  IntegratorShadeFunction integrator_shade_background;
-  IntegratorShadeFunction integrator_shade_light;
-  IntegratorShadeFunction integrator_shade_shadow;
-  IntegratorShadeFunction integrator_shade_surface;
-  IntegratorShadeFunction integrator_shade_volume;
   IntegratorShadeFunction integrator_megakernel;
 
   /* Shader evaluation. */
 
   using ShaderEvalFunction = CPUKernelFunction<void (*)(
-      const KernelGlobalsCPU *kg, const KernelShaderEvalInput *, float *, const int)>;
+      const ThreadKernelGlobalsCPU *kg, const KernelShaderEvalInput *, float *, const int)>;
 
   ShaderEvalFunction shader_eval_displace;
   ShaderEvalFunction shader_eval_background;
   ShaderEvalFunction shader_eval_curve_shadow_transparency;
+  ShaderEvalFunction shader_eval_volume_density;
 
   /* Adaptive stopping. */
 
   using AdaptiveSamplingConvergenceCheckFunction =
-      CPUKernelFunction<bool (*)(const KernelGlobalsCPU *kg,
+      CPUKernelFunction<bool (*)(const ThreadKernelGlobalsCPU *kg,
                                  ccl_global float *render_buffer,
-                                 int x,
-                                 int y,
-                                 float threshold,
-                                 bool reset,
-                                 int offset,
+                                 const int x,
+                                 const int y,
+                                 const float threshold,
+                                 const int reset,
+                                 const int offset,
                                  int stride)>;
 
-  using AdaptiveSamplingFilterXFunction =
-      CPUKernelFunction<void (*)(const KernelGlobalsCPU *kg,
-                                 ccl_global float *render_buffer,
-                                 int y,
-                                 int start_x,
-                                 int width,
-                                 int offset,
-                                 int stride)>;
+  using FilterXFunction = CPUKernelFunction<void (*)(const ThreadKernelGlobalsCPU *kg,
+                                                     ccl_global float *render_buffer,
+                                                     const int y,
+                                                     const int start_x,
+                                                     const int width,
+                                                     const int offset,
+                                                     int stride)>;
 
-  using AdaptiveSamplingFilterYFunction =
-      CPUKernelFunction<void (*)(const KernelGlobalsCPU *kg,
-                                 ccl_global float *render_buffer,
-                                 int x,
-                                 int start_y,
-                                 int height,
-                                 int offset,
-                                 int stride)>;
+  using FilterYFunction = CPUKernelFunction<void (*)(const ThreadKernelGlobalsCPU *kg,
+                                                     ccl_global float *render_buffer,
+                                                     const int x,
+                                                     const int start_y,
+                                                     const int height,
+                                                     const int offset,
+                                                     int stride)>;
 
   AdaptiveSamplingConvergenceCheckFunction adaptive_sampling_convergence_check;
 
-  AdaptiveSamplingFilterXFunction adaptive_sampling_filter_x;
-  AdaptiveSamplingFilterYFunction adaptive_sampling_filter_y;
+  FilterXFunction adaptive_sampling_filter_x;
+  FilterYFunction adaptive_sampling_filter_y;
+
+  /* Volume Scattering Probability Guiding. */
+  CPUKernelFunction<void (*)(const ThreadKernelGlobalsCPU *kg,
+                             ccl_global float *render_buffer,
+                             const int y,
+                             const int center_x,
+                             const int min_x,
+                             const int max_x,
+                             const int offset,
+                             int stride)>
+      volume_guiding_filter_x;
+  FilterYFunction volume_guiding_filter_y;
 
   /* Cryptomatte. */
 
   using CryptomattePostprocessFunction = CPUKernelFunction<void (*)(
-      const KernelGlobalsCPU *kg, ccl_global float *render_buffer, int pixel_index)>;
+      const ThreadKernelGlobalsCPU *kg, ccl_global float *render_buffer, const int pixel_index)>;
 
   CryptomattePostprocessFunction cryptomatte_postprocess;
 
@@ -111,12 +114,14 @@ class CPUKernels {
 
   KERNEL_FILM_CONVERT_FUNCTION(depth)
   KERNEL_FILM_CONVERT_FUNCTION(mist)
+  KERNEL_FILM_CONVERT_FUNCTION(volume_majorant)
   KERNEL_FILM_CONVERT_FUNCTION(sample_count)
   KERNEL_FILM_CONVERT_FUNCTION(shadow_catcher_transparent_sample_count)
   KERNEL_FILM_CONVERT_FUNCTION(shadow_catcher_background_sample_count)
   KERNEL_FILM_CONVERT_FUNCTION(float)
 
   KERNEL_FILM_CONVERT_FUNCTION(light_path)
+  KERNEL_FILM_CONVERT_FUNCTION(rgbe)
   KERNEL_FILM_CONVERT_FUNCTION(float3)
 
   KERNEL_FILM_CONVERT_FUNCTION(motion)

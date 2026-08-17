@@ -1,5 +1,6 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2011-2022 Blender Foundation
 
 set(INC
   ..
@@ -11,21 +12,25 @@ set(INC_SYS
 
 set(SRC
   dice.cpp
+  interpolation.cpp
+  osd.cpp
   patch.cpp
   split.cpp
-  patch_table.cpp
 )
 
 set(SRC_HEADERS
   dice.h
+  interpolation.h
+  osd.h
   patch.h
-  patch_table.h
   split.h
   subpatch.h
 )
 
 set(LIB
-
+  PUBLIC cycles_scene
+  PRIVATE bf::dependencies::openimageio
+  PUBLIC bf::dependencies::optional::opensubdiv
 )
 
 include_directories(${INC})

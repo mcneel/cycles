@@ -1,8 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Adapted from code Copyright 2009-2010 NVIDIA Corporation,
- * and code copyright 2009-2012 Intel Corporation
+/* SPDX-FileCopyrightText: 2009-2010 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2009-2012 Intel Corporation
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Modifications Copyright 2011-2022 Blender Foundation. */
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Adapted code from NVIDIA Corporation. */
 
 #if BVH_FEATURE(BVH_HAIR)
 #  define NODE_INTERSECT bvh_node_intersect
@@ -20,7 +22,7 @@
  */
 
 ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
-                                                     ccl_private const Ray *ray,
+                                                     const ccl_private Ray *ray,
                                                      ccl_private Intersection *isect,
                                                      const uint visibility)
 {
@@ -119,7 +121,6 @@ ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
 
           /* primitive intersection */
           for (; prim_addr < prim_addr2; prim_addr++) {
-            kernel_assert(kernel_data_fetch(prim_type, prim_addr) == type);
 
             const int prim_object = (object == OBJECT_NONE) ?
                                         kernel_data_fetch(prim_object, prim_addr) :
@@ -128,6 +129,12 @@ ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
             if (intersection_skip_self_shadow(ray->self, prim_object, prim)) {
               continue;
             }
+
+#ifdef __SHADOW_LINKING__
+            if (intersection_skip_shadow_link(kg, ray->self, prim_object)) {
+              continue;
+            }
+#endif
 
             switch (type & PRIMITIVE_ALL) {
               case PRIMITIVE_TRIANGLE: {
@@ -140,10 +147,12 @@ ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
                                        visibility,
                                        prim_object,
                                        prim,
-                                       prim_addr)) {
+                                       prim_addr))
+                {
                   /* shadow ray early termination */
-                  if (visibility & PATH_RAY_SHADOW_OPAQUE)
+                  if (visibility & PATH_RAY_VISIBILITY_SHADOW_OPAQUE) {
                     return true;
+                  }
                 }
                 break;
               }
@@ -159,19 +168,22 @@ ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
                                               visibility,
                                               prim_object,
                                               prim,
-                                              prim_addr)) {
+                                              prim_addr))
+                {
                   /* shadow ray early termination */
-                  if (visibility & PATH_RAY_SHADOW_OPAQUE)
+                  if (visibility & PATH_RAY_VISIBILITY_SHADOW_OPAQUE)
                     return true;
                 }
                 break;
               }
 #endif /* BVH_FEATURE(BVH_MOTION) */
-#if BVH_FEATURE(BVH_HAIR)
+#if BVH_FEATURE(BVH_HAIR) && defined(__HAIR__)
               case PRIMITIVE_CURVE_THICK:
               case PRIMITIVE_MOTION_CURVE_THICK:
               case PRIMITIVE_CURVE_RIBBON:
-              case PRIMITIVE_MOTION_CURVE_RIBBON: {
+              case PRIMITIVE_MOTION_CURVE_RIBBON:
+              case PRIMITIVE_CURVE_THICK_LINEAR:
+              case PRIMITIVE_MOTION_CURVE_THICK_LINEAR: {
                 if ((type & PRIMITIVE_MOTION) && kernel_data.bvh.use_bvh_steps) {
                   const float2 prim_time = kernel_data_fetch(prim_time, prim_addr);
                   if (ray->time < prim_time.x || ray->time > prim_time.y) {
@@ -184,13 +196,13 @@ ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
                     kg, isect, P, dir, tmin, isect->t, prim_object, prim, ray->time, curve_type);
                 if (hit) {
                   /* shadow ray early termination */
-                  if (visibility & PATH_RAY_SHADOW_OPAQUE)
+                  if (visibility & PATH_RAY_VISIBILITY_SHADOW_OPAQUE)
                     return true;
                 }
                 break;
               }
 #endif /* BVH_FEATURE(BVH_HAIR) */
-#if BVH_FEATURE(BVH_POINTCLOUD)
+#if BVH_FEATURE(BVH_POINTCLOUD) && defined(__POINTCLOUD__)
               case PRIMITIVE_POINT:
               case PRIMITIVE_MOTION_POINT: {
                 if ((type & PRIMITIVE_MOTION) && kernel_data.bvh.use_bvh_steps) {
@@ -205,7 +217,7 @@ ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
                     kg, isect, P, dir, tmin, isect->t, prim_object, prim, ray->time, point_type);
                 if (hit) {
                   /* shadow ray early termination */
-                  if (visibility & PATH_RAY_SHADOW_OPAQUE)
+                  if (visibility & PATH_RAY_VISIBILITY_SHADOW_OPAQUE)
                     return true;
                 }
                 break;
@@ -249,7 +261,7 @@ ccl_device_noinline bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
 }
 
 ccl_device_inline bool BVH_FUNCTION_NAME(KernelGlobals kg,
-                                         ccl_private const Ray *ray,
+                                         const ccl_private Ray *ray,
                                          ccl_private Intersection *isect,
                                          const uint visibility)
 {

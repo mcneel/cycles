@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2019, NVIDIA Corporation.
- * Copyright 2019-2022 Blender Foundation. */
+/* SPDX-FileCopyrightText: 2019, NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2019-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 // clang-format off
 #include "kernel/device/optix/compat.h"
@@ -18,6 +19,7 @@
 #include "kernel/integrator/intersect_shadow.h"
 #include "kernel/integrator/intersect_subsurface.h"
 #include "kernel/integrator/intersect_volume_stack.h"
+#include "kernel/integrator/intersect_dedicated_light.h"
 // clang-format on
 
 extern "C" __global__ void __raygen__kernel_optix_integrator_intersect_closest()
@@ -56,3 +58,11 @@ extern "C" __global__ void __raygen__kernel_optix_integrator_intersect_volume_st
   integrator_intersect_volume_stack(nullptr, path_index);
 }
 
+extern "C" __global__ void __raygen__kernel_optix_integrator_intersect_dedicated_light()
+{
+  const int global_index = optixGetLaunchIndex().x;
+  const int path_index = (kernel_params.path_index_array) ?
+                             kernel_params.path_index_array[global_index] :
+                             global_index;
+  integrator_intersect_dedicated_light(nullptr, path_index);
+}

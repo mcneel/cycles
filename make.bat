@@ -17,11 +17,15 @@ if "%COMMAND%" == "release" (
 ) else if "%COMMAND%" == "debug" (
 	cmake -B %BUILD_DIR% && cd %BUILD_DIR% && cmake --build . --target install --config Debug
 ) else if "%COMMAND%" == "clean" (
-	cd %BUILD_DIR% && cmake --build . --target install --config Clean
+	cd %BUILD_DIR% && cmake --build . --target clean
 ) else if "%COMMAND%" == "test" (
-	cd %BUILD_DIR% && ctest --config Release
+	cd %BUILD_DIR% && ctest -C Release --output-on-failure
+) else if "%COMMAND%" == "test_debug" (
+	cd %BUILD_DIR% && ctest -C Debug --output-on-failure
 ) else if "%COMMAND%" == "update" (
 	%PYTHON% src/cmake/make_update.py
+) else if "%COMMAND%" == "update_legacy" (
+	%PYTHON% src/cmake/make_update.py --legacy
 ) else if "%COMMAND%" == "format" (
 	%PYTHON% src/cmake/make_format.py
 ) else (

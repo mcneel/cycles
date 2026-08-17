@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -34,7 +35,7 @@ class HdCyclesSession final : public PXR_NS::HdRenderParam {
     return _stageMetersPerUnit;
   }
 
-  void SetStageMetersPerUnit(double stageMetersPerUnit)
+  void SetStageMetersPerUnit(const double stageMetersPerUnit)
   {
     _stageMetersPerUnit = stageMetersPerUnit;
   }

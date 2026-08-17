@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __SUBD_PATCH_H__
-#define __SUBD_PATCH_H__
+#pragma once
 
 #include "util/boundbox.h"
 #include "util/types.h"
@@ -11,40 +11,38 @@ CCL_NAMESPACE_BEGIN
 
 class Patch {
  public:
-  Patch() : patch_index(0), shader(0), from_ngon(false)
-  {
-  }
-
+  Patch() = default;
   virtual ~Patch() = default;
 
-  virtual void eval(float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, float u, float v) = 0;
+  virtual void eval(
+      float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, const float u, float v) const = 0;
 
-  int patch_index;
-  int shader;
-  bool from_ngon;
+  int patch_index = 0;
+  int shader = 0;
+  bool smooth = true;
+  bool from_ngon = false;
 };
 
 /* Linear Quad Patch */
 
-class LinearQuadPatch : public Patch {
+class LinearQuadPatch final : public Patch {
  public:
   float3 hull[4];
-  float3 normals[4];
 
-  void eval(float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, float u, float v);
+  void eval(
+      float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, const float u, float v) const override;
   BoundBox bound();
 };
 
 /* Bicubic Patch */
 
-class BicubicPatch : public Patch {
+class BicubicPatch final : public Patch {
  public:
   float3 hull[16];
 
-  void eval(float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, float u, float v);
+  void eval(
+      float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, const float u, float v) const override;
   BoundBox bound();
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __SUBD_PATCH_H__ */

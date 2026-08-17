@@ -1,21 +1,19 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __LIGHT_H__
-#define __LIGHT_H__
+#pragma once
 
 #include "kernel/types.h"
 
 #include "graph/node.h"
 
-/* included as Light::set_shader defined through NODE_SOCKET_API does not select
- * the right Node::set overload as it does not know that Shader is a Node */
-#include "scene/light_tree.h"
-#include "scene/shader.h"
+#include "scene/geometry.h"
 
 #include "util/ies.h"
 #include "util/thread.h"
 #include "util/types.h"
+#include "util/unique_ptr.h"
 #include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
@@ -27,62 +25,162 @@ class Progress;
 class Scene;
 class Shader;
 
-class Light : public Node {
+class Light : public Geometry {
  public:
-  NODE_DECLARE;
+  NODE_ABSTRACT_DECLARE;
 
-  Light();
+  Light(const NodeType *node_type, const Geometry::Type type);
 
   NODE_SOCKET_API(LightType, light_type)
   NODE_SOCKET_API(float3, strength)
-  NODE_SOCKET_API(float3, co)
-
-  NODE_SOCKET_API(float3, dir)
-  NODE_SOCKET_API(float, size)
-  NODE_SOCKET_API(float, angle)
-
-  NODE_SOCKET_API(float3, axisu)
-  NODE_SOCKET_API(float, sizeu)
-  NODE_SOCKET_API(float3, axisv)
-  NODE_SOCKET_API(float, sizev)
-  NODE_SOCKET_API(bool, ellipse)
-  NODE_SOCKET_API(float, spread)
-
-  NODE_SOCKET_API(Transform, tfm)
-
-  NODE_SOCKET_API(int, map_resolution)
-  NODE_SOCKET_API(float, average_radiance)
-
-  NODE_SOCKET_API(float, spot_angle)
-  NODE_SOCKET_API(float, spot_smooth)
 
   NODE_SOCKET_API(bool, cast_shadow)
   NODE_SOCKET_API(bool, use_mis)
-  NODE_SOCKET_API(bool, use_camera)
-  NODE_SOCKET_API(bool, use_diffuse)
-  NODE_SOCKET_API(bool, use_glossy)
-  NODE_SOCKET_API(bool, use_transmission)
-  NODE_SOCKET_API(bool, use_scatter)
   NODE_SOCKET_API(bool, use_caustics)
 
-  NODE_SOCKET_API(bool, is_shadow_catcher)
-  NODE_SOCKET_API(bool, is_portal)
   NODE_SOCKET_API(bool, is_enabled)
 
-  NODE_SOCKET_API(Shader *, shader)
   NODE_SOCKET_API(int, max_bounces)
-  NODE_SOCKET_API(uint, random_id)
 
-  NODE_SOCKET_API(ustring, lightgroup)
-
+  /* Normalize power by the surface area of the light. */
   NODE_SOCKET_API(bool, normalize)
 
   void tag_update(Scene *scene);
 
   /* Check whether the light has contribution the scene. */
-  bool has_contribution(Scene *scene);
+  bool has_contribution(const Scene *scene, const Object *object);
+
+  /* Shader */
+  Shader *get_shader() const;
+
+  virtual float area(const Transform &tfm) const = 0;
+
+  /* Geometry */
+  void compute_bounds() override;
+  void apply_transform(const Transform &tfm, const bool apply_to_motion) override;
+  void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
+  PrimitiveType primitive_type() const override;
+
+  void copy_to_kernel(KernelLight *klight,
+                      const Scene *scene,
+                      const Object *object,
+                      const uint shader_flags) const;
+  virtual void copy_to_kernel(KernelLight *klight,
+                              const Scene *scene,
+                              const Object *object) const = 0;
+
+  virtual bool is_traceable() const = 0;
+
+  bool is_spot_light() const;
+  bool is_point_light() const;
+  bool is_area_light() const;
+  bool is_sun_light() const;
+  bool is_background_light() const;
+  bool is_distant_light() const;
+  virtual bool is_portal_light() const
+  {
+    return false;
+  }
 
   friend class LightManager;
+  friend class LightTree;
+};
+
+class PointLight : public Light {
+ public:
+  NODE_DECLARE;
+
+  PointLight();
+  PointLight(const NodeType *node_type, const Geometry::Type type) : Light(node_type, type) {};
+
+  float area(const Transform &tfm) const override;
+  void copy_to_kernel(KernelLight *klight,
+                      const Scene *scene,
+                      const Object *object) const override;
+  bool is_traceable() const override
+  {
+    return radius > 0.0f;
+  };
+
+  NODE_SOCKET_API(float, radius)
+  NODE_SOCKET_API(bool, is_sphere)
+};
+
+class SpotLight : public PointLight {
+ public:
+  NODE_DECLARE;
+
+  SpotLight();
+  void copy_to_kernel(KernelLight *klight,
+                      const Scene *scene,
+                      const Object *object) const override;
+
+  NODE_SOCKET_API(float, angle)
+  NODE_SOCKET_API(float, smooth)
+};
+
+class AreaLight : public Light {
+ public:
+  NODE_DECLARE;
+
+  AreaLight();
+
+  float area(const Transform &tfm) const override;
+  void copy_to_kernel(KernelLight *klight,
+                      const Scene *scene,
+                      const Object *object) const override;
+  bool is_traceable() const override
+  {
+    return sizeu * sizev > 0.0f;
+  };
+
+  bool is_portal_light() const override
+  {
+    return is_portal;
+  }
+
+  NODE_SOCKET_API(float, sizeu)
+  NODE_SOCKET_API(float, sizev)
+  NODE_SOCKET_API(bool, ellipse)
+  NODE_SOCKET_API(float, spread)
+  NODE_SOCKET_API(bool, is_portal)
+};
+
+class SunLight : public Light {
+ public:
+  NODE_DECLARE;
+
+  SunLight();
+
+  float area(const Transform &tfm) const override;
+  void copy_to_kernel(KernelLight *klight,
+                      const Scene *scene,
+                      const Object *object) const override;
+  bool is_traceable() const override
+  {
+    return false;
+  };
+
+  NODE_SOCKET_API(float, angle)
+};
+
+class BackgroundLight : public Light {
+ public:
+  NODE_DECLARE;
+
+  BackgroundLight();
+
+  float area(const Transform &tfm) const override;
+  void copy_to_kernel(KernelLight *klight,
+                      const Scene *scene,
+                      const Object *object) const override;
+  bool is_traceable() const override
+  {
+    return false;
+  };
+
+  NODE_SOCKET_API(int, map_resolution)
+  NODE_SOCKET_API(float, average_radiance)
 };
 
 class LightManager {
@@ -107,17 +205,16 @@ class LightManager {
   bool need_update_background;
 
   LightManager();
-  ~LightManager();
 
   /* IES texture management */
-  int add_ies(const string &ies);
+  int add_ies(const string &content, const bool log_parsing_error);
   int add_ies_from_file(const string &filename);
-  void remove_ies(int slot);
+  void remove_ies(const int slot);
 
   void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
   void device_free(Device *device, DeviceScene *dscene, const bool free_background = true);
 
-  void tag_update(Scene *scene, uint32_t flag);
+  void tag_update(Scene *scene, const uint32_t flag);
 
   bool need_update() const;
 
@@ -130,8 +227,10 @@ class LightManager {
    * and scene doesn't need MIS.
    */
   void test_enabled_lights(Scene *scene);
+  /* Count lights in the scene. */
+  void count_lights(KernelIntegrator *kintegrator, const Scene *scene);
 
-  void device_update_lights(Device *device, DeviceScene *dscene, Scene *scene);
+  void device_update_lights(DeviceScene *dscene, Scene *scene);
   void device_update_distribution(Device *device,
                                   DeviceScene *dscene,
                                   Scene *scene,
@@ -143,16 +242,13 @@ class LightManager {
                                 Progress &progress);
   void device_update_ies(DeviceScene *dscene);
 
-  /* Check whether light manager can use the object as a light-emissive. */
-  bool object_usable_as_light(Object *object);
-
   struct IESSlot {
     IESFile ies;
     uint hash;
     int users;
   };
 
-  vector<IESSlot *> ies_slots;
+  vector<unique_ptr<IESSlot>> ies_slots;
   thread_mutex ies_mutex;
 
   bool last_background_enabled;
@@ -162,5 +258,3 @@ class LightManager {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __LIGHT_H__ */

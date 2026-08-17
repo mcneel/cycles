@@ -1,14 +1,17 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "kernel/integrator/init_from_camera.h"
 #include "kernel/integrator/intersect_closest.h"
+#include "kernel/integrator/intersect_dedicated_light.h"
+#include "kernel/integrator/intersect_mnee.h"
 #include "kernel/integrator/intersect_shadow.h"
 #include "kernel/integrator/intersect_subsurface.h"
 #include "kernel/integrator/intersect_volume_stack.h"
 #include "kernel/integrator/shade_background.h"
+#include "kernel/integrator/shade_dedicated_light.h"
 #include "kernel/integrator/shade_light.h"
 #include "kernel/integrator/shade_shadow.h"
 #include "kernel/integrator/shade_surface.h"
@@ -30,15 +33,21 @@ ccl_device void integrator_megakernel(KernelGlobals kg,
       switch (shadow_queued_kernel) {
         case DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW:
           integrator_intersect_shadow(kg, &state->shadow);
-          break;
+          continue;
         case DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW:
           integrator_shade_shadow(kg, &state->shadow, render_buffer);
+          continue;
+        case DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT_NEE:
+          integrator_shade_light_nee(kg, &state->shadow, render_buffer);
+          continue;
+        case DEVICE_KERNEL_INTEGRATOR_SHADOW_PATH_MNEE_PENDING:
+          /* Not a real kernel, only a state to keep it alive until
+           * shade_surface uses this shadow path. */
           break;
         default:
           kernel_assert(0);
           break;
       }
-      continue;
     }
 
     /* Handle any AO paths before we potentially create more AO paths. */
@@ -74,20 +83,29 @@ ccl_device void integrator_megakernel(KernelGlobals kg,
         case DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME:
           integrator_shade_volume(kg, state, render_buffer);
           break;
+        case DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME_RAY_MARCHING:
+          integrator_shade_volume_ray_marching(kg, state, render_buffer);
+          break;
         case DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE:
           integrator_shade_surface_raytrace(kg, state, render_buffer);
           break;
-        case DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_MNEE:
-          integrator_shade_surface_mnee(kg, state, render_buffer);
+        case DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT_FORWARD:
+          integrator_shade_light_forward(kg, state, render_buffer);
           break;
-        case DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT:
-          integrator_shade_light(kg, state, render_buffer);
+        case DEVICE_KERNEL_INTEGRATOR_SHADE_DEDICATED_LIGHT:
+          integrator_shade_dedicated_light(kg, state, render_buffer);
           break;
         case DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE:
           integrator_intersect_subsurface(kg, state);
           break;
         case DEVICE_KERNEL_INTEGRATOR_INTERSECT_VOLUME_STACK:
           integrator_intersect_volume_stack(kg, state);
+          break;
+        case DEVICE_KERNEL_INTEGRATOR_INTERSECT_DEDICATED_LIGHT:
+          integrator_intersect_dedicated_light(kg, state);
+          break;
+        case DEVICE_KERNEL_INTEGRATOR_INTERSECT_MNEE:
+          integrator_intersect_mnee(kg, state);
           break;
         default:
           kernel_assert(0);

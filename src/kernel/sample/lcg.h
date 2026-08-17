@@ -1,7 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
+
+#include "util/hash.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -23,7 +26,16 @@ template<class T> ccl_device float lcg_step_float(T rng)
   return (float)*rng * (1.0f / (float)0xFFFFFFFF);
 }
 
-ccl_device uint lcg_init(uint seed)
+template<class T> ccl_device float3 lcg_step_float3(T rng)
+{
+  /* Make sure the random numbers are evaluated in order. */
+  const float rand_x = lcg_step_float(rng);
+  const float rand_y = lcg_step_float(rng);
+  const float rand_z = lcg_step_float(rng);
+  return make_float3(rand_x, rand_y, rand_z);
+}
+
+ccl_device uint lcg_init(const uint seed)
 {
   uint rng = seed;
   lcg_step_uint(&rng);
@@ -35,7 +47,7 @@ ccl_device_inline uint lcg_state_init(const uint rng_hash,
                                       const uint sample,
                                       const uint scramble)
 {
-  return lcg_init(rng_hash + rng_offset + sample * scramble);
+  return hash_uint3(rng_hash ^ scramble, rng_offset, sample);
 }
 
 CCL_NAMESPACE_END

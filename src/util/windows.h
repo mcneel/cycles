@@ -1,16 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_WINDOWS_H__
-#define __UTIL_WINDOWS_H__
+#pragma once
 
 #ifdef _WIN32
 
 #  ifndef NOGDI
 #    define NOGDI
-#  endif
-#  ifndef NOMINMAX
-#    define NOMINMAX
 #  endif
 #  ifndef WIN32_LEAN_AND_MEAN
 #    define WIN32_LEAN_AND_MEAN
@@ -22,8 +19,6 @@
 
 CCL_NAMESPACE_BEGIN
 
-bool system_windows_version_at_least(int major, int build);
+bool system_windows_version_at_least(const int major, const int build);
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_WINDOWS_H__ */

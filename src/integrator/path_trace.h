@@ -1,7 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
+
+#include <functional>
 
 #include "integrator/denoiser.h"
 #include "integrator/guiding.h"
@@ -11,8 +14,7 @@
 
 #include "session/buffers.h"
 
-#include "util/function.h"
-#include "util/guiding.h"
+#include "util/guiding.h"  // IWYU pragma: keep
 #include "util/thread.h"
 #include "util/unique_ptr.h"
 #include "util/vector.h"
@@ -44,6 +46,7 @@ class PathTrace {
   /* Render scheduler is used to report timing information and access things like start/finish
    * sample. */
   PathTrace(Device *device,
+            Device *denoise_device,
             Film *film,
             DeviceScene *device_scene,
             RenderScheduler &render_scheduler,
@@ -94,7 +97,7 @@ class PathTrace {
   void set_adaptive_sampling(const AdaptiveSampling &adaptive_sampling);
 
   /* Set the parameters for guiding.
-   * Use to setup the guiding structures before each rendering iteration.*/
+   * Use to setup the guiding structures before each rendering iteration. */
   void set_guiding_params(const GuidingParams &params, const bool reset);
 
   /* Sets output driver for render buffer output. */
@@ -104,7 +107,7 @@ class PathTrace {
   void set_display_driver(unique_ptr<DisplayDriver> driver);
 
   /* Clear the display buffer by filling it in with all zeroes. */
-  void clear_display();
+  void zero_display();
 
   /* Perform drawing of the current state of the DisplayDriver. */
   void draw();
@@ -119,7 +122,7 @@ class PathTrace {
    */
   void cancel();
 
-  /* Copy an entire render buffer to/from the path trace.  */
+  /* Copy an entire render buffer to/from the path trace. */
 
   /* Copy happens via CPU side buffer: data will be copied from every device of the path trace, and
    * the data will be copied to the device of the given render buffers. */
@@ -180,7 +183,7 @@ class PathTrace {
    * It is supposed to be cheaper than buffer update/write, hence can be called more often.
    * Additionally, it might be called form the middle of wavefront (meaning, it is not guaranteed
    * that the buffer is "uniformly" sampled at the moment of this callback). */
-  function<void(void)> progress_update_cb;
+  std::function<void(void)> progress_update_cb;
 
  protected:
   /* Actual implementation of the rendering pipeline.
@@ -192,6 +195,9 @@ class PathTrace {
 
   /* Initialize kernel execution on all integrator queues. */
   void render_init_kernel_execution();
+
+  /* Release kernel execution resources on all integrator queues. */
+  void render_deinit_kernel_execution();
 
   /* Make sure both allocated and effective buffer parameters of path tracer works are up to date
    * with the current big tile parameters, performance-dependent slicing, and resolution divider.
@@ -208,6 +214,7 @@ class PathTrace {
   void path_trace(RenderWork &render_work);
   void adaptive_sample(RenderWork &render_work);
   void denoise(const RenderWork &render_work);
+  void denoise_volume_guiding_buffers(const RenderWork &render_work, const bool has_volume);
   void cryptomatte_postprocess(const RenderWork &render_work);
   void update_display(const RenderWork &render_work);
   void rebalance(const RenderWork &render_work);
@@ -251,6 +258,10 @@ class PathTrace {
    * are configured this is a `MultiDevice`. */
   Device *device_ = nullptr;
 
+  /* Pointer to a device which is configured to be used for denoising. Can be identical
+   * to the device */
+  Device *denoise_device_ = nullptr;
+
   /* CPU device for creating temporary render buffers on the CPU side. */
   unique_ptr<Device> cpu_device_;
 
@@ -283,7 +294,7 @@ class PathTrace {
   /* Denoiser device descriptor which holds the denoised big tile for multi-device workloads. */
   unique_ptr<PathTraceWork> big_tile_denoise_work_;
 
-#ifdef WITH_PATH_GUIDING
+#if defined(WITH_PATH_GUIDING)
   /* Guiding related attributes */
   GuidingParams guiding_params_;
 
@@ -295,7 +306,7 @@ class PathTrace {
    * rendering iteration. */
   unique_ptr<openpgl::cpp::SampleStorage> guiding_sample_data_storage_;
 
-  /* The number of already performed training iterations for the guiding field.*/
+  /* The number of already performed training iterations for the guiding field. */
   int guiding_update_count = 0;
 #endif
 
@@ -312,10 +323,11 @@ class PathTrace {
      * Allows to re-use same render buffer, but have less pixels rendered into in it. The way to
      * think of render buffer in this case is as an over-allocated array: the resolution divider
      * affects both resolution and stride as visible by the integrator kernels. */
-    int resolution_divider = 0;
+    float resolution_divider = 0;
 
     /* Parameters of the big tile with the current resolution divider applied. */
     BufferParams effective_big_tile_params;
+    BufferParams effective_denoised_big_tile_params;
 
     /* Denoiser was run and there are denoised versions of the passes in the render buffers. */
     bool has_denoised_result = false;

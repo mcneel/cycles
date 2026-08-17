@@ -1,7 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
+#include "kernel/globals.h"
 
 #include "kernel/sample/util.h"
+
 #include "util/hash.h"
 
 #pragma once
@@ -9,8 +13,8 @@ CCL_NAMESPACE_BEGIN
 
 ccl_device uint tabulated_sobol_shuffled_sample_index(KernelGlobals kg,
                                                       uint sample,
-                                                      uint dimension,
-                                                      uint seed)
+                                                      const uint dimension,
+                                                      const uint seed)
 {
   const uint sample_count = kernel_data.integrator.tabulated_sobol_sequence_size;
 
@@ -30,7 +34,7 @@ ccl_device uint tabulated_sobol_shuffled_sample_index(KernelGlobals kg,
 }
 
 ccl_device float tabulated_sobol_sample_1D(KernelGlobals kg,
-                                           uint sample,
+                                           const uint sample,
                                            const uint rng_hash,
                                            const uint dimension)
 {
@@ -58,7 +62,7 @@ ccl_device float tabulated_sobol_sample_1D(KernelGlobals kg,
 }
 
 ccl_device float2 tabulated_sobol_sample_2D(KernelGlobals kg,
-                                            uint sample,
+                                            const uint sample,
                                             const uint rng_hash,
                                             const uint dimension)
 {
@@ -91,7 +95,7 @@ ccl_device float2 tabulated_sobol_sample_2D(KernelGlobals kg,
 }
 
 ccl_device float3 tabulated_sobol_sample_3D(KernelGlobals kg,
-                                            uint sample,
+                                            const uint sample,
                                             const uint rng_hash,
                                             const uint dimension)
 {
@@ -129,7 +133,7 @@ ccl_device float3 tabulated_sobol_sample_3D(KernelGlobals kg,
 }
 
 ccl_device float4 tabulated_sobol_sample_4D(KernelGlobals kg,
-                                            uint sample,
+                                            const uint sample,
                                             const uint rng_hash,
                                             const uint dimension)
 {

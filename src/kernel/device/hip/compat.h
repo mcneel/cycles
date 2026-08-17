@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -37,17 +38,20 @@ typedef unsigned long long uint64_t;
 #define ccl_device_noinline __device__ __noinline__
 #define ccl_device_noinline_cpu ccl_device
 #define ccl_device_inline_method ccl_device
+#define ccl_device_template_spec template<> ccl_device_inline
 #define ccl_global
 #define ccl_inline_constant __constant__
 #define ccl_device_constant __constant__ __device__
+#define ccl_static_constexpr static constexpr
 #define ccl_constant const
 #define ccl_gpu_shared __shared__
 #define ccl_private
+#define ccl_ray_data ccl_private
 #define ccl_may_alias
 #define ccl_restrict __restrict__
-#define ccl_loop_no_unroll
 #define ccl_align(n) __align__(n)
 #define ccl_optional_struct_init
+#define ccl_attr_maybe_unused [[maybe_unused]]
 
 #define kernel_assert(cond)
 
@@ -77,24 +81,14 @@ typedef unsigned long long uint64_t;
 #define ccl_gpu_ballot(predicate) __ballot(predicate)
 
 /* GPU texture objects */
-typedef hipTextureObject_t ccl_gpu_tex_object_2D;
-typedef hipTextureObject_t ccl_gpu_tex_object_3D;
+typedef hipTextureObject_t ccl_gpu_image_object_2D;
 
 template<typename T>
-ccl_device_forceinline T ccl_gpu_tex_object_read_2D(const ccl_gpu_tex_object_2D texobj,
-                                                    const float x,
-                                                    const float y)
+ccl_device_forceinline T ccl_gpu_image_object_read_2D(const ccl_gpu_image_object_2D texobj,
+                                                      const float x,
+                                                      const float y)
 {
   return tex2D<T>(texobj, x, y);
-}
-
-template<typename T>
-ccl_device_forceinline T ccl_gpu_tex_object_read_3D(const ccl_gpu_tex_object_3D texobj,
-                                                    const float x,
-                                                    const float y,
-                                                    const float z)
-{
-  return tex3D<T>(texobj, x, y, z);
 }
 
 /* Use fast math functions */

@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -67,7 +68,7 @@ class HdCyclesRenderBuffer final : public PXR_NS::HdRenderBuffer {
   void WritePixels(const float *pixels,
                    const PXR_NS::GfVec2i &offset,
                    const PXR_NS::GfVec2i &dims,
-                   int channels,
+                   const int channels,
                    bool isId = false);
 
  private:

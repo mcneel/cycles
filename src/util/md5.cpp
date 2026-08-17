@@ -1,18 +1,21 @@
-/* SPDX-License-Identifier: Zlib
- * Copyright (C) 1999, 2002 Aladdin Enterprises.  All rights reserved.
- * L. Peter Deutsch
- * ghost@aladdin.com */
+/* SPDX-FileCopyrightText: 1999, 2002 Aladdin Enterprises. All rights reserved.
+ *
+ * SPDX-License-Identifier: Zlib
+ *
+ * By `L. Peter Deutsch <ghost@aladdin.com>`. */
 
 /* Minor modifications done to remove some code and change style. */
 
 #include "util/md5.h"
+#include "util/log.h"
 #include "util/path.h"
 
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 CCL_NAMESPACE_BEGIN
 
+// NOLINTBEGIN
 #define T_MASK ((uint32_t)~0)
 #define T1 /* 0xd76aa478 */ (T_MASK ^ 0x28955b87)
 #define T2 /* 0xe8c7b756 */ (T_MASK ^ 0x173848a9)
@@ -78,10 +81,14 @@ CCL_NAMESPACE_BEGIN
 #define T62 /* 0xbd3af235 */ (T_MASK ^ 0x42c50dca)
 #define T63 0x2ad7d2bb
 #define T64 /* 0xeb86d391 */ (T_MASK ^ 0x14792c6e)
+// NOLINTEND
 
 void MD5Hash::process(const uint8_t *data /*[64]*/)
 {
-  uint32_t a = abcd[0], b = abcd[1], c = abcd[2], d = abcd[3];
+  uint32_t a = abcd[0];
+  uint32_t b = abcd[1];
+  uint32_t c = abcd[2];
+  uint32_t d = abcd[3];
   uint32_t t;
   /* Define storage for little-endian or both types of CPUs. */
   uint32_t xbuf[16];
@@ -95,13 +102,16 @@ void MD5Hash::process(const uint8_t *data /*[64]*/)
      */
     static const int w = 1;
 
-    if (*((const uint8_t *)&w)) /* dynamic little-endian */
-    {
+    if (*((const uint8_t *)&w)) /* dynamic little-endian */ {
+#if defined(__GNUC__) && defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wnull-pointer-subtraction"
+#endif
       /*
        * On little-endian machines, we can process properly aligned
        * data without copying it.
        */
-      if (!((data - (const uint8_t *)0) & 3)) {
+      if (!((data - (const uint8_t *)nullptr) & 3)) {
         /* data are properly aligned */
         X = (const uint32_t *)data;
       }
@@ -110,6 +120,9 @@ void MD5Hash::process(const uint8_t *data /*[64]*/)
         memcpy(xbuf, data, 64);
         X = xbuf;
       }
+#if defined(__GNUC__) && defined(__clang__)
+#  pragma clang diagnostic pop
+#endif
     }
     else { /* dynamic big-endian */
       /*
@@ -120,8 +133,9 @@ void MD5Hash::process(const uint8_t *data /*[64]*/)
       int i;
 
       X = xbuf; /* (dynamic only) */
-      for (i = 0; i < 16; ++i, xp += 4)
+      for (i = 0; i < 16; ++i, xp += 4) {
         xbuf[i] = xp[0] + (xp[1] << 8) + (xp[2] << 16) + (xp[3] << 24);
+      }
     }
   }
 
@@ -249,50 +263,53 @@ MD5Hash::MD5Hash()
   abcd[3] = 0x10325476;
 }
 
-MD5Hash::~MD5Hash()
-{
-}
+MD5Hash::~MD5Hash() = default;
 
-void MD5Hash::append(const uint8_t *data, int nbytes)
+void MD5Hash::append(const uint8_t *data, const int nbytes)
 {
   const uint8_t *p = data;
   int left = nbytes;
-  int offset = (count[0] >> 3) & 63;
-  uint32_t nbits = (uint32_t)(nbytes << 3);
+  const int offset = (count[0] >> 3) & 63;
+  const uint32_t nbits = (uint32_t)(nbytes << 3);
 
-  if (nbytes <= 0)
+  if (nbytes <= 0) {
     return;
+  }
 
   /* Update the message length. */
   count[1] += nbytes >> 29;
   count[0] += nbits;
-  if (count[0] < nbits)
+  if (count[0] < nbits) {
     count[1]++;
+  }
 
   /* Process an initial partial block. */
   if (offset) {
-    int copy = (offset + nbytes > 64 ? 64 - offset : nbytes);
+    const int copy = (offset + nbytes > 64 ? 64 - offset : nbytes);
 
     memcpy(buf + offset, p, copy);
-    if (offset + copy < 64)
+    if (offset + copy < 64) {
       return;
+    }
     p += copy;
     left -= copy;
     process(buf);
   }
 
   /* Process full blocks. */
-  for (; left >= 64; p += 64, left -= 64)
+  for (; left >= 64; p += 64, left -= 64) {
     process(p);
+  }
 
   /* Process a final partial block. */
-  if (left)
+  if (left) {
     memcpy(buf, p, left);
+  }
 }
 
 void MD5Hash::append(const string &str)
 {
-  if (str.size()) {
+  if (!str.empty()) {
     append((const uint8_t *)str.c_str(), str.size());
   }
 }
@@ -302,7 +319,7 @@ bool MD5Hash::append_file(const string &filepath)
   FILE *f = path_fopen(filepath, "rb");
 
   if (!f) {
-    fprintf(stderr, "MD5: failed to open file %s\n", filepath.c_str());
+    LOG_ERROR << "MD5: failed to open file " << filepath;
     return false;
   }
 
@@ -315,7 +332,7 @@ bool MD5Hash::append_file(const string &filepath)
     append(buffer, n);
   } while (n == buffer_size);
 
-  bool success = (ferror(f) == 0);
+  const bool success = (ferror(f) == 0);
 
   fclose(f);
 
@@ -333,16 +350,18 @@ void MD5Hash::finish(uint8_t digest[16])
   int i;
 
   /* Save the length before padding. */
-  for (i = 0; i < 8; ++i)
+  for (i = 0; i < 8; ++i) {
     data[i] = (uint8_t)(count[i >> 2] >> ((i & 3) << 3));
+  }
 
   /* Pad to 56 bytes mod 64. */
   append(pad, ((55 - (count[0] >> 3)) & 63) + 1);
   /* Append the length. */
   append(data, 8);
 
-  for (i = 0; i < 16; ++i)
+  for (i = 0; i < 16; ++i) {
     digest[i] = (uint8_t)(abcd[i >> 2] >> ((i & 3) << 3));
+  }
 }
 
 string MD5Hash::get_hex()

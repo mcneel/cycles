@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -13,13 +14,7 @@ HDCYCLES_NAMESPACE_OPEN_SCOPE
 
 class HdCyclesCurves final : public HdCyclesGeometry<PXR_NS::HdBasisCurves, CCL_NS::Hair> {
  public:
-  HdCyclesCurves(
-      const PXR_NS::SdfPath &rprimId
-#if PXR_VERSION < 2102
-      ,
-      const PXR_NS::SdfPath &instancerId = {}
-#endif
-  );
+  HdCyclesCurves(const PXR_NS::SdfPath &rprimId);
   ~HdCyclesCurves() override;
 
   PXR_NS::HdDirtyBits GetInitialDirtyBitsMask() const override;

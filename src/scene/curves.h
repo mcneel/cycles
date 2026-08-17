@@ -1,13 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __CURVES_H__
-#define __CURVES_H__
+#pragma once
 
 #include "util/array.h"
 #include "util/types.h"
-
-#include "scene/hair.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -16,7 +14,7 @@ class DeviceScene;
 class Progress;
 class Scene;
 
-void curvebounds(float *lower, float *upper, float3 *p, int dim);
+void curvebounds(float *lower, float *upper, float3 *p, const int dim);
 
 class ParticleCurveData {
 
@@ -44,5 +42,3 @@ class ParticleCurveData {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __CURVES_H__ */

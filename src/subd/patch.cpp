@@ -1,9 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* Parts adapted from code in the public domain in NVidia Mesh Tools. */
-
-#include "scene/mesh.h"
 
 #include "subd/patch.h"
 
@@ -14,24 +13,26 @@ CCL_NAMESPACE_BEGIN
 
 /* De Casteljau Evaluation */
 
-static void decasteljau_cubic(float3 *P, float3 *dt, float t, const float3 cp[4])
+static void decasteljau_cubic(float3 *P, float3 *dt, const float t, const float3 cp[4])
 {
   float3 d0 = cp[0] + t * (cp[1] - cp[0]);
   float3 d1 = cp[1] + t * (cp[2] - cp[1]);
-  float3 d2 = cp[2] + t * (cp[3] - cp[2]);
+  const float3 d2 = cp[2] + t * (cp[3] - cp[2]);
 
   d0 += t * (d1 - d0);
   d1 += t * (d2 - d1);
 
   *P = d0 + t * (d1 - d0);
-  if (dt)
+  if (dt) {
     *dt = d1 - d0;
+  }
 }
 
 static void decasteljau_bicubic(
-    float3 *P, float3 *du, float3 *dv, const float3 cp[16], float u, float v)
+    float3 *P, float3 *du, float3 *dv, const float3 cp[16], float u, const float v)
 {
-  float3 ucp[4], utn[4];
+  float3 ucp[4];
+  float3 utn[4];
 
   /* interpolate over u */
   decasteljau_cubic(ucp + 0, utn + 0, u, cp);
@@ -41,27 +42,33 @@ static void decasteljau_bicubic(
 
   /* interpolate over v */
   decasteljau_cubic(P, dv, v, ucp);
-  if (du)
-    decasteljau_cubic(du, NULL, v, utn);
+  if (du) {
+    decasteljau_cubic(du, nullptr, v, utn);
+  }
 }
 
 /* Linear Quad Patch */
 
-void LinearQuadPatch::eval(float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, float u, float v)
+void LinearQuadPatch::eval(
+    float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, const float u, float v) const
 {
-  float3 d0 = interp(hull[0], hull[1], u);
-  float3 d1 = interp(hull[2], hull[3], u);
+  const float3 d0 = interp(hull[0], hull[1], u);
+  const float3 d1 = interp(hull[2], hull[3], u);
 
   *P = interp(d0, d1, v);
 
-  if (dPdu && dPdv) {
-    *dPdu = interp(hull[1] - hull[0], hull[3] - hull[2], v);
-    *dPdv = interp(hull[2] - hull[0], hull[3] - hull[1], u);
-  }
+  if (N || (dPdu && dPdv)) {
+    const float3 dPdu_ = interp(hull[1] - hull[0], hull[3] - hull[2], v);
+    const float3 dPdv_ = interp(hull[2] - hull[0], hull[3] - hull[1], u);
 
-  if (N) {
-    *N = normalize(
-        interp(interp(normals[0], normals[1], u), interp(normals[2], normals[3], u), v));
+    if (dPdu && dPdv) {
+      *dPdu = dPdu_;
+      *dPdv = dPdv_;
+    }
+
+    if (N) {
+      *N = normalize(cross(dPdu_, dPdv_));
+    }
   }
 }
 
@@ -69,18 +76,21 @@ BoundBox LinearQuadPatch::bound()
 {
   BoundBox bbox = BoundBox::empty;
 
-  for (int i = 0; i < 4; i++)
+  for (int i = 0; i < 4; i++) {
     bbox.grow(hull[i]);
+  }
 
   return bbox;
 }
 
 /* Bicubic Patch */
 
-void BicubicPatch::eval(float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, float u, float v)
+void BicubicPatch::eval(
+    float3 *P, float3 *dPdu, float3 *dPdv, float3 *N, const float u, const float v) const
 {
   if (N) {
-    float3 dPdu_, dPdv_;
+    float3 dPdu_;
+    float3 dPdv_;
     decasteljau_bicubic(P, &dPdu_, &dPdv_, hull, u, v);
 
     if (dPdu && dPdv) {
@@ -99,8 +109,9 @@ BoundBox BicubicPatch::bound()
 {
   BoundBox bbox = BoundBox::empty;
 
-  for (int i = 0; i < 16; i++)
+  for (int i = 0; i < 16; i++) {
     bbox.grow(hull[i]);
+  }
 
   return bbox;
 }

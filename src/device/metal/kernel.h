@@ -1,11 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #ifdef WITH_METAL
 
 #  include "device/kernel.h"
+
 #  include <Metal/Metal.h>
 
 CCL_NAMESPACE_BEGIN
@@ -13,28 +15,14 @@ CCL_NAMESPACE_BEGIN
 class MetalDevice;
 
 enum {
-  METALRT_FUNC_DEFAULT_TRI,
-  METALRT_FUNC_DEFAULT_BOX,
-  METALRT_FUNC_SHADOW_TRI,
-  METALRT_FUNC_SHADOW_BOX,
-  METALRT_FUNC_LOCAL_TRI,
-  METALRT_FUNC_LOCAL_BOX,
-  METALRT_FUNC_LOCAL_TRI_PRIM,
-  METALRT_FUNC_LOCAL_BOX_PRIM,
-  METALRT_FUNC_CURVE_RIBBON,
-  METALRT_FUNC_CURVE_RIBBON_SHADOW,
-  METALRT_FUNC_CURVE_ALL,
-  METALRT_FUNC_CURVE_ALL_SHADOW,
-  METALRT_FUNC_POINT,
-  METALRT_FUNC_POINT_SHADOW,
-  METALRT_FUNC_NUM
-};
-
-enum {
   METALRT_TABLE_DEFAULT,
   METALRT_TABLE_SHADOW,
+  METALRT_TABLE_SHADOW_ALL,
+  METALRT_TABLE_VOLUME,
   METALRT_TABLE_LOCAL,
-  METALRT_TABLE_LOCAL_PRIM,
+  METALRT_TABLE_LOCAL_MBLUR,
+  METALRT_TABLE_LOCAL_SINGLE_HIT,
+  METALRT_TABLE_LOCAL_SINGLE_HIT_MBLUR,
   METALRT_TABLE_NUM
 };
 
@@ -67,10 +55,12 @@ enum MetalPipelineType {
 
 const char *kernel_type_as_string(MetalPipelineType pso_type);
 
-struct MetalKernelPipeline {
-
+/* A pipeline object that can be shared between multiple instances of MetalDeviceQueue. */
+class MetalKernelPipeline {
+ public:
   void compile();
 
+  int pipeline_id;
   int originating_device_id;
 
   id<MTLLibrary> mtlLibrary = nil;
@@ -92,24 +82,50 @@ struct MetalKernelPipeline {
   int num_threads_per_block = 0;
 
   bool should_use_binary_archive() const;
+  id<MTLFunction> make_intersection_function(const char *function_name);
 
   string error_str;
 
+  NSArray *table_functions[METALRT_TABLE_NUM] = {nil};
+};
+
+/* An actively instanced pipeline that can only be used by a single instance of MetalDeviceQueue.
+ */
+class MetalDispatchPipeline {
+ public:
+  ~MetalDispatchPipeline();
+
+  bool update(MetalDevice *metal_device, DeviceKernel kernel);
+  void free_intersection_function_tables();
+
+ private:
+  friend class MetalDeviceQueue;
+  friend struct ShaderCache;
+
+  int pipeline_id = -1;
+
+  MetalDevice *metal_device = nullptr;
+  MetalPipelineType pso_type;
+  id<MTLComputePipelineState> pipeline = nil;
+  int num_threads_per_block = 0;
+
   API_AVAILABLE(macos(11.0))
   id<MTLIntersectionFunctionTable> intersection_func_table[METALRT_TABLE_NUM] = {nil};
-  id<MTLFunction> rt_intersection_function[METALRT_FUNC_NUM] = {nil};
 };
 
 /* Cache of Metal kernels for each DeviceKernel. */
 namespace MetalDeviceKernels {
 
 int num_incomplete_specialization_requests();
-int get_loaded_kernel_count(MetalDevice const *device, MetalPipelineType pso_type);
-bool should_load_kernels(MetalDevice const *device, MetalPipelineType pso_type);
+int get_loaded_kernel_count(const MetalDevice *device, MetalPipelineType pso_type);
+bool should_load_kernels(const MetalDevice *device, MetalPipelineType pso_type);
 bool load(MetalDevice *device, MetalPipelineType pso_type);
 const MetalKernelPipeline *get_best_pipeline(const MetalDevice *device, DeviceKernel kernel);
 void wait_for_all();
 bool is_benchmark_warmup();
+
+/* Deinitialize all static variables, so that no code would run on application exit. */
+void static_deinitialize();
 
 } /* namespace MetalDeviceKernels */
 

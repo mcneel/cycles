@@ -1,12 +1,13 @@
-/* SPDX-License-Identifier: BSD-3-Clause
+/* SPDX-FileCopyrightText: 2009-2010 Sony Pictures Imageworks Inc., et al. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Adapted from Open Shading Language
- * Copyright (c) 2009-2010 Sony Pictures Imageworks Inc., et al.
- * All Rights Reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
  *
- * Modifications Copyright 2011-2022 Blender Foundation. */
+ * Adapted code from Open Shading Language. */
 
 #pragma once
+
+#include "kernel/types.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -41,19 +42,22 @@ ccl_device void emission_setup(ccl_private ShaderData *sd, const Spectrum weight
  * the PDF computed by sample(). */
 ccl_device float emissive_pdf(const float3 Ng, const float3 wi)
 {
-  float cosNI = fabsf(dot(Ng, wi));
+  const float cosNI = fabsf(dot(Ng, wi));
   return (cosNI > 0.0f) ? 1.0f : 0.0f;
 }
 
-ccl_device void emissive_sample(
-    const float3 Ng, float randu, float randv, ccl_private float3 *wi, ccl_private float *pdf)
+ccl_device void emissive_sample(const float3 /*Ng*/,
+                                const float /*randu*/,
+                                const float /*randv*/,
+                                ccl_private float3 * /*wi*/,
+                                ccl_private float * /*pdf*/)
 {
   /* todo: not implemented and used yet */
 }
 
 ccl_device Spectrum emissive_simple_eval(const float3 Ng, const float3 wi)
 {
-  float res = emissive_pdf(Ng, wi);
+  const float res = emissive_pdf(Ng, wi);
 
   return make_spectrum(res);
 }

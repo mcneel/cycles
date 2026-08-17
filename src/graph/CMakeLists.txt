@@ -1,5 +1,6 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2011-2022 Blender Foundation
 
 set(INC
   ..
@@ -22,7 +23,8 @@ set(SRC_HEADERS
 )
 
 set(LIB
-  cycles_util
+  PUBLIC cycles_util
+  PUBLIC bf::dependencies::optional::pugixml
 )
 
 include_directories(${INC})

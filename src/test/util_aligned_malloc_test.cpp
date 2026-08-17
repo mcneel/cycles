@@ -1,7 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include "testing/testing.h"
+#include <gtest/gtest.h>
 
 #include "util/aligned_malloc.h"
 
@@ -13,7 +14,7 @@ TEST(util_aligned_malloc, aligned_malloc_16)
 {
   int *mem = (int *)util_aligned_malloc(sizeof(int), 16);
   CHECK_ALIGNMENT(mem, 16);
-  util_aligned_free(mem);
+  util_aligned_free(mem, sizeof(int));
 }
 
 /* On Apple we currently only support 16 bytes alignment. */
@@ -22,7 +23,7 @@ TEST(util_aligned_malloc, aligned_malloc_32)
 {
   int *mem = (int *)util_aligned_malloc(sizeof(int), 32);
   CHECK_ALIGNMENT(mem, 32);
-  util_aligned_free(mem);
+  util_aligned_free(mem, sizeof(int));
 }
 #endif /* __APPLE__ */
 

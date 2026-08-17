@@ -1,13 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_PROFILING_H__
-#define __UTIL_PROFILING_H__
+#pragma once
 
-#include <atomic>
+#include <cassert>
 
-#include "util/map.h"
 #include "util/thread.h"
+#include "util/unique_ptr.h"
 #include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
@@ -20,6 +20,7 @@ enum ProfilingEvent : uint32_t {
   PROFILING_INTERSECT_SUBSURFACE,
   PROFILING_INTERSECT_SHADOW,
   PROFILING_INTERSECT_VOLUME_STACK,
+  PROFILING_INTERSECT_DEDICATED_LIGHT,
 
   PROFILING_SHADE_SURFACE_SETUP,
   PROFILING_SHADE_SURFACE_EVAL,
@@ -27,6 +28,7 @@ enum ProfilingEvent : uint32_t {
   PROFILING_SHADE_SURFACE_INDIRECT_LIGHT,
   PROFILING_SHADE_SURFACE_AO,
   PROFILING_SHADE_SURFACE_PASSES,
+  PROFILING_SHADE_DEDICATED_LIGHT,
 
   PROFILING_SHADE_VOLUME_SETUP,
   PROFILING_SHADE_VOLUME_INTEGRATE,
@@ -71,7 +73,7 @@ class Profiler {
   Profiler();
   ~Profiler();
 
-  void reset(int num_shaders, int num_objects);
+  void reset(const int num_shaders, const int num_objects);
 
   void start();
   void stop();
@@ -80,8 +82,8 @@ class Profiler {
   void remove_state(ProfilingState *state);
 
   uint64_t get_event(ProfilingEvent event);
-  bool get_shader(int shader, uint64_t &samples, uint64_t &hits);
-  bool get_object(int object, uint64_t &samples, uint64_t &hits);
+  bool get_shader(const int shader, uint64_t &samples, uint64_t &hits);
+  bool get_object(const int object, uint64_t &samples, uint64_t &hits);
 
   bool active() const;
 
@@ -103,7 +105,7 @@ class Profiler {
   vector<uint64_t> object_hits;
 
   volatile bool do_stop_worker;
-  thread *worker;
+  unique_ptr<thread> worker;
 
   thread_mutex mutex;
   vector<ProfilingState *> states;
@@ -122,7 +124,7 @@ class ProfilingHelper {
     state->event = previous_event;
   }
 
-  inline void set_event(ProfilingEvent event)
+  void set_event(ProfilingEvent event)
   {
     state->event = event;
   }
@@ -145,19 +147,19 @@ class ProfilingWithShaderHelper : public ProfilingHelper {
     state->shader = -1;
   }
 
-  inline void set_shader(int object, int shader)
+  void set_shader(const int object, const int shader)
   {
     if (state->active) {
       state->shader = shader;
       state->object = object;
 
       if (shader >= 0) {
-        assert(shader < state->shader_hits.size());
+        assert(shader < int(state->shader_hits.size()));
         state->shader_hits[shader]++;
       }
 
       if (object >= 0) {
-        assert(object < state->object_hits.size());
+        assert(object < int(state->object_hits.size()));
         state->object_hits[object]++;
       }
     }
@@ -165,5 +167,3 @@ class ProfilingWithShaderHelper : public ProfilingHelper {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_PROFILING_H__ */

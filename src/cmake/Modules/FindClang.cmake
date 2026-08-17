@@ -1,5 +1,6 @@
+# SPDX-FileCopyrightText: 2011 Blender Authors
+#
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright 2011 Blender Foundation.
 
 # - Find Clang library
 # Find the native Clang includes and library
@@ -11,14 +12,18 @@
 #                        This can also be an environment variable.
 #  CLANG_FOUND, If false, do not try to use Clang.
 
-# If CLANG_ROOT_DIR was defined in the environment, use it.
-if(NOT CLANG_ROOT_DIR AND NOT $ENV{CLANG_ROOT_DIR} STREQUAL "")
+# If `CLANG_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED CLANG_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{CLANG_ROOT_DIR})
   set(CLANG_ROOT_DIR $ENV{CLANG_ROOT_DIR})
+else()
+  set(CLANG_ROOT_DIR "")
 endif()
 
 if(NOT LLVM_ROOT_DIR)
   if(DEFINED LLVM_VERSION)
-    message(running llvm-config-${LLVM_VERSION})
+    message(STATUS "Running llvm-config-${LLVM_VERSION}")
     find_program(LLVM_CONFIG llvm-config-${LLVM_VERSION})
   endif()
   if(NOT LLVM_CONFIG)
@@ -31,7 +36,7 @@ if(NOT LLVM_ROOT_DIR)
   set(LLVM_ROOT_DIR ${LLVM_ROOT_DIR} CACHE PATH "Path to the LLVM installation")
 endif()
 
-set(_CLANG_SEARCH_DIRS
+set(_clang_SEARCH_DIRS
   ${CLANG_ROOT_DIR}
   ${LLVM_ROOT_DIR}
   /opt/lib/clang
@@ -41,14 +46,14 @@ find_path(CLANG_INCLUDE_DIR
   NAMES
     AST/AST.h
   HINTS
-    ${_CLANG_SEARCH_DIRS}
+    ${_clang_SEARCH_DIRS}
   PATH_SUFFIXES
     include
     include/clang
 )
 
 
-set(_CLANG_FIND_COMPONENTS
+set(_clang_FIND_COMPONENTS
   clangDependencyScanning
   clangDynamicASTMatchers
   clangFrontendTool
@@ -80,23 +85,22 @@ set(_CLANG_FIND_COMPONENTS
   clangAST
   clangLex
   clangBasic
-  clangSupport
 )
 
-set(_CLANG_LIBRARIES)
-foreach(COMPONENT ${_CLANG_FIND_COMPONENTS})
+set(_clang_LIBRARIES "")
+foreach(COMPONENT ${_clang_FIND_COMPONENTS})
   string(TOUPPER ${COMPONENT} UPPERCOMPONENT)
 
   find_library(CLANG_${UPPERCOMPONENT}_LIBRARY
     NAMES
       ${COMPONENT}
     HINTS
-      ${_CLANG_SEARCH_DIRS}
+      ${_clang_SEARCH_DIRS}
     PATH_SUFFIXES
       lib64 lib
-    )
+  )
   if(CLANG_${UPPERCOMPONENT}_LIBRARY)
-    list(APPEND _CLANG_LIBRARIES "${CLANG_${UPPERCOMPONENT}_LIBRARY}")
+    list(APPEND _clang_LIBRARIES "${CLANG_${UPPERCOMPONENT}_LIBRARY}")
   endif()
 endforeach()
 
@@ -105,10 +109,10 @@ endforeach()
 # all listed variables are TRUE.
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Clang DEFAULT_MSG
-    _CLANG_LIBRARIES CLANG_INCLUDE_DIR)
+  _clang_LIBRARIES CLANG_INCLUDE_DIR)
 
 if(CLANG_FOUND)
-  set(CLANG_LIBRARIES ${_CLANG_LIBRARIES})
+  set(CLANG_LIBRARIES ${_clang_LIBRARIES})
   set(CLANG_INCLUDE_DIRS ${CLANG_INCLUDE_DIR})
 endif()
 
@@ -116,11 +120,11 @@ mark_as_advanced(
   CLANG_INCLUDE_DIR
 )
 
-foreach(COMPONENT ${_CLANG_FIND_COMPONENTS})
+foreach(COMPONENT ${_clang_FIND_COMPONENTS})
   string(TOUPPER ${COMPONENT} UPPERCOMPONENT)
   mark_as_advanced(CLANG_${UPPERCOMPONENT}_LIBRARY)
 endforeach()
 
-unset(_CLANG_SEARCH_DIRS)
-unset(_CLANG_FIND_COMPONENTS)
-unset(_CLANG_LIBRARIES)
+unset(_clang_SEARCH_DIRS)
+unset(_clang_FIND_COMPONENTS)
+unset(_clang_LIBRARIES)

@@ -1,17 +1,16 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2013 Intel Corporation
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2013 Intel Corporation
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_MATH_INT4_H__
-#define __UTIL_MATH_INT4_H__
+#pragma once
 
-#ifndef __UTIL_MATH_H__
-#  error "Do not include this file directly, include util/types.h instead."
-#endif
+#include "util/types_float4.h"
+#include "util/types_int4.h"
 
 CCL_NAMESPACE_BEGIN
 
-#ifndef __KERNEL_GPU__
+#if !defined(__KERNEL_METAL__)
 ccl_device_inline int4 operator+(const int4 a, const int4 b)
 {
 #  ifdef __KERNEL_SSE__
@@ -40,7 +39,12 @@ ccl_device_inline int4 operator-=(int4 &a, const int4 b)
   return a = a - b;
 }
 
-ccl_device_inline int4 operator>>(const int4 a, int i)
+ccl_device_inline int4 operator*(const int4 a, const int4 b)
+{
+  return make_int4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
+}
+
+ccl_device_inline int4 operator>>(const int4 a, const int i)
 {
 #  ifdef __KERNEL_SSE__
   return int4(_mm_srai_epi32(a.m128, i));
@@ -49,7 +53,7 @@ ccl_device_inline int4 operator>>(const int4 a, int i)
 #  endif
 }
 
-ccl_device_inline int4 operator<<(const int4 a, int i)
+ccl_device_inline int4 operator<<(const int4 a, const int i)
 {
 #  ifdef __KERNEL_SSE__
   return int4(_mm_slli_epi32(a.m128, i));
@@ -70,6 +74,11 @@ ccl_device_inline int4 operator<(const int4 a, const int4 b)
 ccl_device_inline int4 operator<(const int4 a, const int b)
 {
   return a < make_int4(b);
+}
+
+ccl_device_inline int4 operator>(const int4 a, const int4 b)
+{
+  return b < a;
 }
 
 ccl_device_inline int4 operator==(const int4 a, const int4 b)
@@ -193,25 +202,27 @@ ccl_device_inline int4 &operator>>=(int4 &a, const int32_t b)
   return a = a >> b;
 }
 
+ccl_device_inline int4 srl(const int4 a, const int i)
+{
 #  ifdef __KERNEL_SSE__
-ccl_device_forceinline const int4 srl(const int4 a, const int32_t b)
-{
-  return int4(_mm_srli_epi32(a.m128, b));
-}
+  return int4(_mm_srli_epi32(a.m128, i));
+#  else
+  return make_int4(uint32_t(a.x) >> i, uint32_t(a.y) >> i, uint32_t(a.z) >> i, uint32_t(a.w) >> i);
 #  endif
+}
 
-ccl_device_inline int4 min(int4 a, int4 b)
+ccl_device_inline int4 min(const int4 a, const int4 b)
 {
-#  if defined(__KERNEL_SSE__) && defined(__KERNEL_SSE41__)
+#  if defined(__KERNEL_SSE__) && defined(__KERNEL_SSE42__)
   return int4(_mm_min_epi32(a.m128, b.m128));
 #  else
   return make_int4(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w));
 #  endif
 }
 
-ccl_device_inline int4 max(int4 a, int4 b)
+ccl_device_inline int4 max(const int4 a, const int4 b)
 {
-#  if defined(__KERNEL_SSE__) && defined(__KERNEL_SSE41__)
+#  if defined(__KERNEL_SSE__) && defined(__KERNEL_SSE42__)
   return int4(_mm_max_epi32(a.m128, b.m128));
 #  else
   return make_int4(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w));
@@ -241,7 +252,7 @@ ccl_device_inline int4 load_int4(const int *v)
   return make_int4(v[0], v[1], v[2], v[3]);
 #  endif
 }
-#endif /* __KERNEL_GPU__ */
+#endif /* __KERNEL_METAL__ */
 
 ccl_device_inline float4 cast(const int4 a)
 {
@@ -259,7 +270,7 @@ ccl_device_forceinline int4 andnot(const int4 a, const int4 b)
   return int4(_mm_andnot_si128(a.m128, b.m128));
 }
 
-template<size_t i0, size_t i1, size_t i2, size_t i3>
+template<size_t i0, const size_t i1, const size_t i2, const size_t i3>
 ccl_device_forceinline int4 shuffle(const int4 a)
 {
 #  ifdef __KERNEL_NEON__
@@ -270,7 +281,7 @@ ccl_device_forceinline int4 shuffle(const int4 a)
 #  endif
 }
 
-template<size_t i0, size_t i1, size_t i2, size_t i3>
+template<size_t i0, const size_t i1, const size_t i2, const size_t i3>
 ccl_device_forceinline int4 shuffle(const int4 a, const int4 b)
 {
 #  ifdef __KERNEL_NEON__
@@ -290,5 +301,3 @@ template<size_t i0> ccl_device_forceinline int4 shuffle(const int4 b)
 #endif
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_MATH_INT4_H__ */

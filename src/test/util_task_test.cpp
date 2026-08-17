@@ -1,7 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include "testing/testing.h"
+#include <gtest/gtest.h>
 
 #include "util/task.h"
 
@@ -9,9 +10,7 @@ CCL_NAMESPACE_BEGIN
 
 namespace {
 
-void task_run()
-{
-}
+void task_run() {}
 
 }  // namespace
 
@@ -20,7 +19,7 @@ TEST(util_task, basic)
   TaskScheduler::init(0);
   TaskPool pool;
   for (int i = 0; i < 100; ++i) {
-    pool.push(function_bind(task_run));
+    pool.push([] { task_run(); });
   }
   TaskPool::Summary summary;
   pool.wait_work(&summary);
@@ -34,7 +33,7 @@ TEST(util_task, multiple_times)
     TaskScheduler::init(0);
     TaskPool pool;
     for (int i = 0; i < 100; ++i) {
-      pool.push(function_bind(task_run));
+      pool.push([] { task_run(); });
     }
     TaskPool::Summary summary;
     pool.wait_work(&summary);

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -11,22 +12,10 @@ CCL_NAMESPACE_BEGIN
  *
  * TODO: there may be ways to optimize this to avoid this many atomic ops? */
 
+#include "kernel/device/gpu/block_sizes.h"
 #include "util/atomic.h"
 
-#ifdef __HIP__
-#  define GPU_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE 1024
-#else
-#  define GPU_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE 512
-#endif
-#define GPU_PARALLEL_SORTED_INDEX_INACTIVE_KEY (~0)
-#define GPU_PARALLEL_SORT_BLOCK_SIZE 1024
-
 #if defined(__KERNEL_LOCAL_ATOMIC_SORT__)
-
-#  define atomic_store_local(p, x) \
-    atomic_store_explicit((threadgroup atomic_int *)p, x, memory_order_relaxed)
-#  define atomic_load_local(p) \
-    atomic_load_explicit((threadgroup atomic_int *)p, memory_order_relaxed)
 
 ccl_device_inline void gpu_parallel_sort_bucket_pass(const uint num_states,
                                                      const uint partition_size,
@@ -41,11 +30,17 @@ ccl_device_inline void gpu_parallel_sort_bucket_pass(const uint num_states,
                                                      const uint grid_id)
 {
   /* Zero the bucket sizes. */
-  if (local_id < max_shaders) {
-    atomic_store_local(&buckets[local_id], 0);
+  for (uint i = local_id; i < max_shaders; i += local_size) {
+    atomic_store_local(&buckets[i], 0);
   }
 
+#  ifdef __KERNEL_ONEAPI__
+  /* NOTE(@nsirgien): For us here only local memory writing (buckets) is important,
+   * so faster local barriers can be used. */
+  ccl_gpu_local_syncthreads();
+#  else
   ccl_gpu_syncthreads();
+#  endif
 
   /* Determine bucket sizes within the partitions. */
 
@@ -53,15 +48,22 @@ ccl_device_inline void gpu_parallel_sort_bucket_pass(const uint num_states,
   const uint partition_end = min(num_states, partition_start + partition_size);
 
   for (int state_index = partition_start + uint(local_id); state_index < partition_end;
-       state_index += uint(local_size)) {
+       state_index += uint(local_size))
+  {
     ushort kernel_index = d_queued_kernel[state_index];
     if (kernel_index == queued_kernel) {
       uint key = d_shader_sort_key[state_index] % max_shaders;
-      atomic_fetch_and_add_uint32(&buckets[key], 1);
+      atomic_fetch_and_add_uint32_shared(&buckets[key], 1);
     }
   }
 
+#  ifdef __KERNEL_ONEAPI__
+  /* NOTE(@nsirgien): For us here only local memory writing (buckets) is important,
+   * so faster local barriers can be used. */
+  ccl_gpu_local_syncthreads();
+#  else
   ccl_gpu_syncthreads();
+#  endif
 
   /* Calculate the partition's local offsets from the prefix sum of bucket sizes. */
 
@@ -94,32 +96,36 @@ ccl_device_inline void gpu_parallel_sort_write_pass(const uint num_states,
   /* Calculate each partition's global offset from the prefix sum of the active state counts per
    * partition. */
 
-  if (local_id < max_shaders) {
-    int partition_offset = 0;
-    for (int i = 0; i < uint(grid_id); i++) {
-      int partition_key_count = partition_key_offsets[max_shaders + uint(i) * (max_shaders + 1)];
-      partition_offset += partition_key_count;
-    }
-
-    ccl_global int *key_offsets = partition_key_offsets + (uint(grid_id) * (max_shaders + 1));
-    atomic_store_local(&local_offset[local_id], key_offsets[local_id] + partition_offset);
+  int partition_offset = 0;
+  for (uint i = 0; i < grid_id; i++) {
+    partition_offset += partition_key_offsets[max_shaders + i * (max_shaders + 1)];
   }
 
+  ccl_global int *key_offsets = partition_key_offsets + grid_id * (max_shaders + 1);
+  for (uint i = local_id; i < max_shaders; i += local_size) {
+    atomic_store_local(&local_offset[i], key_offsets[i] + partition_offset);
+  }
+
+#  ifdef __KERNEL_ONEAPI__
+  /* NOTE(@nsirgien): For us here only local memory writing (local_offset) is important,
+   * so faster local barriers can be used. */
+  ccl_gpu_local_syncthreads();
+#  else
   ccl_gpu_syncthreads();
+#  endif
 
   /* Write the sorted active indices. */
 
   const uint partition_start = partition_size * uint(grid_id);
   const uint partition_end = min(num_states, partition_start + partition_size);
 
-  ccl_global int *key_offsets = partition_key_offsets + (uint(grid_id) * max_shaders);
-
   for (int state_index = partition_start + uint(local_id); state_index < partition_end;
-       state_index += uint(local_size)) {
+       state_index += uint(local_size))
+  {
     ushort kernel_index = d_queued_kernel[state_index];
     if (kernel_index == queued_kernel) {
       uint key = d_shader_sort_key[state_index] % max_shaders;
-      int index = atomic_fetch_and_add_uint32(&local_offset[key], 1);
+      int index = atomic_fetch_and_add_uint32_shared(&local_offset[key], 1);
       if (index < num_states_limit) {
         indices[index] = state_index;
       }

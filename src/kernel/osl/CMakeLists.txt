@@ -1,5 +1,6 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2011-2022 Blender Foundation
 
 set(INC
   ../..
@@ -18,29 +19,26 @@ set(SRC
 set(HEADER_SRC
   closures_setup.h
   closures_template.h
+  compat.h
   globals.h
   osl.h
   services.h
+  services_shared.h
   types.h
 )
 
 set(LIB
-  cycles_scene
+  PUBLIC cycles_scene
 
-  ${OSL_LIBRARIES}
-  ${OPENIMAGEIO_LIBRARIES}
-  ${PUGIXML_LIBRARIES}
-  ${CLANG_LIBRARIES}
-  ${LLVM_LIBRARY}
+  PUBLIC bf::dependencies::optional::osl
+  PRIVATE bf::dependencies::openimageio
+  PRIVATE bf::dependencies::optional::pugixml
 )
-
-# OSL and LLVM are built without RTTI
-string(APPEND CMAKE_CXX_FLAGS " ${RTTI_DISABLE_FLAGS}")
 
 if(APPLE)
   # Disable allocation warning on macOS prior to 10.14: the OSLRenderServices
   # contains member which is 64 bytes aligned (cache inside of OIIO's
-  # unordered_map_concurrent). This is not something what the SDK supportsm, but
+  # unordered_map_concurrent). This is not something what the SDK supports, but
   # since we take care of allocations ourselves is OK to ignore the
   # diagnostic message.
   string(APPEND CMAKE_CXX_FLAGS " -faligned-allocation")

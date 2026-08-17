@@ -1,9 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #ifdef WITH_CUDA
 
 #  include "device/graphics_interop.h"
+#  include "session/display_driver.h"
 
 #  ifdef WITH_CUDA_DYNLOAD
 #    include "cuew.h"
@@ -23,29 +25,37 @@ class CUDADeviceGraphicsInterop : public DeviceGraphicsInterop {
   CUDADeviceGraphicsInterop(const CUDADeviceGraphicsInterop &other) = delete;
   CUDADeviceGraphicsInterop(CUDADeviceGraphicsInterop &&other) noexcept = delete;
 
-  ~CUDADeviceGraphicsInterop();
+  ~CUDADeviceGraphicsInterop() override;
 
   CUDADeviceGraphicsInterop &operator=(const CUDADeviceGraphicsInterop &other) = delete;
   CUDADeviceGraphicsInterop &operator=(CUDADeviceGraphicsInterop &&other) = delete;
 
-  virtual void set_display_interop(const DisplayDriver::GraphicsInterop &display_interop) override;
+  void set_buffer(GraphicsInteropBuffer &interop_buffer) override;
 
-  virtual device_ptr map() override;
-  virtual void unmap() override;
+  device_ptr map() override;
+  void unmap() override;
 
  protected:
   CUDADeviceQueue *queue_ = nullptr;
   CUDADevice *device_ = nullptr;
 
-  /* OpenGL PBO which is currently registered as the destination for the CUDA buffer. */
-  int64_t opengl_pbo_id_ = 0;
-  /* Buffer area in pixels of the corresponding PBO. */
-  int64_t buffer_area_ = 0;
+  /* Size of the buffer in bytes. */
+  size_t buffer_size_ = 0;
 
   /* The destination was requested to be cleared. */
-  bool need_clear_ = false;
+  bool need_zero_ = false;
 
+  /* CUDA resources. */
   CUgraphicsResource cu_graphics_resource_ = nullptr;
+  CUexternalMemory cu_external_memory_ = nullptr;
+  CUdeviceptr cu_external_memory_ptr_ = 0;
+
+  /* Vulkan handle to free. */
+#  ifdef _WIN32
+  int64_t vulkan_windows_handle_ = 0;
+#  endif
+
+  void free();
 };
 
 CCL_NAMESPACE_END

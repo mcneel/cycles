@@ -1,11 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #include "hydra/config.h"
 
+#include <pxr/imaging/hd/dataSource.h>
 #include <pxr/imaging/hd/light.h>
 
 HDCYCLES_NAMESPACE_OPEN_SCOPE
@@ -26,8 +28,9 @@ class HdCyclesLight final : public PXR_NS::HdLight {
  private:
   void Initialize(PXR_NS::HdRenderParam *renderParam);
 
-  void PopulateShaderGraph(PXR_NS::HdSceneDelegate *sceneDelegate);
+  void PopulateShaderGraph(const PXR_NS::HdContainerDataSourceHandle &lightContainer);
 
+  CCL_NS::Object *_object = nullptr;
   CCL_NS::Light *_light = nullptr;
   PXR_NS::TfToken _lightType;
 };

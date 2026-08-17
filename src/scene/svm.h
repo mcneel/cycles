@@ -1,17 +1,16 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __SVM_H__
-#define __SVM_H__
+#pragma once
 
-#include "scene/attribute.h"
+#include <atomic>
+
 #include "scene/shader.h"
 #include "scene/shader_graph.h"
 
 #include "util/array.h"
-#include "util/set.h"
 #include "util/string.h"
-#include "util/thread.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -23,15 +22,14 @@ class ShaderGraph;
 class ShaderInput;
 class ShaderNode;
 class ShaderOutput;
+struct SVMNodeClosureBsdf;
 
 /* Shader Manager */
 
 class SVMShaderManager : public ShaderManager {
  public:
   SVMShaderManager();
-  ~SVMShaderManager();
-
-  void reset(Scene *scene) override;
+  ~SVMShaderManager() override;
 
   void device_update_specific(Device *device,
                               DeviceScene *dscene,
@@ -42,8 +40,8 @@ class SVMShaderManager : public ShaderManager {
  protected:
   void device_update_shader(Scene *scene,
                             Shader *shader,
-                            Progress *progress,
-                            array<int4> *svm_nodes);
+                            Progress &progress,
+                            array<int> *svm_nodes);
 };
 
 /* Graph Compiler */
@@ -58,9 +56,6 @@ class SVMCompiler {
 
     /* Peak stack usage during shader evaluation. */
     int peak_stack_usage;
-
-    /* Time spent on surface graph finalization. */
-    double time_finalize;
 
     /* Time spent on generating SVM nodes for surface shader. */
     double time_generate_surface;
@@ -81,29 +76,83 @@ class SVMCompiler {
     string full_report() const;
   };
 
-  SVMCompiler(Scene *scene);
-  void compile(Shader *shader, array<int4> &svm_nodes, int index, Summary *summary = NULL);
+  SVMCompiler(Scene *scene, Progress &progress);
+  void compile(Shader *shader, array<int> &svm_nodes, const int index, Summary *summary = nullptr);
 
-  int stack_assign(ShaderOutput *output);
-  int stack_assign(ShaderInput *input);
-  int stack_assign_if_linked(ShaderInput *input);
-  int stack_assign_if_linked(ShaderOutput *output);
-  int stack_find_offset(int size);
-  int stack_find_offset(SocketType::Type type);
-  void stack_clear_offset(SocketType::Type type, int offset);
+  /* Create input and output node parameters for struct T passed to add_node. */
+  SVMInputInt input_int(const char *name);
+  SVMInputFloat input_float(const char *name);
+  SVMInputFloat3 input_float3(const char *name);
+  SVMInputFloat3 input_float3_from_offset(SVMStackOffset offset);
+  SVMStackOffset input_link(const char *name);
+  SVMStackOffset output(const char *name);
+  SVMStackOffset output(ShaderOutput *shader_output);
+
+  /* Add simple SVM node without parameters. */
+  void add_node(ShaderNodeType type);
+
+  /* Add SVM node with parameters in struct T. */
+  template<typename T>
+  void add_node(ShaderNode *shader_node,
+                const ShaderNodeType type,
+                const T &node,
+                const bool use_derivatives = false)
+    requires(std::is_class_v<T> && sizeof(T) % sizeof(int) == 0 && alignof(T) <= sizeof(uint))
+  {
+    const ShaderNodeType resolved_type = node_type(shader_node, type, use_derivatives);
+    current_svm_nodes.push_back_slow(resolved_type);
+    const int *data = reinterpret_cast<const int *>(&node);
+    svm_node_types_used[resolved_type] = true;
+    for (size_t i = 0; i < sizeof(T) / sizeof(int); i++) {
+      current_svm_nodes.push_back_slow(data[i]);
+    }
+    if (shader_node) {
+      shader_node->added_to_svm = true;
+    }
+  }
+
+  /* Add value node. */
+  void add_value_node(ShaderNode *shader_node, const float value, const int stack_offset);
+  void add_value_node(ShaderNode *shader_node, const float3 &value, const int stack_offset);
+
+  /* Add BSDF node. */
+  template<typename T> void add_bsdf_node(const SVMNodeClosureBsdf &node, const T &data)
+  {
+    assert(current_node->shader_node_type() == NODE_CLOSURE_BSDF);
+    add_node(current_node, NODE_CLOSURE_BSDF, node);
+    add_node_data(data);
+  }
+
+  /* Add extra node data following add_node. */
+  template<typename T>
+  void add_node_data(const T &data)
+    requires(std::is_class_v<T> && sizeof(T) % sizeof(int) == 0 && alignof(T) <= sizeof(uint))
+  {
+    const int *ptr = reinterpret_cast<const int *>(&data);
+    for (size_t i = 0; i < sizeof(T) / sizeof(int); i++) {
+      current_svm_nodes.push_back_slow(ptr[i]);
+    }
+  }
+  void add_node_data_float4(const float4 &f);
+  void add_node_data_float(const float f);
+
+  /* Low level input and output handling for some special nodes. Usually the functions
+   * above should be used instead of these. */
+  SVMStackOffset stack_assign(ShaderInput *input);
+  SVMStackOffset stack_find_offset(const ShaderIO *io);
+  void stack_clear_offset(const ShaderIO *io, const SVMStackOffset offset);
   void stack_link(ShaderInput *input, ShaderOutput *output);
 
-  void add_node(ShaderNodeType type, int a = 0, int b = 0, int c = 0);
-  void add_node(int a = 0, int b = 0, int c = 0, int d = 0);
-  void add_node(ShaderNodeType type, const float3 &f);
-  void add_node(const float4 &f);
   uint attribute(ustring name);
   uint attribute(AttributeStandard std);
   uint attribute_standard(ustring name);
-  uint encode_uchar4(uint x, uint y = 0, uint z = 0, uint w = 0);
-  uint closure_mix_weight_offset()
+  SVMStackOffset closure_mix_weight_offset()
   {
     return mix_weight_offset;
+  }
+  SVMStackOffset get_bump_state_offset()
+  {
+    return bump_state_offset;
   }
 
   ShaderType output_type()
@@ -112,7 +161,9 @@ class SVMCompiler {
   }
 
   Scene *scene;
+  Progress &progress;
   ShaderGraph *current_graph;
+  ShaderNode *current_node;
   bool background;
 
  protected:
@@ -134,9 +185,11 @@ class SVMCompiler {
 
     bool empty()
     {
-      for (int i = 0; i < SVM_STACK_SIZE; i++)
-        if (users[i])
+      for (int i = 0; i < SVM_STACK_SIZE; i++) {
+        if (users[i]) {
           return false;
+        }
+      }
 
       return true;
     }
@@ -145,8 +198,9 @@ class SVMCompiler {
     {
       printf("stack <");
 
-      for (int i = 0; i < SVM_STACK_SIZE; i++)
+      for (int i = 0; i < SVM_STACK_SIZE; i++) {
         printf((users[i]) ? "*" : " ");
+      }
 
       printf(">\n");
     }
@@ -184,15 +238,28 @@ class SVMCompiler {
     uint node_feature_mask;
   };
 
+  ShaderNodeType node_type(const ShaderNode *shader_node,
+                           const ShaderNodeType type,
+                           const bool use_derivatives);
+
+  SVMStackOffset stack_assign(ShaderOutput *output);
+  SVMStackOffset stack_find_offset(const int size);
+
   void stack_clear_temporary(ShaderNode *node);
   int stack_size(SocketType::Type type);
+  int stack_size(const ShaderIO *io);
   void stack_clear_users(ShaderNode *node, ShaderNodeSet &done);
+  bool is_sole_user(const ShaderNode *node, const ShaderOutput *output, const ShaderNodeSet &done);
+  void stack_zero_incomplete_derivatives(const ShaderNode *node);
+
+  /* Stack size that will be allocated for the outputs of this node. */
+  int stack_node_output_size(const ShaderNode *node);
 
   /* single closure */
   void find_dependencies(ShaderNodeSet &dependencies,
                          const ShaderNodeSet &done,
                          ShaderInput *input,
-                         ShaderNode *skip_node = NULL);
+                         ShaderNode *skip_node = nullptr);
   void find_aov_nodes_and_dependencies(ShaderNodeSet &aov_nodes,
                                        ShaderGraph *graph,
                                        CompilerState *state);
@@ -212,15 +279,14 @@ class SVMCompiler {
   void compile_type(Shader *shader, ShaderGraph *graph, ShaderType type);
 
   std::atomic_int *svm_node_types_used;
-  array<int4> current_svm_nodes;
+  array<int> current_svm_nodes;
   ShaderType current_type;
   Shader *current_shader;
   Stack active_stack;
   int max_stack_use;
-  uint mix_weight_offset;
+  SVMStackOffset mix_weight_offset;
+  SVMStackOffset bump_state_offset;
   bool compile_failed;
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __SVM_H__ */

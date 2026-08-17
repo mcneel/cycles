@@ -1,8 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Adapted from code Copyright 2009-2010 NVIDIA Corporation,
- * and code copyright 2009-2012 Intel Corporation
+/* SPDX-FileCopyrightText: 2009-2010 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2009-2012 Intel Corporation
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Modifications Copyright 2011-2022 Blender Foundation. */
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Adapted code from NVIDIA Corporation. */
 
 #if BVH_FEATURE(BVH_HAIR)
 #  define NODE_INTERSECT bvh_node_intersect
@@ -24,13 +26,10 @@ ccl_device
 #else
 ccl_device_inline
 #endif
-    bool BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
-                                     ccl_private const Ray *ray,
-                                     IntegratorShadowState state,
-                                     const uint visibility,
-                                     const uint max_hits,
-                                     ccl_private uint *r_num_recorded_hits,
-                                     ccl_private float *r_throughput)
+    void
+    BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
+                                const ccl_private Ray *ccl_restrict ray,
+                                ccl_private BVHShadowAllPayload &ccl_restrict payload)
 {
   /* todo:
    * - likely and unlikely for if() statements
@@ -51,16 +50,12 @@ ccl_device_inline
   float3 idir = bvh_inverse_direction(dir);
   float tmin = ray->tmin;
   int object = OBJECT_NONE;
-  uint num_hits = 0;
 
-  /* Max distance in world space. May be dynamically reduced when max number of
-   * recorded hits is exceeded and we no longer need to find hits beyond the max
-   * distance found. */
+  /* Max distance in world space. May be dynamically reduced when max number of recorded hits is
+   * exceeded and we no longer need to find hits beyond the max distance found. */
   const float tmax = ray->tmax;
-  float tmax_hits = tmax;
 
-  *r_num_recorded_hits = 0;
-  *r_throughput = 1.0f;
+  const uint visibility = payload.base.ray_visibility;
 
   /* traversal loop */
   do {
@@ -144,6 +139,12 @@ ccl_device_inline
               continue;
             }
 
+#ifdef __SHADOW_LINKING__
+            if (intersection_skip_shadow_link(kg, ray->self, prim_object)) {
+              continue;
+            }
+#endif
+
             switch (type & PRIMITIVE_ALL) {
               case PRIMITIVE_TRIANGLE: {
                 hit = triangle_intersect(
@@ -166,11 +167,13 @@ ccl_device_inline
                 break;
               }
 #endif
-#if BVH_FEATURE(BVH_HAIR)
+#if BVH_FEATURE(BVH_HAIR) && defined(__HAIR__)
               case PRIMITIVE_CURVE_THICK:
               case PRIMITIVE_MOTION_CURVE_THICK:
               case PRIMITIVE_CURVE_RIBBON:
-              case PRIMITIVE_MOTION_CURVE_RIBBON: {
+              case PRIMITIVE_MOTION_CURVE_RIBBON:
+              case PRIMITIVE_CURVE_THICK_LINEAR:
+              case PRIMITIVE_MOTION_CURVE_THICK_LINEAR: {
                 if ((type & PRIMITIVE_MOTION) && kernel_data.bvh.use_bvh_steps) {
                   const float2 prim_time = kernel_data_fetch(prim_time, prim_addr);
                   if (ray->time < prim_time.x || ray->time > prim_time.y) {
@@ -186,7 +189,7 @@ ccl_device_inline
                 break;
               }
 #endif
-#if BVH_FEATURE(BVH_POINTCLOUD)
+#if BVH_FEATURE(BVH_POINTCLOUD) && defined(__POINTCLOUD__)
               case PRIMITIVE_POINT:
               case PRIMITIVE_MOTION_POINT: {
                 if ((type & PRIMITIVE_MOTION) && kernel_data.bvh.use_bvh_steps) {
@@ -209,70 +212,15 @@ ccl_device_inline
               }
             }
 
-            /* shadow ray early termination */
             if (hit) {
-              /* detect if this surface has a shader with transparent shadows */
-              /* todo: optimize so primitive visibility flag indicates if
-               * the primitive has a transparent shadow shader? */
-              const int flags = intersection_get_shader_flags(kg, isect.prim, isect.object, isect.type);
-
-              if (!(flags & SD_HAS_TRANSPARENT_SHADOW) || num_hits >= max_hits) {
-                /* If no transparent shadows, all light is blocked and we can
-                 * stop immediately. */
-                return true;
-              }
-
-              num_hits++;
-
-              bool record_intersection = true;
-
-              /* Always use baked shadow transparency for curves. */
-              if (isect.type & PRIMITIVE_CURVE) {
-                *r_throughput *= intersection_curve_shadow_transparency(
-                    kg, isect.object, isect.prim, isect.type, isect.u);
-
-                if (*r_throughput < CURVE_SHADOW_TRANSPARENCY_CUTOFF) {
-                  return true;
-                }
-                else {
-                  record_intersection = false;
-                }
-              }
-
-              if (record_intersection) {
-                /* Test if we need to record this transparent intersection. */
-                const uint max_record_hits = min(max_hits, INTEGRATOR_SHADOW_ISECT_SIZE);
-                if (*r_num_recorded_hits < max_record_hits || isect.t < tmax_hits) {
-                  /* If maximum number of hits was reached, replace the intersection with the
-                   * highest distance. We want to find the N closest intersections. */
-                  const uint num_recorded_hits = min(*r_num_recorded_hits, max_record_hits);
-                  uint isect_index = num_recorded_hits;
-                  if (num_recorded_hits + 1 >= max_record_hits) {
-                    float max_t = INTEGRATOR_STATE_ARRAY(state, shadow_isect, 0, t);
-                    uint max_recorded_hit = 0;
-
-                    for (uint i = 1; i < num_recorded_hits; ++i) {
-                      const float isect_t = INTEGRATOR_STATE_ARRAY(state, shadow_isect, i, t);
-                      if (isect_t > max_t) {
-                        max_recorded_hit = i;
-                        max_t = isect_t;
-                      }
-                    }
-
-                    if (num_recorded_hits >= max_record_hits) {
-                      isect_index = max_recorded_hit;
-                    }
-
-                    /* Limit the ray distance and stop counting hits beyond this. */
-                    tmax_hits = max(isect.t, max_t);
-                  }
-
-                  integrator_state_write_shadow_isect(state, &isect, isect_index);
-                }
-
-                /* Always increase the number of recorded hits, even beyond the maximum,
-                 * so that we can detect this and trace another ray if needed. */
-                ++(*r_num_recorded_hits);
+              if (!bvh_shadow_all_anyhit_filter<ISECT_TEST_NONE>(kg,
+                                                                 payload.state,
+                                                                 payload,
+                                                                 payload.base.ray_self,
+                                                                 payload.base.ray_visibility,
+                                                                 isect))
+              {
+                return;
               }
             }
           }
@@ -307,20 +255,13 @@ ccl_device_inline
       --stack_ptr;
     }
   } while (node_addr != ENTRYPOINT_SENTINEL);
-
-  return false;
 }
 
-ccl_device_inline bool BVH_FUNCTION_NAME(KernelGlobals kg,
-                                         ccl_private const Ray *ray,
-                                         IntegratorShadowState state,
-                                         const uint visibility,
-                                         const uint max_hits,
-                                         ccl_private uint *num_recorded_hits,
-                                         ccl_private float *throughput)
+ccl_device_inline void BVH_FUNCTION_NAME(KernelGlobals kg,
+                                         const ccl_private Ray *ccl_restrict ray,
+                                         ccl_private BVHShadowAllPayload &ccl_restrict payload)
 {
-  return BVH_FUNCTION_FULL_NAME(BVH)(
-      kg, ray, state, visibility, max_hits, num_recorded_hits, throughput);
+  BVH_FUNCTION_FULL_NAME(BVH)(kg, ray, payload);
 }
 
 #undef BVH_FUNCTION_NAME

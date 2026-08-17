@@ -1,27 +1,28 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include <ostream>
+#include <iosfwd>
 
-#include "util/types.h"
+#include "util/types_int2.h"
 
 CCL_NAMESPACE_BEGIN
 
 struct TileSize {
   TileSize() = default;
 
-  inline TileSize(int width, int height, int num_samples)
+  TileSize(const int width, const int height, const int num_samples)
       : width(width), height(height), num_samples(num_samples)
   {
   }
 
-  inline bool operator==(const TileSize &other) const
+  bool operator==(const TileSize &other) const
   {
     return width == other.width && height == other.height && num_samples == other.num_samples;
   }
-  inline bool operator!=(const TileSize &other) const
+  bool operator!=(const TileSize &other) const
   {
     return !(*this == other);
   }

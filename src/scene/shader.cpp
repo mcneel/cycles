@@ -1,11 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "device/device.h"
 
 #include "scene/background.h"
 #include "scene/camera.h"
-#include "scene/colorspace.h"
 #include "scene/integrator.h"
 #include "scene/light.h"
 #include "scene/mesh.h"
@@ -18,17 +18,14 @@
 #include "scene/shader_nodes.h"
 #include "scene/svm.h"
 #include "scene/tables.h"
+#include "scene/volume.h"
 
-#include "util/foreach.h"
+#include "util/colorspace.h"
 #include "util/log.h"
 #include "util/murmurhash.h"
-#include "util/task.h"
 #include "util/transform.h"
 
-#ifdef WITH_OCIO
-#  include <OpenColorIO/OpenColorIO.h>
-namespace OCIO = OCIO_NAMESPACE;
-#endif
+#include "scene/shader.tables"
 
 CCL_NAMESPACE_BEGIN
 
@@ -59,7 +56,7 @@ NODE_DEFINE(Shader)
               EMISSION_SAMPLING_AUTO);
 
   SOCKET_BOOLEAN(use_transparent_shadow, "Use Transparent Shadow", true);
-  SOCKET_BOOLEAN(heterogeneous_volume, "Heterogeneous Volume", true);
+  SOCKET_BOOLEAN(use_bump_map_correction, "Bump Map Correction", true);
 
   static NodeEnum volume_sampling_method_enum;
   volume_sampling_method_enum.insert("distance", VOLUME_SAMPLING_DISTANCE);
@@ -95,7 +92,7 @@ Shader::Shader() : Node(get_node_type())
 {
   pass_id = 0;
 
-  graph = NULL;
+  graph = nullptr;
 
   has_surface = false;
   has_surface_transparent = false;
@@ -103,14 +100,18 @@ Shader::Shader() : Node(get_node_type())
   has_surface_bssrdf = false;
   has_volume = false;
   has_displacement = false;
-  has_bump = false;
+  has_bump_from_displacement = false;
+  has_bump_from_surface = false;
   has_bssrdf_bump = false;
   has_surface_spatial_varying = false;
   has_volume_spatial_varying = false;
   has_volume_attribute_dependency = false;
-  has_integrator_dependency = false;
   has_volume_connected = false;
+  prev_has_surface_shadow_transparency = false;
   prev_volume_step_rate = 0.0f;
+  has_light_path_node = false;
+  has_aov_output_node = false;
+  has_time_dependency = false;
 
   emission_estimate = zero_float3();
   emission_sampling = EMISSION_SAMPLING_NONE;
@@ -123,11 +124,8 @@ Shader::Shader() : Node(get_node_type())
   need_update_uvs = true;
   need_update_attribute = true;
   need_update_displacement = true;
-}
-
-Shader::~Shader()
-{
-  delete graph;
+  need_update_shadow_transparency = true;
+  shadow_transparency_needs_realloc = true;
 }
 
 static float3 output_estimate_emission(ShaderOutput *output, bool &is_constant)
@@ -138,11 +136,19 @@ static float3 output_estimate_emission(ShaderOutput *output, bool &is_constant)
   if (node == nullptr) {
     return zero_float3();
   }
-  else if (node->type == EmissionNode::get_node_type() ||
-           node->type == BackgroundNode::get_node_type()) {
+  if (node->type == EmissionNode::get_node_type() ||
+      node->type == BackgroundNode::get_node_type() ||
+      node->type == PrincipledBsdfNode::get_node_type())
+  {
+    const bool is_principled = (node->type == PrincipledBsdfNode::get_node_type());
     /* Emission and Background node. */
-    ShaderInput *color_in = node->input("Color");
-    ShaderInput *strength_in = node->input("Strength");
+    ShaderInput *color_in = node->input(is_principled ? "Emission Color" : "Color");
+    ShaderInput *strength_in = node->input(is_principled ? "Emission Strength" : "Strength");
+
+    if (is_principled) {
+      /* Too many parameters (coat, sheen, alpha) influence Emission for the Principled BSDF. */
+      is_constant = false;
+    }
 
     float3 estimate = one_float3();
 
@@ -161,20 +167,11 @@ static float3 output_estimate_emission(ShaderOutput *output, bool &is_constant)
       estimate *= node->get_float(strength_in->socket_type);
     }
 
-    /* Lower importance of emission nodes from automatic value/color to shader
-     * conversion, as these are likely used for previewing and can be slow to
-     * build a light tree for on dense meshes. */
-    if (node->type == EmissionNode::get_node_type()) {
-      EmissionNode *emission_node = static_cast<EmissionNode *>(node);
-      if (emission_node->from_auto_conversion) {
-        estimate *= 0.1f;
-      }
-    }
-
     return estimate;
   }
-  else if (node->type == LightFalloffNode::get_node_type() ||
-           node->type == IESLightNode::get_node_type()) {
+  if (node->type == LightFalloffNode::get_node_type() ||
+      node->type == IESLightNode::get_node_type())
+  {
     /* Get strength from Light Falloff and IES texture node. */
     ShaderInput *strength_in = node->input("Strength");
     is_constant = false;
@@ -182,7 +179,7 @@ static float3 output_estimate_emission(ShaderOutput *output, bool &is_constant)
     return (strength_in->link) ? output_estimate_emission(strength_in->link, is_constant) :
                                  make_float3(node->get_float(strength_in->socket_type));
   }
-  else if (node->type == AddClosureNode::get_node_type()) {
+  if (node->type == AddClosureNode::get_node_type()) {
     /* Add Closure. */
     ShaderInput *closure1_in = node->input("Closure1");
     ShaderInput *closure2_in = node->input("Closure2");
@@ -196,7 +193,7 @@ static float3 output_estimate_emission(ShaderOutput *output, bool &is_constant)
 
     return estimate1 + estimate2;
   }
-  else if (node->type == MixClosureNode::get_node_type()) {
+  if (node->type == MixClosureNode::get_node_type()) {
     /* Mix Closure. */
     ShaderInput *fac_in = node->input("Fac");
     ShaderInput *closure1_in = node->input("Closure1");
@@ -213,39 +210,37 @@ static float3 output_estimate_emission(ShaderOutput *output, bool &is_constant)
       is_constant = false;
       return estimate1 + estimate2;
     }
-    else {
-      const float fac = node->get_float(fac_in->socket_type);
-      return (1.0f - fac) * estimate1 + fac * estimate2;
-    }
+
+    const float fac = node->get_float(fac_in->socket_type);
+    return (1.0f - fac) * estimate1 + fac * estimate2;
   }
-  else {
-    /* Other nodes, potentially OSL nodes with arbitrary code for which all we can
-     * determine is if it has emission or not. */
-    const bool has_emission = node->has_surface_emission();
-    float3 estimate;
 
-    if (output->type() == SocketType::CLOSURE) {
-      if (has_emission) {
-        estimate = one_float3();
-        is_constant = false;
-      }
-      else {
-        estimate = zero_float3();
-      }
+  /* Other nodes, potentially OSL nodes with arbitrary code for which all we can
+   * determine is if it has emission or not. */
+  const bool has_emission = node->has_surface_emission();
+  float3 estimate;
 
-      foreach (const ShaderInput *in, node->inputs) {
-        if (in->type() == SocketType::CLOSURE && in->link) {
-          estimate += output_estimate_emission(in->link, is_constant);
-        }
-      }
-    }
-    else {
+  if (output->type() == SocketType::CLOSURE) {
+    if (has_emission) {
       estimate = one_float3();
       is_constant = false;
     }
+    else {
+      estimate = zero_float3();
+    }
 
-    return estimate;
+    for (const ShaderInput *in : node->inputs) {
+      if (in->type() == SocketType::CLOSURE && in->link) {
+        estimate += output_estimate_emission(in->link, is_constant);
+      }
+    }
   }
+  else {
+    estimate = one_float3();
+    is_constant = false;
+  }
+
+  return estimate;
 }
 
 void Shader::estimate_emission()
@@ -253,14 +248,15 @@ void Shader::estimate_emission()
   /* If the shader has AOVs, they need to be evaluated, so we can't skip the shader. */
   emission_is_constant = true;
 
-  foreach (ShaderNode *node, graph->nodes) {
+  for (ShaderNode *node : graph->nodes) {
     if (node->special_type == SHADER_SPECIAL_TYPE_OUTPUT_AOV) {
       emission_is_constant = false;
+      break;
     }
   }
 
   ShaderInput *surf = graph->output()->input("Surface");
-  emission_estimate = fabs(output_estimate_emission(surf->link, emission_is_constant));
+  emission_estimate = output_estimate_emission(surf->link, emission_is_constant);
 
   if (is_zero(emission_estimate)) {
     emission_sampling = EMISSION_SAMPLING_NONE;
@@ -270,15 +266,28 @@ void Shader::estimate_emission()
      * using a lot of memory in the light tree and potentially wasting samples
      * where indirect light samples are sufficient.
      * Possible optimization: estimate front and back emission separately. */
-    emission_sampling = (reduce_max(emission_estimate) > 0.5f) ? EMISSION_SAMPLING_FRONT_BACK :
-                                                                 EMISSION_SAMPLING_NONE;
+
+    /* Lower importance of emission nodes from automatic value/color to shader conversion, as these
+     * are likely used for previewing and can be slow to build a light tree for on dense meshes. */
+    float scale = 1.0f;
+    const ShaderOutput *output = surf->link;
+    if (output && output->parent->type == EmissionNode::get_node_type()) {
+      const EmissionNode *emission_node = static_cast<const EmissionNode *>(output->parent);
+      if (emission_node->from_auto_conversion) {
+        scale = 0.1f;
+      }
+    }
+
+    emission_sampling = (reduce_max(fabs(emission_estimate * scale)) > 0.5f) ?
+                            EMISSION_SAMPLING_FRONT_BACK :
+                            EMISSION_SAMPLING_NONE;
   }
   else {
     emission_sampling = emission_sampling_method;
   }
 }
 
-void Shader::set_graph(ShaderGraph *graph_)
+void Shader::set_graph(unique_ptr<ShaderGraph> &&graph_)
 {
   /* do this here already so that we can detect if mesh or object attributes
    * are needed, since the node attribute callbacks check if their sockets
@@ -302,12 +311,26 @@ void Shader::set_graph(ShaderGraph *graph_)
   }
 
   /* assign graph */
-  delete graph;
-  graph = graph_;
+  graph = std::move(graph_);
 
   /* Store info here before graph optimization to make sure that
    * nodes that get optimized away still count. */
-  has_volume_connected = (graph->output()->input("Volume")->link != NULL);
+  has_volume_connected = (graph->output()->input("Volume")->link != nullptr);
+}
+
+bool Shader::has_surface_shadow_transparency() const
+{
+  if (!use_transparent_shadow) {
+    return false;
+  }
+
+  for (ShaderNode *node : graph->nodes) {
+    if (node->has_surface_transparent()) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void Shader::tag_update(Scene *scene)
@@ -320,8 +343,9 @@ void Shader::tag_update(Scene *scene)
   /* if the shader previously was emissive, update light distribution,
    * if the new shader is emissive, a light manager update tag will be
    * done in the shader manager device update. */
-  if (emission_sampling != EMISSION_SAMPLING_NONE)
+  if (emission_sampling != EMISSION_SAMPLING_NONE) {
     scene->light_manager->tag_update(scene, LightManager::SHADER_MODIFIED);
+  }
 
   /* Special handle of background MIS light for now: for some reason it
    * has use_mis set to false. We are quite close to release now, so
@@ -338,25 +362,50 @@ void Shader::tag_update(Scene *scene)
    * e.g. surface attributes when there is only a volume shader. this could
    * be more fine grained but it's better than nothing */
   OutputNode *output = graph->output();
-  bool prev_has_volume = has_volume;
+  const bool prev_has_volume = has_volume;
   has_surface = has_surface || output->input("Surface")->link;
   has_volume = has_volume || output->input("Volume")->link;
   has_displacement = has_displacement || output->input("Displacement")->link;
+
+  if (!has_surface && !has_volume) {
+    /* If we need to output surface AOVs, add a Transparent BSDF so that the
+     * surface shader runs. */
+    for (ShaderNode *node : graph->nodes) {
+      if (node->special_type == SHADER_SPECIAL_TYPE_OUTPUT_AOV) {
+        for (const ShaderInput *in : node->inputs) {
+          if (in->link) {
+            TransparentBsdfNode *transparent = graph->create_node<TransparentBsdfNode>();
+            graph->connect(transparent->output("BSDF"), output->input("Surface"));
+            has_surface = true;
+            break;
+          }
+        }
+        if (has_surface) {
+          break;
+        }
+      }
+    }
+  }
 
   /* get requested attributes. this could be optimized by pruning unused
    * nodes here already, but that's the job of the shader manager currently,
    * and may not be so great for interactive rendering where you temporarily
    * disconnect a node */
 
-  AttributeRequestSet prev_attributes = attributes;
+  const AttributeRequestSet prev_attributes = attributes;
+  const AttributeRequestSet prev_global_attributes = global_attributes;
 
   attributes.clear();
-  foreach (ShaderNode *node, graph->nodes)
+  global_attributes.clear();
+  for (ShaderNode *node : graph->nodes) {
     node->attributes(this, &attributes);
+    node->global_attributes(this, &global_attributes);
+  }
 
   if (has_displacement) {
     if (displacement_method == DISPLACE_BOTH) {
       attributes.add(ATTR_STD_POSITION_UNDISPLACED);
+      attributes.add(ATTR_STD_NORMAL_UNDISPLACED);
     }
     if (displacement_method_is_modified()) {
       need_update_displacement = true;
@@ -367,16 +416,28 @@ void Shader::tag_update(Scene *scene)
 
   /* compare if the attributes changed, mesh manager will check
    * need_update_attribute, update the relevant meshes and clear it. */
-  if (attributes.modified(prev_attributes)) {
+  if (attributes.modified(prev_attributes) || global_attributes.modified(prev_global_attributes)) {
     need_update_attribute = true;
     scene->geometry_manager->tag_update(scene, GeometryManager::SHADER_ATTRIBUTE_MODIFIED);
     scene->procedural_manager->tag_update();
   }
 
+  if (prev_has_surface_shadow_transparency != has_surface_shadow_transparency()) {
+    prev_has_surface_shadow_transparency = !prev_has_surface_shadow_transparency;
+    shadow_transparency_needs_realloc = true;
+  }
+
+  need_update_shadow_transparency = prev_has_surface_shadow_transparency;
+
   if (has_volume != prev_has_volume || volume_step_rate != prev_volume_step_rate) {
     scene->geometry_manager->need_flags_update = true;
     scene->object_manager->need_flags_update = true;
+    scene->volume_manager->need_update_step_size = true;
     prev_volume_step_rate = volume_step_rate;
+  }
+
+  if (has_volume || prev_has_volume) {
+    scene->volume_manager->tag_update(this);
   }
 }
 
@@ -398,7 +459,7 @@ bool Shader::need_update_geometry() const
 
 /* Shader Manager */
 
-ShaderManager::ShaderManager()
+ShaderManager::ShaderManager() : thin_film_table_offset_(TABLE_OFFSET_INVALID)
 {
   update_flags = UPDATE_ALL;
 
@@ -411,25 +472,22 @@ ShaderManager::ShaderManager()
   init_xyz_transforms();
 }
 
-ShaderManager::~ShaderManager()
-{
-}
+ShaderManager::~ShaderManager() = default;
 
-ShaderManager *ShaderManager::create(int shadingsystem, Device *device)
+unique_ptr<ShaderManager> ShaderManager::create(const int shadingsystem)
 {
-  ShaderManager *manager;
+  unique_ptr<ShaderManager> manager;
 
   (void)shadingsystem; /* Ignored when built without OSL. */
-  (void)device;
 
 #ifdef WITH_OSL
   if (shadingsystem == SHADINGSYSTEM_OSL) {
-    manager = new OSLShaderManager(device);
+    manager = make_unique<OSLShaderManager>();
   }
   else
 #endif
   {
-    manager = new SVMShaderManager();
+    manager = make_unique<SVMShaderManager>();
   }
 
   return manager;
@@ -437,15 +495,16 @@ ShaderManager *ShaderManager::create(int shadingsystem, Device *device)
 
 uint64_t ShaderManager::get_attribute_id(ustring name)
 {
-  thread_scoped_spin_lock lock(attribute_lock_);
+  const thread_scoped_spin_lock lock(attribute_lock_);
 
   /* get a unique id for each name, for SVM attribute lookup */
-  AttributeIDMap::iterator it = unique_attribute_id.find(name);
+  const AttributeIDMap::iterator it = unique_attribute_id.find(name);
 
-  if (it != unique_attribute_id.end())
+  if (it != unique_attribute_id.end()) {
     return it->second;
+  }
 
-  uint64_t id = ATTR_STD_NUM + unique_attribute_id.size();
+  const uint64_t id = ATTR_STD_NUM + unique_attribute_id.size();
   unique_attribute_id[name] = id;
   return id;
 }
@@ -455,43 +514,112 @@ uint64_t ShaderManager::get_attribute_id(AttributeStandard std)
   return (uint64_t)std;
 }
 
-int ShaderManager::get_shader_id(Shader *shader, bool smooth)
+int ShaderManager::get_shader_id(const Shader *shader, bool smooth)
 {
   /* get a shader id to pass to the kernel */
   int id = shader->id;
 
   /* smooth flag */
-  if (smooth)
+  if (smooth) {
     id |= SHADER_SMOOTH_NORMAL;
+  }
 
   /* default flags */
-  id |= SHADER_CAST_SHADOW | SHADER_AREA_LIGHT;
+  id |= SHADER_CAST_SHADOW;
 
   return id;
 }
 
-void ShaderManager::device_update(Device *device,
-                                  DeviceScene *dscene,
-                                  Scene *scene,
-                                  Progress &progress)
+void ShaderManager::device_update_pre(Device * /*device*/,
+                                      DeviceScene *dscene,
+                                      Scene *scene,
+                                      Progress & /*progress*/)
 {
+  /* This optimizes the shader graphs, but does not update anything on the device yet.
+   * After this we'll know the kernel features actually used, to load the kernels. */
   if (!need_update()) {
     return;
   }
 
   uint id = 0;
-  foreach (Shader *shader, scene->shaders) {
+  for (Shader *shader : scene->shaders) {
     shader->id = id++;
   }
 
-  /* Those shaders should always be compiled as they are used as fallback if a shader cannot be
+  /* Those shaders should always be compiled as they are used as a fallback if a shader cannot be
    * found, e.g. bad shader index for the triangle shaders on a Mesh. */
   assert(scene->default_surface->reference_count() != 0);
   assert(scene->default_light->reference_count() != 0);
   assert(scene->default_background->reference_count() != 0);
   assert(scene->default_empty->reference_count() != 0);
 
+  /* Preprocess shader graph. */
+  bool has_volumes = false;
+
+  for (Shader *shader : scene->shaders) {
+    if (shader->is_modified()) {
+      ShaderNode *output = shader->graph->output();
+      shader->has_bump_from_displacement = (shader->get_displacement_method() != DISPLACE_TRUE) &&
+                                           output->input("Surface")->link &&
+                                           output->input("Displacement")->link;
+      shader->has_bssrdf_bump = shader->has_bump_from_displacement;
+
+      shader->graph->finalize(scene,
+                              shader->has_bump_from_displacement,
+                              shader->get_displacement_method() == DISPLACE_BOTH);
+
+      shader->has_surface = output->input("Surface")->link != nullptr;
+      shader->has_surface_transparent = false;
+      shader->has_surface_raytrace = false;
+      shader->has_surface_bssrdf = false;
+      shader->has_surface_spatial_varying = false;
+      shader->has_volume = output->input("Volume")->link != nullptr;
+      shader->has_volume_spatial_varying = false;
+      shader->has_volume_attribute_dependency = false;
+      shader->has_displacement = output->input("Displacement")->link != nullptr;
+      shader->has_bump_from_surface = false;
+
+      /* Determine both properties. */
+      shader->has_light_path_node = false;
+      shader->has_aov_output_node = false;
+      shader->has_time_dependency = false;
+      for (ShaderNode *node : shader->graph->nodes) {
+        if (node->special_type == SHADER_SPECIAL_TYPE_LIGHT_PATH) {
+          /* TODO: check if the light path node is linked to the volume output. */
+          shader->has_light_path_node = true;
+        }
+        else if (node->special_type == SHADER_SPECIAL_TYPE_OUTPUT_AOV) {
+          shader->has_aov_output_node = true;
+        }
+        else if (node->special_type == SHADER_SPECIAL_TYPE_SCENE_TIME) {
+          shader->has_time_dependency = true;
+        }
+      }
+    }
+
+    if (shader->reference_count()) {
+      has_volumes |= shader->has_volume;
+    }
+  }
+
+  /* Set this early as it is needed by volume rendering passes. */
+  KernelIntegrator *kintegrator = &dscene->data.integrator;
+  if (bool(kintegrator->use_volumes) != has_volumes) {
+    scene->tag_has_volume_modified();
+    kintegrator->use_volumes = has_volumes;
+  }
+}
+
+void ShaderManager::device_update_post(Device *device,
+                                       DeviceScene *dscene,
+                                       Scene *scene,
+                                       Progress &progress)
+{
   device_update_specific(device, dscene, scene, progress);
+
+  /* This runs after kernels have been loaded, so can copy to device. */
+  dscene->shaders.copy_to_device_if_modified();
+  dscene->svm_nodes.copy_to_device_if_modified();
 }
 
 void ShaderManager::device_update_common(Device * /*device*/,
@@ -501,14 +629,14 @@ void ShaderManager::device_update_common(Device * /*device*/,
 {
   dscene->shaders.free();
 
-  if (scene->shaders.size() == 0)
+  if (scene->shaders.empty()) {
     return;
+  }
 
   KernelShader *kshader = dscene->shaders.alloc(scene->shaders.size());
-  bool has_volumes = false;
   bool has_transparent_shadow = false;
 
-  foreach (Shader *shader, scene->shaders) {
+  for (Shader *shader : scene->shaders) {
     uint flag = 0;
 
     if (shader->emission_sampling == EMISSION_SAMPLING_FRONT) {
@@ -521,48 +649,68 @@ void ShaderManager::device_update_common(Device * /*device*/,
       flag |= SD_MIS_FRONT | SD_MIS_BACK;
     }
 
-    if (!is_zero(shader->emission_estimate))
+    if (!is_zero(shader->emission_estimate)) {
       flag |= SD_HAS_EMISSION;
-    if (shader->has_surface_transparent && shader->get_use_transparent_shadow())
+    }
+    if (shader->has_surface_transparent && shader->get_use_transparent_shadow()) {
       flag |= SD_HAS_TRANSPARENT_SHADOW;
-    if (shader->has_surface_raytrace)
+    }
+    if (shader->has_surface_raytrace) {
       flag |= SD_HAS_RAYTRACE;
+    }
     if (shader->has_volume) {
       flag |= SD_HAS_VOLUME;
-      has_volumes = true;
-
       /* todo: this could check more fine grained, to skip useless volumes
        * enclosed inside an opaque bsdf.
        */
       flag |= SD_HAS_TRANSPARENT_SHADOW;
     }
     /* in this case we can assume transparent surface */
-    if (shader->has_volume_connected && !shader->has_surface)
+    if (shader->has_volume_connected && !shader->has_surface) {
       flag |= SD_HAS_ONLY_VOLUME;
-    if (shader->has_volume) {
-      if (shader->get_heterogeneous_volume() && shader->has_volume_spatial_varying)
-        flag |= SD_HETEROGENEOUS_VOLUME;
     }
-    if (shader->has_volume_attribute_dependency)
+    if (shader->has_volume && shader->has_volume_spatial_varying) {
+      flag |= SD_HETEROGENEOUS_VOLUME;
+    }
+    if (shader->has_volume_attribute_dependency) {
       flag |= SD_NEED_VOLUME_ATTRIBUTES;
-    if (shader->has_bssrdf_bump)
+    }
+    if (shader->has_bssrdf_bump) {
       flag |= SD_HAS_BSSRDF_BUMP;
-    if (shader->get_volume_sampling_method() == VOLUME_SAMPLING_EQUIANGULAR)
+    }
+    if (shader->get_volume_sampling_method() == VOLUME_SAMPLING_EQUIANGULAR) {
       flag |= SD_VOLUME_EQUIANGULAR;
-    if (shader->get_volume_sampling_method() == VOLUME_SAMPLING_MULTIPLE_IMPORTANCE)
+    }
+    if (shader->get_volume_sampling_method() == VOLUME_SAMPLING_MULTIPLE_IMPORTANCE) {
       flag |= SD_VOLUME_MIS;
-    if (shader->get_volume_interpolation_method() == VOLUME_INTERPOLATION_CUBIC)
+    }
+    if (shader->get_volume_interpolation_method() == VOLUME_INTERPOLATION_CUBIC) {
       flag |= SD_VOLUME_CUBIC;
-    if (shader->has_bump)
-      flag |= SD_HAS_BUMP;
-    if (shader->get_displacement_method() != DISPLACE_BUMP)
+    }
+    if (shader->has_bump_from_displacement) {
+      flag |= SD_HAS_BUMP_FROM_DISPLACEMENT;
+    }
+    if (shader->has_bump_from_surface) {
+      flag |= SD_HAS_BUMP_FROM_SURFACE;
+    }
+    if (shader->get_displacement_method() != DISPLACE_BUMP) {
       flag |= SD_HAS_DISPLACEMENT;
+    }
+    if (shader->get_use_bump_map_correction()) {
+      flag |= SD_USE_BUMP_MAP_CORRECTION;
+    }
 
     /* constant emission check */
-    if (shader->emission_is_constant)
+    if (shader->emission_is_constant) {
       flag |= SD_HAS_CONSTANT_EMISSION;
+    }
 
-    uint32_t cryptomatte_id = util_murmur_hash3(shader->name.c_str(), shader->name.length(), 0);
+    if (shader->has_light_path_node) {
+      flag |= SD_HAS_LIGHT_PATH_NODE;
+    }
+
+    const uint32_t cryptomatte_id = util_murmur_hash3(
+        shader->name.c_str(), shader->name.length(), 0);
 
     /* regular shader */
     kshader->flags = flag;
@@ -576,26 +724,41 @@ void ShaderManager::device_update_common(Device * /*device*/,
     has_transparent_shadow |= (flag & SD_HAS_TRANSPARENT_SHADOW) != 0;
   }
 
-  dscene->shaders.copy_to_device();
+  /* lookup tables */
+  KernelTables *ktables = &dscene->data.tables;
+  ktables->ggx_E = ensure_bsdf_table(dscene, scene, table_ggx_E);
+  ktables->ggx_Eavg = ensure_bsdf_table(dscene, scene, table_ggx_Eavg);
+  ktables->ggx_glass_E = ensure_bsdf_table(dscene, scene, table_ggx_glass_E);
+  ktables->ggx_glass_Eavg = ensure_bsdf_table(dscene, scene, table_ggx_glass_Eavg);
+  ktables->ggx_glass_inv_E = ensure_bsdf_table(dscene, scene, table_ggx_glass_inv_E);
+  ktables->ggx_glass_inv_Eavg = ensure_bsdf_table(dscene, scene, table_ggx_glass_inv_Eavg);
+  ktables->sheen_ltc = ensure_bsdf_table(dscene, scene, table_sheen_ltc);
+  ktables->ggx_gen_schlick_ior_s = ensure_bsdf_table(dscene, scene, table_ggx_gen_schlick_ior_s);
+  ktables->ggx_gen_schlick_s = ensure_bsdf_table(dscene, scene, table_ggx_gen_schlick_s);
+
+  if (thin_film_table_offset_ == TABLE_OFFSET_INVALID) {
+    thin_film_table_offset_ = scene->lookup_tables->add_table(dscene, thin_film_table);
+  }
+  dscene->data.tables.thin_film_table = (int)thin_film_table_offset_;
 
   /* integrator */
   KernelIntegrator *kintegrator = &dscene->data.integrator;
-  kintegrator->use_volumes = has_volumes;
   /* TODO(sergey): De-duplicate with flags set in integrator.cpp. */
   kintegrator->transparent_shadows = has_transparent_shadow;
 
   /* film */
   KernelFilm *kfilm = &dscene->data.film;
   /* color space, needs to be here because e.g. displacement shaders could depend on it */
-  kfilm->xyz_to_r = float3_to_float4(xyz_to_r);
-  kfilm->xyz_to_g = float3_to_float4(xyz_to_g);
-  kfilm->xyz_to_b = float3_to_float4(xyz_to_b);
-  kfilm->rgb_to_y = float3_to_float4(rgb_to_y);
-  kfilm->rgb_to_lum = float3_to_float4(rgb_to_lum);
-  kfilm->rec709_to_r = float3_to_float4(rec709_to_r);
-  kfilm->rec709_to_g = float3_to_float4(rec709_to_g);
-  kfilm->rec709_to_b = float3_to_float4(rec709_to_b);
-  kfilm->is_rec709 = is_rec709;
+  kfilm->xyz_to_r = make_float4(xyz_to_r);
+  kfilm->xyz_to_g = make_float4(xyz_to_g);
+  kfilm->xyz_to_b = make_float4(xyz_to_b);
+  kfilm->rgb_to_y = make_float4(rgb_to_y);
+  kfilm->rgb_to_lum = make_float4(rgb_to_lum);
+  kfilm->white_xyz = make_float4(white_xyz);
+  kfilm->rec709_to_r = make_float4(rec709_to_r);
+  kfilm->rec709_to_g = make_float4(rec709_to_g);
+  kfilm->rec709_to_b = make_float4(rec709_to_b);
+  kfilm->is_rec709 = scene_linear_interop_id == "lin_rec709_scene";
 
   /* Rhino procedural noise tables */
   if (rhino_perlin_noise_table_offset == TABLE_OFFSET_INVALID) {
@@ -637,7 +800,17 @@ void ShaderManager::device_update_common(Device * /*device*/,
 }
 
 void ShaderManager::device_free_common(Device * /*device*/, DeviceScene *dscene, Scene * scene)
+}
+
+void ShaderManager::device_free_common(Device * /*device*/, DeviceScene *dscene, Scene *scene)
 {
+  for (auto &entry : bsdf_tables) {
+    scene->lookup_tables->remove_table(&entry.second);
+  }
+  bsdf_tables.clear();
+  scene->lookup_tables->remove_table(&thin_film_table_offset_);
+  thin_film_table_offset_ = TABLE_OFFSET_INVALID;
+
   dscene->shaders.free();
   scene->lookup_tables->remove_table(&rhino_aaltonen_noise_table_offset);
   scene->lookup_tables->remove_table(&rhino_perlin_noise_table_offset);
@@ -651,17 +824,14 @@ void ShaderManager::add_default(Scene *scene)
 {
   /* default surface */
   {
-    ShaderGraph *graph = new ShaderGraph();
+    unique_ptr<ShaderGraph> graph = make_unique<ShaderGraph>();
 
-    DiffuseBsdfNode *diffuse = graph->create_node<DiffuseBsdfNode>();
-    diffuse->set_color(make_float3(0.8f, 0.8f, 0.8f));
-    graph->add(diffuse);
-
-    graph->connect(diffuse->output("BSDF"), graph->output()->input("Surface"));
+    PrincipledBsdfNode *bsdf = graph->create_node<PrincipledBsdfNode>();
+    graph->connect(bsdf->output("BSDF"), graph->output()->input("Surface"));
 
     Shader *shader = scene->create_node<Shader>();
     shader->name = "default_surface";
-    shader->set_graph(graph);
+    shader->set_graph(std::move(graph));
     shader->reference();
     scene->default_surface = shader;
     shader->tag_update(scene);
@@ -669,16 +839,15 @@ void ShaderManager::add_default(Scene *scene)
 
   /* default volume */
   {
-    ShaderGraph *graph = new ShaderGraph();
+    unique_ptr<ShaderGraph> graph = make_unique<ShaderGraph>();
 
     PrincipledVolumeNode *principled = graph->create_node<PrincipledVolumeNode>();
-    graph->add(principled);
 
     graph->connect(principled->output("Volume"), graph->output()->input("Volume"));
 
     Shader *shader = scene->create_node<Shader>();
     shader->name = "default_volume";
-    shader->set_graph(graph);
+    shader->set_graph(std::move(graph));
     scene->default_volume = shader;
     shader->tag_update(scene);
     /* No default reference for the volume to avoid compiling volume kernels if there are no
@@ -687,18 +856,17 @@ void ShaderManager::add_default(Scene *scene)
 
   /* default light */
   {
-    ShaderGraph *graph = new ShaderGraph();
+    unique_ptr<ShaderGraph> graph = make_unique<ShaderGraph>();
 
     EmissionNode *emission = graph->create_node<EmissionNode>();
     emission->set_color(make_float3(0.8f, 0.8f, 0.8f));
     emission->set_strength(0.0f);
-    graph->add(emission);
 
     graph->connect(emission->output("Emission"), graph->output()->input("Surface"));
 
     Shader *shader = scene->create_node<Shader>();
     shader->name = "default_light";
-    shader->set_graph(graph);
+    shader->set_graph(std::move(graph));
     shader->reference();
     scene->default_light = shader;
     shader->tag_update(scene);
@@ -706,11 +874,11 @@ void ShaderManager::add_default(Scene *scene)
 
   /* default background */
   {
-    ShaderGraph *graph = new ShaderGraph();
+    unique_ptr<ShaderGraph> graph = make_unique<ShaderGraph>();
 
     Shader *shader = scene->create_node<Shader>();
     shader->name = "default_background";
-    shader->set_graph(graph);
+    shader->set_graph(std::move(graph));
     shader->reference();
     scene->default_background = shader;
     shader->tag_update(scene);
@@ -718,11 +886,11 @@ void ShaderManager::add_default(Scene *scene)
 
   /* default empty */
   {
-    ShaderGraph *graph = new ShaderGraph();
+    unique_ptr<ShaderGraph> graph = make_unique<ShaderGraph>();
 
     Shader *shader = scene->create_node<Shader>();
     shader->name = "default_empty";
-    shader->set_graph(graph);
+    shader->set_graph(std::move(graph));
     shader->reference();
     scene->default_empty = shader;
     shader->tag_update(scene);
@@ -733,7 +901,7 @@ uint ShaderManager::get_graph_kernel_features(ShaderGraph *graph)
 {
   uint kernel_features = 0;
 
-  foreach (ShaderNode *node, graph->nodes) {
+  for (ShaderNode *node : graph->nodes) {
     kernel_features |= node->get_feature();
     if (node->special_type == SHADER_SPECIAL_TYPE_CLOSURE) {
       BsdfBaseNode *bsdf_node = static_cast<BsdfBaseNode *>(node);
@@ -762,9 +930,9 @@ uint ShaderManager::get_kernel_features(Scene *scene)
     }
 
     /* Gather requested features from all the nodes from the graph nodes. */
-    kernel_features |= get_graph_kernel_features(shader->graph);
+    kernel_features |= get_graph_kernel_features(shader->graph.get());
     ShaderNode *output_node = shader->graph->output();
-    if (output_node->input("Displacement")->link != NULL) {
+    if (output_node->input("Displacement")->link != nullptr) {
       kernel_features |= KERNEL_FEATURE_NODE_BUMP;
       if (shader->get_displacement_method() == DISPLACE_BOTH) {
         kernel_features |= KERNEL_FEATURE_NODE_BUMP_STATE;
@@ -778,7 +946,7 @@ uint ShaderManager::get_kernel_features(Scene *scene)
   }
 
   if (use_osl()) {
-    kernel_features |= KERNEL_FEATURE_OSL;
+    kernel_features |= KERNEL_FEATURE_OSL_SHADING;
   }
 
   kernel_features |= KERNEL_FEATURE_CLIPPING_PLANES;
@@ -786,41 +954,32 @@ uint ShaderManager::get_kernel_features(Scene *scene)
   return kernel_features;
 }
 
-void ShaderManager::free_memory()
-{
-
-#ifdef WITH_OSL
-  OSLShaderManager::free_memory();
-#endif
-
-  ColorSpaceManager::free_memory();
-}
-
-float ShaderManager::linear_rgb_to_gray(float3 c)
+float ShaderManager::linear_rgb_to_gray(const float3 c)
 {
   return dot(c, rgb_to_y);
 }
 
-float ShaderManager::linear_rgb_to_luminance(float3 c)
+float ShaderManager::linear_rgb_to_luminance(const float3 c)
 {
-	return dot(c, rgb_to_lum);
+  return dot(c, rgb_to_lum);
 }
 
-float3 ShaderManager::rec709_to_scene_linear(float3 c)
+float3 ShaderManager::rec709_to_scene_linear(const float3 c)
 {
-  return make_float3(dot(rec709_to_r, c), dot(rec709_to_g, c), dot(rec709_to_b, c));
+  return to_local(c, rec709_to_r, rec709_to_g, rec709_to_b);
 }
 
 string ShaderManager::get_cryptomatte_materials(Scene *scene)
 {
   string manifest = "{";
-  unordered_set<ustring, ustringHash> materials;
-  foreach (Shader *shader, scene->shaders) {
-    if (materials.count(shader->name)) {
+  unordered_set<ustring> materials;
+  for (Shader *shader : scene->shaders) {
+    if (materials.contains(shader->name)) {
       continue;
     }
     materials.insert(shader->name);
-    uint32_t cryptomatte_id = util_murmur_hash3(shader->name.c_str(), shader->name.length(), 0);
+    const uint32_t cryptomatte_id = util_murmur_hash3(
+        shader->name.c_str(), shader->name.length(), 0);
     manifest += string_printf("\"%s\":\"%08x\",", shader->name.c_str(), cryptomatte_id);
   }
   manifest[manifest.size() - 1] = '}';
@@ -838,128 +997,113 @@ bool ShaderManager::need_update() const
   return update_flags != UPDATE_NONE;
 }
 
-#ifdef WITH_OCIO
-static bool to_scene_linear_transform(OCIO::ConstConfigRcPtr &config,
-                                      const char *colorspace,
-                                      Transform &to_scene_linear)
+void ShaderManager::compute_thin_film_table(const Transform &xyz_to_rgb)
 {
-  OCIO::ConstProcessorRcPtr processor;
-  try {
-    processor = config->getProcessor("scene_linear", colorspace);
-  }
-  catch (OCIO::Exception &) {
-    return false;
-  }
+  /* Our implementation of Thin Film Fresnel is based on
+   * "A Practical Extension to Microfacet Theory for the Modeling of Varying Iridescence"
+   * by Laurent Belcour and Pascal Barla
+   * (https://belcour.github.io/blog/research/publication/2017/05/01/brdf-thin-film.html).
+   *
+   * The idea there is that for a naive implementation of Thin Film interference, you'd compute
+   * the reflectivity for a given wavelength using Airy summation, and then numerically integrate
+   * the product of this reflectivity function and the Color Matching Functions of the colorspace
+   * you're working in to obtain the RGB (or XYZ) values.
+   * However, this integration would require too many evaluations to be practical.
+   * Therefore, they reformulate the computation as a rapidly converging series involving the
+   * Fourier transform of the CMFs.
+   *
+   * Specifically, we need to:
+   * - Compute the RGB CMFs from the XYZ CMFs using the working color space's XYZ-to-RGB matrix
+   * - Resample the RGB CMFs to be parametrized by frequency instead of wavelength as usual
+   * - Compute the FFT of the CMFs
+   * - Store the result as a LUT
+   * - Look up the values for each channel at runtime based on the optical path difference and
+   *   phase shift.
+   *
+   * Computing an FFT here would be annoying, so we'd like to precompute it, but we only know
+   * the XYZ-to-RGB matrix at runtime. Luckily, both resampling and FFT are linear operations,
+   * so we can precompute the FFT of the resampled XYZ CMFs and then multiply each entry with
+   * the XYZ-to-RGB matrix to get the RGB LUT.
+   *
+   * That's what this function does: We load the precomputed values, convert to RGB, normalize
+   * the result to make the DC term equal to 1, and then store that into the final table that's
+   * used by the kernel.
+   */
+  assert(sizeof(table_thin_film_cmf) == 6 * THIN_FILM_TABLE_SIZE * sizeof(float));
+  thin_film_table.resize(6 * THIN_FILM_TABLE_SIZE);
 
-  if (!processor) {
-    return false;
-  }
+  float3 normalization;
+  for (int i = 0; i < THIN_FILM_TABLE_SIZE; i++) {
+    const float *table_row = table_thin_film_cmf[i];
+    /* Load precomputed resampled Fourier-transformed XYZ CMFs. */
+    const float3 xyzReal = make_float3(table_row[0], table_row[1], table_row[2]);
+    const float3 xyzImag = make_float3(table_row[3], table_row[4], table_row[5]);
 
-  OCIO::ConstCPUProcessorRcPtr device_processor = processor->getDefaultCPUProcessor();
-  if (!device_processor) {
-    return false;
-  }
+    /* Linearly combine precomputed data to produce the RGB equivalents. Works since both
+     * resampling and Fourier transformation are linear operations. */
+    const float3 rgbReal = transform_direction(&xyz_to_rgb, xyzReal);
+    const float3 rgbImag = transform_direction(&xyz_to_rgb, xyzImag);
 
-  to_scene_linear = transform_identity();
-  device_processor->applyRGB(&to_scene_linear.x.x);
-  device_processor->applyRGB(&to_scene_linear.y.x);
-  device_processor->applyRGB(&to_scene_linear.z.x);
-  to_scene_linear = transform_transposed_inverse(to_scene_linear);
-  return true;
+    /* We normalize all entries by the first element. Since that is the DC component, it normalizes
+     * the CMF (in non-Fourier space) to an area of 1. */
+    if (i == 0) {
+      normalization = 1.0f / rgbReal;
+    }
+
+    /* Store in lookup table. */
+    thin_film_table[i + 0 * THIN_FILM_TABLE_SIZE] = rgbReal.x * normalization.x;
+    thin_film_table[i + 1 * THIN_FILM_TABLE_SIZE] = rgbReal.y * normalization.y;
+    thin_film_table[i + 2 * THIN_FILM_TABLE_SIZE] = rgbReal.z * normalization.z;
+    thin_film_table[i + 3 * THIN_FILM_TABLE_SIZE] = rgbImag.x * normalization.x;
+    thin_film_table[i + 4 * THIN_FILM_TABLE_SIZE] = rgbImag.y * normalization.y;
+    thin_film_table[i + 5 * THIN_FILM_TABLE_SIZE] = rgbImag.z * normalization.z;
+  }
 }
-#endif
 
 void ShaderManager::init_xyz_transforms()
 {
-  /* Default to ITU-BT.709 in case no appropriate transform found.
-   * Note XYZ here is defined as having a D65 white point. */
-  const Transform xyz_to_rec709 = make_transform(3.2404542f,
-                                                 -1.5371385f,
-                                                 -0.4985314f,
-                                                 0.0f,
-                                                 -0.9692660f,
-                                                 1.8760108f,
-                                                 0.0415560f,
-                                                 0.0f,
-                                                 0.0556434f,
-                                                 -0.2040259f,
-                                                 1.0572252f,
-                                                 0.0f);
+  const Transform xyz_to_rgb = ColorSpaceManager::get_xyz_to_scene_linear_rgb();
 
-  xyz_to_r = float4_to_float3(xyz_to_rec709.x);
-  xyz_to_g = float4_to_float3(xyz_to_rec709.y);
-  xyz_to_b = float4_to_float3(xyz_to_rec709.z);
-  rgb_to_y = make_float3(0.2126729f, 0.7151522f, 0.0721750f);
-  rgb_to_lum = make_float3(0.2989f, 0.5870f, 0.1140f);
+  scene_linear_interop_id = ColorSpaceManager::get_scene_linear_interop_id();
 
-  rec709_to_r = make_float3(1.0f, 0.0f, 0.0f);
-  rec709_to_g = make_float3(0.0f, 1.0f, 0.0f);
-  rec709_to_b = make_float3(0.0f, 0.0f, 1.0f);
-  is_rec709 = true;
-
-#ifdef WITH_OCIO
-  try {
-    /* Get from OpenColorO config if it has the required roles. */
-    OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
-    if (!(config && config->hasRole("scene_linear"))) {
-      return;
-    }
-
-    Transform xyz_to_rgb;
-
-    if (config->hasRole("aces_interchange")) {
-      /* Standard OpenColorIO role, defined as ACES AP0 (ACES2065-1). */
-      Transform aces_to_rgb;
-      if (!to_scene_linear_transform(config, "aces_interchange", aces_to_rgb)) {
-        return;
-      }
-
-      /* This is the OpenColorIO builtin transform:
-       * UTILITY - ACES-AP0_to_CIE-XYZ-D65_BFD. */
-      const Transform ACES_AP0_to_xyz_D65 = make_transform(0.938280f,
-                                                           -0.004451f,
-                                                           0.016628f,
-                                                           0.000000f,
-                                                           0.337369f,
-                                                           0.729522f,
-                                                           -0.066890f,
-                                                           0.000000f,
-                                                           0.001174f,
-                                                           -0.003711f,
-                                                           1.091595f,
-                                                           0.000000f);
-      const Transform xyz_to_aces = transform_inverse(ACES_AP0_to_xyz_D65);
-      xyz_to_rgb = aces_to_rgb * xyz_to_aces;
-    }
-    else if (config->hasRole("XYZ")) {
-      /* Custom role used before the standard existed. */
-      if (!to_scene_linear_transform(config, "XYZ", xyz_to_rgb)) {
-        return;
-      }
-    }
-    else {
-      /* No reference role found to determine XYZ. */
-      return;
-    }
-
-    xyz_to_r = float4_to_float3(xyz_to_rgb.x);
-    xyz_to_g = float4_to_float3(xyz_to_rgb.y);
-    xyz_to_b = float4_to_float3(xyz_to_rgb.z);
-
-    const Transform rgb_to_xyz = transform_inverse(xyz_to_rgb);
-    rgb_to_y = float4_to_float3(rgb_to_xyz.y);
-
+  if (scene_linear_interop_id == "lin_rec709_scene") {
+    rec709_to_r = make_float3(1.0f, 0.0f, 0.0f);
+    rec709_to_g = make_float3(0.0f, 1.0f, 0.0f);
+    rec709_to_b = make_float3(0.0f, 0.0f, 1.0f);
+  }
+  else {
+    const Transform xyz_to_rec709 = ColorSpaceManager::get_xyz_to_rec709();
     const Transform rec709_to_rgb = xyz_to_rgb * transform_inverse(xyz_to_rec709);
-    rec709_to_r = float4_to_float3(rec709_to_rgb.x);
-    rec709_to_g = float4_to_float3(rec709_to_rgb.y);
-    rec709_to_b = float4_to_float3(rec709_to_rgb.z);
-    is_rec709 = transform_equal_threshold(xyz_to_rgb, xyz_to_rec709, 0.0001f);
+    rec709_to_r = make_float3(rec709_to_rgb.x);
+    rec709_to_g = make_float3(rec709_to_rgb.y);
+    rec709_to_b = make_float3(rec709_to_rgb.z);
   }
-  catch (const OCIO::Exception &exception) {
-    VLOG_WARNING << "OpenColorIO config could not be loaded during ShaderManager startup; "
-                 << "falling back to built-in Rec.709 transforms: " << exception.what();
+
+  xyz_to_r = make_float3(xyz_to_rgb.x);
+  xyz_to_g = make_float3(xyz_to_rgb.y);
+  xyz_to_b = make_float3(xyz_to_rgb.z);
+
+  const Transform rgb_to_xyz = transform_inverse(xyz_to_rgb);
+  rgb_to_y = make_float3(rgb_to_xyz.y);
+  /* Rhino: luminance weights, distinct from rgb_to_y. Used by
+   * ShaderManager::linear_rgb_to_luminance and the COLOR2 SVM path. */
+  rgb_to_lum = make_float3(0.2989f, 0.5870f, 0.1140f);
+  white_xyz = transform_direction(&rgb_to_xyz, one_float3());
+
+  compute_thin_film_table(xyz_to_rgb);
+}
+
+size_t ShaderManager::ensure_bsdf_table_impl(DeviceScene *dscene,
+                                             Scene *scene,
+                                             const float *table,
+                                             const size_t n)
+{
+  /* Since the BSDF tables are static arrays, we can use their address to identify them. */
+  if (!(bsdf_tables.count(table))) {
+    vector<float> entries(table, table + n);
+    bsdf_tables[table] = scene->lookup_tables->add_table(dscene, entries);
   }
-#endif
+  return bsdf_tables[table];
 }
 
 void ShaderManager::set_rhino_perlin_noise_table(const vector<float> &perlin_noise_table)

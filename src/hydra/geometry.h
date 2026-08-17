@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -12,12 +13,7 @@ HDCYCLES_NAMESPACE_OPEN_SCOPE
 
 template<typename Base, typename CyclesBase> class HdCyclesGeometry : public Base {
  public:
-  HdCyclesGeometry(const PXR_NS::SdfPath &rprimId
-#if PXR_VERSION < 2102
-                   ,
-                   const PXR_NS::SdfPath &instancerId
-#endif
-  );
+  HdCyclesGeometry(const PXR_NS::SdfPath &rprimId);
 
   void Sync(PXR_NS::HdSceneDelegate *sceneDelegate,
             PXR_NS::HdRenderParam *renderParam,
@@ -26,7 +22,7 @@ template<typename Base, typename CyclesBase> class HdCyclesGeometry : public Bas
 
   PXR_NS::HdDirtyBits GetInitialDirtyBitsMask() const override;
 
-  virtual void Finalize(PXR_NS::HdRenderParam *renderParam) override;
+  void Finalize(PXR_NS::HdRenderParam *renderParam) override;
 
  protected:
   void _InitRepr(const PXR_NS::TfToken &reprToken, PXR_NS::HdDirtyBits *dirtyBits) override;
@@ -37,16 +33,13 @@ template<typename Base, typename CyclesBase> class HdCyclesGeometry : public Bas
                         PXR_NS::HdDirtyBits dirtyBits,
                         bool &rebuild) = 0;
 
-  PXR_NS::HdInterpolation GetPrimvarInterpolation(PXR_NS::HdSceneDelegate *sceneDelegate,
-                                                  const PXR_NS::TfToken &name) const;
-
   CyclesBase *_geom = nullptr;
   std::vector<CCL_NS::Object *> _instances;
 
  private:
   void Initialize(PXR_NS::HdRenderParam *renderParam);
 
-  void InitializeInstance(int index);
+  void InitializeInstance(const int index);
 
   PXR_NS::GfMatrix4d _geomTransform;
 };

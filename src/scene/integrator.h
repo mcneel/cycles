@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __INTEGRATOR_H__
-#define __INTEGRATOR_H__
+#pragma once
 
 #include "kernel/types.h"
 
@@ -16,6 +16,25 @@ CCL_NAMESPACE_BEGIN
 class Device;
 class DeviceScene;
 class Scene;
+
+struct HaltonSequence {
+  HaltonSequence()
+  {
+    reset();
+  }
+
+  void reset()
+  {
+    a2 = 0;
+    b2 = 1;
+    a3 = 0;
+    b3 = 1;
+  }
+  float2 next();
+
+  int a2, b2;
+  int a3, b3;
+};
 
 class Integrator : public Node {
  public:
@@ -41,6 +60,7 @@ class Integrator : public Node {
   NODE_SOCKET_API(float, ao_distance)
   NODE_SOCKET_API(float, ao_additive_factor)
 
+  NODE_SOCKET_API(bool, volume_ray_marching)
   NODE_SOCKET_API(int, volume_max_steps)
   NODE_SOCKET_API(float, volume_step_rate)
 
@@ -54,6 +74,8 @@ class Integrator : public Node {
   NODE_SOCKET_API(bool, use_guiding_direct_light);
   NODE_SOCKET_API(bool, use_guiding_mis_weights);
   NODE_SOCKET_API(GuidingDistributionType, guiding_distribution_type);
+  NODE_SOCKET_API(GuidingDirectionalSamplingType, guiding_directional_sampling_type);
+  NODE_SOCKET_API(float, guiding_roughness_threshold);
 
   NODE_SOCKET_API(bool, caustics_reflective)
   NODE_SOCKET_API(bool, caustics_refractive)
@@ -77,7 +99,10 @@ class Integrator : public Node {
   static const int MAX_SAMPLES = (1 << 24);
 
   NODE_SOCKET_API(int, aa_samples)
-  NODE_SOCKET_API(int, start_sample)
+
+  NODE_SOCKET_API(bool, use_sample_subset)
+  NODE_SOCKET_API(int, sample_subset_offset)
+  NODE_SOCKET_API(int, sample_subset_length)
 
   NODE_SOCKET_API(bool, use_light_tree)
   NODE_SOCKET_API(float, light_sampling_threshold)
@@ -89,12 +114,20 @@ class Integrator : public Node {
   NODE_SOCKET_API(SamplingPattern, sampling_pattern)
   NODE_SOCKET_API(float, scrambling_distance)
 
+  NODE_SOCKET_API(bool, use_pixel_jitter);
+  NODE_SOCKET_API(bool, use_custom_pixel_jitter_sample);
+  NODE_SOCKET_API_ARRAY(array<float>, custom_pixel_jitter_sample);
+  HaltonSequence pixel_jitter_state;
+  int pixel_jitter_frame = 0;
+
   NODE_SOCKET_API(bool, use_denoise);
   NODE_SOCKET_API(DenoiserType, denoiser_type);
   NODE_SOCKET_API(int, denoise_start_sample);
-  NODE_SOCKET_API(bool, use_denoise_pass_albedo);
-  NODE_SOCKET_API(bool, use_denoise_pass_normal);
+  NODE_SOCKET_API(DenoiserPassMask, denoiser_passes);
   NODE_SOCKET_API(DenoiserPrefilter, denoiser_prefilter);
+  NODE_SOCKET_API(bool, denoise_use_gpu);
+  NODE_SOCKET_API(DenoiserQuality, denoiser_quality);
+  NODE_SOCKET_API(float, denoiser_upscale_factor);
 
   enum : uint32_t {
     AO_PASS_MODIFIED = (1 << 0),
@@ -106,21 +139,24 @@ class Integrator : public Node {
     UPDATE_NONE = 0u,
   };
 
+  bool shadow_catcher_needs_recalc_ = true;
+
   Integrator();
-  ~Integrator();
+  ~Integrator() override;
 
   void device_update(Device *device, DeviceScene *dscene, Scene *scene);
   void device_free(Device *device, DeviceScene *dscene, bool force_free = false);
 
-  void tag_update(Scene *scene, uint32_t flag);
+  void tag_update(Scene *scene, const uint32_t flag);
 
   uint get_kernel_features() const;
 
   AdaptiveSampling get_adaptive_sampling() const;
   DenoiseParams get_denoise_params() const;
   GuidingParams get_guiding_params(const Device *device) const;
+
+  bool is_modified() const;
+  void clear_modified();
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __INTEGRATOR_H__ */

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #ifdef WITH_HIP
 
@@ -15,7 +16,7 @@ HIPContextScope::HIPContextScope(HIPDevice *device) : device(device)
 
 HIPContextScope::~HIPContextScope()
 {
-  hip_device_assert(device, hipCtxPopCurrent(NULL));
+  hip_device_assert(device, hipCtxPopCurrent(nullptr));
 }
 
 #  ifndef WITH_HIP_DYNLOAD
@@ -41,7 +42,35 @@ int hipewCompilerVersion()
 {
   return (HIP_VERSION / 100) + (HIP_VERSION % 100 / 10);
 }
+#  endif /* !WITH_HIP_DYNLOAD */
+
+bool hipSupportsDriver()
+{
+  int hip_driver_version = 0;
+  hipError_t result = hipDriverGetVersion(&hip_driver_version);
+  if (result != hipSuccess) {
+    LOG_WARNING << "Error getting driver version: " << hipewErrorString(result);
+    return false;
+  }
+
+  LOG_TRACE << "Detected HIP driver version: " << hip_driver_version;
+
+#  ifdef _WIN32
+  if (hip_driver_version < 60241512) {
+    /* Users get error messages about being unable to find GPU binaries on older GPU drivers.
+     * 60241512 corresponds to Adrenalin 24.9.1. */
+    return false;
+  }
+#  else /* Linux */
+  if (hip_driver_version < 60342131) {
+    /* Users get error messages about being unable to load GPU kernels on older ROCm versions.
+     * 60342131 corresponds to ROCm 6.3.0 */
+    return false;
+  }
 #  endif
+
+  return true;
+}
 
 CCL_NAMESPACE_END
 

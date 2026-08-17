@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* Device data taken from CUDA occupancy calculator.
  *
@@ -11,41 +12,8 @@
  *   used by each threads limits the number of threads per block.
  */
 
-/* 3.0 and 3.5 */
-#if __CUDA_ARCH__ == 300 || __CUDA_ARCH__ == 350
-#  define GPU_MULTIPRESSOR_MAX_REGISTERS 65536
-#  define GPU_MULTIPROCESSOR_MAX_BLOCKS 16
-#  define GPU_BLOCK_MAX_THREADS 1024
-#  define GPU_THREAD_MAX_REGISTERS 63
-
-/* tunable parameters */
-#  define GPU_KERNEL_BLOCK_NUM_THREADS 256
-#  define GPU_KERNEL_MAX_REGISTERS 63
-
-/* 3.2 */
-#elif __CUDA_ARCH__ == 320
-#  define GPU_MULTIPRESSOR_MAX_REGISTERS 32768
-#  define GPU_MULTIPROCESSOR_MAX_BLOCKS 16
-#  define GPU_BLOCK_MAX_THREADS 1024
-#  define GPU_THREAD_MAX_REGISTERS 63
-
-/* tunable parameters */
-#  define GPU_KERNEL_BLOCK_NUM_THREADS 256
-#  define GPU_KERNEL_MAX_REGISTERS 63
-
-/* 3.7 */
-#elif __CUDA_ARCH__ == 370
-#  define GPU_MULTIPRESSOR_MAX_REGISTERS 65536
-#  define GPU_MULTIPROCESSOR_MAX_BLOCKS 16
-#  define GPU_BLOCK_MAX_THREADS 1024
-#  define GPU_THREAD_MAX_REGISTERS 255
-
-/* tunable parameters */
-#  define GPU_KERNEL_BLOCK_NUM_THREADS 256
-#  define GPU_KERNEL_MAX_REGISTERS 63
-
 /* 5.x, 6.x */
-#elif __CUDA_ARCH__ <= 699
+#if __CUDA_ARCH__ <= 699
 #  define GPU_MULTIPRESSOR_MAX_REGISTERS 65536
 #  define GPU_MULTIPROCESSOR_MAX_BLOCKS 32
 #  define GPU_BLOCK_MAX_THREADS 1024
@@ -61,16 +29,16 @@
 #    define GPU_KERNEL_MAX_REGISTERS 48
 #  endif
 
-/* 7.x, 8.x */
-#elif __CUDA_ARCH__ <= 899
+/* 7.x, 8.x, 12.x */
+#elif __CUDA_ARCH__ <= 1299
 #  define GPU_MULTIPRESSOR_MAX_REGISTERS 65536
 #  define GPU_MULTIPROCESSOR_MAX_BLOCKS 32
 #  define GPU_BLOCK_MAX_THREADS 1024
 #  define GPU_THREAD_MAX_REGISTERS 255
 
 /* tunable parameters */
-#  define GPU_KERNEL_BLOCK_NUM_THREADS 512
-#  define GPU_KERNEL_MAX_REGISTERS 96
+#  define GPU_KERNEL_BLOCK_NUM_THREADS 384
+#  define GPU_KERNEL_MAX_REGISTERS 168
 
 /* unknown architecture */
 #else
@@ -91,6 +59,7 @@
 #define ccl_gpu_kernel_postfix
 
 #define ccl_gpu_kernel_call(x) x
+#define ccl_gpu_kernel_within_bounds(i, n) ((i) < (n))
 
 /* Define a function object where "func" is the lambda body, and additional parameters are used to
  * specify captured state  */

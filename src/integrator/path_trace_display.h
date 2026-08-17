@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -7,7 +8,6 @@
 
 #include "util/half.h"
 #include "util/thread.h"
-#include "util/types.h"
 #include "util/unique_ptr.h"
 
 CCL_NAMESPACE_BEGIN
@@ -47,7 +47,7 @@ class PathTraceDisplay {
    * If false is returned then no update is possible, and no update_end() call is needed.
    *
    * The texture width and height denotes an actual resolution of the underlying render result. */
-  bool update_begin(int texture_width, int texture_height);
+  bool update_begin(const int texture_width, const int texture_height);
 
   void update_end();
 
@@ -70,8 +70,11 @@ class PathTraceDisplay {
    * for partial updates from different devices. In this case the caller will acquire the lock
    * once, update all the slices and release
    * the lock once. This will ensure that draw() will never use partially updated texture. */
-  void copy_pixels_to_texture(
-      const half4 *rgba_pixels, int texture_x, int texture_y, int pixels_width, int pixels_height);
+  void copy_pixels_to_texture(const half4 *rgba_pixels,
+                              const int texture_x,
+                              const int texture_y,
+                              const int pixels_width,
+                              const int pixels_height);
 
   /* --------------------------------------------------------------------
    * Texture buffer mapping.
@@ -107,12 +110,13 @@ class PathTraceDisplay {
    * device. Complementary part of DeviceGraphicsInterop.
    *
    * NOTE: Graphics interoperability can not be used while the texture buffer is mapped. This means
-   * that `graphics_interop_get()` is not allowed between `map_texture_buffer()` and
+   * that `graphics_interop_get_buffer()` is not allowed between `map_texture_buffer()` and
    * `unmap_texture_buffer()` calls. */
 
   /* Get PathTraceDisplay graphics interoperability information which acts as a destination for the
    * device API. */
-  DisplayDriver::GraphicsInterop graphics_interop_get();
+  GraphicsInteropDevice graphics_interop_get_device();
+  GraphicsInteropBuffer &graphics_interop_get_buffer();
 
   /* (De)activate GPU display for graphics interoperability outside of regular display update
    * routines. */
@@ -133,8 +137,8 @@ class PathTraceDisplay {
    * after clear will write new pixel values for an updating area, leaving everything else zeroed.
    *
    * If the GPU display supports graphics interoperability then the zeroing the display is to be
-   * delegated to the device via the `DisplayDriver::GraphicsInterop`. */
-  void clear();
+   * delegated to the device via the `GraphicsInterop`. */
+  void zero();
 
   /* Draw the current state of the texture.
    *

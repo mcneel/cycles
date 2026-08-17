@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -13,12 +14,6 @@ CCL_NAMESPACE_BEGIN
  * which is not usually huge, so might not be a significant bottleneck. */
 
 #include "util/atomic.h"
-
-#ifdef __HIP__
-#  define GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE 1024
-#else
-#  define GPU_PARALLEL_PREFIX_SUM_DEFAULT_BLOCK_SIZE 512
-#endif
 
 __device__ void gpu_parallel_prefix_sum(const int global_id,
                                         ccl_global int *counter,

@@ -1,7 +1,12 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
+
+#include "kernel/globals.h"
+
+#include "kernel/bvh/util.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -11,59 +16,59 @@ CCL_NAMESPACE_BEGIN
  * other than the frame center. Computing the curve keys at a given ray time is
  * a matter of interpolation of the two steps between which the ray time lies.
  *
- * The extra curve keys are stored as ATTR_STD_MOTION_VERTEX_POSITION.
+ * The extra curve keys are stored as additional motion steps in ATTR_STD_POSITION.
  */
 
 #ifdef __HAIR__
 
 ccl_device_inline void motion_curve_keys_for_step_linear(KernelGlobals kg,
                                                          int offset,
-                                                         int numkeys,
-                                                         int numsteps,
+                                                         const int numverts,
+                                                         const int numsteps,
                                                          int step,
-                                                         int k0,
-                                                         int k1,
+                                                         const int k0,
+                                                         const int k1,
                                                          float4 keys[2])
 {
-  if (step == numsteps) {
-    /* center step: regular key location */
-    keys[0] = kernel_data_fetch(curve_keys, k0);
-    keys[1] = kernel_data_fetch(curve_keys, k1);
+  const int center_step = (numsteps - 1) / 2;
+  if (step == center_step) {
+    /* Center step: first in the array. */
   }
   else {
-    /* center step is not stored in this array */
-    if (step > numsteps)
-      step--;
-
-    offset += step * numkeys;
-
-    keys[0] = kernel_data_fetch(attributes_float4, offset + k0);
-    keys[1] = kernel_data_fetch(attributes_float4, offset + k1);
+    /* Non-center step, stored after center with center index skipped. */
+    if (step < center_step) {
+      step++;
+    }
+    offset += step * numverts;
   }
+
+  keys[0] = kernel_data_fetch(curve_keys, offset + k0);
+  keys[1] = kernel_data_fetch(curve_keys, offset + k1);
 }
 
 /* return 2 curve key locations */
-ccl_device_inline void motion_curve_keys_linear(
-    KernelGlobals kg, int object, int prim, float time, int k0, int k1, float4 keys[2])
+ccl_device_inline void motion_curve_keys_linear(KernelGlobals kg,
+                                                const int object,
+                                                const float time,
+                                                const int k0,
+                                                const int k1,
+                                                float4 keys[2])
 {
   /* get motion info */
-  int numsteps, numkeys;
-  object_motion_info(kg, object, &numsteps, NULL, &numkeys);
+  const int numsteps = kernel_data_fetch(objects, object).num_geom_steps;
+  const int numverts = kernel_data_fetch(objects, object).numverts;
 
   /* figure out which steps we need to fetch and their interpolation factor */
-  const int maxstep = numsteps * 2;
+  const int maxstep = numsteps - 1;
   const int step = min((int)(time * maxstep), maxstep - 1);
   const float t = time * maxstep - step;
 
-  /* find attribute */
-  const int offset = intersection_find_attribute(kg, object, ATTR_STD_MOTION_VERTEX_POSITION);
-  kernel_assert(offset != ATTR_STD_NOT_FOUND);
-
   /* fetch key coordinates */
+  const int offset = kernel_data_fetch(objects, object).position_offset;
   float4 next_keys[2];
 
-  motion_curve_keys_for_step_linear(kg, offset, numkeys, numsteps, step, k0, k1, keys);
-  motion_curve_keys_for_step_linear(kg, offset, numkeys, numsteps, step + 1, k0, k1, next_keys);
+  motion_curve_keys_for_step_linear(kg, offset, numverts, numsteps, step, k0, k1, keys);
+  motion_curve_keys_for_step_linear(kg, offset, numverts, numsteps, step + 1, k0, k1, next_keys);
 
   /* interpolate between steps */
   keys[0] = (1.0f - t) * keys[0] + t * next_keys[0];
@@ -72,65 +77,58 @@ ccl_device_inline void motion_curve_keys_linear(
 
 ccl_device_inline void motion_curve_keys_for_step(KernelGlobals kg,
                                                   int offset,
-                                                  int numkeys,
-                                                  int numsteps,
+                                                  const int numverts,
+                                                  const int numsteps,
                                                   int step,
-                                                  int k0,
-                                                  int k1,
-                                                  int k2,
-                                                  int k3,
+                                                  const int k0,
+                                                  const int k1,
+                                                  const int k2,
+                                                  const int k3,
                                                   float4 keys[4])
 {
-  if (step == numsteps) {
-    /* center step: regular key location */
-    keys[0] = kernel_data_fetch(curve_keys, k0);
-    keys[1] = kernel_data_fetch(curve_keys, k1);
-    keys[2] = kernel_data_fetch(curve_keys, k2);
-    keys[3] = kernel_data_fetch(curve_keys, k3);
+  const int center_step = (numsteps - 1) / 2;
+  if (step == center_step) {
+    /* Center step: first in the array. */
   }
   else {
-    /* center step is not stored in this array */
-    if (step > numsteps)
-      step--;
-
-    offset += step * numkeys;
-
-    keys[0] = kernel_data_fetch(attributes_float4, offset + k0);
-    keys[1] = kernel_data_fetch(attributes_float4, offset + k1);
-    keys[2] = kernel_data_fetch(attributes_float4, offset + k2);
-    keys[3] = kernel_data_fetch(attributes_float4, offset + k3);
+    /* Non-center step, stored after center with center index skipped. */
+    if (step < center_step) {
+      step++;
+    }
+    offset += step * numverts;
   }
+
+  keys[0] = kernel_data_fetch(curve_keys, offset + k0);
+  keys[1] = kernel_data_fetch(curve_keys, offset + k1);
+  keys[2] = kernel_data_fetch(curve_keys, offset + k2);
+  keys[3] = kernel_data_fetch(curve_keys, offset + k3);
 }
 
 /* return 2 curve key locations */
 ccl_device_inline void motion_curve_keys(KernelGlobals kg,
-                                         int object,
-                                         int prim,
-                                         float time,
-                                         int k0,
-                                         int k1,
-                                         int k2,
-                                         int k3,
+                                         const int object,
+                                         const float time,
+                                         const int k0,
+                                         const int k1,
+                                         const int k2,
+                                         const int k3,
                                          float4 keys[4])
 {
   /* get motion info */
-  int numsteps, numkeys;
-  object_motion_info(kg, object, &numsteps, NULL, &numkeys);
+  const int numsteps = kernel_data_fetch(objects, object).num_geom_steps;
+  const int numverts = kernel_data_fetch(objects, object).numverts;
 
   /* figure out which steps we need to fetch and their interpolation factor */
-  const int maxstep = numsteps * 2;
+  const int maxstep = numsteps - 1;
   const int step = min((int)(time * maxstep), maxstep - 1);
   const float t = time * maxstep - step;
 
-  /* find attribute */
-  const int offset = intersection_find_attribute(kg, object, ATTR_STD_MOTION_VERTEX_POSITION);
-  kernel_assert(offset != ATTR_STD_NOT_FOUND);
-
   /* fetch key coordinates */
+  const int offset = kernel_data_fetch(objects, object).position_offset;
   float4 next_keys[4];
 
-  motion_curve_keys_for_step(kg, offset, numkeys, numsteps, step, k0, k1, k2, k3, keys);
-  motion_curve_keys_for_step(kg, offset, numkeys, numsteps, step + 1, k0, k1, k2, k3, next_keys);
+  motion_curve_keys_for_step(kg, offset, numverts, numsteps, step, k0, k1, k2, k3, keys);
+  motion_curve_keys_for_step(kg, offset, numverts, numsteps, step + 1, k0, k1, k2, k3, next_keys);
 
   /* interpolate between steps */
   keys[0] = (1.0f - t) * keys[0] + t * next_keys[0];

@@ -1,13 +1,12 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "app/opengl/display_driver.h"
 #include "app/opengl/shader.h"
 
 #include "util/log.h"
-#include "util/string.h"
 
-#include <SDL.h>
 #include <epoxy/gl.h>
 
 CCL_NAMESPACE_BEGIN
@@ -16,15 +15,13 @@ CCL_NAMESPACE_BEGIN
  * OpenGLDisplayDriver.
  */
 
-OpenGLDisplayDriver::OpenGLDisplayDriver(const function<bool()> &gl_context_enable,
-                                         const function<void()> &gl_context_disable)
+OpenGLDisplayDriver::OpenGLDisplayDriver(const std::function<bool()> &gl_context_enable,
+                                         const std::function<void()> &gl_context_disable)
     : gl_context_enable_(gl_context_enable), gl_context_disable_(gl_context_disable)
 {
 }
 
-OpenGLDisplayDriver::~OpenGLDisplayDriver()
-{
-}
+OpenGLDisplayDriver::~OpenGLDisplayDriver() = default;
 
 /* --------------------------------------------------------------------
  * Update procedure.
@@ -35,7 +32,9 @@ void OpenGLDisplayDriver::next_tile_begin()
   /* Assuming no tiles used in interactive display. */
 }
 
-bool OpenGLDisplayDriver::update_begin(const Params &params, int texture_width, int texture_height)
+bool OpenGLDisplayDriver::update_begin(const Params &params,
+                                       const int texture_width,
+                                       const int texture_height)
 {
   /* Note that it's the responsibility of OpenGLDisplayDriver to ensure updating and drawing
    * the texture does not happen at the same time. This is achieved indirectly.
@@ -62,15 +61,23 @@ bool OpenGLDisplayDriver::update_begin(const Params &params, int texture_width, 
   if (texture_.width != texture_width || texture_.height != texture_height) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture_.gl_id);
-    glTexImage2D(
-        GL_TEXTURE_2D, 0, GL_RGBA16F, texture_width, texture_height, 0, GL_RGBA, GL_HALF_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D,
+                 0,
+                 GL_RGBA16F,
+                 texture_width,
+                 texture_height,
+                 0,
+                 GL_RGBA,
+                 GL_HALF_FLOAT,
+                 nullptr);
     texture_.width = texture_width;
     texture_.height = texture_height;
     glBindTexture(GL_TEXTURE_2D, 0);
 
     /* Texture did change, and no pixel storage was provided. Tag for an explicit zeroing out to
      * avoid undefined content. */
-    texture_.need_clear = true;
+    texture_.need_zero = true;
+    graphics_interop_buffer_.clear();
   }
 
   /* Update PBO dimensions if needed.
@@ -85,7 +92,7 @@ bool OpenGLDisplayDriver::update_begin(const Params &params, int texture_width, 
   if (texture_.buffer_width != buffer_width || texture_.buffer_height != buffer_height) {
     const size_t size_in_bytes = sizeof(half4) * buffer_width * buffer_height;
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, size_in_bytes, 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, size_in_bytes, nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     texture_.buffer_width = buffer_width;
@@ -118,16 +125,16 @@ half4 *OpenGLDisplayDriver::map_texture_buffer()
   half4 *mapped_rgba_pixels = reinterpret_cast<half4 *>(
       glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY));
   if (!mapped_rgba_pixels) {
-    LOG(ERROR) << "Error mapping OpenGLDisplayDriver pixel buffer object.";
+    LOG_ERROR << "Error mapping OpenGLDisplayDriver pixel buffer object.";
   }
 
-  if (texture_.need_clear) {
+  if (texture_.need_zero) {
     const int64_t texture_width = texture_.width;
     const int64_t texture_height = texture_.height;
     memset(reinterpret_cast<void *>(mapped_rgba_pixels),
            0,
            texture_width * texture_height * sizeof(half4));
-    texture_.need_clear = false;
+    texture_.need_zero = false;
   }
 
   return mapped_rgba_pixels;
@@ -144,18 +151,26 @@ void OpenGLDisplayDriver::unmap_texture_buffer()
  * Graphics interoperability.
  */
 
-OpenGLDisplayDriver::GraphicsInterop OpenGLDisplayDriver::graphics_interop_get()
+GraphicsInteropDevice OpenGLDisplayDriver::graphics_interop_get_device()
 {
-  GraphicsInterop interop_dst;
+  GraphicsInteropDevice interop_device;
+  interop_device.type = GraphicsInteropDevice::OPENGL;
+  return interop_device;
+}
 
-  interop_dst.buffer_width = texture_.buffer_width;
-  interop_dst.buffer_height = texture_.buffer_height;
-  interop_dst.opengl_pbo_id = texture_.gl_pbo_id;
+void OpenGLDisplayDriver::graphics_interop_update_buffer()
+{
+  if (graphics_interop_buffer_.is_empty()) {
+    graphics_interop_buffer_.assign(GraphicsInteropDevice::OPENGL,
+                                    texture_.gl_pbo_id,
+                                    texture_.buffer_width * texture_.buffer_height *
+                                        sizeof(half4));
+  }
 
-  interop_dst.need_clear = texture_.need_clear;
-  texture_.need_clear = false;
-
-  return interop_dst;
+  if (texture_.need_zero) {
+    graphics_interop_buffer_.zero();
+    texture_.need_zero = false;
+  }
 }
 
 void OpenGLDisplayDriver::graphics_interop_activate()
@@ -172,15 +187,15 @@ void OpenGLDisplayDriver::graphics_interop_deactivate()
  * Drawing.
  */
 
-void OpenGLDisplayDriver::clear()
+void OpenGLDisplayDriver::zero()
 {
-  texture_.need_clear = true;
+  texture_.need_zero = true;
 }
 
 void OpenGLDisplayDriver::draw(const Params &params)
 {
   /* See do_update_begin() for why no locking is required here. */
-  if (texture_.need_clear) {
+  if (texture_.need_zero) {
     /* Texture is requested to be cleared and was not yet cleared.
      * Do early return which should be equivalent of drawing all-zero texture. */
     return;
@@ -226,7 +241,7 @@ void OpenGLDisplayDriver::draw(const Params &params)
   glEnableVertexAttribArray(position_attribute);
 
   glVertexAttribPointer(
-      texcoord_attribute, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (const GLvoid *)0);
+      texcoord_attribute, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (const GLvoid *)nullptr);
   glVertexAttribPointer(position_attribute,
                         2,
                         GL_FLOAT,
@@ -266,7 +281,7 @@ bool OpenGLDisplayDriver::gl_draw_resources_ensure()
   if (!vertex_buffer_) {
     glGenBuffers(1, &vertex_buffer_);
     if (!vertex_buffer_) {
-      LOG(ERROR) << "Error creating vertex buffer.";
+      LOG_ERROR << "Error creating vertex buffer.";
       return false;
     }
   }
@@ -310,7 +325,7 @@ bool OpenGLDisplayDriver::gl_texture_resources_ensure()
   /* Create texture. */
   glGenTextures(1, &texture_.gl_id);
   if (!texture_.gl_id) {
-    LOG(ERROR) << "Error creating texture.";
+    LOG_ERROR << "Error creating texture.";
     return false;
   }
 
@@ -324,12 +339,13 @@ bool OpenGLDisplayDriver::gl_texture_resources_ensure()
   /* Create PBO for the texture. */
   glGenBuffers(1, &texture_.gl_pbo_id);
   if (!texture_.gl_pbo_id) {
-    LOG(ERROR) << "Error creating texture pixel buffer object.";
+    LOG_ERROR << "Error creating texture pixel buffer object.";
     return false;
   }
 
   /* Creation finished with a success. */
   texture_.is_created = true;
+  graphics_interop_buffer_.clear();
 
   return true;
 }
@@ -342,7 +358,7 @@ void OpenGLDisplayDriver::texture_update_if_needed()
 
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, texture_.gl_pbo_id);
   glTexSubImage2D(
-      GL_TEXTURE_2D, 0, 0, 0, texture_.width, texture_.height, GL_RGBA, GL_HALF_FLOAT, 0);
+      GL_TEXTURE_2D, 0, 0, 0, texture_.width, texture_.height, GL_RGBA, GL_HALF_FLOAT, nullptr);
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
   texture_.need_update = false;
@@ -352,7 +368,7 @@ void OpenGLDisplayDriver::vertex_buffer_update(const Params &params)
 {
   /* Invalidate old contents - avoids stalling if the buffer is still waiting in queue to be
    * rendered. */
-  glBufferData(GL_ARRAY_BUFFER, 16 * sizeof(float), NULL, GL_STREAM_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, 16 * sizeof(float), nullptr, GL_STREAM_DRAW);
 
   float *vpointer = reinterpret_cast<float *>(glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY));
   if (!vpointer) {

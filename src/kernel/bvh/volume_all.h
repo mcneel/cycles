@@ -1,8 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Adapted from code Copyright 2009-2010 NVIDIA Corporation,
- * and code copyright 2009-2012 Intel Corporation
+/* SPDX-FileCopyrightText: 2009-2010 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2009-2012 Intel Corporation
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Modifications Copyright 2011-2022 Blender Foundation. */
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Adapted code from NVIDIA Corporation. */
 
 #if BVH_FEATURE(BVH_HAIR)
 #  define NODE_INTERSECT bvh_node_intersect
@@ -22,11 +24,12 @@ ccl_device
 #else
 ccl_device_inline
 #endif
-    uint BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
-                                     ccl_private const Ray *ray,
-                                     Intersection *isect_array,
-                                     const uint max_hits,
-                                     const uint visibility)
+    uint
+    BVH_FUNCTION_FULL_NAME(BVH)(KernelGlobals kg,
+                                const ccl_private Ray *ray,
+                                Intersection *isect_array,
+                                const uint max_hits,
+                                const uint visibility)
 {
   /* todo:
    * - test if pushing distance on the stack helps (for non shadow rays)
@@ -50,8 +53,6 @@ ccl_device_inline
   const float tmin = ray->tmin;
   int object = OBJECT_NONE;
   float isect_t = ray->tmax;
-
-  int num_hits_in_instance = 0;
 
   uint num_hits = 0;
   isect_array->t = ray->tmax;
@@ -125,17 +126,16 @@ ccl_device_inline
             case PRIMITIVE_TRIANGLE: {
               /* intersect ray against primitive */
               for (; prim_addr < prim_addr2; prim_addr++) {
-                kernel_assert(kernel_data_fetch(prim_type, prim_addr) == type);
+                kernel_assert((kernel_data_fetch(prim_type, prim_addr) & PRIMITIVE_ALL) ==
+                              (type & PRIMITIVE_ALL));
                 /* only primitives from volume object */
                 const int prim_object = (object == OBJECT_NONE) ?
                                             kernel_data_fetch(prim_object, prim_addr) :
                                             object;
                 const int prim = kernel_data_fetch(prim_index, prim_addr);
-                if (intersection_skip_self(ray->self, prim_object, prim)) {
-                  continue;
-                }
-                int object_flag = kernel_data_fetch(object_flag, prim_object);
-                if ((object_flag & SD_OBJECT_HAS_VOLUME) == 0) {
+                if (bvh_volume_anyhit_triangle_filter<false>(
+                        kg, prim_object, prim, ray->self, visibility))
+                {
                   continue;
                 }
                 hit = triangle_intersect(kg,
@@ -152,7 +152,6 @@ ccl_device_inline
                   /* Move on to next entry in intersections array. */
                   isect_array++;
                   num_hits++;
-                  num_hits_in_instance++;
                   isect_array->t = isect_t;
                   if (num_hits == max_hits) {
                     return num_hits;
@@ -165,17 +164,16 @@ ccl_device_inline
             case PRIMITIVE_MOTION_TRIANGLE: {
               /* intersect ray against primitive */
               for (; prim_addr < prim_addr2; prim_addr++) {
-                kernel_assert(kernel_data_fetch(prim_type, prim_addr) == type);
+                kernel_assert((kernel_data_fetch(prim_type, prim_addr) & PRIMITIVE_ALL) ==
+                              (type & PRIMITIVE_ALL));
                 /* only primitives from volume object */
                 const int prim_object = (object == OBJECT_NONE) ?
                                             kernel_data_fetch(prim_object, prim_addr) :
                                             object;
                 const int prim = kernel_data_fetch(prim_index, prim_addr);
-                if (intersection_skip_self(ray->self, prim_object, prim)) {
-                  continue;
-                }
-                int object_flag = kernel_data_fetch(object_flag, prim_object);
-                if ((object_flag & SD_OBJECT_HAS_VOLUME) == 0) {
+                if (bvh_volume_anyhit_triangle_filter<false>(
+                        kg, prim_object, prim, ray->self, visibility))
+                {
                   continue;
                 }
                 hit = motion_triangle_intersect(kg,
@@ -193,7 +191,6 @@ ccl_device_inline
                   /* Move on to next entry in intersections array. */
                   isect_array++;
                   num_hits++;
-                  num_hits_in_instance++;
                   isect_array->t = isect_t;
                   if (num_hits == max_hits) {
                     return num_hits;
@@ -211,7 +208,7 @@ ccl_device_inline
         else {
           /* instance push */
           object = kernel_data_fetch(prim_object, -prim_addr - 1);
-          int object_flag = kernel_data_fetch(object_flag, object);
+          const uint object_flag = kernel_data_fetch(object_flag, object);
           if (object_flag & SD_OBJECT_HAS_VOLUME) {
 #if BVH_FEATURE(BVH_MOTION)
             bvh_instance_motion_push(kg, object, ray, &P, &dir, &idir);
@@ -219,7 +216,6 @@ ccl_device_inline
             bvh_instance_push(kg, object, ray, &P, &dir, &idir);
 #endif
 
-            num_hits_in_instance = 0;
             isect_array->t = isect_t;
 
             ++stack_ptr;
@@ -254,7 +250,7 @@ ccl_device_inline
 }
 
 ccl_device_inline uint BVH_FUNCTION_NAME(KernelGlobals kg,
-                                         ccl_private const Ray *ray,
+                                         const ccl_private Ray *ray,
                                          Intersection *isect_array,
                                          const uint max_hits,
                                          const uint visibility)

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* Constant Globals */
 
@@ -8,22 +9,25 @@
 #include "kernel/types.h"
 
 #include "kernel/integrator/state.h"
+#include "kernel/util/profiler.h"
 
-#include "kernel/util/profiling.h"
+#include "util/color.h"
+#include "util/types_image.h"
 
 CCL_NAMESPACE_BEGIN
 
-/* Not actually used, just a NULL pointer that gets passed everywhere, which we
+/* Not actually used, just a nullptr pointer that gets passed everywhere, which we
  * hope gets optimized out by the compiler. */
 struct KernelGlobalsGPU {
   int unused[1];
 };
-typedef ccl_global const KernelGlobalsGPU *ccl_restrict KernelGlobals;
+using KernelGlobals = const ccl_global KernelGlobalsGPU *ccl_restrict;
 
 struct KernelParamsCUDA {
   /* Global scene data and textures */
   KernelData data;
 #define KERNEL_DATA_ARRAY(type, name) const type *name;
+#define KERNEL_DATA_ARRAY_WRITABLE(type, name) type *name;
 #include "kernel/data_arrays.h"
 
   /* Integrator state */
@@ -37,6 +41,7 @@ __constant__ KernelParamsCUDA kernel_params;
 /* Abstraction macros */
 #define kernel_data kernel_params.data
 #define kernel_data_fetch(name, index) kernel_params.name[(index)]
+#define kernel_data_write(name, index, value) kernel_params.name[(index)] = (value)
 #define kernel_data_array(name) (kernel_params.name)
 #define kernel_integrator_state kernel_params.integrator_state
 

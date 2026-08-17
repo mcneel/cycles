@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "integrator/adaptive_sampling.h"
 
@@ -7,11 +8,9 @@
 
 CCL_NAMESPACE_BEGIN
 
-AdaptiveSampling::AdaptiveSampling()
-{
-}
+AdaptiveSampling::AdaptiveSampling() = default;
 
-int AdaptiveSampling::align_samples(int start_sample, int num_samples) const
+int AdaptiveSampling::align_samples(const int start_sample, const int num_samples) const
 {
   if (!use) {
     return num_samples;
@@ -42,7 +41,7 @@ int AdaptiveSampling::align_samples(int start_sample, int num_samples) const
   return min(num_samples_until_filter, num_samples);
 }
 
-bool AdaptiveSampling::need_filter(int sample) const
+bool AdaptiveSampling::need_filter(const int sample) const
 {
   if (!use) {
     return false;

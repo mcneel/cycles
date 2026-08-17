@@ -1,7 +1,8 @@
-/* SPDX-License-Identifier: Zlib
- * Copyright (C) 1999, 2002 Aladdin Enterprises.  All rights reserved.
- * L. Peter Deutsch
- * ghost@aladdin.com */
+/* SPDX-FileCopyrightText: 1999, 2002 Aladdin Enterprises. All rights reserved.
+ *
+ * SPDX-License-Identifier: Zlib
+ *
+ * By `L. Peter Deutsch <ghost@aladdin.com>`. */
 
 /* MD5
  *
@@ -9,11 +10,9 @@
  * code, with minor code modifications done to remove some unused code and
  * change code style. */
 
-#ifndef __UTIL_MD5_H__
-#define __UTIL_MD5_H__
+#pragma once
 
 #include "util/string.h"
-#include "util/types.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -22,7 +21,7 @@ class MD5Hash {
   MD5Hash();
   ~MD5Hash();
 
-  void append(const uint8_t *data, int size);
+  void append(const uint8_t *data, const int nbytes);
   void append(const string &str);
   bool append_file(const string &filepath);
   string get_hex();
@@ -39,5 +38,3 @@ class MD5Hash {
 string util_md5_string(const string &str);
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_MD5_H__ */

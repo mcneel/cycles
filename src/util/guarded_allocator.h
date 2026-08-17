@@ -1,11 +1,12 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_GUARDED_ALLOCATOR_H__
-#define __UTIL_GUARDED_ALLOCATOR_H__
+#pragma once
 
 #include <cstddef>
 #include <cstdlib>
+#include <new>
 #include <memory>
 
 #ifdef WITH_BLENDER_GUARDEDALLOC
@@ -15,34 +16,30 @@
 CCL_NAMESPACE_BEGIN
 
 /* Internal use only. */
-void util_guarded_mem_alloc(size_t n);
-void util_guarded_mem_free(size_t n);
+void util_guarded_mem_alloc(const size_t n);
+void util_guarded_mem_free(const size_t n);
 
 /* Guarded allocator for the use with STL. */
 template<typename T> class GuardedAllocator {
  public:
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
-  typedef T *pointer;
-  typedef const T *const_pointer;
-  typedef T &reference;
-  typedef const T &const_reference;
-  typedef T value_type;
+  using size_type = size_t;
+  using difference_type = ptrdiff_t;
+  using pointer = T *;
+  using const_pointer = const T *;
+  using reference = T &;
+  using const_reference = const T &;
+  using value_type = T;
 
-  GuardedAllocator()
-  {
-  }
-  GuardedAllocator(const GuardedAllocator &)
-  {
-  }
+  GuardedAllocator() = default;
+  GuardedAllocator(const GuardedAllocator & /*unused*/) = default;
 
-  T *allocate(size_t n, const void *hint = 0)
+  T *allocate(const size_t n, const void *hint = nullptr)
   {
     (void)hint;
     size_t size = n * sizeof(T);
     util_guarded_mem_alloc(size);
     if (n == 0) {
-      return NULL;
+      return nullptr;
     }
     T *mem;
 #ifdef WITH_BLENDER_GUARDEDALLOC
@@ -51,22 +48,22 @@ template<typename T> class GuardedAllocator {
      * far as i concerned. We might over-align on 32bit here, but that should
      * be all safe actually.
      */
-    mem = (T *)MEM_mallocN_aligned(size, 16, "Cycles Alloc");
+    mem = (T *)MEM_new_uninitialized_aligned(size, 16, "Cycles Alloc");
 #else
     mem = (T *)malloc(size);
 #endif
-    if (mem == NULL) {
+    if (mem == nullptr) {
       throw std::bad_alloc();
     }
     return mem;
   }
 
-  void deallocate(T *p, size_t n)
+  void deallocate(T *p, const size_t n)
   {
     util_guarded_mem_free(n * sizeof(T));
-    if (p != NULL) {
+    if (p != nullptr) {
 #ifdef WITH_BLENDER_GUARDEDALLOC
-      MEM_freeN(p);
+      MEM_delete_void(const_cast<void *>(static_cast<const void *>(p)));
 #else
       free(p);
 #endif
@@ -83,10 +80,7 @@ template<typename T> class GuardedAllocator {
     return &x;
   }
 
-  GuardedAllocator<T> &operator=(const GuardedAllocator &)
-  {
-    return *this;
-  }
+  GuardedAllocator<T> &operator=(const GuardedAllocator & /*unused*/) = default;
 
   size_t max_size() const
   {
@@ -94,28 +88,26 @@ template<typename T> class GuardedAllocator {
   }
 
   template<class U> struct rebind {
-    typedef GuardedAllocator<U> other;
+    using other = GuardedAllocator<U>;
   };
 
-  template<class U> GuardedAllocator(const GuardedAllocator<U> &)
-  {
-  }
+  template<class U> GuardedAllocator(const GuardedAllocator<U> & /*unused*/) {}
 
-  template<class U> GuardedAllocator &operator=(const GuardedAllocator<U> &)
+  template<class U> GuardedAllocator &operator=(const GuardedAllocator<U> & /*unused*/)
   {
     return *this;
   }
 
-  inline bool operator==(GuardedAllocator const & /*other*/) const
+  bool operator==(const GuardedAllocator & /*other*/) const
   {
     return true;
   }
-  inline bool operator!=(GuardedAllocator const &other) const
+  bool operator!=(const GuardedAllocator &other) const
   {
     return !operator==(other);
   }
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && _ITERATOR_DEBUG_LEVEL
   /* Welcome to the black magic here.
    *
    * The issue is that MSVC C++ allocates container proxy on any
@@ -131,6 +123,9 @@ template<typename T> class GuardedAllocator {
    *
    * Here we work this around by making it so container proxy does
    * not use guarded allocation. A bit fragile, unfortunately.
+   *
+   * Note: _Container_proxy only exists when _ITERATOR_DEBUG_LEVEL != 0,
+   * which is typically only in Debug builds with newer MSVC versions.
    */
   template<> struct rebind<std::_Container_proxy> {
     typedef std::allocator<std::_Container_proxy> other;
@@ -161,12 +156,10 @@ size_t util_guarded_get_mem_peak();
       (func)(__VA_ARGS__); \
     } \
     catch (std::bad_alloc &) { \
-      fprintf(stderr, "Error: run out of memory!\n"); \
+      LOG_ERROR << "Out of memory"; \
       fflush(stderr); \
       (progress)->set_error("Out of memory"); \
     } \
   } while (false)
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_GUARDED_ALLOCATOR_H__ */

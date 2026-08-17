@@ -1,14 +1,34 @@
+set(INC
+  .
+  include
+  src
+)
+
+set(INC_SYS
+
+)
+
 set(SRC
-	src/hipew.c
+  src/hipew.c
+  include/hipew.h
+  include/hipew6.h
+  include/hipew5.h
 )
 
-set(SRC_HEADERS
-	include/hipew.h
+set(LIB
 )
 
-include_directories(
-	.
-	include
-)
+if(HIPRT_INCLUDE_DIR)
+  list(APPEND INC_SYS
+    ${HIPRT_INCLUDE_DIR}
+  )
 
-add_library(extern_hipew ${SRC} ${SRC_HEADERS})
+  list(APPEND SRC
+    src/hiprtew.cc
+
+    include/hiprtew.h
+    src/util.h
+  )
+endif()
+
+add_library(extern_hipew ${SRC} ${INC} ${INC_SYS})

@@ -1,13 +1,16 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Adapted from code copyright 2009-2010 NVIDIA Corporation
- * Modifications Copyright 2011-2022 Blender Foundation. */
+/* SPDX-FileCopyrightText: 2009-2010 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Adapted code from NVIDIA Corporation. */
 
-#ifndef __BVH_H__
-#define __BVH_H__
+#pragma once
 
 #include "bvh/params.h"
 #include "util/array.h"
 #include "util/types.h"
+#include "util/unique_ptr.h"
 #include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
@@ -23,8 +26,9 @@ class Object;
 class Progress;
 class Stats;
 
-#define BVH_ALIGN 4096
-#define TRI_NODE_SIZE 3
+#define BVH_ALIGN 4096   // NOLINT
+#define TRI_NODE_SIZE 3  // NOLINT
+
 /* Packed BVH
  *
  * BVH stored as it will be used for traversal on the rendering device. */
@@ -66,13 +70,11 @@ class BVH {
   vector<Geometry *> geometry;
   vector<Object *> objects;
 
-  static BVH *create(const BVHParams &params,
-                     const vector<Geometry *> &geometry,
-                     const vector<Object *> &objects,
-                     Device *device);
-  virtual ~BVH()
-  {
-  }
+  static unique_ptr<BVH> create(const BVHParams &params,
+                                const vector<Geometry *> &geometry,
+                                const vector<Object *> &objects,
+                                Device *device);
+  virtual ~BVH() = default;
 
   virtual void replace_geometry(const vector<Geometry *> &geometry,
                                 const vector<Object *> &objects)
@@ -88,5 +90,3 @@ class BVH {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __BVH_H__ */

@@ -1,12 +1,13 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include <ostream>  // NOLINT
+#include <iosfwd>
 
 #include "util/string.h"
-#include "util/vector.h"
+#include "util/unique_ptr_vector.h"
 
 #include "kernel/types.h"
 
@@ -28,6 +29,7 @@ struct PassInfo {
   bool use_filter = false;
   bool use_exposure = false;
   bool is_written = true;
+  float scale = 1.0f;
   PassType divide_type = PASS_NONE;
   PassType direct_type = PASS_NONE;
   PassType indirect_type = PASS_NONE;
@@ -65,8 +67,8 @@ class Pass : public Node {
   bool is_written() const;
 
  protected:
-  /* The has been created automatically as a requirement to various rendering functionality (such
-   * as adaptive sampling). */
+  /* This has been created automatically as a requirement to various rendering functionality
+   * (such as adaptive sampling). */
   bool is_auto_;
 
  public:
@@ -74,24 +76,27 @@ class Pass : public Node {
   static const NodeEnum *get_mode_enum();
 
   static PassInfo get_info(PassType type,
+                           const PassMode mode = PassMode::DENOISED,
                            const bool include_albedo = false,
                            const bool is_lightgroup = false);
 
-  static bool contains(const vector<Pass *> &passes, PassType type);
+  static bool contains(const unique_ptr_vector<Pass> &passes, PassType type);
 
   /* Returns nullptr if there is no pass with the given name or type+mode. */
-  static const Pass *find(const vector<Pass *> &passes, const string &name);
-  static const Pass *find(const vector<Pass *> &passes,
+  static const Pass *find(const unique_ptr_vector<Pass> &passes, const string &name);
+  static const Pass *find(const unique_ptr_vector<Pass> &passes,
                           PassType type,
                           PassMode mode = PassMode::NOISY,
                           const ustring &lightgroup = ustring());
 
   /* Returns PASS_UNUSED if there is no corresponding pass. */
-  static int get_offset(const vector<Pass *> &passes, const Pass *pass);
+  static int get_offset(const unique_ptr_vector<Pass> &passes, const Pass *pass);
 
   friend class Film;
 };
 
 std::ostream &operator<<(std::ostream &os, const Pass &pass);
+
+bool is_volume_guiding_pass(const PassType pass_type);
 
 CCL_NAMESPACE_END

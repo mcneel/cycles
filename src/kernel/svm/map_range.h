@@ -1,51 +1,37 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
+
+#include "kernel/svm/node_types.h"
+#include "kernel/svm/util.h"
 
 CCL_NAMESPACE_BEGIN
 
 /* Map Range Node */
 
-ccl_device_inline float smootherstep(float edge0, float edge1, float x)
+ccl_device_inline float smootherstep(const float edge0, const float edge1, float x)
 {
   x = clamp(safe_divide((x - edge0), (edge1 - edge0)), 0.0f, 1.0f);
   return x * x * x * (x * (x * 6.0f - 15.0f) + 10.0f);
 }
 
-ccl_device_noinline int svm_node_map_range(KernelGlobals kg,
-                                           ccl_private ShaderData *sd,
-                                           ccl_private float *stack,
-                                           uint value_stack_offset,
-                                           uint parameters_stack_offsets,
-                                           uint results_stack_offsets,
-                                           int offset)
+ccl_device_noinline void svm_node_map_range(ccl_private float *ccl_restrict stack,
+                                            const ccl_global SVMNodeMapRange &ccl_restrict node)
 {
-  uint from_min_stack_offset, from_max_stack_offset, to_min_stack_offset, to_max_stack_offset;
-  uint type_stack_offset, steps_stack_offset, result_stack_offset;
-  svm_unpack_node_uchar4(parameters_stack_offsets,
-                         &from_min_stack_offset,
-                         &from_max_stack_offset,
-                         &to_min_stack_offset,
-                         &to_max_stack_offset);
-  svm_unpack_node_uchar3(
-      results_stack_offsets, &type_stack_offset, &steps_stack_offset, &result_stack_offset);
-
-  uint4 defaults = read_node(kg, &offset);
-  uint4 defaults2 = read_node(kg, &offset);
-
-  float value = stack_load_float(stack, value_stack_offset);
-  float from_min = stack_load_float_default(stack, from_min_stack_offset, defaults.x);
-  float from_max = stack_load_float_default(stack, from_max_stack_offset, defaults.y);
-  float to_min = stack_load_float_default(stack, to_min_stack_offset, defaults.z);
-  float to_max = stack_load_float_default(stack, to_max_stack_offset, defaults.w);
-  float steps = stack_load_float_default(stack, steps_stack_offset, defaults2.x);
+  const float value = stack_load(stack, node.value);
+  const float from_min = stack_load(stack, node.from_min);
+  const float from_max = stack_load(stack, node.from_max);
+  const float to_min = stack_load(stack, node.to_min);
+  const float to_max = stack_load(stack, node.to_max);
+  const float steps = stack_load(stack, node.steps);
 
   float result;
 
   if (from_max != from_min) {
     float factor = value;
-    switch (type_stack_offset) {
+    switch (node.range_type) {
       default:
       case NODE_MAP_RANGE_LINEAR:
         factor = (value - from_min) / (from_max - from_min);
@@ -71,45 +57,27 @@ ccl_device_noinline int svm_node_map_range(KernelGlobals kg,
   else {
     result = 0.0f;
   }
-  stack_store_float(stack, result_stack_offset, result);
-  return offset;
+  stack_store_float(stack, node.result_offset, result);
 }
 
-ccl_device_noinline int svm_node_vector_map_range(KernelGlobals kg,
-                                                  ccl_private ShaderData *sd,
-                                                  ccl_private float *stack,
-                                                  uint value_stack_offset,
-                                                  uint parameters_stack_offsets,
-                                                  uint results_stack_offsets,
-                                                  int offset)
+ccl_device_noinline void svm_node_vector_map_range(
+    ccl_private float *ccl_restrict stack,
+    const ccl_global SVMNodeVectorMapRange &ccl_restrict node)
 {
-  uint from_min_stack_offset, from_max_stack_offset, to_min_stack_offset, to_max_stack_offset;
-  uint steps_stack_offset, clamp_stack_offset, range_type_stack_offset, result_stack_offset;
-  svm_unpack_node_uchar4(parameters_stack_offsets,
-                         &from_min_stack_offset,
-                         &from_max_stack_offset,
-                         &to_min_stack_offset,
-                         &to_max_stack_offset);
-  svm_unpack_node_uchar4(results_stack_offsets,
-                         &steps_stack_offset,
-                         &clamp_stack_offset,
-                         &range_type_stack_offset,
-                         &result_stack_offset);
+  const float3 value = stack_load(stack, node.value);
+  const float3 from_min = stack_load(stack, node.from_min);
+  const float3 from_max = stack_load(stack, node.from_max);
+  const float3 to_min = stack_load(stack, node.to_min);
+  const float3 to_max = stack_load(stack, node.to_max);
+  const float3 steps = stack_load(stack, node.steps);
 
-  float3 value = stack_load_float3(stack, value_stack_offset);
-  float3 from_min = stack_load_float3(stack, from_min_stack_offset);
-  float3 from_max = stack_load_float3(stack, from_max_stack_offset);
-  float3 to_min = stack_load_float3(stack, to_min_stack_offset);
-  float3 to_max = stack_load_float3(stack, to_max_stack_offset);
-  float3 steps = stack_load_float3(stack, steps_stack_offset);
-
-  int type = range_type_stack_offset;
-  int use_clamp = (type == NODE_MAP_RANGE_SMOOTHSTEP || type == NODE_MAP_RANGE_SMOOTHERSTEP) ?
-                      0 :
-                      clamp_stack_offset;
+  const int use_clamp = (node.range_type == NODE_MAP_RANGE_SMOOTHSTEP ||
+                         node.range_type == NODE_MAP_RANGE_SMOOTHERSTEP) ?
+                            0 :
+                            node.use_clamp;
   float3 result;
   float3 factor = value;
-  switch (range_type_stack_offset) {
+  switch (node.range_type) {
     default:
     case NODE_MAP_RANGE_LINEAR:
       factor = safe_divide((value - from_min), (from_max - from_min));
@@ -145,8 +113,7 @@ ccl_device_noinline int svm_node_vector_map_range(KernelGlobals kg,
                                        clamp(result.z, to_min.z, to_max.z);
   }
 
-  stack_store_float3(stack, result_stack_offset, result);
-  return offset;
+  stack_store_float3(stack, node.result_offset, result);
 }
 
 CCL_NAMESPACE_END

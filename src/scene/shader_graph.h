@@ -1,19 +1,21 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __GRAPH_H__
-#define __GRAPH_H__
+#pragma once
 
 #include "graph/node.h"
 #include "graph/node_type.h"
 
+#include "kernel/svm/types.h"
 #include "kernel/types.h"
 
-#include "util/list.h"
 #include "util/map.h"
 #include "util/param.h"
 #include "util/set.h"
+#include "util/string.h"
 #include "util/types.h"
+#include "util/unique_ptr_vector.h"
 #include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
@@ -55,6 +57,35 @@ enum ShaderNodeSpecialType {
   SHADER_SPECIAL_TYPE_OUTPUT,
   SHADER_SPECIAL_TYPE_BUMP,
   SHADER_SPECIAL_TYPE_OUTPUT_AOV,
+  SHADER_SPECIAL_TYPE_LIGHT_PATH,
+  SHADER_SPECIAL_TYPE_SCENE_TIME,
+};
+
+/* Base class for ShaderInput and ShaderOutput. */
+
+class ShaderIO {
+ public:
+  ShaderIO(const SocketType &socket_type_, ShaderNode *parent_)
+      : socket_type(socket_type_), parent(parent_)
+
+  {
+  }
+
+  ustring name() const
+  {
+    return socket_type.ui_name;
+  }
+  SocketType::Type type() const
+  {
+    return socket_type.type;
+  }
+
+  const SocketType &socket_type;
+  ShaderNode *parent;
+
+  virtual void disconnect() {};
+
+  int stack_offset = SVM_STACK_INVALID; /* for SVM compiler */
 };
 
 /* Input
@@ -63,77 +94,47 @@ enum ShaderNodeSpecialType {
  * linked, it will either get a fixed default value, or e.g. a texture
  * coordinate. */
 
-class ShaderInput {
+class ShaderInput final : public ShaderIO {
  public:
-  ShaderInput(const SocketType &socket_type_, ShaderNode *parent_)
-      : socket_type(socket_type_),
-        parent(parent_),
-        link(NULL),
-        stack_offset(SVM_STACK_INVALID),
-        constant_folded_in(false)
-  {
-  }
+  using ShaderIO::ShaderIO;
 
-  ustring name() const
-  {
-    return socket_type.ui_name;
-  }
   int flags() const
   {
     return socket_type.flags;
   }
-  SocketType::Type type() const
-  {
-    return socket_type.type;
-  }
-
-  void set(float f)
+  void set(const float f)
   {
     ((Node *)parent)->set(socket_type, f);
   }
-  void set(float3 f)
+  void set(const float3 f)
+  {
+    ((Node *)parent)->set(socket_type, f);
+  }
+  void set(const int f)
   {
     ((Node *)parent)->set(socket_type, f);
   }
 
-  void disconnect();
+  void disconnect() override;
 
-  const SocketType &socket_type;
-  ShaderNode *parent;
-  ShaderOutput *link;
-  int stack_offset; /* for SVM compiler */
+  ShaderOutput *link = nullptr;
 
   /* Keeps track of whether a constant was folded in this socket, to avoid over-optimizing when the
    * link is null. */
-  bool constant_folded_in;
+  bool constant_folded_in = false;
 };
 
 /* Output
  *
  * Output socket for a shader node. */
 
-class ShaderOutput {
+class ShaderOutput final : public ShaderIO {
  public:
-  ShaderOutput(const SocketType &socket_type_, ShaderNode *parent_)
-      : socket_type(socket_type_), parent(parent_), stack_offset(SVM_STACK_INVALID)
-  {
-  }
+  using ShaderIO::ShaderIO;
 
-  ustring name() const
-  {
-    return socket_type.ui_name;
-  }
-  SocketType::Type type() const
-  {
-    return socket_type.type;
-  }
+  void disconnect() override;
 
-  void disconnect();
-
-  const SocketType &socket_type;
-  ShaderNode *parent;
   vector<ShaderInput *> links;
-  int stack_offset; /* for SVM compiler */
 };
 
 /* Node
@@ -144,7 +145,7 @@ class ShaderOutput {
 class ShaderNode : public Node {
  public:
   explicit ShaderNode(const NodeType *type);
-  virtual ~ShaderNode();
+  ShaderNode(const ShaderNode &other);
 
   void create_inputs_outputs(const NodeType *type);
   void remove_input(ShaderInput *input);
@@ -156,24 +157,21 @@ class ShaderNode : public Node {
 
   virtual ShaderNode *clone(ShaderGraph *graph) const = 0;
   virtual void attributes(Shader *shader, AttributeRequestSet *attributes);
+  virtual void global_attributes(Shader *shader, AttributeRequestSet *attributes);
   virtual void compile(SVMCompiler &compiler) = 0;
   virtual void compile(OSLCompiler &compiler) = 0;
 
   /* Expand node into additional nodes. */
-  virtual void expand(ShaderGraph * /* graph */)
-  {
-  }
+  virtual void expand(ShaderGraph * /* graph */) {}
 
   /* ** Node optimization ** */
   /* Check whether the node can be replaced with single constant. */
-  virtual void constant_fold(const ConstantFolder & /*folder*/)
-  {
-  }
+  virtual void constant_fold(const ConstantFolder & /*folder*/) {}
 
   /* Simplify settings used by artists to the ones which are simpler to
    * evaluate in the kernel but keep the final result unchanged.
    */
-  virtual void simplify_settings(Scene * /*scene*/){};
+  virtual void simplify_settings(Scene * /*scene*/) {};
 
   virtual bool has_surface_emission()
   {
@@ -203,21 +201,42 @@ class ShaderNode : public Node {
   {
     return false;
   }
-  virtual bool has_integrator_dependency()
-  {
-    return false;
-  }
   virtual bool has_volume_support()
   {
     return false;
   }
-  vector<ShaderInput *> inputs;
-  vector<ShaderOutput *> outputs;
+  /* True if the node only multiplies or adds a constant values. */
+  virtual bool is_linear_operation()
+  {
+    return false;
+  }
+  virtual ShaderNodeType shader_node_type() const
+  {
+    return NODE_NONE;
+  }
+  virtual bool is_texture_node_and_needs_derivatives(const SVMCompiler & /*compiler*/)
+  {
+    return false;
+  }
+  bool need_derivatives() const
+  {
+    return need_derivatives_;
+  }
+  void set_need_derivatives(const bool need_derivatives = true)
+  {
+    need_derivatives_ = need_derivatives;
+  }
 
-  int id;          /* index in graph node array */
-  ShaderBump bump; /* for bump mapping utility */
+  unique_ptr_vector<ShaderInput> inputs;
+  unique_ptr_vector<ShaderOutput> outputs;
 
-  ShaderNodeSpecialType special_type; /* special node type */
+  /* index in graph node array */
+  int id = -1;
+  /* for bump mapping utility */
+  ShaderBump bump = SHADER_BUMP_NONE;
+  float bump_filter_width = 0.0f;
+  /* special node type */
+  ShaderNodeSpecialType special_type = SHADER_SPECIAL_TYPE_NONE;
 
   /* ** Selective nodes compilation ** */
 
@@ -229,7 +248,7 @@ class ShaderNode : public Node {
    * so it's possible to disable huge nodes inside of the required
    * nodes group.
    */
-  virtual int get_feature()
+  virtual uint get_feature()
   {
     return bump == SHADER_BUMP_NONE ? 0 : KERNEL_FEATURE_NODE_BUMP;
   }
@@ -250,6 +269,16 @@ class ShaderNode : public Node {
    * is to be handled in the subclass.
    */
   virtual bool equals(const ShaderNode &other);
+
+  /* Helps to avoid adding input link to the node after the node is already added to SVM. */
+  bool added_to_svm = false;
+
+ protected:
+  bool need_derivatives_ = false;
+
+  /* Disconnect the input with the given name if it is connected.
+   * Used to optimize away unused inputs. */
+  void disconnect_unused_input(const char *name);
 };
 
 /* Node definition utility macros */
@@ -257,26 +286,26 @@ class ShaderNode : public Node {
 #define SHADER_NODE_CLASS(type) \
   NODE_DECLARE \
   type(); \
-  virtual ShaderNode *clone(ShaderGraph *graph) const \
+  ShaderNode *clone(ShaderGraph *graph) const override \
   { \
     return graph->create_node<type>(*this); \
   } \
-  virtual void compile(SVMCompiler &compiler); \
-  virtual void compile(OSLCompiler &compiler);
+  void compile(SVMCompiler &compiler) override; \
+  void compile(OSLCompiler &compiler) override;
 
 #define SHADER_NODE_NO_CLONE_CLASS(type) \
   NODE_DECLARE \
   type(); \
-  virtual void compile(SVMCompiler &compiler); \
-  virtual void compile(OSLCompiler &compiler);
+  void compile(SVMCompiler &compiler) override; \
+  void compile(OSLCompiler &compiler) override;
 
 #define SHADER_NODE_BASE_CLASS(type) \
-  virtual ShaderNode *clone(ShaderGraph *graph) const \
+  ShaderNode *clone(ShaderGraph *graph) const override \
   { \
     return graph->create_node<type>(*this); \
   } \
-  virtual void compile(SVMCompiler &compiler); \
-  virtual void compile(OSLCompiler &compiler);
+  void compile(SVMCompiler &compiler) override; \
+  void compile(OSLCompiler &compiler) override;
 
 class ShaderNodeIDComparator {
  public:
@@ -286,8 +315,17 @@ class ShaderNodeIDComparator {
   }
 };
 
-typedef set<ShaderNode *, ShaderNodeIDComparator> ShaderNodeSet;
-typedef map<ShaderNode *, ShaderNode *, ShaderNodeIDComparator> ShaderNodeMap;
+class ShaderNodeIDAndBoolComparator {
+ public:
+  bool operator()(const std::pair<ShaderNode *, bool> p1,
+                  const std::pair<ShaderNode *, bool> p2) const
+  {
+    return p1.first->id < p2.first->id || (p1.first->id == p2.first->id && p1.second < p2.second);
+  }
+};
+
+using ShaderNodeSet = set<ShaderNode *, ShaderNodeIDComparator>;
+using ShaderNodeMap = map<ShaderNode *, ShaderNode *, ShaderNodeIDComparator>;
 
 /* Graph
  *
@@ -296,16 +334,15 @@ typedef map<ShaderNode *, ShaderNode *, ShaderNodeIDComparator> ShaderNodeMap;
 
 class ShaderGraph : public NodeOwner {
  public:
-  list<ShaderNode *> nodes;
+  unique_ptr_vector<ShaderNode> nodes;
   size_t num_node_ids;
   bool finalized;
   bool simplified;
   string displacement_hash;
 
   ShaderGraph();
-  ~ShaderGraph();
+  ~ShaderGraph() override;
 
-  ShaderNode *add(ShaderNode *node);
   OutputNode *output();
 
   void connect(ShaderOutput *from, ShaderInput *to);
@@ -318,35 +355,44 @@ class ShaderGraph : public NodeOwner {
   void remove_proxy_nodes();
   void compute_displacement_hash();
   void simplify(Scene *scene);
-  void finalize(Scene *scene,
-                bool do_bump = false,
-                bool do_simplify = false,
-                bool bump_in_object_space = false);
+  void finalize(Scene *scene, bool do_bump = false, bool bump_in_object_space = false);
 
   int get_num_closures();
 
   void dump_graph(const char *filename);
 
-  /* This function is used to create a node of a specified type instead of
-   * calling 'new', and sets the graph as the owner of the node.
-   */
+  /* Create node from class and add it to the shader graph. */
   template<typename T, typename... Args> T *create_node(Args &&...args)
   {
-    T *node = new T(args...);
-    node->set_owner(this);
-    return node;
+    unique_ptr<T> node = make_unique<T>(args...);
+    T *node_ptr = node.get();
+    this->add_node(std::move(node));
+    return node_ptr;
   }
 
-  /* This function is used to delete a node created and owned by the graph.
-   */
-  template<typename T> void delete_node(T *node)
+  /* Create OSL node from class and add it to the shader graph. */
+  template<typename T, typename... Args> T *create_osl_node(void *node_memory, Args &&...args)
   {
-    assert(node->get_owner() == this);
-    delete node;
+    T *node_ptr = new (node_memory) T(args...);
+    unique_ptr<T> node(node_ptr);
+    this->add_node(std::move(node));
+    return node_ptr;
+  }
+
+  /* Create node from node type and add it to the shader graph. */
+  ShaderNode *create_node(const NodeType *node_type)
+  {
+    unique_ptr<Node> node = node_type->create(node_type);
+    unique_ptr<ShaderNode> shader_node(static_cast<ShaderNode *>(node.release()));
+    ShaderNode *shader_node_ptr = shader_node.get();
+    this->add_node(std::move(shader_node));
+    return shader_node_ptr;
   }
 
  protected:
-  typedef pair<ShaderNode *const, ShaderNode *> NodePair;
+  using NodePair = pair<ShaderNode *const, ShaderNode *>;
+
+  void add_node(unique_ptr<ShaderNode> &&node);
 
   void find_dependencies(ShaderNodeSet &dependencies, ShaderInput *input);
   void clear_nodes();
@@ -364,9 +410,7 @@ class ShaderGraph : public NodeOwner {
   void constant_fold(Scene *scene);
   void simplify_settings(Scene *scene);
   void deduplicate_nodes();
-  void verify_volume_output();
+  void optimize_volume_output();
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __GRAPH_H__ */

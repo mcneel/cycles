@@ -1,38 +1,31 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include "hydra/attribute.h"
 #include "hydra/geometry.h"
 #include "hydra/instancer.h"
 #include "hydra/material.h"
 #include "hydra/session.h"
+#include "hydra/util.h"
 #include "scene/geometry.h"
 #include "scene/object.h"
 #include "scene/scene.h"
 #include "util/hash.h"
 
+#include <pxr/imaging/hd/materialBindingSchema.h>
+#include <pxr/imaging/hd/materialBindingsSchema.h>
 #include <pxr/imaging/hd/sceneDelegate.h>
+#include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/xformSchema.h>
 
 HDCYCLES_NAMESPACE_OPEN_SCOPE
 
 extern Transform convert_transform(const GfMatrix4d &matrix);
 
 template<typename Base, typename CyclesBase>
-HdCyclesGeometry<Base, CyclesBase>::HdCyclesGeometry(const SdfPath &rprimId
-#if PXR_VERSION < 2102
-                                                     ,
-                                                     const SdfPath &instancerId
-#endif
-                                                     )
-    : Base(rprimId
-#if PXR_VERSION < 2102
-
-           ,
-           instancerId
-#endif
-           ),
-      _geomTransform(1.0)
+HdCyclesGeometry<Base, CyclesBase>::HdCyclesGeometry(const SdfPath &rprimId)
+    : Base(rprimId), _geomTransform(1.0)
 {
 }
 
@@ -72,23 +65,27 @@ void HdCyclesGeometry<Base, CyclesBase>::Sync(HdSceneDelegate *sceneDelegate,
 
   Initialize(renderParam);
 
-#if PXR_VERSION >= 2102
   Base::_UpdateInstancer(sceneDelegate, dirtyBits);
   HdInstancer::_SyncInstancerAndParents(sceneDelegate->GetRenderIndex(), Base::GetInstancerId());
-#endif
   Base::_UpdateVisibility(sceneDelegate, dirtyBits);
 
   const SceneLock lock(renderParam);
 
-  if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
-#if HD_API_VERSION >= 37 && PXR_VERSION >= 2105
-    Base::SetMaterialId(sceneDelegate->GetMaterialId(Base::GetId()));
-#else
-    Base::_SetMaterialId(sceneDelegate->GetRenderIndex().GetChangeTracker(),
-                         sceneDelegate->GetMaterialId(Base::GetId()));
-#endif
+  const SdfPath &id = Base::GetId();
+  const HdSceneIndexPrim prim = GetPrim(sceneDelegate, id);
+  const HdContainerDataSourceHandle &primDs = prim.dataSource;
 
-    const auto material = static_cast<const HdCyclesMaterial *>(
+  if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
+    SdfPath materialId;
+    /* Purpose here matches #HdCyclesDelegate::GetMaterialBindingPurpose. */
+    if (auto pathDs =
+            HdMaterialBindingsSchema::GetFromParent(primDs).GetMaterialBinding().GetPath())
+    {
+      materialId = pathDs->GetTypedValue(0.0f);
+    }
+    Base::SetMaterialId(materialId);
+
+    const auto *const material = static_cast<const HdCyclesMaterial *>(
         sceneDelegate->GetRenderIndex().GetSprim(HdPrimTypeTokens->material,
                                                  Base::GetMaterialId()));
 
@@ -107,20 +104,22 @@ void HdCyclesGeometry<Base, CyclesBase>::Sync(HdSceneDelegate *sceneDelegate,
     _geom->set_used_shaders(usedShaders);
   }
 
-  const SdfPath &id = Base::GetId();
-
   if (HdChangeTracker::IsPrimIdDirty(*dirtyBits, id)) {
     // This needs to be corrected in the AOV
     _instances[0]->set_pass_id(Base::GetPrimId() + 1);
   }
 
   if (HdChangeTracker::IsTransformDirty(*dirtyBits, id)) {
-    _geomTransform = sceneDelegate->GetTransform(id);
+    _geomTransform = GfMatrix4d(1.0);
+    if (auto matrixDs = HdXformSchema::GetFromParent(primDs).GetMatrix()) {
+      _geomTransform = matrixDs->GetTypedValue(0.0f);
+    }
   }
 
   if (HdChangeTracker::IsTransformDirty(*dirtyBits, id) ||
-      HdChangeTracker::IsInstancerDirty(*dirtyBits, id)) {
-    const auto instancer = static_cast<HdCyclesInstancer *>(
+      HdChangeTracker::IsInstancerDirty(*dirtyBits, id))
+  {
+    auto *const instancer = static_cast<HdCyclesInstancer *>(
         sceneDelegate->GetRenderIndex().GetInstancer(Base::GetInstancerId()));
 
     // Make sure the first object attribute is the instanceId
@@ -235,22 +234,6 @@ void HdCyclesGeometry<Base, CyclesBase>::InitializeInstance(int index)
 
   instance->set_color(make_float3(0.8f, 0.8f, 0.8f));
   instance->set_random_id(hash_uint2(hash_string(_geom->name.c_str()), index));
-}
-
-template<typename Base, typename CyclesBase>
-HdInterpolation HdCyclesGeometry<Base, CyclesBase>::GetPrimvarInterpolation(
-    HdSceneDelegate *sceneDelegate, const TfToken &name) const
-{
-  for (int i = 0; i < HdInterpolationCount; ++i) {
-    for (const HdPrimvarDescriptor &desc :
-         Base::GetPrimvarDescriptors(sceneDelegate, static_cast<HdInterpolation>(i))) {
-      if (desc.name == name) {
-        return static_cast<HdInterpolation>(i);
-      }
-    }
-  }
-
-  return HdInterpolationCount;
 }
 
 HDCYCLES_NAMESPACE_CLOSE_SCOPE

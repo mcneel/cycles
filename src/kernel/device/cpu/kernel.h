@@ -1,14 +1,14 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 /* CPU Kernel Interface */
 
-#include "util/half.h"
-#include "util/types.h"
-
 #include "kernel/types.h"
+
+#include "util/half.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -26,16 +26,13 @@ void kernel_globals_free(KernelGlobalsCPU *kg);
 void *kernel_osl_memory(const KernelGlobalsCPU *kg);
 bool kernel_osl_use(const KernelGlobalsCPU *kg);
 
-void kernel_const_copy(KernelGlobalsCPU *kg, const char *name, void *host, size_t size);
-void kernel_global_memory_copy(KernelGlobalsCPU *kg, const char *name, void *mem, size_t size);
+void kernel_const_copy(KernelGlobalsCPU *kg, const char *name, void *host, const size_t size);
+void kernel_global_memory_copy(KernelGlobalsCPU *kg,
+                               const char *name,
+                               void *mem,
+                               const size_t size);
 
 #define KERNEL_ARCH cpu
-#include "kernel/device/cpu/kernel_arch.h"
-
-#define KERNEL_ARCH cpu_sse2
-#include "kernel/device/cpu/kernel_arch.h"
-
-#define KERNEL_ARCH cpu_sse41
 #include "kernel/device/cpu/kernel_arch.h"
 
 #define KERNEL_ARCH cpu_avx2

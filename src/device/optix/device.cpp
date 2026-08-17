@@ -1,20 +1,29 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2019, NVIDIA Corporation.
- * Copyright 2019-2022 Blender Foundation. */
+/* SPDX-FileCopyrightText: 2019 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2019-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "device/optix/device.h"
-
 #include "device/cuda/device.h"
-#include "device/optix/device_impl.h"
-
-#include "util/log.h"
+#include "device/device.h"
 
 #ifdef WITH_OSL
+#  include <OSL/oslconfig.h>
 #  include <OSL/oslversion.h>
 #endif
 
 #ifdef WITH_OPTIX
+#  include "device/optix/device_impl.h"
+
+#  include "integrator/denoiser_oidn_gpu.h"  // IWYU pragma: keep
+
 #  include <optix_function_table_definition.h>
+#endif
+
+#include "util/log.h"
+
+#ifndef OPTIX_FUNCTION_TABLE_SYMBOL
+#  define OPTIX_FUNCTION_TABLE_SYMBOL g_optixFunctionTable
 #endif
 
 CCL_NAMESPACE_BEGIN
@@ -22,7 +31,7 @@ CCL_NAMESPACE_BEGIN
 bool device_optix_init()
 {
 #ifdef WITH_OPTIX
-  if (g_optixFunctionTable.optixDeviceContextCreate != NULL) {
+  if (OPTIX_FUNCTION_TABLE_SYMBOL.optixDeviceContextCreate != nullptr) {
     /* Already initialized function table. */
     return true;
   }
@@ -35,12 +44,12 @@ bool device_optix_init()
   const OptixResult result = optixInit();
 
   if (result == OPTIX_ERROR_UNSUPPORTED_ABI_VERSION) {
-    VLOG_WARNING << "OptiX initialization failed because the installed NVIDIA driver is too old. "
-                    "Please update to the latest driver first!";
+    LOG_WARNING << "OptiX initialization failed because the installed NVIDIA driver is too old. "
+                   "Please update to the latest driver first!";
     return false;
   }
-  else if (result != OPTIX_SUCCESS) {
-    VLOG_WARNING << "OptiX initialization failed with error code " << (unsigned int)result;
+  if (result != OPTIX_SUCCESS) {
+    LOG_WARNING << "OptiX initialization failed with error code " << (unsigned int)result;
     return false;
   }
 
@@ -69,10 +78,20 @@ void device_optix_info(const vector<DeviceInfo> &cuda_devices, vector<DeviceInfo
 
     info.type = DEVICE_OPTIX;
     info.id += "_OptiX";
-#  if defined(WITH_OSL) && (OSL_VERSION_MINOR >= 13 || OSL_VERSION_MAJOR > 1)
+#  if defined(WITH_OSL) && defined(OSL_USE_OPTIX) && \
+      (OSL_VERSION_MINOR >= 13 || OSL_VERSION_MAJOR > 1)
     info.has_osl = true;
 #  endif
     info.denoisers |= DENOISER_OPTIX;
+#  if defined(WITH_OPENIMAGEDENOISE)
+#    if OIDN_VERSION >= 20300
+    if (oidnIsCUDADeviceSupported(info.num)) {
+#    else
+    if (OIDNDenoiserGPU::is_device_supported(info)) {
+#    endif
+      info.denoisers |= DENOISER_OPENIMAGEDENOISE;
+    }
+#  endif
 
     devices.push_back(info);
   }
@@ -82,16 +101,20 @@ void device_optix_info(const vector<DeviceInfo> &cuda_devices, vector<DeviceInfo
 #endif
 }
 
-Device *device_optix_create(const DeviceInfo &info, Stats &stats, Profiler &profiler)
+unique_ptr<Device> device_optix_create(const DeviceInfo &info,
+                                       Stats &stats,
+                                       Profiler &profiler,
+                                       bool headless)
 {
 #ifdef WITH_OPTIX
-  return new OptiXDevice(info, stats, profiler);
+  return make_unique<OptiXDevice>(info, stats, profiler, headless);
 #else
   (void)info;
   (void)stats;
   (void)profiler;
+  (void)headless;
 
-  LOG(FATAL) << "Request to create OptiX device without compiled-in support. Should never happen.";
+  LOG_FATAL << "Request to create OptiX device without compiled-in support. Should never happen.";
 
   return nullptr;
 #endif

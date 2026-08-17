@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -25,13 +26,13 @@ class AdaptiveSampling {
    * if the number of samples is 1, then the path tracer will render samples [align_samples],
    * if the number of samples is 2, then the path tracer will render samples [align_samples,
    * align_samples + 1] and so on. */
-  int align_samples(int start_sample, int num_samples) const;
+  int align_samples(const int start_sample, const int num_samples) const;
 
   /* Check whether adaptive sampling filter should happen at this sample.
    * Returns false if the adaptive sampling is not use.
    *
    * `sample` is the 0-based index of sample. */
-  bool need_filter(int sample) const;
+  bool need_filter(const int sample) const;
 
   bool use = false;
   int adaptive_step = 0;

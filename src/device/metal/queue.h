@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2021-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2021-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -12,6 +13,11 @@
 #  include "device/metal/util.h"
 #  include "kernel/device/metal/globals.h"
 
+#  define MAX_SAMPLE_BUFFER_LENGTH 4096
+
+/* The number of resources to be contiguously encoded into the MetalAncillaries struct. */
+#  define ANCILLARY_SLOT_COUNT 11
+
 CCL_NAMESPACE_BEGIN
 
 class MetalDevice;
@@ -20,37 +26,42 @@ class MetalDevice;
 class MetalDeviceQueue : public DeviceQueue {
  public:
   MetalDeviceQueue(MetalDevice *device);
-  ~MetalDeviceQueue();
+  ~MetalDeviceQueue() override;
 
-  virtual int num_concurrent_states(const size_t) const override;
-  virtual int num_concurrent_busy_states(const size_t) const override;
-  virtual int num_sort_partition_elements() const override;
-  virtual bool supports_local_atomic_sort() const override;
+  int num_concurrent_states(const size_t /*state_size*/) const override;
+  int num_concurrent_busy_states(const size_t /*state_size*/) const override;
+  int num_sort_partitions(int max_num_paths, uint max_scene_shaders) const override;
+  bool supports_local_atomic_sort() const override;
 
-  virtual void init_execution() override;
+  void init_execution() override;
+  void load_image_info() override;
 
-  virtual bool enqueue(DeviceKernel kernel,
-                       const int work_size,
-                       DeviceKernelArguments const &args) override;
+  bool enqueue(DeviceKernel kernel,
+               const int work_size,
+               const DeviceKernelArguments &args) override;
 
-  virtual bool synchronize() override;
+  bool synchronize() override;
 
-  virtual void zero_to_device(device_memory &mem) override;
-  virtual void copy_to_device(device_memory &mem) override;
-  virtual void copy_from_device(device_memory &mem) override;
+  void zero_to_device(device_memory &mem) override;
+  void copy_to_device(device_memory &mem) override;
+  void copy_from_device(device_memory &mem) override;
+  void *copy_from_device_synchronized(device_memory &mem, vector<uint8_t> &storage) override;
+
+  void *native_queue() override;
+
+  unique_ptr<DeviceGraphicsInterop> graphics_interop_create() override;
 
  protected:
   void setup_capture();
   void update_capture(DeviceKernel kernel);
   void begin_capture();
   void end_capture();
-  void prepare_resources(DeviceKernel kernel);
+  void prepare_resources();
 
   id<MTLComputeCommandEncoder> get_compute_encoder(DeviceKernel kernel);
   id<MTLBlitCommandEncoder> get_blit_encoder();
 
   MetalDevice *metal_device_;
-  MetalBufferPool temp_buffer_pool_;
 
   API_AVAILABLE(macos(11.0), ios(14.0))
   MTLCommandBufferDescriptor *command_buffer_desc_ = nullptr;
@@ -63,16 +74,10 @@ class MetalDeviceQueue : public DeviceQueue {
   id<MTLSharedEvent> shared_event_ = nil;
   API_AVAILABLE(macos(10.14), ios(14.0))
   MTLSharedEventListener *shared_event_listener_ = nil;
+  MetalDispatchPipeline active_pipelines_[DEVICE_KERNEL_NUM];
 
   dispatch_queue_t event_queue_;
   dispatch_semaphore_t wait_semaphore_;
-
-  struct CopyBack {
-    void *host_pointer;
-    void *gpu_mem;
-    uint64_t size;
-  };
-  std::vector<CopyBack> copy_back_mem_;
 
   uint64_t shared_event_id_;
   uint64_t command_buffers_submitted_ = 0;
@@ -93,10 +98,12 @@ class MetalDeviceQueue : public DeviceQueue {
     uint64_t timing_id;
   };
   std::vector<TimingData> command_encoder_labels_;
-  API_AVAILABLE(macos(10.14), ios(14.0))
-  id<MTLSharedEvent> timing_shared_event_ = nil;
-  uint64_t timing_shared_event_id_;
-  uint64_t command_buffer_start_timing_id_;
+  bool profiling_enabled_ = false;
+  uint64_t current_encoder_idx_ = 0;
+
+  std::atomic<uint64_t> counter_sample_buffer_curr_idx_ = 0;
+
+  void flush_timing_stats();
 
   struct TimingStats {
     double total_time = 0.0;

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -17,7 +18,7 @@ ccl_device void integrator_intersect_subsurface(KernelGlobals kg, IntegratorStat
   }
 #endif
 
-  integrator_path_terminate(kg, state, DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE);
+  integrator_path_terminate(kg, state, nullptr, DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE);
 }
 
 CCL_NAMESPACE_END

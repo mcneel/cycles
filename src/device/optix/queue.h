@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -16,11 +17,11 @@ class OptiXDeviceQueue : public CUDADeviceQueue {
  public:
   OptiXDeviceQueue(OptiXDevice *device);
 
-  virtual void init_execution() override;
+  void init_execution() override;
 
-  virtual bool enqueue(DeviceKernel kernel,
-                       const int work_size,
-                       DeviceKernelArguments const &args) override;
+  bool enqueue(DeviceKernel kernel,
+               const int work_size,
+               const DeviceKernelArguments &args) override;
 };
 
 CCL_NAMESPACE_END

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 OpenGL Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 OpenGL Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -20,7 +21,7 @@ class OpenGLShader {
   int get_position_attrib_location();
   int get_tex_coord_attrib_location();
 
-  void bind(int width, int height);
+  void bind(const int width, const int height);
   void unbind();
 
  protected:

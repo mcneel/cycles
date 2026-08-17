@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -16,20 +17,12 @@ HDCYCLES_NAMESPACE_OPEN_SCOPE
 
 class HdCyclesInstancer final : public PXR_NS::HdInstancer {
  public:
-  HdCyclesInstancer(PXR_NS::HdSceneDelegate *delegate,
-                    const PXR_NS::SdfPath &instancerId
-#if PXR_VERSION <= 2011
-                    ,
-                    const PXR_NS::SdfPath &parentId
-#endif
-  );
+  HdCyclesInstancer(PXR_NS::HdSceneDelegate *delegate, const PXR_NS::SdfPath &instancerId);
   ~HdCyclesInstancer() override;
 
-#if PXR_VERSION > 2011
   void Sync(PXR_NS::HdSceneDelegate *sceneDelegate,
             PXR_NS::HdRenderParam *renderParam,
             PXR_NS::HdDirtyBits *dirtyBits) override;
-#endif
 
   PXR_NS::VtMatrix4dArray ComputeInstanceTransforms(const PXR_NS::SdfPath &prototypeId);
 

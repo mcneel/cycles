@@ -1,16 +1,14 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "device/device.h"
+
 #include "session/buffers.h"
 
-#include "util/foreach.h"
-#include "util/hash.h"
-#include "util/math.h"
-#include "util/time.h"
-#include "util/types.h"
+#include "util/log.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -56,9 +54,7 @@ NODE_DEFINE(BufferPass)
   return type;
 }
 
-BufferPass::BufferPass() : Node(get_node_type())
-{
-}
+BufferPass::BufferPass() : Node(get_node_type()) {}
 
 BufferPass::BufferPass(const Pass *scene_pass)
     : Node(get_node_type()),
@@ -72,11 +68,11 @@ BufferPass::BufferPass(const Pass *scene_pass)
 
 PassInfo BufferPass::get_info() const
 {
-  return Pass::get_info(type, include_albedo, !lightgroup.empty());
+  return Pass::get_info(type, mode, include_albedo, !lightgroup.empty());
 }
 
 /* --------------------------------------------------------------------
- * Buffer Params.
+ * Buffer Parameters.
  */
 
 NODE_DEFINE(BufferParams)
@@ -136,7 +132,7 @@ void BufferParams::update_passes()
   }
 }
 
-void BufferParams::update_passes(const vector<Pass *> &scene_passes)
+void BufferParams::update_passes(const unique_ptr_vector<Pass> &scene_passes)
 {
   passes.clear();
 
@@ -232,12 +228,14 @@ bool BufferParams::modified(const BufferParams &other) const
   }
 
   if (full_x != other.full_x || full_y != other.full_y || full_width != other.full_width ||
-      full_height != other.full_height) {
+      full_height != other.full_height)
+  {
     return true;
   }
 
   if (window_x != other.window_x || window_y != other.window_y ||
-      window_width != other.window_width || window_height != other.window_height) {
+      window_width != other.window_width || window_height != other.window_height)
+  {
     return true;
   }
 
@@ -251,7 +249,8 @@ bool BufferParams::modified(const BufferParams &other) const
 
   if (exposure != other.exposure ||
       use_approximate_shadow_catcher != other.use_approximate_shadow_catcher ||
-      use_transparent_background != other.use_transparent_background) {
+      use_transparent_background != other.use_transparent_background)
+  {
     return true;
   }
 
@@ -262,9 +261,7 @@ bool BufferParams::modified(const BufferParams &other) const
  * Render Buffers.
  */
 
-RenderBuffers::RenderBuffers(Device *device) : buffer(device, "RenderBuffers", MEM_READ_WRITE)
-{
-}
+RenderBuffers::RenderBuffers(Device *device) : buffer(device, "RenderBuffers", MEM_READ_WRITE) {}
 
 RenderBuffers::~RenderBuffers()
 {
@@ -290,8 +287,9 @@ bool RenderBuffers::copy_from_device()
 {
   DCHECK(params.pass_stride != -1);
 
-  if (!buffer.device_pointer)
+  if (!buffer.device_pointer) {
     return false;
+  }
 
   buffer.copy_from_device(0, params.width * params.pass_stride, params.height);
 
@@ -356,7 +354,8 @@ void render_buffers_host_copy_denoised(RenderBuffers *dst,
   float *dst_pixel = dst->buffer.data();
 
   for (int i = 0; i < dst_num_pixels;
-       ++i, src_pixel += src_pass_stride, dst_pixel += dst_pass_stride) {
+       ++i, src_pixel += src_pass_stride, dst_pixel += dst_pass_stride)
+  {
     for (int pass_offset_idx = 0; pass_offset_idx < num_passes; ++pass_offset_idx) {
       const int dst_pass_offset = pass_offsets[pass_offset_idx].dst_offset;
       const int src_pass_offset = pass_offsets[pass_offset_idx].src_offset;

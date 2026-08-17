@@ -1,11 +1,16 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /* Functions to retrieving render passes for display or output. Reading from
  * the raw render buffer and normalizing based on the number of samples,
  * computing alpha, compositing shadow catchers, etc. */
 
 #pragma once
+
+#include "kernel/types.h"
+
+#include "util/color.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -16,14 +21,14 @@ CCL_NAMESPACE_BEGIN
 /* The input buffer contains transparency = 1 - alpha, this converts it to
  * alpha. Also clamp since alpha might end up outside of 0..1 due to Russian
  * roulette. */
-ccl_device_forceinline float film_transparency_to_alpha(float transparency)
+ccl_device_forceinline float film_transparency_to_alpha(const float transparency)
 {
   return saturatef(1.0f - transparency);
 }
 
-ccl_device_inline float film_get_scale(ccl_global const KernelFilmConvert *ccl_restrict
+ccl_device_inline float film_get_scale(const ccl_global KernelFilmConvert *ccl_restrict
                                            kfilm_convert,
-                                       ccl_global const float *ccl_restrict buffer)
+                                       const ccl_global float *ccl_restrict buffer)
 {
   if (kfilm_convert->pass_sample_count == PASS_UNUSED) {
     return kfilm_convert->scale;
@@ -31,16 +36,16 @@ ccl_device_inline float film_get_scale(ccl_global const KernelFilmConvert *ccl_r
 
   if (kfilm_convert->pass_use_filter) {
     const uint sample_count = *(
-        (ccl_global const uint *)(buffer + kfilm_convert->pass_sample_count));
-    return 1.0f / sample_count;
+        (const ccl_global uint *)(buffer + kfilm_convert->pass_sample_count));
+    return kfilm_convert->scale / sample_count;
   }
 
-  return 1.0f;
+  return kfilm_convert->scale;
 }
 
-ccl_device_inline float film_get_scale_exposure(ccl_global const KernelFilmConvert *ccl_restrict
+ccl_device_inline float film_get_scale_exposure(const ccl_global KernelFilmConvert *ccl_restrict
                                                     kfilm_convert,
-                                                ccl_global const float *ccl_restrict buffer)
+                                                const ccl_global float *ccl_restrict buffer)
 {
   if (kfilm_convert->pass_sample_count == PASS_UNUSED &&
       kfilm_convert->pass_shadow_catcher_transparent_sample_count == PASS_UNUSED) {
@@ -72,8 +77,8 @@ ccl_device_inline float film_get_scale_exposure(ccl_global const KernelFilmConve
 }
 
 ccl_device_inline bool film_get_scale_and_scale_exposure(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict scale,
     ccl_private float *ccl_restrict scale_exposure,
     ccl_private float *ccl_restrict background_scale_exposure)
@@ -102,10 +107,18 @@ ccl_device_inline bool film_get_scale_and_scale_exposure(
   }
 
   if (kfilm_convert->pass_use_filter) {
-    *scale = 1.0f / sample_count;
+    const uint sample_count = *(
+        (const ccl_global uint *)(buffer + kfilm_convert->pass_sample_count));
+    if (!sample_count) {
+      *scale = 0.0f;
+      *scale_exposure = 0.0f;
+      return false;
+    }
+
+    *scale = kfilm_convert->scale / sample_count;
   }
   else {
-    *scale = 1.0f;
+    *scale = kfilm_convert->scale;
   }
 
   float local_scale_exposure = *scale;
@@ -154,9 +167,9 @@ ccl_device_inline bool film_get_scale_and_scale_exposure(
  * Float (scalar) passes.
  */
 
-ccl_device_inline void film_get_pass_pixel_depth(ccl_global const KernelFilmConvert *ccl_restrict
+ccl_device_inline void film_get_pass_pixel_depth(const ccl_global KernelFilmConvert *ccl_restrict
                                                      kfilm_convert,
-                                                 ccl_global const float *ccl_restrict buffer,
+                                                 const ccl_global float *ccl_restrict buffer,
                                                  ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components >= 1);
@@ -164,15 +177,15 @@ ccl_device_inline void film_get_pass_pixel_depth(ccl_global const KernelFilmConv
 
   const float scale_exposure = film_get_scale_exposure(kfilm_convert, buffer);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
   const float f = *in;
 
   pixel[0] = (f == 0.0f) ? 1e10f : f * scale_exposure;
 }
 
-ccl_device_inline void film_get_pass_pixel_mist(ccl_global const KernelFilmConvert *ccl_restrict
+ccl_device_inline void film_get_pass_pixel_mist(const ccl_global KernelFilmConvert *ccl_restrict
                                                     kfilm_convert,
-                                                ccl_global const float *ccl_restrict buffer,
+                                                const ccl_global float *ccl_restrict buffer,
                                                 ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components >= 1);
@@ -180,7 +193,7 @@ ccl_device_inline void film_get_pass_pixel_mist(ccl_global const KernelFilmConve
 
   const float scale_exposure = film_get_scale_exposure(kfilm_convert, buffer);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
   const float f = *in;
 
   /* Note that we accumulate 1 - mist in the kernel to avoid having to
@@ -189,8 +202,8 @@ ccl_device_inline void film_get_pass_pixel_mist(ccl_global const KernelFilmConve
 }
 
 ccl_device_inline void film_get_pass_pixel_sample_count(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
 {
   /* TODO(sergey): Consider normalizing into the [0..1] range, so that it is possible to see
@@ -201,12 +214,46 @@ ccl_device_inline void film_get_pass_pixel_sample_count(
   kernel_assert(kfilm_convert->num_components >= 1);
   kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
   const float f = *in;
 
   pixel[0] = __float_as_uint(f) * kfilm_convert->scale;
 }
 
+ccl_device_inline void film_get_pass_pixel_volume_majorant(
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
+    ccl_private float *ccl_restrict pixel)
+{
+  kernel_assert(kfilm_convert->num_components >= 1);
+  kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
+
+  const float scale_exposure = film_get_scale_exposure(kfilm_convert, buffer);
+
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *count = buffer + kfilm_convert->pass_divide;
+  const float f = *in;
+
+  pixel[0] = (*count != 0.0f) ? expf(-(f * scale_exposure) / *count) : 0.0f;
+}
+
+ccl_device_inline void film_get_pass_pixel_rgbe(const ccl_global KernelFilmConvert *ccl_restrict
+                                                    kfilm_convert,
+                                                const ccl_global float *ccl_restrict buffer,
+                                                ccl_private float *ccl_restrict pixel)
+{
+  kernel_assert(kfilm_convert->num_components >= 1);
+  kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
+
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
+  const float3 f = rgbe_to_rgb(RGBE(*in));
+
+  pixel[0] = f.x;
+  pixel[1] = f.y;
+  pixel[2] = f.z;
+}
+
+ccl_device_inline void film_get_pass_pixel_float(const ccl_global KernelFilmConvert *ccl_restrict
 ccl_device_inline void film_get_pass_pixel_shadow_catcher_transparent_sample_count(
     ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
     ccl_global const float *ccl_restrict buffer,
@@ -247,7 +294,7 @@ ccl_device_inline void film_get_pass_pixel_shadow_catcher_background_sample_coun
 
 ccl_device_inline void film_get_pass_pixel_float(ccl_global const KernelFilmConvert *ccl_restrict
                                                      kfilm_convert,
-                                                 ccl_global const float *ccl_restrict buffer,
+                                                 const ccl_global float *ccl_restrict buffer,
                                                  ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components >= 1);
@@ -255,7 +302,7 @@ ccl_device_inline void film_get_pass_pixel_float(ccl_global const KernelFilmConv
 
   const float scale_exposure = film_get_scale_exposure(kfilm_convert, buffer);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
   const float f = *in;
 
   pixel[0] = f * scale_exposure;
@@ -266,27 +313,27 @@ ccl_device_inline void film_get_pass_pixel_float(ccl_global const KernelFilmConv
  */
 
 ccl_device_inline void film_get_pass_pixel_light_path(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components >= 3);
   kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
 
   /* Read light pass. */
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
   float3 f = make_float3(in[0], in[1], in[2]);
 
   /* Optionally add indirect light pass. */
   if (kfilm_convert->pass_indirect != PASS_UNUSED) {
-    ccl_global const float *in_indirect = buffer + kfilm_convert->pass_indirect;
+    const ccl_global float *in_indirect = buffer + kfilm_convert->pass_indirect;
     const float3 f_indirect = make_float3(in_indirect[0], in_indirect[1], in_indirect[2]);
     f += f_indirect;
   }
 
   /* Optionally divide out color. */
   if (kfilm_convert->pass_divide != PASS_UNUSED) {
-    ccl_global const float *in_divide = buffer + kfilm_convert->pass_divide;
+    const ccl_global float *in_divide = buffer + kfilm_convert->pass_divide;
     const float3 f_divide = make_float3(in_divide[0], in_divide[1], in_divide[2]);
     f = safe_divide_even_color(f, f_divide);
 
@@ -309,7 +356,7 @@ ccl_device_inline void film_get_pass_pixel_light_path(
       film_get_scale_and_scale_exposure(
           kfilm_convert, buffer, &scale, &scale_exposure, &background_scale_exposure);
 
-      ccl_global const float *in_combined = buffer + kfilm_convert->pass_combined;
+      const ccl_global float *in_combined = buffer + kfilm_convert->pass_combined;
       const float alpha = in_combined[3] * scale;
       pixel[3] = film_transparency_to_alpha(alpha);
     }
@@ -319,9 +366,9 @@ ccl_device_inline void film_get_pass_pixel_light_path(
   }
 }
 
-ccl_device_inline void film_get_pass_pixel_float3(ccl_global const KernelFilmConvert *ccl_restrict
+ccl_device_inline void film_get_pass_pixel_float3(const ccl_global KernelFilmConvert *ccl_restrict
                                                       kfilm_convert,
-                                                  ccl_global const float *ccl_restrict buffer,
+                                                  const ccl_global float *ccl_restrict buffer,
                                                   ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components >= 3);
@@ -329,7 +376,7 @@ ccl_device_inline void film_get_pass_pixel_float3(ccl_global const KernelFilmCon
 
   const float scale_exposure = film_get_scale_exposure(kfilm_convert, buffer);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
 
   const float3 f = make_float3(in[0], in[1], in[2]) * scale_exposure;
 
@@ -344,7 +391,7 @@ ccl_device_inline void film_get_pass_pixel_float3(ccl_global const KernelFilmCon
       film_get_scale_and_scale_exposure(
           kfilm_convert, buffer, &scale, &scale_exposure, &background_scale_exposure);
 
-      ccl_global const float *in_combined = buffer + kfilm_convert->pass_combined;
+      const ccl_global float *in_combined = buffer + kfilm_convert->pass_combined;
       const float alpha = in_combined[3] * scale;
       pixel[3] = film_transparency_to_alpha(alpha);
     }
@@ -358,17 +405,17 @@ ccl_device_inline void film_get_pass_pixel_float3(ccl_global const KernelFilmCon
  * Float4 passes.
  */
 
-ccl_device_inline void film_get_pass_pixel_motion(ccl_global const KernelFilmConvert *ccl_restrict
+ccl_device_inline void film_get_pass_pixel_motion(const ccl_global KernelFilmConvert *ccl_restrict
                                                       kfilm_convert,
-                                                  ccl_global const float *ccl_restrict buffer,
+                                                  const ccl_global float *ccl_restrict buffer,
                                                   ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components == 4);
   kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
   kernel_assert(kfilm_convert->pass_motion_weight != PASS_UNUSED);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
-  ccl_global const float *in_weight = buffer + kfilm_convert->pass_motion_weight;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in_weight = buffer + kfilm_convert->pass_motion_weight;
 
   const float weight = in_weight[0];
   const float weight_inv = (weight > 0.0f) ? 1.0f / weight : 0.0f;
@@ -382,8 +429,8 @@ ccl_device_inline void film_get_pass_pixel_motion(ccl_global const KernelFilmCon
 }
 
 ccl_device_inline void film_get_pass_pixel_cryptomatte(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components == 4);
@@ -391,7 +438,7 @@ ccl_device_inline void film_get_pass_pixel_cryptomatte(
 
   const float scale = film_get_scale(kfilm_convert, buffer);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
 
   const float4 f = make_float4(in[0], in[1], in[2], in[3]);
 
@@ -403,9 +450,9 @@ ccl_device_inline void film_get_pass_pixel_cryptomatte(
   pixel[3] = f.w * scale;
 }
 
-ccl_device_inline void film_get_pass_pixel_float4(ccl_global const KernelFilmConvert *ccl_restrict
+ccl_device_inline void film_get_pass_pixel_float4(const ccl_global KernelFilmConvert *ccl_restrict
                                                       kfilm_convert,
-                                                  ccl_global const float *ccl_restrict buffer,
+                                                  const ccl_global float *ccl_restrict buffer,
                                                   ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components == 4);
@@ -415,7 +462,7 @@ ccl_device_inline void film_get_pass_pixel_float4(ccl_global const KernelFilmCon
   film_get_scale_and_scale_exposure(
       kfilm_convert, buffer, &scale, &scale_exposure, &background_scale_exposure);
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
 
   const float3 color = make_float3(in[0], in[1], in[2]) * scale_exposure;
   const float alpha = in[3] * scale;
@@ -427,8 +474,8 @@ ccl_device_inline void film_get_pass_pixel_float4(ccl_global const KernelFilmCon
 }
 
 ccl_device_inline void film_get_pass_pixel_combined(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components == 4);
@@ -448,7 +495,7 @@ ccl_device_inline void film_get_pass_pixel_combined(
     return;
   }
 
-  ccl_global const float *in = buffer + kfilm_convert->pass_offset;
+  const ccl_global float *in = buffer + kfilm_convert->pass_offset;
 
   const float3 color = make_float3(in[0], in[1], in[2]) * scale_exposure;
   const float alpha = in[3] * scale;
@@ -464,8 +511,8 @@ ccl_device_inline void film_get_pass_pixel_combined(
  */
 
 ccl_device_inline float3 film_calculate_shadow_catcher_denoised(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer)
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer)
 {
   kernel_assert(kfilm_convert->pass_shadow_catcher != PASS_UNUSED);
 
@@ -473,16 +520,18 @@ ccl_device_inline float3 film_calculate_shadow_catcher_denoised(
   film_get_scale_and_scale_exposure(
       kfilm_convert, buffer, &scale, &scale_exposure, &background_scale_exposure);
 
-  ccl_global const float *in_catcher = buffer + kfilm_convert->pass_shadow_catcher;
+  const ccl_global float *in_catcher = buffer + kfilm_convert->pass_shadow_catcher;
 
   const float3 pixel = make_float3(in_catcher[0], in_catcher[1], in_catcher[2]) * scale_exposure;
 
   return pixel;
 }
 
-ccl_device_inline float3 safe_divide_shadow_catcher(float3 a, float3 b)
+ccl_device_inline float3 safe_divide_shadow_catcher(const float3 a, const float3 b)
 {
-  float x, y, z;
+  float x;
+  float y;
+  float z;
 
   x = (b.x != 0.0f) ? a.x / b.x : 1.0f;
   y = (b.y != 0.0f) ? a.y / b.y : 1.0f;
@@ -492,8 +541,8 @@ ccl_device_inline float3 safe_divide_shadow_catcher(float3 a, float3 b)
 }
 
 ccl_device_inline float3
-film_calculate_shadow_catcher(ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-                              ccl_global const float *ccl_restrict buffer)
+film_calculate_shadow_catcher(const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+                              const ccl_global float *ccl_restrict buffer)
 {
   /* For the shadow catcher pass we divide combined pass by the shadow catcher.
    * Note that denoised shadow catcher pass contains value which only needs ot be scaled (but not
@@ -507,7 +556,7 @@ film_calculate_shadow_catcher(ccl_global const KernelFilmConvert *ccl_restrict k
 
   /* If there is no shadow catcher object in this pixel, there is no modification of the light
    * needed, so return one. */
-  ccl_global const float *in_catcher_sample_count =
+  const ccl_global float *in_catcher_sample_count =
       buffer + kfilm_convert->pass_shadow_catcher_sample_count;
   const float num_samples = in_catcher_sample_count[0];
   if (num_samples == 0.0f) {
@@ -515,7 +564,7 @@ film_calculate_shadow_catcher(ccl_global const KernelFilmConvert *ccl_restrict k
   }
 
   kernel_assert(kfilm_convert->pass_shadow_catcher != PASS_UNUSED);
-  ccl_global const float *in_catcher = buffer + kfilm_convert->pass_shadow_catcher;
+  const ccl_global float *in_catcher = buffer + kfilm_convert->pass_shadow_catcher;
 
   /* NOTE: It is possible that the Shadow Catcher pass is requested as an output without actual
    * shadow catcher objects in the scene. In this case there will be no auxiliary passes required
@@ -525,8 +574,8 @@ film_calculate_shadow_catcher(ccl_global const KernelFilmConvert *ccl_restrict k
   kernel_assert(kfilm_convert->pass_combined != PASS_UNUSED);
   kernel_assert(kfilm_convert->pass_shadow_catcher_matte != PASS_UNUSED);
 
-  ccl_global const float *in_combined = buffer + kfilm_convert->pass_combined;
-  ccl_global const float *in_matte = buffer + kfilm_convert->pass_shadow_catcher_matte;
+  const ccl_global float *in_combined = buffer + kfilm_convert->pass_combined;
+  const ccl_global float *in_matte = buffer + kfilm_convert->pass_shadow_catcher_matte;
 
   /* No scaling needed. The integration works in way that number of samples in the combined and
    * shadow catcher passes are the same, and exposure is canceled during the division. */
@@ -556,8 +605,8 @@ film_calculate_shadow_catcher(ccl_global const KernelFilmConvert *ccl_restrict k
 }
 
 ccl_device_inline float4 film_calculate_shadow_catcher_matte_with_shadow(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer)
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer)
 {
   /* The approximation of the shadow is 1 - average(shadow_catcher_pass). A better approximation
    * is possible.
@@ -575,7 +624,7 @@ ccl_device_inline float4 film_calculate_shadow_catcher_matte_with_shadow(
     return zero_float4();
   }
 
-  ccl_global const float *in_matte = buffer + kfilm_convert->pass_shadow_catcher_matte;
+  const ccl_global float *in_matte = buffer + kfilm_convert->pass_shadow_catcher_matte;
 
   const float3 shadow_catcher = film_calculate_shadow_catcher(kfilm_convert, buffer);
   const float3 color_matte = make_float3(in_matte[0], in_matte[1], in_matte[2]) * scale_exposure;
@@ -602,12 +651,12 @@ ccl_device_inline float4 film_calculate_shadow_catcher_matte_with_shadow(
     return make_float4(alpha_over.x, alpha_over.y, alpha_over.z, 1.0f);
   }
 
-  return make_float4(color_matte.x, color_matte.y, color_matte.z, alpha_matte);
+  return make_float4(color_matte, alpha_matte);
 }
 
 ccl_device_inline void film_get_pass_pixel_shadow_catcher(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components >= 3);
@@ -620,8 +669,8 @@ ccl_device_inline void film_get_pass_pixel_shadow_catcher(
 }
 
 ccl_device_inline void film_get_pass_pixel_shadow_catcher_matte_with_shadow(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
 {
   kernel_assert(kfilm_convert->num_components == 3 || kfilm_convert->num_components == 4);
@@ -642,12 +691,12 @@ ccl_device_inline void film_get_pass_pixel_shadow_catcher_matte_with_shadow(
  */
 
 ccl_device_inline void film_apply_pass_pixel_overlays_rgba(
-    ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
+    const ccl_global KernelFilmConvert *ccl_restrict kfilm_convert,
+    const ccl_global float *ccl_restrict buffer,
     ccl_private float *ccl_restrict pixel)
 {
-  if (kfilm_convert->show_active_pixels &&
-      kfilm_convert->pass_adaptive_aux_buffer != PASS_UNUSED) {
+  if (kfilm_convert->show_active_pixels && kfilm_convert->pass_adaptive_aux_buffer != PASS_UNUSED)
+  {
     if (buffer[kfilm_convert->pass_adaptive_aux_buffer + 3] == 0.0f) {
       const float3 active_rgb = make_float3(1.0f, 0.0f, 0.0f);
       const float3 mix_rgb = interp(make_float3(pixel[0], pixel[1], pixel[2]), active_rgb, 0.5f);

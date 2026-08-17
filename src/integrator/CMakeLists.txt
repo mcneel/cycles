@@ -1,5 +1,6 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2011-2022 Blender Foundation
 
 set(INC
   ..
@@ -13,6 +14,8 @@ set(SRC
   denoiser.cpp
   denoiser_gpu.cpp
   denoiser_oidn.cpp
+  denoiser_oidn_base.cpp
+  denoiser_oidn_gpu.cpp
   denoiser_optix.cpp
   path_trace.cpp
   tile.cpp
@@ -35,7 +38,10 @@ set(SRC_HEADERS
   denoiser.h
   denoiser_gpu.h
   denoiser_oidn.h
+  denoiser_oidn_base.h
+  denoiser_oidn_gpu.h
   denoiser_optix.h
+  guiding.h
   path_trace.h
   tile.h
   pass_accessor.h
@@ -53,26 +59,16 @@ set(SRC_HEADERS
 )
 
 set(LIB
-  cycles_device
+  PUBLIC cycles_device
 
   # NOTE: Is required for RenderBuffers access. Might consider moving files around a bit to
   # avoid such cyclic dependency.
-  cycles_session
+  PUBLIC cycles_session
 
-  cycles_util
+  PUBLIC cycles_util
+  PRIVATE bf::dependencies::optional::openimagedenoise
+  PRIVATE bf::dependencies::optional::openpgl
 )
-
-if(WITH_OPENIMAGEDENOISE)
-  list(APPEND LIB
-    ${OPENIMAGEDENOISE_LIBRARIES}
-  )
-endif()
-
-if(WITH_CYCLES_PATH_GUIDING)
-  list(APPEND LIB
-    ${OPENPGL_LIBRARIES}
-  )
-endif()
 
 include_directories(${INC})
 include_directories(SYSTEM ${INC_SYS})

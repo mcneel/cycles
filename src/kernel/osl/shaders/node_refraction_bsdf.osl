@@ -1,10 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "stdcycles.h"
 
 shader node_refraction_bsdf(color Color = 0.8,
-                            string distribution = "sharp",
+                            string distribution = "ggx",
                             float Roughness = 0.2,
                             float IOR = 1.45,
                             normal Normal = N,
@@ -14,10 +15,5 @@ shader node_refraction_bsdf(color Color = 0.8,
   float eta = backfacing() ? 1.0 / f : f;
   float roughness = Roughness * Roughness;
 
-  if (distribution == "sharp")
-    BSDF = Color * refraction(Normal, eta);
-  else if (distribution == "beckmann")
-    BSDF = Color * microfacet_beckmann_refraction(Normal, roughness, eta);
-  else if (distribution == "GGX")
-    BSDF = Color * microfacet_ggx_refraction(Normal, roughness, eta);
+  BSDF = Color * microfacet(distribution, Normal, roughness, eta, 1);
 }

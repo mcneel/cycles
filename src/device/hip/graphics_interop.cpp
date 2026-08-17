@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #ifdef WITH_HIP
 
@@ -18,62 +19,70 @@ HIPDeviceGraphicsInterop::HIPDeviceGraphicsInterop(HIPDeviceQueue *queue)
 HIPDeviceGraphicsInterop::~HIPDeviceGraphicsInterop()
 {
   HIPContextScope scope(device_);
-
-  if (hip_graphics_resource_) {
-    hip_device_assert(device_, hipGraphicsUnregisterResource(hip_graphics_resource_));
-  }
+  free();
 }
 
-void HIPDeviceGraphicsInterop::set_display_interop(
-    const DisplayDriver::GraphicsInterop &display_interop)
+void HIPDeviceGraphicsInterop::set_buffer(GraphicsInteropBuffer &interop_buffer)
 {
-  const int64_t new_buffer_area = int64_t(display_interop.buffer_width) *
-                                  display_interop.buffer_height;
+  HIPContextScope scope(device_);
 
-  need_clear_ = display_interop.need_clear;
-
-  if (opengl_pbo_id_ == display_interop.opengl_pbo_id && buffer_area_ == new_buffer_area) {
+  if (interop_buffer.is_empty()) {
+    free();
     return;
   }
 
-  HIPContextScope scope(device_);
+  need_zero_ |= interop_buffer.take_zero();
 
-  if (hip_graphics_resource_) {
-    hip_device_assert(device_, hipGraphicsUnregisterResource(hip_graphics_resource_));
+  if (!interop_buffer.has_new_handle()) {
+    return;
   }
 
-  const hipError_t result = hipGraphicsGLRegisterBuffer(
-      &hip_graphics_resource_, display_interop.opengl_pbo_id, hipGraphicsRegisterFlagsNone);
-  if (result != hipSuccess) {
-    LOG(ERROR) << "Error registering OpenGL buffer: " << hipewErrorString(result);
-  }
+  free();
 
-  opengl_pbo_id_ = display_interop.opengl_pbo_id;
-  buffer_area_ = new_buffer_area;
+  switch (interop_buffer.get_type()) {
+    case GraphicsInteropDevice::OPENGL: {
+      const hipError_t result = hipGraphicsGLRegisterBuffer(
+          &hip_graphics_resource_, interop_buffer.take_handle(), hipGraphicsRegisterFlagsNone);
+
+      if (result != hipSuccess) {
+        LOG_ERROR << "Error registering OpenGL buffer: " << hipewErrorString(result);
+        break;
+      }
+
+      buffer_size_ = interop_buffer.get_size();
+
+      break;
+    }
+    case GraphicsInteropDevice::VULKAN:
+    case GraphicsInteropDevice::METAL:
+    case GraphicsInteropDevice::NONE:
+      /* TODO: implement vulkan support. */
+      break;
+  }
 }
 
 device_ptr HIPDeviceGraphicsInterop::map()
 {
-  if (!hip_graphics_resource_) {
-    return 0;
+  hipDeviceptr_t hip_buffer = 0;
+
+  if (hip_graphics_resource_) {
+    HIPContextScope scope(device_);
+    size_t bytes;
+
+    hip_device_assert(device_,
+                      hipGraphicsMapResources(1, &hip_graphics_resource_, queue_->stream()));
+    hip_device_assert(
+        device_, hipGraphicsResourceGetMappedPointer(&hip_buffer, &bytes, hip_graphics_resource_));
+  }
+  else {
+    /* Vulkan buffer is always mapped. */
+    hip_buffer = hip_external_memory_ptr_;
   }
 
-  HIPContextScope scope(device_);
+  if (hip_buffer && need_zero_) {
+    hip_device_assert(device_, hipMemsetD8Async(hip_buffer, 0, buffer_size_, queue_->stream()));
 
-  hipDeviceptr_t hip_buffer;
-  size_t bytes;
-
-  hip_device_assert(device_,
-                    hipGraphicsMapResources(1, &hip_graphics_resource_, queue_->stream()));
-  hip_device_assert(
-      device_, hipGraphicsResourceGetMappedPointer(&hip_buffer, &bytes, hip_graphics_resource_));
-
-  if (need_clear_) {
-    hip_device_assert(
-        device_,
-        hipMemsetD8Async(static_cast<hipDeviceptr_t>(hip_buffer), 0, bytes, queue_->stream()));
-
-    need_clear_ = false;
+    need_zero_ = false;
   }
 
   return static_cast<device_ptr>(hip_buffer);
@@ -81,10 +90,29 @@ device_ptr HIPDeviceGraphicsInterop::map()
 
 void HIPDeviceGraphicsInterop::unmap()
 {
-  HIPContextScope scope(device_);
+  if (hip_graphics_resource_) {
+    HIPContextScope scope(device_);
 
-  hip_device_assert(device_,
-                    hipGraphicsUnmapResources(1, &hip_graphics_resource_, queue_->stream()));
+    hip_device_assert(device_,
+                      hipGraphicsUnmapResources(1, &hip_graphics_resource_, queue_->stream()));
+  }
+}
+
+void HIPDeviceGraphicsInterop::free()
+{
+  if (hip_graphics_resource_) {
+    hip_device_assert(device_, hipGraphicsUnregisterResource(hip_graphics_resource_));
+    hip_graphics_resource_ = nullptr;
+  }
+
+  if (hip_external_memory_ptr_) {
+    hip_device_assert(device_, hipFree(hip_external_memory_ptr_));
+    hip_external_memory_ptr_ = 0;
+  }
+
+  buffer_size_ = 0;
+
+  need_zero_ = false;
 }
 
 CCL_NAMESPACE_END

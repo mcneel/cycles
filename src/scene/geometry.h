@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __GEOMETRY_H__
-#define __GEOMETRY_H__
+#pragma once
 
 #include "graph/node.h"
 
@@ -12,6 +12,7 @@
 
 #include "util/boundbox.h"
 #include "util/set.h"
+#include "util/task.h"
 #include "util/transform.h"
 #include "util/types.h"
 #include "util/vector.h"
@@ -30,6 +31,39 @@ class Shader;
 class Volume;
 struct PackedBVH;
 
+/* Set of flags used to help determining what data has been modified or needs reallocation, so we
+ * can decide which device data to free or update. */
+enum {
+  DEVICE_CURVE_DATA_MODIFIED = (1 << 0),
+  DEVICE_MESH_DATA_MODIFIED = (1 << 1),
+  DEVICE_POINT_DATA_MODIFIED = (1 << 2),
+
+  ATTR_FLOAT_MODIFIED = (1 << 3),
+  ATTR_FLOAT2_MODIFIED = (1 << 4),
+  ATTR_FLOAT3_MODIFIED = (1 << 5),
+  ATTR_FLOAT4_MODIFIED = (1 << 6),
+  ATTR_UCHAR4_MODIFIED = (1 << 7),
+  ATTR_NORMAL_MODIFIED = (1 << 8),
+
+  CURVE_DATA_NEED_REALLOC = (1 << 9),
+  MESH_DATA_NEED_REALLOC = (1 << 10),
+  POINT_DATA_NEED_REALLOC = (1 << 11),
+
+  ATTR_FLOAT_NEEDS_REALLOC = (1 << 12),
+  ATTR_FLOAT2_NEEDS_REALLOC = (1 << 13),
+  ATTR_FLOAT3_NEEDS_REALLOC = (1 << 14),
+  ATTR_FLOAT4_NEEDS_REALLOC = (1 << 15),
+  ATTR_UCHAR4_NEEDS_REALLOC = (1 << 16),
+  ATTR_NORMAL_NEEDS_REALLOC = (1 << 17),
+
+  ATTRS_NEED_REALLOC = (ATTR_FLOAT_NEEDS_REALLOC | ATTR_FLOAT2_NEEDS_REALLOC |
+                        ATTR_FLOAT3_NEEDS_REALLOC | ATTR_FLOAT4_NEEDS_REALLOC |
+                        ATTR_UCHAR4_NEEDS_REALLOC | ATTR_NORMAL_NEEDS_REALLOC),
+  DEVICE_MESH_DATA_NEEDS_REALLOC = (MESH_DATA_NEED_REALLOC | ATTRS_NEED_REALLOC),
+  DEVICE_POINT_DATA_NEEDS_REALLOC = (POINT_DATA_NEED_REALLOC | ATTRS_NEED_REALLOC),
+  DEVICE_CURVE_DATA_NEEDS_REALLOC = (CURVE_DATA_NEED_REALLOC | ATTRS_NEED_REALLOC),
+};
+
 /* Geometry
  *
  * Base class for geometric types like Mesh and Hair. */
@@ -43,6 +77,11 @@ class Geometry : public Node {
     HAIR,
     VOLUME,
     POINTCLOUD,
+    AREA_LIGHT,
+    BACKGROUND_LIGHT,
+    POINT_LIGHT,
+    SPOT_LIGHT,
+    SUN_LIGHT,
   };
 
   Type geometry_type;
@@ -67,13 +106,25 @@ class Geometry : public Node {
   static const uint MAX_MOTION_STEPS = 129;
 
   /* BVH */
-  BVH *bvh;
+  unique_ptr<BVH> bvh;
   size_t attr_map_offset;
   size_t prim_offset;
 
   /* Shader Properties */
   bool has_volume;         /* Set in the device_update_flags(). */
   bool has_surface_bssrdf; /* Set in the device_update_flags(). */
+
+  /* Position attribute. */
+  const packed_float3 *get_position() const;
+  packed_float3 *get_position_for_write();
+  void tag_position_modified();
+  bool position_is_modified() const;
+
+  /* Radius attribute. */
+  const float *get_radius() const;
+  float *get_radius_for_write();
+  void tag_radius_modified();
+  bool radius_is_modified() const;
 
   /* Update Flags */
   bool need_update_rebuild;
@@ -84,7 +135,7 @@ class Geometry : public Node {
 
   /* Constructor/Destructor */
   explicit Geometry(const NodeType *node_type, const Type type);
-  virtual ~Geometry();
+  ~Geometry() override;
 
   /* Geometry */
   virtual void clear(bool preserve_shaders = false);
@@ -92,7 +143,7 @@ class Geometry : public Node {
   virtual void apply_transform(const Transform &tfm, const bool apply_to_motion) = 0;
 
   /* Attribute Requests */
-  bool need_attribute(Scene *scene, AttributeStandard std);
+  bool need_attribute(const Scene *scene, AttributeStandard std);
   bool need_attribute(Scene *scene, ustring name);
 
   AttributeRequestSet needed_attributes();
@@ -102,15 +153,15 @@ class Geometry : public Node {
 
   /* Convert between normalized -1..1 motion time and index in the
    * VERTEX_MOTION attribute. */
-  float motion_time(int step) const;
-  int motion_step(float time) const;
+  float motion_time(const int step) const;
+  int motion_step(const float time) const;
 
   /* BVH */
   void compute_bvh(Device *device,
                    DeviceScene *dscene,
                    SceneParams *params,
                    Progress *progress,
-                   size_t n,
+                   const size_t n,
                    size_t total);
 
   virtual PrimitiveType primitive_type() const = 0;
@@ -130,7 +181,7 @@ class Geometry : public Node {
   bool is_instanced() const;
 
   bool has_true_displacement() const;
-  bool has_motion_blur() const;
+  virtual bool has_motion_blur() const;
   bool has_voxel_attributes() const;
 
   bool is_mesh() const
@@ -153,16 +204,26 @@ class Geometry : public Node {
     return geometry_type == VOLUME;
   }
 
+  bool is_light() const
+  {
+    return geometry_type == AREA_LIGHT || geometry_type == POINT_LIGHT ||
+           geometry_type == SPOT_LIGHT || geometry_type == SUN_LIGHT ||
+           geometry_type == BACKGROUND_LIGHT;
+  }
+
   /* Updates */
   void tag_update(Scene *scene, bool rebuild);
-
-  void tag_bvh_update(bool rebuild);
 };
 
 /* Geometry Manager */
 
 class GeometryManager {
   uint32_t update_flags;
+
+  /* Persistent task pool for BVH building, because the Embree scene creates its own
+   * task group that has a parent pointer to this one. And if we create a task pool
+   * on the stack, that becomes a dangling pointer. See #143662 for details. */
+  TaskPool bvh_task_pool_;
 
  public:
   enum : uint32_t {
@@ -187,6 +248,8 @@ class GeometryManager {
 
     VISIBILITY_MODIFIED = (1 << 11),
 
+    VOLUME_MODIFIED = (1 << 14),
+
     /* tag everything in the manager for an update */
     UPDATE_ALL = ~0u,
 
@@ -200,6 +263,7 @@ class GeometryManager {
   GeometryManager();
   ~GeometryManager();
 
+  void update_interactive_motion(Scene *scene);
   void prune(Scene* scene);
 
   /* Device Updates */
@@ -208,7 +272,7 @@ class GeometryManager {
   void device_free(Device *device, DeviceScene *dscene, bool force_free);
 
   /* Updates */
-  void tag_update(Scene *scene, uint32_t flag);
+  void tag_update(Scene *scene, const uint32_t flag);
 
   bool need_update() const;
 
@@ -245,25 +309,6 @@ class GeometryManager {
   void device_update_displacement_images(Device *device, Scene *scene, Progress &progress);
 
   void device_update_volume_images(Device *device, Scene *scene, Progress &progress);
-
- private:
-  static void update_attribute_element_offset(Geometry *geom,
-                                              device_vector<float> &attr_float,
-                                              size_t &attr_float_offset,
-                                              device_vector<float2> &attr_float2,
-                                              size_t &attr_float2_offset,
-                                              device_vector<packed_float3> &attr_float3,
-                                              size_t &attr_float3_offset,
-                                              device_vector<float4> &attr_float4,
-                                              size_t &attr_float4_offset,
-                                              device_vector<uchar4> &attr_uchar4,
-                                              size_t &attr_uchar4_offset,
-                                              Attribute *mattr,
-                                              AttributePrimitive prim,
-                                              TypeDesc &type,
-                                              AttributeDescriptor &desc);
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __GEOMETRY_H__ */

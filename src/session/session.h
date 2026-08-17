@@ -1,21 +1,23 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __SESSION_H__
-#define __SESSION_H__
+#pragma once
+
+#include <functional>
 
 #include "device/device.h"
 #include "integrator/render_scheduler.h"
 #include "scene/shader.h"
 #include "scene/stats.h"
 #include "session/buffers.h"
+#include "session/cache_eviction.h"
 #include "session/tile.h"
 
 #include "util/progress.h"
 #include "util/stats.h"
 #include "util/thread.h"
 #include "util/unique_ptr.h"
-#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -34,14 +36,19 @@ class SceneParams;
 
 class SessionParams {
  public:
+  /* Device, which is chosen based on Blender Cycles preferences, as well as Scene settings and
+   * command line arguments. */
   DeviceInfo device;
+  /* Device from Cycles preferences for denoising. */
+  DeviceInfo denoise_device;
 
   bool headless;
   bool background;
 
-  bool experimental;
   int samples;
-  int sample_offset;
+  bool use_sample_subset;
+  int sample_subset_offset;
+  int sample_subset_length;
   int pixel_size;
   int threads;
 
@@ -66,9 +73,10 @@ class SessionParams {
     headless = false;
     background = false;
 
-    experimental = false;
     samples = 1024;
-    sample_offset = 0;
+    use_sample_subset = false;
+    sample_subset_offset = 0;
+    sample_subset_length = 1024;
     pixel_size = 1;
     threads = 0;
     time_limit = 0.0;
@@ -88,10 +96,11 @@ class SessionParams {
     /* Modified means we have to recreate the session, any parameter changes
      * that can be handled by an existing Session are omitted. */
     return !(device == params.device && headless == params.headless &&
-             background == params.background && experimental == params.experimental &&
-             pixel_size == params.pixel_size && threads == params.threads &&
-             use_profiling == params.use_profiling && shadingsystem == params.shadingsystem &&
-             use_auto_tile == params.use_auto_tile && tile_size == params.tile_size);
+             background == params.background && pixel_size == params.pixel_size &&
+             threads == params.threads && use_profiling == params.use_profiling &&
+             use_auto_tile == params.use_auto_tile && tile_size == params.tile_size &&
+             use_resolution_divider == params.use_resolution_divider &&
+             shadingsystem == params.shadingsystem);
   }
 };
 
@@ -102,8 +111,10 @@ class SessionParams {
 
 class Session {
  public:
-  Device *device;
-  Scene *scene;
+  unique_ptr<Device> device;
+  /* Denoiser device. Could be the same as the path trace device. */
+  unique_ptr<Device> denoise_device_;
+  unique_ptr<Scene> scene;
   Progress progress;
   SessionParams params;
   Stats stats;
@@ -112,7 +123,7 @@ class Session {
   /* Callback is invoked by tile manager whenever on-dist tiles storage file is closed after
    * writing. Allows an engine integration to keep track of those files without worry about
    * transferring the information when it needs to re-create session during rendering. */
-  function<void(string_view)> full_buffer_written_cb;
+  std::function<void(string_view)> full_buffer_written_cb;
 
   explicit Session(const SessionParams &params, const SceneParams &scene_params);
   ~Session();
@@ -130,9 +141,10 @@ class Session {
   void reset(const SessionParams &session_params, const BufferParams &buffer_params);
 
   void set_pause(bool pause);
+  void set_navigating(bool navigating);
 
-  void set_samples(int samples);
-  void set_time_limit(double time_limit);
+  void set_samples(const int samples);
+  void set_time_limit(const double time_limit);
 
   void set_output_driver(unique_ptr<OutputDriver> driver);
   void set_display_driver(unique_ptr<DisplayDriver> driver);
@@ -193,18 +205,25 @@ class Session {
 
   void run_main_render_loop();
 
-  bool update_scene(int width, int height);
+  bool update_scene(const bool reset_samples);
 
   void update_status_time(bool show_pause = false, bool show_done = false);
 
-  void do_delayed_reset();
+  bool delayed_reset_buffer_params();
+  void update_buffers_for_params();
 
   int2 get_effective_tile_size() const;
+
+  /* Get device used for denoising, may be the same as render device. */
+  Device *denoise_device()
+  {
+    return (denoise_device_) ? denoise_device_.get() : device.get();
+  }
 
   /* Session thread that performs rendering tasks decoupled from the thread
    * controlling the sessions. The thread is created and destroyed along with
    * the session. */
-  thread *session_thread_ = nullptr;
+  unique_ptr<thread> session_thread_ = nullptr;
   thread_condition_variable session_thread_cond_;
   thread_mutex session_thread_mutex_;
   enum {
@@ -224,6 +243,9 @@ class Session {
   TileManager tile_manager_;
   BufferParams buffer_params_;
 
+  /* Manages when image cache eviction happens. */
+  CacheEvictionManager eviction_manager_;
+
   /* Render scheduler is used to get work to be rendered with the current big tile. */
   RenderScheduler render_scheduler_;
 
@@ -235,5 +257,3 @@ class Session {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __SESSION_H__ */

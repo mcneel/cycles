@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_MAP_H__
-#define __UTIL_MAP_H__
+#pragma once
 
 #include <map>
 #include <unordered_map>
@@ -22,5 +22,3 @@ template<typename T> static void map_free_memory(T &data)
 }
 
 CCL_NAMESPACE_END
-
-#endif /* __UTIL_MAP_H__ */

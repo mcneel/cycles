@@ -1,11 +1,10 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "device/memory.h"
 #include "graph/node.h"
-#include "session/buffers.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -21,7 +20,20 @@ enum DenoiserType {
 /* COnstruct human-readable string which denotes the denoiser type. */
 const char *denoiserTypeToHumanReadable(DenoiserType type);
 
-typedef int DenoiserTypeMask;
+using DenoiserTypeMask = int;
+
+enum DenoiserPass {
+  DENOISER_PASS_NONE = 0,
+  DENOISER_PASS_ALBEDO = 1 << 0,
+  DENOISER_PASS_SPECULAR_ALBEDO = 1 << 1,
+  DENOISER_PASS_NORMAL = 1 << 2,
+  DENOISER_PASS_ROUGHNESS = 1 << 3,
+  DENOISER_PASS_DEPTH = 1 << 4,
+  DENOISER_PASS_MOTION = 1 << 5,
+  DENOISER_PASS_BACKWARD_MOTION = 1 << 6,
+};
+
+using DenoiserPassMask = int;
 
 enum DenoiserPrefilter {
   /* Best quality of the result without extra processing time, but requires guiding passes to be
@@ -37,6 +49,13 @@ enum DenoiserPrefilter {
   DENOISER_PREFILTER_ACCURATE = 3,
 
   DENOISER_PREFILTER_NUM,
+};
+
+enum DenoiserQuality {
+  DENOISER_QUALITY_HIGH = 1,
+  DENOISER_QUALITY_BALANCED = 2,
+  DENOISER_QUALITY_FAST = 3,
+  DENOISER_QUALITY_NUM,
 };
 
 /* NOTE: Is not a real scene node. Using Node API for ease of (de)serialization.
@@ -56,26 +75,24 @@ class DenoiseParams : public Node {
   int start_sample = 0;
 
   /* Auxiliary passes. */
-  bool use_pass_albedo = true;
-  bool use_pass_normal = true;
+  DenoiserPassMask passes = DENOISER_PASS_ALBEDO | DENOISER_PASS_NORMAL;
 
   /* Configure the denoiser to use motion vectors, previous image and a temporally stable model. */
   bool temporally_stable = false;
 
+  /* If true, then allow, if supported, OpenImageDenoise to use GPU device.
+   * If false, then OpenImageDenoise will always use CPU regardless of GPU device presence. */
+  bool use_gpu = true;
+
   DenoiserPrefilter prefilter = DENOISER_PREFILTER_FAST;
+  DenoiserQuality quality = DENOISER_QUALITY_HIGH;
+  float upscale_factor = 1.0f;
 
   static const NodeEnum *get_type_enum();
   static const NodeEnum *get_prefilter_enum();
+  static const NodeEnum *get_quality_enum();
 
   DenoiseParams();
-
-  bool modified(const DenoiseParams &other) const
-  {
-    return !(use == other.use && type == other.type && start_sample == other.start_sample &&
-             use_pass_albedo == other.use_pass_albedo &&
-             use_pass_normal == other.use_pass_normal &&
-             temporally_stable == other.temporally_stable && prefilter == other.prefilter);
-  }
 };
 
 CCL_NAMESPACE_END

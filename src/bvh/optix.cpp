@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2019, NVIDIA Corporation.
- * Copyright 2019-2022 Blender Foundation. */
+/* SPDX-FileCopyrightText: 2019 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2019-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #ifdef WITH_OPTIX
 
@@ -28,7 +29,7 @@ BVHOptiX::~BVHOptiX()
 {
   /* Acceleration structure memory is delayed freed on device, since deleting the
    * BVH may happen while still being used for rendering. */
-  device->release_optix_bvh(this);
+  device->release_bvh(this);
 }
 
 CCL_NAMESPACE_END

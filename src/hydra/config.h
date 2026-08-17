@@ -1,10 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include <pxr/pxr.h>
+#include <pxr/pxr.h>  // IWYU pragma: export
 
 #define CCL_NS ccl
 #define CCL_NAMESPACE_USING_DIRECTIVE using namespace CCL_NS;

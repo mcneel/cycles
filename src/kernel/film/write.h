@@ -1,11 +1,19 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "kernel/util/color.h"
+#include "kernel/globals.h"
+
+#include "kernel/integrator/state.h"
+
+#include "kernel/util/colorspace.h"
+
+#include "util/types_rgbe.h"
 
 #ifdef __KERNEL_GPU__
+#  include "util/atomic.h"
 #  define __ATOMIC_PASS_WRITE__
 #endif
 
@@ -22,9 +30,33 @@ ccl_device_forceinline ccl_global float *film_pass_pixel_render_buffer(
   return render_buffer + render_buffer_offset;
 }
 
+ccl_device_forceinline ccl_global float *film_pass_pixel_render_buffer_shadow(
+    KernelGlobals kg,
+    ConstIntegratorShadowState state,
+    ccl_global float *ccl_restrict render_buffer)
+{
+  const uint32_t render_pixel_index = INTEGRATOR_STATE(state, shadow_path, render_pixel_index);
+  const uint64_t render_buffer_offset = (uint64_t)render_pixel_index *
+                                        kernel_data.film.pass_stride;
+  return render_buffer + render_buffer_offset;
+}
+
+ccl_device_forceinline ccl_global float *film_pass_pixel_render_buffer(
+    KernelGlobals kg,
+    const int x,
+    const int y,
+    const int offset,
+    const int stride,
+    ccl_global float *ccl_restrict render_buffer)
+{
+  const int render_pixel_index = offset + x + y * stride;
+  return render_buffer + (uint64_t)render_pixel_index * kernel_data.film.pass_stride;
+}
+
 /* Accumulate in passes. */
 
-ccl_device_inline void film_write_pass_float(ccl_global float *ccl_restrict buffer, float value)
+ccl_device_inline void film_write_pass_float(ccl_global float *ccl_restrict buffer,
+                                             const float value)
 {
 #ifdef __ATOMIC_PASS_WRITE__
   atomic_add_and_fetch_float(buffer, value);
@@ -33,7 +65,8 @@ ccl_device_inline void film_write_pass_float(ccl_global float *ccl_restrict buff
 #endif
 }
 
-ccl_device_inline void film_write_pass_float3(ccl_global float *ccl_restrict buffer, float3 value)
+ccl_device_inline void film_write_pass_float3(ccl_global float *ccl_restrict buffer,
+                                              const float3 value)
 {
 #ifdef __ATOMIC_PASS_WRITE__
   ccl_global float *buf_x = buffer + 0;
@@ -56,7 +89,8 @@ ccl_device_inline void film_write_pass_spectrum(ccl_global float *ccl_restrict b
   film_write_pass_float3(buffer, spectrum_to_rgb(value));
 }
 
-ccl_device_inline void film_write_pass_float4(ccl_global float *ccl_restrict buffer, float4 value)
+ccl_device_inline void film_write_pass_float4(ccl_global float *ccl_restrict buffer,
+                                              const float4 value)
 {
 #ifdef __ATOMIC_PASS_WRITE__
   ccl_global float *buf_x = buffer + 0;
@@ -76,17 +110,23 @@ ccl_device_inline void film_write_pass_float4(ccl_global float *ccl_restrict buf
 #endif
 }
 
+ccl_device_inline void film_overwrite_pass_rgbe(ccl_global float *ccl_restrict buffer,
+                                                const float3 value)
+{
+  *buffer = rgb_to_rgbe(value).f;
+}
+
 /* Overwrite for passes that only write on sample 0. This assumes only a single thread will write
  * to this pixel and no atomics are needed. */
 
 ccl_device_inline void film_overwrite_pass_float(ccl_global float *ccl_restrict buffer,
-                                                 float value)
+                                                 const float value)
 {
   *buffer = value;
 }
 
 ccl_device_inline void film_overwrite_pass_float3(ccl_global float *ccl_restrict buffer,
-                                                  float3 value)
+                                                  const float3 value)
 {
   buffer[0] = value.x;
   buffer[1] = value.y;
@@ -95,12 +135,12 @@ ccl_device_inline void film_overwrite_pass_float3(ccl_global float *ccl_restrict
 
 /* Read back from passes. */
 
-ccl_device_inline float kernel_read_pass_float(ccl_global float *ccl_restrict buffer)
+ccl_device_inline float kernel_read_pass_float(const ccl_global float *ccl_restrict buffer)
 {
   return *buffer;
 }
 
-ccl_device_inline float3 kernel_read_pass_float3(ccl_global float *ccl_restrict buffer)
+ccl_device_inline float3 kernel_read_pass_float3(const ccl_global float *ccl_restrict buffer)
 {
   return make_float3(buffer[0], buffer[1], buffer[2]);
 }
@@ -108,6 +148,11 @@ ccl_device_inline float3 kernel_read_pass_float3(ccl_global float *ccl_restrict 
 ccl_device_inline float4 kernel_read_pass_float4(ccl_global float *ccl_restrict buffer)
 {
   return make_float4(buffer[0], buffer[1], buffer[2], buffer[3]);
+}
+
+ccl_device_inline float3 kernel_read_pass_rgbe(const ccl_global float *ccl_restrict buffer)
+{
+  return rgbe_to_rgb(RGBE(*buffer));
 }
 
 CCL_NAMESPACE_END

@@ -1,89 +1,243 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
+#include "kernel/types.h"
+
+#include "kernel/closure/bsdf_diffuse.h"
+#include "kernel/sample/mapping.h"
+
 CCL_NAMESPACE_BEGIN
 
-typedef struct OrenNayarBsdf {
-  SHADER_CLOSURE_BASE;
-
+struct OrenNayarParam {
   float roughness;
   float a;
   float b;
-} OrenNayarBsdf;
+  Spectrum multiscatter_term;
+};
+
+struct OrenNayarBsdf {
+  SHADER_CLOSURE_BASE;
+
+  OrenNayarParam param;
+};
 
 static_assert(sizeof(ShaderClosure) >= sizeof(OrenNayarBsdf), "OrenNayarBsdf is too large!");
 
-ccl_device Spectrum bsdf_oren_nayar_get_intensity(ccl_private const ShaderClosure *sc,
-                                                  float3 n,
-                                                  float3 v,
-                                                  float3 l)
+/* NOTE: This implements the improved Oren-Nayar model by Yasuhiro Fujii
+ * (https://mimosa-pudica.net/improved-oren-nayar.html), plus an
+ * energy-preserving multi-scattering term based on the OpenPBR specification
+ * (https://academysoftwarefoundation.github.io/OpenPBR). */
+
+/* Above certain roughness threshold we switch to Oren Nayar model. */
+ccl_device_forceinline bool diffuse_roughness_is_almost_zero(const float alpha)
 {
-  ccl_private const OrenNayarBsdf *bsdf = (ccl_private const OrenNayarBsdf *)sc;
-  float nl = max(dot(n, l), 0.0f);
-  float nv = max(dot(n, v), 0.0f);
+  return alpha < 1e-5f;
+}
+
+ccl_device_inline float bsdf_oren_nayar_G(const float cosTheta)
+{
+  if (cosTheta < 1e-6f) {
+    /* The tan(theta) term starts to act up at low cosTheta, so fall back to Taylor expansion. */
+    return (M_PI_2_F - 2.0f / 3.0f) - cosTheta;
+  }
+  const float sinTheta = sin_from_cos(cosTheta);
+  const float theta = safe_acosf(cosTheta);
+  return sinTheta * (theta - 2.0f / 3.0f - sinTheta * cosTheta) +
+         2.0f / 3.0f * (sinTheta / cosTheta) * (1.0f - sqr(sinTheta) * sinTheta);
+}
+
+ccl_device Spectrum bsdf_oren_nayar_get_intensity(const ccl_private OrenNayarBsdf *bsdf,
+                                                  const float3 n,
+                                                  const float3 v,
+                                                  const float3 l)
+{
+  const OrenNayarParam param = bsdf->param;
+  const float nl = max(dot(n, l), 0.0f);
+  if (param.b <= 0.0f) {
+    return make_spectrum(nl * M_1_PI_F);
+  }
+  const float nv = max(dot(n, v), 0.0f);
   float t = dot(l, v) - nl * nv;
 
-  if (t > 0.0f)
+  if (t > 0.0f) {
     t /= max(nl, nv) + FLT_MIN;
-  float is = nl * (bsdf->a + bsdf->b * t);
-  return make_spectrum(is);
+  }
+
+  const float single_scatter = param.a + param.b * t;
+
+  const float El = param.a * M_PI_F + param.b * bsdf_oren_nayar_G(nl);
+  const Spectrum multi_scatter = param.multiscatter_term * (1.0f - El);
+
+  return nl * (make_spectrum(single_scatter) + multi_scatter);
 }
 
-ccl_device int bsdf_oren_nayar_setup(ccl_private OrenNayarBsdf *bsdf)
+ccl_device_inline OrenNayarParam bsdf_oren_nayar_param(const Spectrum color,
+                                                       const float nv,
+                                                       const float roughness)
 {
-  float sigma = bsdf->roughness;
+  const float sigma = saturatef(roughness);
+  const float a = 1.0f / (M_PI_F + sigma * (M_PI_2_F - 2.0f / 3.0f));
+  const float b = sigma * a;
 
-  bsdf->type = CLOSURE_BSDF_OREN_NAYAR_ID;
+  /* Compute energy compensation term (except for (1.0f - El) factor since it depends on wo). */
+  const Spectrum albedo = saturate(color);
+  const float Eavg = a * M_PI_F + ((M_2PI_F - 5.6f) / 3.0f) * b;
+  const Spectrum Ems = M_1_PI_F * sqr(albedo) * (Eavg / (1.0f - Eavg)) /
+                       (one_spectrum() - albedo * (1.0f - Eavg));
+  const float Ev = a * M_PI_F + b * bsdf_oren_nayar_G(max(nv, 0.0f));
 
-  sigma = saturatef(sigma);
-
-  float div = 1.0f / (M_PI_F + ((3.0f * M_PI_F - 4.0f) / 6.0f) * sigma);
-
-  bsdf->a = 1.0f * div;
-  bsdf->b = sigma * div;
-
-  return SD_BSDF | SD_BSDF_HAS_EVAL;
+  return {/* .roughness = */ roughness,
+          /* .a = */ a,
+          /* .b = */ b,
+          /* .multiscatter_term = */ Ems * (1.0f - Ev)};
 }
 
-ccl_device Spectrum bsdf_oren_nayar_eval(ccl_private const ShaderClosure *sc,
+ccl_device void bsdf_oren_nayar_setup(ccl_private ShaderData *sd,
+                                      const float3 N,
+                                      const Spectrum weight,
+                                      const float roughness,
+                                      const Spectrum color)
+{
+  ccl_private OrenNayarBsdf *bsdf = (ccl_private OrenNayarBsdf *)bsdf_alloc(
+      sd, sizeof(OrenNayarBsdf), weight);
+  if (bsdf) {
+    bsdf->N = N;
+    bsdf->type = CLOSURE_BSDF_OREN_NAYAR_ID;
+    bsdf->param = bsdf_oren_nayar_param(color, dot(bsdf->N, sd->wi), roughness);
+    sd->flag |= SD_BSDF | SD_BSDF_HAS_EVAL;
+  }
+}
+
+ccl_device Spectrum bsdf_oren_nayar_eval(const ccl_private ShaderClosure *sc,
                                          const float3 wi,
                                          const float3 wo,
                                          ccl_private float *pdf)
 {
-  ccl_private const OrenNayarBsdf *bsdf = (ccl_private const OrenNayarBsdf *)sc;
-  if (dot(bsdf->N, wo) > 0.0f) {
-    *pdf = 0.5f * M_1_PI_F;
-    return bsdf_oren_nayar_get_intensity(sc, bsdf->N, wi, wo);
+  const ccl_private OrenNayarBsdf *bsdf = (const ccl_private OrenNayarBsdf *)sc;
+  const float cosNO = dot(bsdf->N, wo);
+  if (cosNO > 0.0f) {
+    *pdf = cosNO * M_1_PI_F;
+    return bsdf_oren_nayar_get_intensity(bsdf, bsdf->N, wi, wo);
   }
-  else {
-    *pdf = 0.0f;
-    return zero_spectrum();
-  }
+  *pdf = 0.0f;
+  return zero_spectrum();
 }
 
-ccl_device int bsdf_oren_nayar_sample(ccl_private const ShaderClosure *sc,
-                                      float3 Ng,
-                                      float3 wi,
-                                      float randu,
-                                      float randv,
+ccl_device int bsdf_oren_nayar_sample(const ccl_private ShaderClosure *sc,
+                                      const float3 Ng,
+                                      const float3 wi,
+                                      const float2 rand,
                                       ccl_private Spectrum *eval,
                                       ccl_private float3 *wo,
-                                      ccl_private float *pdf)
+                                      ccl_private float *pdf,
+                                      ccl_private float2 *sampled_roughness,
+                                      ccl_private float *eta)
 {
-  ccl_private const OrenNayarBsdf *bsdf = (ccl_private const OrenNayarBsdf *)sc;
-  sample_uniform_hemisphere(bsdf->N, randu, randv, wo, pdf);
+  const ccl_private OrenNayarBsdf *bsdf = (const ccl_private OrenNayarBsdf *)sc;
+
+  sample_cos_hemisphere(bsdf->N, rand, wo, pdf);
 
   if (dot(Ng, *wo) > 0.0f) {
-    *eval = bsdf_oren_nayar_get_intensity(sc, bsdf->N, wi, *wo);
+    *eval = bsdf_oren_nayar_get_intensity(bsdf, bsdf->N, wi, *wo);
   }
   else {
     *pdf = 0.0f;
     *eval = zero_spectrum();
   }
 
+  *sampled_roughness = one_float2();
+  *eta = 1.0f;
+
   return LABEL_REFLECT | LABEL_DIFFUSE;
 }
+
+/* ---------------------------------------------------------------------------------------- */
+/** \name Subsurface in thin-walled mode
+ *
+ * An infinitesimally thin sheet of dense scattering material, following OpenPBR spec
+ * https://academysoftwarefoundation.github.io/OpenPBR/#model/thin-walledcase
+ *
+ * It is approximated by a diffuse lobe and a translucent lobe, the respective weights of both
+ * lobes are given by subsurface anisotropy, with specifies the relative amount of backward and
+ * forward scattering.
+ *
+ * \{ */
+
+ccl_device_inline void bsdf_thin_subsurface_setup(ccl_private ShaderData *sd,
+                                                  const float3 N,
+                                                  const Spectrum weight,
+                                                  const float anisotropy,
+                                                  const float roughness,
+                                                  const Spectrum color)
+{
+  const Spectrum reflection_weight = saturatef(0.5f * (1.0f - anisotropy)) * weight;
+  const Spectrum transmission_weight = saturatef(0.5f * (1.0f + anisotropy)) * weight;
+  if (is_zero(reflection_weight) && is_zero(transmission_weight)) {
+    return;
+  }
+
+  if (sd->num_closure_left == 0) {
+    return;
+  }
+
+  if (diffuse_roughness_is_almost_zero(roughness)) {
+    bsdf_diffuse_setup(sd, N, reflection_weight);
+    bsdf_translucent_setup(sd, N, transmission_weight);
+    return;
+  }
+
+  const OrenNayarParam param = bsdf_oren_nayar_param(color, dot(N, sd->wi), roughness);
+
+  /* Reflection. */
+  {
+    ccl_private OrenNayarBsdf *bsdf = (ccl_private OrenNayarBsdf *)bsdf_alloc(
+        sd, sizeof(OrenNayarBsdf), reflection_weight);
+    if (bsdf) {
+      bsdf->type = CLOSURE_BSDF_OREN_NAYAR_ID;
+      bsdf->N = N;
+      bsdf->param = param;
+      sd->flag |= SD_BSDF | SD_BSDF_HAS_EVAL;
+    }
+  }
+
+  /* Transmission. */
+  {
+    ccl_private OrenNayarBsdf *bsdf = (ccl_private OrenNayarBsdf *)bsdf_alloc(
+        sd, sizeof(OrenNayarBsdf), transmission_weight);
+    if (bsdf) {
+      bsdf->type = CLOSURE_BSDF_ROUGH_TRANSLUCENT_ID;
+      bsdf->N = -N;
+      bsdf->param = param;
+      sd->flag |= SD_BSDF | SD_BSDF_HAS_EVAL | SD_BSDF_HAS_TRANSMISSION;
+    }
+  }
+}
+
+ccl_device int bsdf_rough_translucent_sample(const ccl_private ShaderClosure *sc,
+                                             const float3 Ng,
+                                             const float3 wi,
+                                             const float2 rand,
+                                             ccl_private Spectrum *eval,
+                                             ccl_private float3 *wo,
+                                             ccl_private float *pdf,
+                                             ccl_private float2 *sampled_roughness,
+                                             ccl_private float *eta)
+{
+  bsdf_oren_nayar_sample(sc, -Ng, reflect(wi, sc->N), rand, eval, wo, pdf, sampled_roughness, eta);
+  return LABEL_TRANSMIT | LABEL_DIFFUSE;
+}
+
+ccl_device Spectrum bsdf_rough_translucent_eval(const ccl_private ShaderClosure *sc,
+                                                const float3 wi,
+                                                const float3 wo,
+                                                ccl_private float *pdf)
+{
+  return bsdf_oren_nayar_eval(sc, reflect(wi, sc->N), wo, pdf);
+}
+
+/** \} */
 
 CCL_NAMESPACE_END

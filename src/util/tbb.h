@@ -1,16 +1,21 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __UTIL_TBB_H__
-#define __UTIL_TBB_H__
+#pragma once
 
 /* TBB includes <windows.h>, do it ourselves first so we are sure
  * WIN32_LEAN_AND_MEAN and similar are defined beforehand. */
-#include "util/windows.h"
+#ifdef _WIN32
+#  include "util/windows.h"
+#endif
 
+#include <tbb/blocked_range2d.h>
+#include <tbb/blocked_range3d.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_for_each.h>
+#include <tbb/parallel_reduce.h>
 #include <tbb/task_arena.h>
 #include <tbb/task_group.h>
 
@@ -23,9 +28,12 @@
 CCL_NAMESPACE_BEGIN
 
 using tbb::blocked_range;
+using tbb::blocked_range2d;
+using tbb::blocked_range3d;
 using tbb::enumerable_thread_specific;
 using tbb::parallel_for;
 using tbb::parallel_for_each;
+using tbb::parallel_reduce;
 
 static inline void thread_capture_fp_settings()
 {
@@ -51,6 +59,9 @@ static inline void parallel_for_cancel()
 #endif
 }
 
-CCL_NAMESPACE_END
+template<typename Function> static inline void isolate_task(const Function &function)
+{
+  tbb::this_task_arena::isolate(function);
+}
 
-#endif /* __UTIL_TBB_H__ */
+CCL_NAMESPACE_END

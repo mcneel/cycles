@@ -1,9 +1,9 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2019, NVIDIA Corporation.
- * Copyright 2019-2022 Blender Foundation. */
+/* SPDX-FileCopyrightText: 2019 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2019-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __BVH_OPTIX_H__
-#define __BVH_OPTIX_H__
+#pragma once
 
 #ifdef WITH_OPTIX
 
@@ -23,17 +23,13 @@ class BVHOptiX : public BVH {
   unique_ptr<device_only_memory<char>> as_data;
   unique_ptr<device_only_memory<char>> motion_transform_data;
 
- protected:
-  friend class BVH;
   BVHOptiX(const BVHParams &params,
            const vector<Geometry *> &geometry,
            const vector<Object *> &objects,
            Device *device);
-  virtual ~BVHOptiX();
+  ~BVHOptiX() override;
 };
 
 CCL_NAMESPACE_END
 
 #endif /* WITH_OPTIX */
-
-#endif /* __BVH_OPTIX_H__ */

@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -14,54 +15,33 @@ CCL_NAMESPACE_BEGIN
 /* Implementation of denoising API which uses the OptiX denoiser. */
 class OptiXDenoiser : public DenoiserGPU {
  public:
-  OptiXDenoiser(Device *path_trace_device, const DenoiseParams &params);
+  OptiXDenoiser(Device *denoiser_device, const DenoiseParams &params);
   ~OptiXDenoiser();
 
- protected:
-  virtual uint get_device_type_mask() const override;
+  virtual bool denoise_buffer(const BufferParams &buffer_params,
+                              const BufferParams &denoised_buffer_params,
+                              RenderBuffers *render_buffers,
+                              int num_samples,
+                              bool allow_inplace_modification,
+                              float2 pixel_jitter) override;
+
+  static bool is_device_supported(const DeviceInfo &device);
 
  private:
-  class DenoiseContext;
-  class DenoisePass;
-
-  virtual bool denoise_buffer(const DenoiseTask &task) override;
-
-  /* Read guiding passes from the render buffers, preprocess them in a way which is expected by
-   * OptiX and store in the guiding passes memory within the given context.
-   *
-   * Pre-processing of the guiding passes is to only happen once per context lifetime. DO not
-   * preprocess them for every pass which is being denoised. */
-  bool denoise_filter_guiding_preprocess(const DenoiseContext &context);
-
   /* Set fake albedo pixels in the albedo guiding pass storage.
    * After this point only passes which do not need albedo for denoising can be processed. */
   bool denoise_filter_guiding_set_fake_albedo(const DenoiseContext &context);
 
-  void denoise_pass(DenoiseContext &context, PassType pass_type);
-
-  /* Read input color pass from the render buffer into the memory which corresponds to the noisy
-   * input within the given context. Pixels are scaled to the number of samples, but are not
-   * preprocessed yet. */
-  void denoise_color_read(const DenoiseContext &context, const DenoisePass &pass);
-
-  /* Run corresponding filter kernels, preparing data for the denoiser or copying data from the
-   * denoiser result to the render buffer. */
-  bool denoise_filter_color_preprocess(const DenoiseContext &context, const DenoisePass &pass);
-  bool denoise_filter_color_postprocess(const DenoiseContext &context, const DenoisePass &pass);
-
-  /* Make sure the OptiX denoiser is created and configured. */
-  bool denoise_ensure(DenoiseContext &context);
-
   /* Create OptiX denoiser descriptor if needed.
    * Will do nothing if the current OptiX descriptor is usable for the given parameters.
    * If the OptiX denoiser descriptor did re-allocate here it is left unconfigured. */
-  bool denoise_create_if_needed(DenoiseContext &context);
+  virtual bool denoise_create_if_needed(DenoiseContext &context) override;
 
   /* Configure existing OptiX denoiser descriptor for the use for the given task. */
-  bool denoise_configure_if_needed(DenoiseContext &context);
+  virtual bool denoise_configure_if_needed(DenoiseContext &context) override;
 
   /* Run configured denoiser. */
-  bool denoise_run(const DenoiseContext &context, const DenoisePass &pass);
+  virtual bool denoise_run(const DenoiseContext &context, const DenoisePass &pass) override;
 
   OptixDenoiser optix_denoiser_ = nullptr;
 
@@ -79,6 +59,7 @@ class OptiXDenoiser : public DenoiserGPU {
   bool use_pass_albedo_ = false;
   bool use_pass_normal_ = false;
   bool use_pass_motion_ = false;
+  bool use_upscale_model_ = false;
 };
 
 CCL_NAMESPACE_END

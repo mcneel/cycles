@@ -1,23 +1,25 @@
 Building Cycles
 ===============
 
-## Quick Setup
+## Prerequisites
 
 Ensure the following software is installed and available in the PATH:
 - Git
-- Subversion
+- Git LFS
 - Python 3
 - CMake
 
-Quick build setup on Windows, macOS and Linux is as follows:
+### Standalone Build
 
-    git clone git://git.blender.org/cycles.git
+Get the source code:
 
+    git clone https://projects.blender.org/blender/cycles.git
     cd cycles
+
+Download precompiled libraries and build:
+
     make update
     make
-
-This will download the Cycles source code, download precompiled libraries, configure CMake, and build.
 
 The resulting binary will be at:
 
@@ -25,7 +27,8 @@ The resulting binary will be at:
 
 ## Hydra Render Delegate with USD Repository
 
-This will make the render delegate work with usdview and other applications built using the USD repository. USD version 21.11 or newer is required.
+This will make the render delegate work with usdview and other applications built using the USD repository. USD version 25.11 or newer is required.
+
 
 USD includes a script to build itself and all required dependencies and then install the result a specified directory.
 
@@ -33,8 +36,15 @@ USD includes a script to build itself and all required dependencies and then ins
     cd USD
     python3 build_scripts/build_usd.py "<path to USD install>"
 
-Build Cycles pointing to this directory.
+Get the Cycles source code:
 
+    git clone https://projects.blender.org/blender/cycles.git
+    cd cycles
+
+At the moment, when using USD from the USD repository, Cycles will build without OSL and NanoVDB support.
+To build Cycles, download the Cycles dependency libraries and point CMake to the USD directory like this.
+
+    make update
     cmake -B ./build -DPXR_ROOT="<path to USD install>"
     make
 
@@ -44,10 +54,30 @@ Test in usdview.
 
 ## Hydra Render Delegate for Houdini
 
-For use in Houdini, Cycles must be built using Houdini's USD libraries. Houdini version 19 or newer is required.
+For use in Houdini, Cycles must be built using Houdini's USD libraries. Houdini version 21+ is required. 
 
+Get the source code:
+
+    git clone https://projects.blender.org/blender/cycles.git
+    cd cycles
+
+Download precompiled libraries and build.
+
+Linux:
+```
+    make update
     cmake -B ./build -DHOUDINI_ROOT="<path to Houdini>"
-    make
+    cmake --build build --config Release
+    cmake --install build
+```
+
+Windows:
+```
+    .\make.bat update
+    cmake -B .\build -DHOUDINI_ROOT="<path to Houdini>"
+    cmake --build build --config Release
+    cmake --install build
+```
 
 The path to Houdini depends on the operating system, typically:
 - Linux: `/opt/hfsX.Y`
@@ -59,6 +89,11 @@ Test in Houdini using an environment variable.
     PXR_PLUGINPATH_NAME=<path to cycles>/install/houdini/dso/usd_plugins houdini
 
 Or copy `install/houdini/packages/cycles.json` to the Houdini packages directory to make it always available.
+The packages directory can be found (or needs to be created) under:
+- Linux: `/home/[username]/houdiniX.Y`
+- macOS: `/Users/[username]/Library/Preferences/houdini/X.Y`
+- Windows: `C:/Users/[username]/Documents/houdiniX.Y`
+**Note:** If you move the Cycles installation folder to another place you need to adjust the path in `cycles.json`.
 
 ## Build System
 
@@ -66,11 +101,7 @@ Cycles uses the CMake build system. As an alternative to the `make` wrapper, CMa
 
 See the CMake configuration to enable and disable various features.
 
-The precompiled libraries are shared with Blender, and will be automatically downloaded from the Blender repository with `make update`. They can also be manually downloaded from:
-
-https://svn.blender.org/svnroot/bf-blender/trunk/lib/
-
-The precompiled libraries are expected to be in a `lib/<platform>` folder next to the `cycles/` source folder.
+The precompiled libraries are shared with Blender, and will be automatically downloaded from the Blender repository with `make update`. This will populate a submodule in the `lib/` folder, matching the platform.
 
 ## Dependencies
 

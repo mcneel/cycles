@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -8,16 +9,16 @@
 
 CCL_NAMESPACE_BEGIN
 
-typedef void (*WindowInitFunc)();
-typedef void (*WindowExitFunc)();
-typedef void (*WindowResizeFunc)(int width, int height);
-typedef void (*WindowDisplayFunc)();
-typedef void (*WindowKeyboardFunc)(unsigned char key);
-typedef void (*WindowMotionFunc)(int x, int y, int button);
+using WindowInitFunc = void (*)();
+using WindowExitFunc = void (*)();
+using WindowResizeFunc = void (*)(int, int);
+using WindowDisplayFunc = void (*)();
+using WindowKeyboardFunc = void (*)(unsigned char);
+using WindowMotionFunc = void (*)(int, int, int);
 
 void window_main_loop(const char *title,
-                      int width,
-                      int height,
+                      const int width,
+                      const int height,
                       WindowInitFunc initf,
                       WindowExitFunc exitf,
                       WindowResizeFunc resize,

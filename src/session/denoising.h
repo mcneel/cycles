@@ -1,14 +1,17 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#ifndef __DENOISING_H__
-#define __DENOISING_H__
+#pragma once
 
 /* TODO(sergey): Make it explicit and clear when something is a denoiser, its pipeline or
  * parameters. Currently it is an annoying mixture of terms used interchangeably. */
 
 #include "device/device.h"
+
 #include "integrator/denoiser.h"
+
+#include "session/buffers.h"
 
 #include "util/string.h"
 #include "util/unique_ptr.h"
@@ -24,7 +27,7 @@ CCL_NAMESPACE_BEGIN
 
 class DenoiserPipeline {
  public:
-  DenoiserPipeline(DeviceInfo &device_info, const DenoiseParams &params);
+  DenoiserPipeline(DeviceInfo &denoiser_device_info, const DenoiseParams &params);
   ~DenoiserPipeline();
 
   bool run();
@@ -44,7 +47,8 @@ class DenoiserPipeline {
 
   Stats stats;
   Profiler profiler;
-  Device *device;
+  unique_ptr<Device> device;
+  unique_ptr<Device> cpu_device;
   std::unique_ptr<Denoiser> denoiser;
 };
 
@@ -130,6 +134,10 @@ class DenoiseImage {
    * fill layers and set up the output channels and passthrough map. */
   bool parse_channels(const ImageSpec &in_spec, string &error);
 
+  /* Read pixels from an open ImageInput into the pixels buffer.
+   * Updates in_spec, num_channels, and pixels. */
+  bool read_pixels(ImageInput *in);
+
   void close_input();
 };
 
@@ -137,7 +145,7 @@ class DenoiseImage {
 
 class DenoiseTask {
  public:
-  DenoiseTask(Device *device, DenoiserPipeline *denoiser, int frame);
+  DenoiseTask(Device *device, DenoiserPipeline *denoiser, const int frame);
   ~DenoiseTask();
 
   /* Task stages */
@@ -163,9 +171,7 @@ class DenoiseTask {
   RenderBuffers buffers;
 
   /* Task handling */
-  bool load_input_pixels(int layer);
+  bool load_input_pixels(const int layer);
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __DENOISING_H__ */

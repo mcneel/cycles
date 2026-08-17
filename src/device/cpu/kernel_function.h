@@ -1,10 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "util/debug.h"
-#include "util/system.h"
+#include "util/debug.h"   // IWYU pragma: keep
+#include "util/system.h"  // IWYU pragma: keep
 
 CCL_NAMESPACE_BEGIN
 
@@ -12,18 +13,15 @@ CCL_NAMESPACE_BEGIN
  *
  * Provides a function-call-like API which gets routed to the most suitable implementation.
  *
- * For example, on a computer which only has SSE4.1 the kernel_sse41 will be used. */
+ * For example, on a computer which only has AVX2 the kernel_avx2 will be used. */
 template<typename FunctionType> class CPUKernelFunction {
  public:
-  CPUKernelFunction(FunctionType kernel_default,
-                    FunctionType kernel_sse2,
-                    FunctionType kernel_sse41,
-                    FunctionType kernel_avx2)
+  CPUKernelFunction(FunctionType kernel_default, FunctionType kernel_avx2)
   {
-    kernel_info_ = get_best_kernel_info(kernel_default, kernel_sse2, kernel_sse41, kernel_avx2);
+    kernel_info_ = get_best_kernel_info(kernel_default, kernel_avx2);
   }
 
-  template<typename... Args> inline auto operator()(Args... args) const
+  template<typename... Args> auto operator()(Args... args) const
   {
     assert(kernel_info_.kernel);
 
@@ -40,9 +38,7 @@ template<typename FunctionType> class CPUKernelFunction {
    * pointer. */
   class KernelInfo {
    public:
-    KernelInfo() : KernelInfo("", nullptr)
-    {
-    }
+    KernelInfo() : KernelInfo("", nullptr) {}
 
     /* TODO(sergey): Use string view, to have higher-level functionality (i.e. comparison) without
      * memory allocation. */
@@ -55,31 +51,14 @@ template<typename FunctionType> class CPUKernelFunction {
     FunctionType kernel;
   };
 
-  KernelInfo get_best_kernel_info(FunctionType kernel_default,
-                                  FunctionType kernel_sse2,
-                                  FunctionType kernel_sse41,
-                                  FunctionType kernel_avx2)
+  KernelInfo get_best_kernel_info(FunctionType kernel_default, FunctionType kernel_avx2)
   {
     /* Silence warnings about unused variables when compiling without some architectures. */
-    (void)kernel_sse2;
-    (void)kernel_sse41;
     (void)kernel_avx2;
 
 #ifdef WITH_CYCLES_OPTIMIZED_KERNEL_AVX2
     if (DebugFlags().cpu.has_avx2() && system_cpu_support_avx2()) {
       return KernelInfo("AVX2", kernel_avx2);
-    }
-#endif
-
-#ifdef WITH_CYCLES_OPTIMIZED_KERNEL_SSE41
-    if (DebugFlags().cpu.has_sse41() && system_cpu_support_sse41()) {
-      return KernelInfo("SSE4.1", kernel_sse41);
-    }
-#endif
-
-#ifdef WITH_CYCLES_OPTIMIZED_KERNEL_SSE2
-    if (DebugFlags().cpu.has_sse2() && system_cpu_support_sse2()) {
-      return KernelInfo("SSE2", kernel_sse2);
     }
 #endif
 

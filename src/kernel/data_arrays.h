@@ -1,8 +1,14 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
+#include "kernel/types.h"
 
 #ifndef KERNEL_DATA_ARRAY
 #  define KERNEL_DATA_ARRAY(type, name)
+#endif
+#ifndef KERNEL_DATA_ARRAY_WRITABLE
+#  define KERNEL_DATA_ARRAY_WRITABLE(type, name) KERNEL_DATA_ARRAY(type, name)
 #endif
 
 /* BVH2, not used for OptiX or Embree. */
@@ -23,7 +29,6 @@ KERNEL_DATA_ARRAY(KernelObject, objects)
 KERNEL_DATA_ARRAY(Transform, object_motion_pass)
 KERNEL_DATA_ARRAY(DecomposedTransform, object_motion)
 KERNEL_DATA_ARRAY(uint, object_flag)
-KERNEL_DATA_ARRAY(float, object_volume_step)
 KERNEL_DATA_ARRAY(uint, object_prim_offset)
 
 /* cameras */
@@ -31,19 +36,13 @@ KERNEL_DATA_ARRAY(DecomposedTransform, camera_motion)
 
 /* triangles */
 KERNEL_DATA_ARRAY(uint, tri_shader)
-KERNEL_DATA_ARRAY(packed_float3, tri_vnormal)
-KERNEL_DATA_ARRAY(uint4, tri_vindex)
-KERNEL_DATA_ARRAY(uint, tri_patch)
-KERNEL_DATA_ARRAY(float2, tri_patch_uv)
+KERNEL_DATA_ARRAY(packed_uint3, tri_vindex)
 KERNEL_DATA_ARRAY(packed_float3, tri_verts)
 
 /* curves */
 KERNEL_DATA_ARRAY(KernelCurve, curves)
 KERNEL_DATA_ARRAY(float4, curve_keys)
 KERNEL_DATA_ARRAY(KernelCurveSegment, curve_segments)
-
-/* patches */
-KERNEL_DATA_ARRAY(uint, patches)
 
 /* pointclouds */
 KERNEL_DATA_ARRAY(float4, points)
@@ -56,6 +55,7 @@ KERNEL_DATA_ARRAY(float2, attributes_float2)
 KERNEL_DATA_ARRAY(packed_float3, attributes_float3)
 KERNEL_DATA_ARRAY(float4, attributes_float4)
 KERNEL_DATA_ARRAY(uchar4, attributes_uchar4)
+KERNEL_DATA_ARRAY(packed_normal, attributes_normal)
 
 /* lights */
 KERNEL_DATA_ARRAY(KernelLightDistribution, light_distribution)
@@ -74,7 +74,7 @@ KERNEL_DATA_ARRAY(uint, triangle_to_tree)
 KERNEL_DATA_ARRAY(KernelParticle, particles)
 
 /* shaders */
-KERNEL_DATA_ARRAY(uint4, svm_nodes)
+KERNEL_DATA_ARRAY(uint, svm_nodes)
 KERNEL_DATA_ARRAY(KernelShader, shaders)
 
 /* lookup tables */
@@ -83,10 +83,21 @@ KERNEL_DATA_ARRAY(float, lookup_table)
 /* tabulated Sobol sample pattern */
 KERNEL_DATA_ARRAY(float, sample_pattern_lut)
 
-/* image textures */
-KERNEL_DATA_ARRAY(TextureInfo, texture_info)
-
 /* ies lights */
 KERNEL_DATA_ARRAY(float, ies)
 
+/* Volume. */
+KERNEL_DATA_ARRAY(KernelOctreeNode, volume_tree_nodes)
+KERNEL_DATA_ARRAY(KernelOctreeRoot, volume_tree_roots)
+KERNEL_DATA_ARRAY(int, volume_tree_root_ids)
+KERNEL_DATA_ARRAY(float, volume_step_size)
+
+/* image textures */
+KERNEL_DATA_ARRAY(KernelImageTexture, image_textures)
+KERNEL_DATA_ARRAY_WRITABLE(KernelTileDescriptor, image_texture_tile_descriptors)
+KERNEL_DATA_ARRAY_WRITABLE(uint8_t, image_texture_tile_access_state)
+KERNEL_DATA_ARRAY(KernelImageUDIM, image_texture_udims)
+KERNEL_DATA_ARRAY(KernelImageInfo, image_info)
+
 #undef KERNEL_DATA_ARRAY
+#undef KERNEL_DATA_ARRAY_WRITABLE

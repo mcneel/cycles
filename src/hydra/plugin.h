@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2022 NVIDIA Corporation
- * Copyright 2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2022 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
@@ -14,14 +15,15 @@ class HdCyclesPlugin final : public PXR_NS::HdRendererPlugin {
   HdCyclesPlugin();
   ~HdCyclesPlugin() override;
 
-#if PXR_VERSION < 2302
-  bool IsSupported() const override;
-#else
-  bool IsSupported(bool gpuEnabled) const override;
+#if PXR_VERSION >= 2511
+  bool IsSupported(HdRendererCreateArgs const &rendererCreateArgs,
+                   std::string *reasonWhyNot = nullptr) const override;
 #endif
+  bool IsSupported(bool gpuEnabled) const override;
 
   PXR_NS::HdRenderDelegate *CreateRenderDelegate() override;
-  PXR_NS::HdRenderDelegate *CreateRenderDelegate(const PXR_NS::HdRenderSettingsMap &) override;
+  PXR_NS::HdRenderDelegate *CreateRenderDelegate(
+      const PXR_NS::HdRenderSettingsMap & /*settingsMap*/) override;
 
   void DeleteRenderDelegate(PXR_NS::HdRenderDelegate *) override;
 };

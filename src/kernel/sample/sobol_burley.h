@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 /*
  * A shuffled, Owen-scrambled Sobol sampler, implemented with the
@@ -13,10 +14,11 @@
 
 #pragma once
 
+#include "kernel/tables.h"
+
 #include "kernel/sample/util.h"
+
 #include "util/hash.h"
-#include "util/math.h"
-#include "util/types.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -47,12 +49,12 @@ ccl_device_forceinline float sobol_burley(uint rev_bit_index,
   else {
     uint i = 0;
     while (rev_bit_index != 0) {
-      uint j = count_leading_zeros(rev_bit_index);
+      const uint j = count_leading_zeros(rev_bit_index);
       result ^= sobol_burley_table[dimension][i + j];
       i += j + 1;
 
-      /* We can't do "<<= j + 1" because that can overflow the shift
-       * operator, which doesn't do what we need on at least x86. */
+      /* We can't do `<<= j + 1` because that can overflow the shift
+       * operator, which doesn't do what we need, at least on x86. */
       rev_bit_index <<= j;
       rev_bit_index <<= 1;
     }
@@ -95,9 +97,9 @@ ccl_device_forceinline float sobol_burley(uint rev_bit_index,
  * length.
  */
 ccl_device float sobol_burley_sample_1D(uint index,
-                                        uint const dimension,
+                                        const uint dimension,
                                         uint seed,
-                                        uint shuffled_index_mask)
+                                        const uint shuffled_index_mask)
 {
   /* Include the dimension in the seed, so we get decorrelated
    * sequences for different dimensions via shuffling. */
@@ -124,7 +126,7 @@ ccl_device float sobol_burley_sample_1D(uint index,
 ccl_device float2 sobol_burley_sample_2D(uint index,
                                          const uint dimension_set,
                                          uint seed,
-                                         uint shuffled_index_mask)
+                                         const uint shuffled_index_mask)
 {
   /* Include the dimension set in the seed, so we get decorrelated
    * sequences for different dimension sets via shuffling. */
@@ -152,7 +154,7 @@ ccl_device float2 sobol_burley_sample_2D(uint index,
 ccl_device float3 sobol_burley_sample_3D(uint index,
                                          const uint dimension_set,
                                          uint seed,
-                                         uint shuffled_index_mask)
+                                         const uint shuffled_index_mask)
 {
   /* Include the dimension set in the seed, so we get decorrelated
    * sequences for different dimension sets via shuffling. */
@@ -181,7 +183,7 @@ ccl_device float3 sobol_burley_sample_3D(uint index,
 ccl_device float4 sobol_burley_sample_4D(uint index,
                                          const uint dimension_set,
                                          uint seed,
-                                         uint shuffled_index_mask)
+                                         const uint shuffled_index_mask)
 {
   /* Include the dimension set in the seed, so we get decorrelated
    * sequences for different dimension sets via shuffling. */

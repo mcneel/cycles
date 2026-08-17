@@ -1,16 +1,15 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include <limits.h>
-#include <string.h>
+#include <cstring>
 
 #include "device/cpu/device.h"
 #include "device/device.h"
-#include "integrator/pass_accessor_cpu.h"
 #include "integrator/path_trace.h"
 #include "scene/background.h"
-#include "scene/bake.h"
 #include "scene/camera.h"
+#include "scene/image.h"
 #include "scene/integrator.h"
 #include "scene/light.h"
 #include "scene/mesh.h"
@@ -22,8 +21,6 @@
 #include "session/output_driver.h"
 #include "session/session.h"
 
-#include "util/foreach.h"
-#include "util/function.h"
 #include "util/log.h"
 #include "util/math.h"
 #include "util/task.h"
@@ -32,7 +29,9 @@
 CCL_NAMESPACE_BEGIN
 
 Session::Session(const SessionParams &params_, const SceneParams &scene_params)
-    : params(params_), render_scheduler_(tile_manager_, params)
+    : params(params_),
+      eviction_manager_(params_.background),
+      render_scheduler_(tile_manager_, params)
 {
   TaskScheduler::init(params.threads);
 
@@ -41,17 +40,32 @@ Session::Session(const SessionParams &params_, const SceneParams &scene_params)
   pause_ = false;
   new_work_added_ = false;
 
-  device = Device::create(params.device, stats, profiler);
+  device = Device::create(params.device, stats, profiler, params_.headless);
 
   if (device->have_error()) {
     progress.set_error(device->error_message());
   }
 
-  scene = new Scene(scene_params, device);
+  scene = make_unique<Scene>(scene_params, device.get());
+
+  if (params.device == params.denoise_device) {
+    /* Reuse render device. */
+  }
+  else {
+    denoise_device_ = Device::create(params.denoise_device, stats, profiler, params_.headless);
+
+    if (denoise_device_->have_error()) {
+      progress.set_error(denoise_device_->error_message());
+    }
+  }
 
   /* Configure path tracer. */
-  path_trace_ = make_unique<PathTrace>(
-      device, scene->film, scene->dscene, render_scheduler_, tile_manager_);
+  path_trace_ = make_unique<PathTrace>(device.get(),
+                                       denoise_device(),
+                                       scene->film,
+                                       &scene->dscene,
+                                       render_scheduler_,
+                                       tile_manager_);
   path_trace_->set_progress(&progress);
   path_trace_->progress_update_cb = [&]() { update_status_time(); };
 
@@ -63,7 +77,7 @@ Session::Session(const SessionParams &params_, const SceneParams &scene_params)
   };
 
   /* Create session thread. */
-  session_thread_ = new thread(function_bind(&Session::thread_run, this));
+  session_thread_ = make_unique<thread>([this] { thread_run(); });
 }
 
 Session::~Session()
@@ -73,14 +87,14 @@ Session::~Session()
 
   /* Signal session thread to end. */
   {
-    thread_scoped_lock session_thread_lock(session_thread_mutex_);
+    const thread_scoped_lock session_thread_lock(session_thread_mutex_);
     session_thread_state_ = SESSION_THREAD_END;
   }
   session_thread_cond_.notify_all();
 
   /* Destroy session thread. */
   session_thread_->join();
-  delete session_thread_;
+  session_thread_.reset();
 
   /* Destroy path tracer, before the device. This is needed because destruction might need to
    * access device for device memory free.
@@ -89,8 +103,9 @@ Session::~Session()
   path_trace_.reset();
 
   /* Destroy scene and device. */
-  delete scene;
-  delete device;
+  scene.reset();
+  denoise_device_.reset();
+  device.reset();
 
   /* Stop task scheduler. */
   TaskScheduler::exit();
@@ -100,7 +115,7 @@ void Session::start()
 {
   {
     /* Signal session thread to start rendering. */
-    thread_scoped_lock session_thread_lock(session_thread_mutex_);
+    const thread_scoped_lock session_thread_lock(session_thread_mutex_);
     if (session_thread_state_ == SESSION_THREAD_RENDER) {
       /* Already rendering, nothing to do. */
       return;
@@ -130,7 +145,7 @@ void Session::cancel(bool quick)
 
     /* Signal unpause in case the render was paused. */
     {
-      thread_scoped_lock pause_lock(pause_mutex_);
+      const thread_scoped_lock pause_lock(pause_mutex_);
       pause_ = false;
     }
     pause_cond_.notify_all();
@@ -147,17 +162,25 @@ bool Session::ready_to_reset()
 
 void Session::run_main_render_loop()
 {
-  path_trace_->clear_display();
+  path_trace_->zero_display();
 
   while (true) {
     RenderWork render_work = run_update_for_next_iteration();
 
+    const bool did_cancel = progress.get_cancel();
+
     if (!render_work) {
-      if (VLOG_INFO_IS_ON) {
-        double total_time, render_time;
-        progress.get_time(total_time, render_time);
-        VLOG_INFO << "Rendering in main loop is done in " << render_time << " seconds.";
-        VLOG_INFO << path_trace_->full_report();
+      if (LOG_IS_ON(LOG_LEVEL_INFO)) {
+        if (did_cancel) {
+          LOG_INFO << "Rendering was canceled.";
+        }
+        else {
+          double total_time;
+          double render_time;
+          progress.get_time(total_time, render_time);
+          LOG_INFO << "Rendering in main loop is done in " << render_time << " seconds.";
+          LOG_INFO << path_trace_->full_report();
+        }
       }
 
       if (params.background) {
@@ -167,7 +190,6 @@ void Session::run_main_render_loop()
       }
     }
 
-    const bool did_cancel = progress.get_cancel();
     if (did_cancel) {
       render_scheduler_.render_work_reschedule_on_cancel(render_work);
       if (!render_work) {
@@ -189,7 +211,7 @@ void Session::run_main_render_loop()
       /* buffers mutex is locked entirely while rendering each
        * sample, and released/reacquired on each iteration to allow
        * reset and draw in between */
-      thread_scoped_lock buffers_lock(buffers_mutex_);
+      const thread_scoped_lock buffers_lock(buffers_mutex_);
 
       /* update status and timing */
       update_status_time();
@@ -231,7 +253,7 @@ void Session::thread_run()
         session_thread_cond_.wait(session_thread_lock);
         continue;
       }
-      else if (session_thread_state_ == SESSION_THREAD_END) {
+      if (session_thread_state_ == SESSION_THREAD_END) {
         /* End thread immediately. */
         break;
       }
@@ -242,7 +264,7 @@ void Session::thread_run()
 
     /* Go back from rendering to waiting. */
     {
-      thread_scoped_lock session_thread_lock(session_thread_mutex_);
+      const thread_scoped_lock session_thread_lock(session_thread_mutex_);
       if (session_thread_state_ == SESSION_THREAD_RENDER) {
         session_thread_state_ = SESSION_THREAD_WAIT;
       }
@@ -277,15 +299,17 @@ void Session::thread_render()
   profiler.stop();
 
   /* progress update */
-  if (progress.get_cancel())
+  if (progress.get_cancel()) {
     progress.set_status(progress.get_cancel_message());
-  else
+  }
+  else {
     progress.set_update();
+  }
 }
 
 bool Session::is_session_thread_rendering()
 {
-  thread_scoped_lock session_thread_lock(session_thread_mutex_);
+  const thread_scoped_lock session_thread_lock(session_thread_mutex_);
   return (session_thread_state_ == SESSION_THREAD_RENDER);
 }
 
@@ -295,32 +319,24 @@ RenderWork Session::run_update_for_next_iteration()
 
   thread_scoped_lock scene_lock(scene->mutex);
 
+  /* Perform delayed reset if requested. */
+  const bool reset_buffers = delayed_reset_buffer_params();
+
+  /* Update scene */
+  const bool reset_scene = update_scene(delayed_reset_.do_reset);
+
+  /* Update buffers for new parameters. After scene update which influences the passes used. */
   bool have_tiles = true;
   bool switched_to_new_tile = false;
-  bool did_reset = false;
 
-  /* Perform delayed reset if requested. */
-  {
-    thread_scoped_lock reset_lock(delayed_reset_.mutex);
-    if (delayed_reset_.do_reset) {
-      did_reset = true;
+  if (reset_buffers) {
+    update_buffers_for_params();
 
-      thread_scoped_lock buffers_lock(buffers_mutex_);
-      do_delayed_reset();
+    /* After reset make sure the tile manager is at the first big tile. */
+    have_tiles = tile_manager_.next();
+    switched_to_new_tile = true;
 
-      /* After reset make sure the tile manager is at the first big tile. */
-      have_tiles = tile_manager_.next();
-      switched_to_new_tile = true;
-    }
-  }
-
-  /* Update number of samples in the integrator.
-   * Ideally this would need to happen once in `Session::set_samples()`, but the issue there is
-   * the initial configuration when Session is created where the `set_samples()` is not used.
-   *
-   * NOTE: Unless reset was requested only allow increasing number of samples. */
-  if (did_reset || scene->integrator->get_aa_samples() < params.samples) {
-    scene->integrator->set_aa_samples(params.samples);
+    eviction_manager_.reset();
   }
 
   /* Update denoiser settings. */
@@ -337,13 +353,15 @@ RenderWork Session::run_update_for_next_iteration()
 
   /* Update path guiding. */
   {
-    const GuidingParams guiding_params = scene->integrator->get_guiding_params(device);
-    const bool guiding_reset = (guiding_params.use) ? scene->need_reset(false) : false;
+    const GuidingParams guiding_params = scene->integrator->get_guiding_params(device.get());
+    const bool guiding_reset = (guiding_params.use) ? reset_scene : false;
     path_trace_->set_guiding_params(guiding_params, guiding_reset);
   }
 
-  render_scheduler_.set_num_samples(params.samples);
-  render_scheduler_.set_start_sample(params.sample_offset);
+  render_scheduler_.set_sample_params(params.samples,
+                                      params.use_sample_subset,
+                                      params.sample_subset_offset,
+                                      params.sample_subset_length);
   render_scheduler_.set_time_limit(params.time_limit);
 
   while (have_tiles) {
@@ -361,8 +379,13 @@ RenderWork Session::run_update_for_next_iteration()
     }
   }
 
+  /* Evict unused image tiles periodically. */
+  if (eviction_manager_.need_eviction(!render_work, switched_to_new_tile)) {
+    scene->image_manager->evict_unused(device.get(), scene.get());
+  }
+
   if (render_work) {
-    scoped_timer update_timer;
+    const scoped_timer update_timer;
 
     if (switched_to_new_tile) {
       BufferParams tile_params = buffer_params_;
@@ -384,28 +407,17 @@ RenderWork Session::run_update_for_next_iteration()
 
       tile_params.update_offset_stride();
 
-      path_trace_->reset(buffer_params_, tile_params, did_reset);
+      path_trace_->reset(buffer_params_, tile_params, reset_buffers);
     }
 
-    const int resolution = render_work.resolution_divider;
-    const int width = max(1, buffer_params_.full_width / resolution);
-    const int height = max(1, buffer_params_.full_height / resolution);
+    /* Update camera if dimensions changed for progressive render. the camera
+     * knows nothing about progressive or cropped rendering, it just gets the
+     * image dimensions passed in. */
+    const float resolution = render_work.resolution_divider;
+    const int width = max(1, int(buffer_params_.full_width / resolution));
+    const int height = max(1, int(buffer_params_.full_height / resolution));
 
-    {
-      /* Load render kernels, before device update where we upload data to the GPU.
-       * Do it outside of the scene mutex since the heavy part of the loading (i.e. kernel
-       * compilation) does not depend on the scene and some other functionality (like display
-       * driver) might be waiting on the scene mutex to synchronize display pass.
-       *
-       * The scene will lock itself for the short period if it needs to update kernel features. */
-      scene_lock.unlock();
-      scene->load_kernels(progress);
-      scene_lock.lock();
-    }
-
-    if (update_scene(width, height)) {
-      profiler.reset(scene->shaders.size(), scene->objects.size());
-    }
+    scene->update_camera_resolution(progress, width, height);
 
     /* Unlock scene mutex before loading denoiser kernels, since that may attempt to activate
      * graphics interop, which can deadlock when the scene mutex is still being held. */
@@ -450,14 +462,26 @@ bool Session::run_wait_for_work(const RenderWork &render_work)
   /* Only leave the loop when rendering is not paused. But even if the current render is
    * un-paused but there is nothing to render keep waiting until new work is added. */
   while (!progress.get_cancel()) {
-    scoped_timer pause_timer;
+    const scoped_timer pause_timer;
 
     if (!pause_ && (render_work || new_work_added_ || delayed_reset_.do_reset)) {
       break;
     }
 
-    /* Wait for either pause state changed, or extra samples added to render. */
-    pause_cond_.wait(pause_lock);
+    const std::chrono::milliseconds wait_time = eviction_manager_.wait_time(!render_work);
+    if (wait_time == std::chrono::milliseconds::zero()) {
+      /* Break out of the loop for cache eviction. */
+      break;
+    }
+
+    /* Wait for either pause state changed, extra samples added to render, or idle
+     * timer before performing eviction. */
+    if (wait_time == std::chrono::milliseconds::max()) {
+      pause_cond_.wait(pause_lock);
+    }
+    else {
+      pause_cond_.wait_for(pause_lock, wait_time);
+    }
 
     if (pause_) {
       progress.add_skip_time(pause_timer, params.background);
@@ -495,25 +519,32 @@ int2 Session::get_effective_tile_size() const
   const int64_t actual_tile_area = static_cast<int64_t>(tile_size) * tile_size;
 
   if (actual_tile_area >= image_area && image_width <= TileManager::MAX_TILE_SIZE &&
-      image_height <= TileManager::MAX_TILE_SIZE) {
+      image_height <= TileManager::MAX_TILE_SIZE)
+  {
     return make_int2(image_width, image_height);
   }
 
   return make_int2(tile_size, tile_size);
 }
 
-void Session::do_delayed_reset()
+bool Session::delayed_reset_buffer_params()
 {
+  /* Reset buffer parameters, delayed from when we got the reset call so we can complete
+   * rendering the sample. Otherwise e.g. viewport navigation might reset without ever
+   * finishing anything. */
+  const thread_scoped_lock reset_lock(delayed_reset_.mutex);
   if (!delayed_reset_.do_reset) {
-    return;
+    return false;
   }
+
+  const thread_scoped_lock buffers_lock(buffers_mutex_);
   delayed_reset_.do_reset = false;
 
   params = delayed_reset_.session_params;
   buffer_params_ = delayed_reset_.buffer_params;
 
-  /* Store parameters used for buffers access outside of scene graph.  */
-  buffer_params_.samples = params.samples;
+  /* Store parameters used for buffers access outside of scene graph. */
+  buffer_params_.samples = min(params.samples, Integrator::MAX_SAMPLES);
   buffer_params_.exposure = scene->film->get_exposure();
   buffer_params_.use_approximate_shadow_catcher =
       scene->film->get_use_approximate_shadow_catcher();
@@ -521,18 +552,21 @@ void Session::do_delayed_reset()
 
   /* Tile and work scheduling. */
   tile_manager_.reset_scheduling(buffer_params_, get_effective_tile_size());
-  render_scheduler_.reset(buffer_params_, params.samples, params.sample_offset);
 
-  /* Passes. */
-  /* When multiple tiles are used SAMPLE_COUNT pass is used to keep track of possible partial
-   * tile results. It is safe to use generic update function here which checks for changes since
-   * changes in tile settings re-creates session, which ensures film is fully updated on tile
-   * changes. */
-  scene->film->update_passes(scene, tile_manager_.has_multiple_tiles());
+  return true;
+}
+
+void Session::update_buffers_for_params()
+{
+  render_scheduler_.set_sample_params(params.samples,
+                                      params.use_sample_subset,
+                                      params.sample_subset_offset,
+                                      params.sample_subset_length);
+  render_scheduler_.reset(buffer_params_);
 
   /* Update for new state of scene and passes. */
   buffer_params_.update_passes(scene->passes);
-  tile_manager_.update(buffer_params_, scene);
+  tile_manager_.update(buffer_params_, scene.get());
 
   /* Update temp directory on reset.
    * This potentially allows to finish the existing rendering with a previously configure
@@ -543,7 +577,7 @@ void Session::do_delayed_reset()
   /* Progress. */
   progress.reset_sample();
   progress.set_total_pixel_samples(static_cast<uint64_t>(buffer_params_.width) *
-                                   buffer_params_.height * params.samples);
+                                   buffer_params_.height * buffer_params_.samples);
 
   if (!params.background) {
     progress.set_start_time();
@@ -556,12 +590,14 @@ void Session::do_delayed_reset()
 void Session::reset(const SessionParams &session_params, const BufferParams &buffer_params)
 {
   {
-    thread_scoped_lock reset_lock(delayed_reset_.mutex);
-    thread_scoped_lock pause_lock(pause_mutex_);
+    const thread_scoped_lock reset_lock(delayed_reset_.mutex);
+    const thread_scoped_lock pause_lock(pause_mutex_);
 
     delayed_reset_.do_reset = true;
     delayed_reset_.session_params = session_params;
     delayed_reset_.buffer_params = buffer_params;
+
+    scene->scene_updated_while_loading_kernels = true;
 
     path_trace_->cancel();
   }
@@ -569,7 +605,7 @@ void Session::reset(const SessionParams &session_params, const BufferParams &buf
   pause_cond_.notify_all();
 }
 
-void Session::set_samples(int samples)
+void Session::set_samples(const int samples)
 {
   if (samples == params.samples) {
     return;
@@ -578,14 +614,14 @@ void Session::set_samples(int samples)
   params.samples = samples;
 
   {
-    thread_scoped_lock pause_lock(pause_mutex_);
+    const thread_scoped_lock pause_lock(pause_mutex_);
     new_work_added_ = true;
   }
 
   pause_cond_.notify_all();
 }
 
-void Session::set_time_limit(double time_limit)
+void Session::set_time_limit(const double time_limit)
 {
   if (time_limit == params.time_limit) {
     return;
@@ -594,7 +630,7 @@ void Session::set_time_limit(double time_limit)
   params.time_limit = time_limit;
 
   {
-    thread_scoped_lock pause_lock(pause_mutex_);
+    const thread_scoped_lock pause_lock(pause_mutex_);
     new_work_added_ = true;
   }
 
@@ -606,7 +642,7 @@ void Session::set_pause(bool pause)
   bool notify = false;
 
   {
-    thread_scoped_lock pause_lock(pause_mutex_);
+    const thread_scoped_lock pause_lock(pause_mutex_);
 
     if (pause != pause_) {
       pause_ = pause;
@@ -624,14 +660,19 @@ void Session::set_pause(bool pause)
   }
 }
 
+void Session::set_navigating(bool navigating)
+{
+  eviction_manager_.set_navigating(navigating);
+}
+
 void Session::set_output_driver(unique_ptr<OutputDriver> driver)
 {
-  path_trace_->set_output_driver(move(driver));
+  path_trace_->set_output_driver(std::move(driver));
 }
 
 void Session::set_display_driver(unique_ptr<DisplayDriver> driver)
 {
-  path_trace_->set_display_driver(move(driver));
+  path_trace_->set_display_driver(std::move(driver));
 }
 
 double Session::get_estimated_remaining_time() const
@@ -641,7 +682,8 @@ double Session::get_estimated_remaining_time() const
     return 0.0;
   }
 
-  double total_time, render_time;
+  double total_time;
+  double render_time;
   progress.get_time(total_time, render_time);
   double remaining = (1.0 - (double)completed) * (render_time / (double)completed);
 
@@ -666,15 +708,32 @@ void Session::wait()
   }
 }
 
-bool Session::update_scene(int width, int height)
+bool Session::update_scene(const bool reset_samples)
 {
-  /* Update camera if dimensions changed for progressive render. the camera
-   * knows nothing about progressive or cropped rendering, it just gets the
-   * image dimensions passed in. */
-  Camera *cam = scene->camera;
-  cam->set_screen_size(width, height);
+  /* Update number of samples in the integrator.
+   * Ideally this would need to happen once in `Session::set_samples()`, but the issue there is
+   * the initial configuration when Session is created where the `set_samples()` is not used.
+   *
+   * NOTE: Unless reset was requested only allow increasing number of samples. */
+  if (reset_samples || scene->integrator->get_aa_samples() < params.samples) {
+    scene->integrator->set_aa_samples(params.samples);
+  }
 
-  return scene->update(progress);
+  scene->integrator->set_use_sample_subset(params.use_sample_subset);
+  scene->integrator->set_sample_subset_offset(params.sample_subset_offset);
+  scene->integrator->set_sample_subset_length(params.sample_subset_length);
+
+  /* When multiple tiles are used SAMPLE_COUNT pass is used to keep track of possible partial
+   * tile results. */
+  scene->film->set_use_sample_count(tile_manager_.has_multiple_tiles());
+
+  const bool reset = scene->need_reset(false);
+
+  if (scene->update(progress)) {
+    profiler.reset(scene->shaders.size(), scene->objects.size());
+  }
+
+  return reset;
 }
 
 static string status_append(const string &status, const string &suffix)
@@ -688,7 +747,8 @@ static string status_append(const string &status, const string &suffix)
 
 void Session::update_status_time(bool show_pause, bool show_done)
 {
-  string status, substatus;
+  string status;
+  string substatus;
 
   const int current_tile = progress.get_rendered_tiles();
   const int num_tiles = tile_manager_.get_num_tiles();
@@ -744,7 +804,7 @@ void Session::collect_statistics(RenderStats *render_stats)
 {
   scene->collect_statistics(render_stats);
   if (params.use_profiling && (params.device.type == DEVICE_CPU)) {
-    render_stats->collect_profiling(scene, profiler);
+    render_stats->collect_profiling(scene.get(), profiler);
   }
 }
 

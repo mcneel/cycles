@@ -1,12 +1,12 @@
-/* SPDX-License-Identifier: Apache-2.0
- * Copyright 2011-2022 Blender Foundation */
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #include "integrator/pass_accessor.h"
 #include "scene/pass.h"
 #include "session/buffers.h"
-#include "util/types.h"
 #include "util/unique_ptr.h"
 
 CCL_NAMESPACE_BEGIN
@@ -32,7 +32,7 @@ class PathTraceWork {
   static unique_ptr<PathTraceWork> create(Device *device,
                                           Film *film,
                                           DeviceScene *device_scene,
-                                          bool *cancel_requested_flag);
+                                          const bool *cancel_requested_flag);
 
   virtual ~PathTraceWork();
 
@@ -43,15 +43,16 @@ class PathTraceWork {
   RenderBuffers *get_render_buffers();
 
   /* Set effective parameters of the big tile and the work itself. */
-  void set_effective_buffer_params(const BufferParams &effective_full_params,
-                                   const BufferParams &effective_big_tile_params,
-                                   const BufferParams &effective_buffer_params);
+  void set_effective_buffer_params(const BufferParams &effective_big_tile_params,
+                                   const BufferParams &effective_buffer_params,
+                                   const BufferParams &effective_denoised_big_tile_params,
+                                   const BufferParams &effective_denoised_buffer_params);
 
   /* Check whether the big tile is being worked on by multiple path trace works. */
   bool has_multiple_works() const;
 
   /* Allocate working memory for execution. Must be called before init_execution(). */
-  virtual void alloc_work_memory(){};
+  virtual void alloc_work_memory() {};
 
   /* Initialize execution of kernels.
    * Will ensure that all device queues are initialized for execution.
@@ -60,12 +61,15 @@ class PathTraceWork {
    * to an every call of the `render_samples()`. */
   virtual void init_execution() = 0;
 
+  /* Release resources acquired by init_execution(). */
+  virtual void deinit_execution() {}
+
   /* Render given number of samples as a synchronous blocking call.
    * The samples are added to the render buffer associated with this work. */
   virtual void render_samples(RenderStatistics &statistics,
-                              int start_sample,
-                              int samples_num,
-                              int sample_offset) = 0;
+                              const int start_sample,
+                              const int samples_num,
+                              const int sample_offset) = 0;
 
   /* Copy render result from this work to the corresponding place of the GPU display.
    *
@@ -73,7 +77,9 @@ class PathTraceWork {
    * noisy pass mode will be passed here when it is known that the buffer does not have denoised
    * passes yet (because denoiser did not run). If the denoised pass is requested and denoiser is
    * not used then this function will fall-back to the noisy pass instead. */
-  virtual void copy_to_display(PathTraceDisplay *display, PassMode pass_mode, int num_samples) = 0;
+  virtual void copy_to_display(PathTraceDisplay *display,
+                               PassMode pass_mode,
+                               const int num_samples) = 0;
 
   virtual void destroy_gpu_resources(PathTraceDisplay *display) = 0;
 
@@ -120,14 +126,18 @@ class PathTraceWork {
 
   /* Perform convergence test on the render buffer, and filter the convergence mask.
    * Returns number of active pixels (the ones which did not converge yet). */
-  virtual int adaptive_sampling_converge_filter_count_active(float threshold, bool reset) = 0;
+  virtual int adaptive_sampling_converge_filter_count_active(const float threshold,
+                                                             bool reset) = 0;
+
+  /* Denoise Volume Scattering Probability Guiding buffers. */
+  virtual void denoise_volume_guiding_buffers() = 0;
 
   /* Run cryptomatte pass post-processing kernels. */
   virtual void cryptomatte_postproces() = 0;
 
   /* Cheap-ish request to see whether rendering is requested and is to be stopped as soon as
    * possible, without waiting for any samples to be finished. */
-  inline bool is_cancel_requested() const
+  bool is_cancel_requested() const
   {
     /* NOTE: Rely on the fact that on x86 CPU reading scalar can happen without atomic even in
      * threaded environment. */
@@ -140,9 +150,11 @@ class PathTraceWork {
     return device_;
   }
 
-#ifdef WITH_PATH_GUIDING
+#if defined(WITH_PATH_GUIDING)
   /* Initializes the per-thread guiding kernel data. */
-  virtual void guiding_init_kernel_globals(void *, void *, const bool)
+  virtual void guiding_init_kernel_globals(void * /*unused*/,
+                                           void * /*unused*/,
+                                           const bool /*unused*/)
   {
   }
 #endif
@@ -151,14 +163,14 @@ class PathTraceWork {
   PathTraceWork(Device *device,
                 Film *film,
                 DeviceScene *device_scene,
-                bool *cancel_requested_flag);
+                const bool *cancel_requested_flag);
 
   PassAccessor::PassAccessInfo get_display_pass_access_info(PassMode pass_mode) const;
 
   /* Get destination which offset and stride are configured so that writing to it will write to a
    * proper location of GPU display texture, taking current tile and device slice into account. */
-  PassAccessor::Destination get_display_destination_template(
-      const PathTraceDisplay *display) const;
+  PassAccessor::Destination get_display_destination_template(const PathTraceDisplay *display,
+                                                             const PassMode mode) const;
 
   /* Device which will be used for path tracing.
    * Note that it is an actual render device (and never is a multi-device). */
@@ -176,14 +188,15 @@ class PathTraceWork {
    * It also defines possible subset of a big tile in the case of multi-device rendering. */
   unique_ptr<RenderBuffers> buffers_;
 
-  /* Effective parameters of the full, big tile, and current work render buffer.
+  /* Effective parameters of the big tile, and current work render buffer.
    * The latter might be different from `buffers_->params` when there is a resolution divider
    * involved. */
-  BufferParams effective_full_params_;
   BufferParams effective_big_tile_params_;
   BufferParams effective_buffer_params_;
+  BufferParams effective_denoised_big_tile_params_;
+  BufferParams effective_denoised_buffer_params_;
 
-  bool *cancel_requested_flag_ = nullptr;
+  const bool *cancel_requested_flag_ = nullptr;
 };
 
 CCL_NAMESPACE_END
