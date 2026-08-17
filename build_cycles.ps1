@@ -75,6 +75,11 @@ function Write-Step($msg) { Write-Host "`n== $msg" -ForegroundColor Cyan }
 function Write-Found($what, $where) { Write-Host ("   {0,-12} {1}" -f $what, $where) -ForegroundColor Green }
 function Write-Missing($what, $why) { Write-Host ("   {0,-12} not found - {1}" -f $what, $why) -ForegroundColor DarkYellow }
 
+# CMake treats a backslash as an escape inside cache values, so a Windows path
+# passed straight through breaks its own find modules - FindCUDA.cmake reports
+# a syntax error rather than a bad path. Normalise every path handed to -D.
+function ConvertTo-CMakePath([string]$p) { return $p.Replace('\', '/') }
+
 # ---------------------------------------------------------------- prerequisites
 
 Write-Step "Checking prerequisites"
@@ -95,6 +100,30 @@ if (-not $vsPath) {
     throw "No Visual Studio 2022 with the C++ toolset found. Install the 'Desktop development with C++' workload."
 }
 Write-Found 'VS 2022' $vsPath
+
+# Enter the Visual Studio developer environment.
+#
+# The oneAPI kernel is compiled by the clang++ shipped in the library bundle,
+# and that compiler locates the MSVC toolchain and Windows SDK through the
+# environment rather than through CMake. Without this it fails with
+# "unable to find a Visual Studio installation". The devshell module is
+# resolved from the detected install rather than hardcoded, unlike the previous
+# scripts which pinned a VS2022 Professional path and then entered a VS2019
+# BuildTools environment.
+$devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+if (Test-Path $devShell) {
+    if (-not $env:VSINSTALLDIR) {
+        Import-Module $devShell
+        Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+        Write-Found 'VS devshell' 'entered (x64)'
+    }
+    else {
+        Write-Found 'VS devshell' "already active ($env:VSINSTALLDIR)"
+    }
+}
+else {
+    Write-Missing 'VS devshell' "$devShell not found; the oneAPI kernel build will fail"
+}
 
 # ------------------------------------------------------------------ libraries
 
@@ -240,23 +269,23 @@ if (-not $InstallDir) {
 }
 
 Write-Step "Configuring ($cmakeConfig)"
-Write-Host "   install -> $InstallDir"
+Write-Host "   install -> $(ConvertTo-CMakePath $InstallDir)"
 
 if (-not [System.IO.Path]::IsPathRooted($BuildDir)) { $BuildDir = Join-Path $cyclesRoot $BuildDir }
 
 $cmakeArgs = @(
-    '-S', $cyclesRoot
-    '-B', $BuildDir
+    '-S', (ConvertTo-CMakePath $cyclesRoot)
+    '-B', (ConvertTo-CMakePath $BuildDir)
     '-G', 'Visual Studio 17 2022'
     '-A', 'x64'
-    "-DCMAKE_INSTALL_PREFIX=$InstallDir"
+    "-DCMAKE_INSTALL_PREFIX=$(ConvertTo-CMakePath $InstallDir)"
     '-DWITH_CYCLES_ALEMBIC=OFF'
     '-DWITH_CYCLES_USD=OFF'
     '-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF'
 )
 
 if ($Devices -contains 'optix') {
-    $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=ON', "-DOPTIX_ROOT_DIR=$optixPath"
+    $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=ON', "-DOPTIX_ROOT_DIR=$(ConvertTo-CMakePath $optixPath)"
 } else {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=OFF'
 }
@@ -267,10 +296,10 @@ if ($Devices -contains 'cuda') {
     # CUDA_PATH/PATH, which silently fails when a stale CUDA_PATH points at an
     # uninstalled version - it reports "CUDA compiler not found" and quietly
     # turns CUDA binaries back off.
-    $cmakeArgs += "-DCUDA_TOOLKIT_ROOT_DIR=$cudaPath"
+    $cmakeArgs += "-DCUDA_TOOLKIT_ROOT_DIR=$(ConvertTo-CMakePath $cudaPath)"
     if ($cuda11Path) {
-        $cmakeArgs += "-DCUDA11_TOOLKIT_ROOT_DIR=$cuda11Path"
-        $cmakeArgs += "-DCUDA11_NVCC_EXECUTABLE=$(Join-Path $cuda11Path 'bin\nvcc.exe')"
+        $cmakeArgs += "-DCUDA11_TOOLKIT_ROOT_DIR=$(ConvertTo-CMakePath $cuda11Path)"
+        $cmakeArgs += "-DCUDA11_NVCC_EXECUTABLE=$(ConvertTo-CMakePath (Join-Path $cuda11Path 'bin/nvcc.exe'))"
     }
     # Leave CYCLES_CUDA_BINARIES_ARCH at the upstream default unless a full
     # cubin build was asked for; PTX-only keeps iteration times sane.
@@ -281,12 +310,12 @@ if ($Devices -contains 'cuda') {
 
 if ($Devices -contains 'hip') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_HIP=ON'
-    $cmakeArgs += "-DHIP_ROOT_DIR=$hipPath"
+    $cmakeArgs += "-DHIP_ROOT_DIR=$(ConvertTo-CMakePath $hipPath)"
 }
 if ($Devices -contains 'oneapi') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_ONEAPI=ON'
-    $cmakeArgs += "-D_LEVEL_ZERO_INCLUDE_DIR=$(Join-Path $levelZeroRoot 'include')"
-    $cmakeArgs += "-D_LEVEL_ZERO_LIBRARY=$(Join-Path $levelZeroRoot 'lib')"
+    $cmakeArgs += "-D_LEVEL_ZERO_INCLUDE_DIR=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'include'))"
+    $cmakeArgs += "-D_LEVEL_ZERO_LIBRARY=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'lib'))"
 }
 
 Write-Host "   cmake $($cmakeArgs -join ' ')" -ForegroundColor DarkGray
@@ -303,4 +332,4 @@ Write-Step "Building ($cmakeConfig)"
 & cmake --build $BuildDir --config $cmakeConfig --target install --parallel
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 
-Write-Step "Done - installed to $InstallDir"
+Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
