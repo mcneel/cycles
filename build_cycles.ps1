@@ -75,6 +75,11 @@ function Write-Step($msg) { Write-Host "`n== $msg" -ForegroundColor Cyan }
 function Write-Found($what, $where) { Write-Host ("   {0,-12} {1}" -f $what, $where) -ForegroundColor Green }
 function Write-Missing($what, $why) { Write-Host ("   {0,-12} not found - {1}" -f $what, $why) -ForegroundColor DarkYellow }
 
+# CMake treats a backslash as an escape inside cache values, so a Windows path
+# passed straight through breaks its own find modules - FindCUDA.cmake reports
+# a syntax error rather than a bad path. Normalise every path handed to -D.
+function ConvertTo-CMakePath([string]$p) { return $p.Replace('\', '/') }
+
 # ---------------------------------------------------------------- prerequisites
 
 Write-Step "Checking prerequisites"
@@ -95,6 +100,30 @@ if (-not $vsPath) {
     throw "No Visual Studio 2022 with the C++ toolset found. Install the 'Desktop development with C++' workload."
 }
 Write-Found 'VS 2022' $vsPath
+
+# Enter the Visual Studio developer environment.
+#
+# The oneAPI kernel is compiled by the clang++ shipped in the library bundle,
+# and that compiler locates the MSVC toolchain and Windows SDK through the
+# environment rather than through CMake. Without this it fails with
+# "unable to find a Visual Studio installation". The devshell module is
+# resolved from the detected install rather than hardcoded, unlike the previous
+# scripts which pinned a VS2022 Professional path and then entered a VS2019
+# BuildTools environment.
+$devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+if (Test-Path $devShell) {
+    if (-not $env:VSINSTALLDIR) {
+        Import-Module $devShell
+        Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+        Write-Found 'VS devshell' 'entered (x64)'
+    }
+    else {
+        Write-Found 'VS devshell' "already active ($env:VSINSTALLDIR)"
+    }
+}
+else {
+    Write-Missing 'VS devshell' "$devShell not found; the oneAPI kernel build will fail"
+}
 
 # ------------------------------------------------------------------ libraries
 
@@ -137,24 +166,51 @@ $detected = [System.Collections.Generic.List[string]]::new()
 # had several SDK versions - treat it as absent and fall back to the on-disk
 # search rather than reporting the toolkit missing.
 
-$cudaPath = $env:CUDA_PATH
-if (-not $cudaPath -or -not (Test-Path $cudaPath)) {
-    $cudaPath = Get-ChildItem 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA' -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+# Enumerate every CUDA toolkit on the machine rather than trusting CUDA_PATH.
+# Installing a second toolkit repoints CUDA_PATH at whichever was installed
+# last, so on a machine with both 11.8 and 12.9 it can easily name the older
+# one - which would silently drop the newest architectures from the build.
+# Machine-level CUDA_PATH_V* entries also go stale when a toolkit is removed,
+# hence the nvcc.exe existence check.
+function Get-CudaToolkits {
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    foreach ($scope in 'Machine', 'User') {
+        $vars = [Environment]::GetEnvironmentVariables($scope)
+        foreach ($k in $vars.Keys) { if ($k -like 'CUDA_PATH*') { $candidates.Add($vars[$k]) } }
+    }
+    if ($env:CUDA_PATH) { $candidates.Add($env:CUDA_PATH) }
+    Get-ChildItem 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA' -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { $candidates.Add($_.FullName) }
+
+    $found = @{}
+    foreach ($c in ($candidates | Where-Object { $_ } | Select-Object -Unique)) {
+        $nvcc = Join-Path $c 'bin\nvcc.exe'
+        if (-not (Test-Path $nvcc)) { continue }
+        $out = & $nvcc --version 2>$null | Select-String 'release ([0-9]+)\.([0-9]+)'
+        if (-not $out) { continue }
+        $ver = [version]("{0}.{1}" -f $out.Matches[0].Groups[1].Value, $out.Matches[0].Groups[2].Value)
+        $key = $c.TrimEnd('\')
+        if (-not $found.ContainsKey($key)) { $found[$key] = $ver }
+    }
+    $found.GetEnumerator() | Sort-Object Value -Descending |
+        ForEach-Object { [pscustomobject]@{ Path = $_.Key; Version = $_.Value } }
 }
-if ($cudaPath -and (Test-Path $cudaPath)) { $detected.Add('cuda'); Write-Found 'CUDA' $cudaPath }
+
+$cudaToolkits = @(Get-CudaToolkits)
+$cudaPath = ($cudaToolkits | Select-Object -First 1).Path
+if ($cudaPath) {
+    $detected.Add('cuda')
+    Write-Found 'CUDA' ("{0}  (v{1})" -f $cudaPath, ($cudaToolkits | Select-Object -First 1).Version)
+}
 else { Write-Missing 'CUDA' 'set CUDA_PATH to enable' }
 
 # Optional second toolkit. Cycles builds the default compute_7x PTX kernel -
 # the fallback path for every NVIDIA card - with CUDA 11 when it is available,
 # which keeps the minimum driver version users need low. Without it that kernel
 # is built with the primary toolkit and the driver floor rises.
-$cuda11Path = $env:CUDA11_TOOLKIT_ROOT_DIR
-if (-not $cuda11Path -or -not (Test-Path $cuda11Path)) {
-    $cuda11Path = Get-ChildItem 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA' -Directory -Filter 'v11.*' -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
-}
-if ($cuda11Path -and (Test-Path $cuda11Path)) { Write-Found 'CUDA 11' $cuda11Path }
+$cuda11 = $cudaToolkits | Where-Object { $_.Version.Major -eq 11 } | Select-Object -First 1
+$cuda11Path = if ($cuda11) { $cuda11.Path } else { $null }
+if ($cuda11Path) { Write-Found 'CUDA 11' ("{0}  (v{1})" -f $cuda11Path, $cuda11.Version) }
 else { Write-Missing 'CUDA 11' 'optional; default PTX kernel will raise the minimum driver version' }
 
 $optixPath = $env:OPTIX_ROOT_DIR
@@ -213,29 +269,38 @@ if (-not $InstallDir) {
 }
 
 Write-Step "Configuring ($cmakeConfig)"
-Write-Host "   install -> $InstallDir"
+Write-Host "   install -> $(ConvertTo-CMakePath $InstallDir)"
 
 if (-not [System.IO.Path]::IsPathRooted($BuildDir)) { $BuildDir = Join-Path $cyclesRoot $BuildDir }
 
 $cmakeArgs = @(
-    '-S', $cyclesRoot
-    '-B', $BuildDir
+    '-S', (ConvertTo-CMakePath $cyclesRoot)
+    '-B', (ConvertTo-CMakePath $BuildDir)
     '-G', 'Visual Studio 17 2022'
     '-A', 'x64'
-    "-DCMAKE_INSTALL_PREFIX=$InstallDir"
+    "-DCMAKE_INSTALL_PREFIX=$(ConvertTo-CMakePath $InstallDir)"
     '-DWITH_CYCLES_ALEMBIC=OFF'
     '-DWITH_CYCLES_USD=OFF'
     '-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF'
 )
 
 if ($Devices -contains 'optix') {
-    $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=ON', "-DOPTIX_ROOT_DIR=$optixPath"
+    $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=ON', "-DOPTIX_ROOT_DIR=$(ConvertTo-CMakePath $optixPath)"
 } else {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=OFF'
 }
 
 if ($Devices -contains 'cuda') {
     $cmakeArgs += '-DWITH_CYCLES_CUDA_BINARIES=ON'
+    # Pass the toolkit explicitly. CMake's FindCUDA otherwise relies on
+    # CUDA_PATH/PATH, which silently fails when a stale CUDA_PATH points at an
+    # uninstalled version - it reports "CUDA compiler not found" and quietly
+    # turns CUDA binaries back off.
+    $cmakeArgs += "-DCUDA_TOOLKIT_ROOT_DIR=$(ConvertTo-CMakePath $cudaPath)"
+    if ($cuda11Path) {
+        $cmakeArgs += "-DCUDA11_TOOLKIT_ROOT_DIR=$(ConvertTo-CMakePath $cuda11Path)"
+        $cmakeArgs += "-DCUDA11_NVCC_EXECUTABLE=$(ConvertTo-CMakePath (Join-Path $cuda11Path 'bin/nvcc.exe'))"
+    }
     # Leave CYCLES_CUDA_BINARIES_ARCH at the upstream default unless a full
     # cubin build was asked for; PTX-only keeps iteration times sane.
     if (-not $CudaBinaries) { $cmakeArgs += '-DCYCLES_CUDA_BINARIES_ARCH=compute_52' }
@@ -245,12 +310,12 @@ if ($Devices -contains 'cuda') {
 
 if ($Devices -contains 'hip') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_HIP=ON'
-    $cmakeArgs += "-DHIP_ROOT_DIR=$hipPath"
+    $cmakeArgs += "-DHIP_ROOT_DIR=$(ConvertTo-CMakePath $hipPath)"
 }
 if ($Devices -contains 'oneapi') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_ONEAPI=ON'
-    $cmakeArgs += "-D_LEVEL_ZERO_INCLUDE_DIR=$(Join-Path $levelZeroRoot 'include')"
-    $cmakeArgs += "-D_LEVEL_ZERO_LIBRARY=$(Join-Path $levelZeroRoot 'lib')"
+    $cmakeArgs += "-D_LEVEL_ZERO_INCLUDE_DIR=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'include'))"
+    $cmakeArgs += "-D_LEVEL_ZERO_LIBRARY=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'lib'))"
 }
 
 Write-Host "   cmake $($cmakeArgs -join ' ')" -ForegroundColor DarkGray
@@ -267,4 +332,4 @@ Write-Step "Building ($cmakeConfig)"
 & cmake --build $BuildDir --config $cmakeConfig --target install --parallel
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 
-Write-Step "Done - installed to $InstallDir"
+Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
