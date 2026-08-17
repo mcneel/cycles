@@ -24,7 +24,7 @@ NODE_DEFINE(MatrixMathNode)
   return type;
 }
 
-MatrixMathNode::MatrixMathNode() : ShaderNode(node_type)
+MatrixMathNode::MatrixMathNode() : ShaderNode(get_node_type())
 {
   tfm = transform_identity();
 }
@@ -36,19 +36,19 @@ void MatrixMathNode::compile(SVMCompiler &compiler)
   ShaderInput *vector_in = input("Vector");
   ShaderOutput *vector_out = output("Vector");
 
-  compiler.stack_assign(vector_in);
-  compiler.stack_assign(vector_out);
+  compiler.input_link(vector_in);
+  compiler.output(vector_out);
 
   if (vector_in->stack_offset == SVM_STACK_INVALID ||
       vector_out->stack_offset == SVM_STACK_INVALID)
     return;
 
-  compiler.add_node(
-      RHINO_NODE_MATRIX_MATH, type, compiler.stack_assign(vector_in), compiler.stack_assign(vector_out));
+  compiler.add_node_packed(
+      RHINO_NODE_MATRIX_MATH, type, compiler.input_link(vector_in), compiler.output(vector_out));
 
-  compiler.add_node(tfm.x);
-  compiler.add_node(tfm.y);
-  compiler.add_node(tfm.z);
+  compiler.add_node_packed(tfm.x);
+  compiler.add_node_packed(tfm.y);
+  compiler.add_node_packed(tfm.z);
 }
 
 void MatrixMathNode::compile(OSLCompiler &compiler)
@@ -73,7 +73,7 @@ NODE_DEFINE(AzimuthAltitudeTransformNode)
   return type;
 }
 
-AzimuthAltitudeTransformNode::AzimuthAltitudeTransformNode() : ShaderNode(node_type)
+AzimuthAltitudeTransformNode::AzimuthAltitudeTransformNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -82,11 +82,11 @@ void AzimuthAltitudeTransformNode::compile(SVMCompiler &compiler)
   ShaderInput *vector_in = input("Vector");
   ShaderOutput *vector_out = output("Vector");
 
-  compiler.add_node(RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM,
-                    compiler.stack_assign(vector_in),
+  compiler.add_node_packed(RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM,
+                    compiler.input_link(vector_in),
                     compiler.stack_assign_if_linked(vector_out)
                     );
-  compiler.add_node(
+  compiler.add_node_packed(
     __float_as_int(azimuth),
     __float_as_int(altitude),
     __float_as_int(threshold));
@@ -114,7 +114,7 @@ NODE_DEFINE(RhinoCheckerTextureNode)
   return type;
 }
 
-RhinoCheckerTextureNode::RhinoCheckerTextureNode() : ShaderNode(node_type)
+RhinoCheckerTextureNode::RhinoCheckerTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -129,14 +129,14 @@ void RhinoCheckerTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_CHECKER_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_CHECKER_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 }
 
 void RhinoCheckerTextureNode::compile(OSLCompiler &compiler)
@@ -187,7 +187,7 @@ NODE_DEFINE(RhinoNoiseTextureNode)
   return type;
 }
 
-RhinoNoiseTextureNode::RhinoNoiseTextureNode() : ShaderNode(node_type)
+RhinoNoiseTextureNode::RhinoNoiseTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -202,22 +202,22 @@ void RhinoNoiseTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_NOISE_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_NOISE_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node(
+  compiler.add_node_packed(
       (int)noise_type, (int)spec_synth_type, octave_count, __float_as_int(frequency_multiplier));
-  compiler.add_node(__float_as_int(amplitude_multiplier),
+  compiler.add_node_packed(__float_as_int(amplitude_multiplier),
                     __float_as_int(clamp_min),
                     __float_as_int(clamp_max),
                     (int)scale_to_clamp);
-  compiler.add_node((int)inverse, __float_as_int(gain));
+  compiler.add_node_packed((int)inverse, __float_as_int(gain));
 }
 
 void RhinoNoiseTextureNode::compile(OSLCompiler &compiler)
@@ -252,7 +252,7 @@ NODE_DEFINE(RhinoWavesTextureNode)
   return type;
 }
 
-RhinoWavesTextureNode::RhinoWavesTextureNode() : ShaderNode(node_type)
+RhinoWavesTextureNode::RhinoWavesTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -268,21 +268,21 @@ void RhinoWavesTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_WAVES_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(color3_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_WAVES_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.input_link(color3_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node((int)wave_type,
+  compiler.add_node_packed((int)wave_type,
                     __float_as_int(wave_width),
                     (int)wave_width_texture_on,
                     __float_as_int(contrast1));
-  compiler.add_node(__float_as_int(contrast2));
+  compiler.add_node_packed(__float_as_int(contrast2));
 }
 
 void RhinoWavesTextureNode::compile(OSLCompiler &compiler)
@@ -307,7 +307,7 @@ NODE_DEFINE(RhinoWavesWidthTextureNode)
   return type;
 }
 
-RhinoWavesWidthTextureNode::RhinoWavesWidthTextureNode() : ShaderNode(node_type)
+RhinoWavesWidthTextureNode::RhinoWavesWidthTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -317,11 +317,11 @@ void RhinoWavesWidthTextureNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *uvw_out = output("UVW");
 
-  compiler.add_node(RHINO_NODE_WAVES_WIDTH_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(uvw_out)));
+  compiler.add_node_packed(RHINO_NODE_WAVES_WIDTH_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.output(uvw_out)));
 
-  compiler.add_node((int)wave_type);
+  compiler.add_node_packed((int)wave_type);
 }
 
 void RhinoWavesWidthTextureNode::compile(OSLCompiler &compiler)
@@ -343,7 +343,7 @@ NODE_DEFINE(RhinoPerturbingPart1TextureNode)
   return type;
 }
 
-RhinoPerturbingPart1TextureNode::RhinoPerturbingPart1TextureNode() : ShaderNode(node_type)
+RhinoPerturbingPart1TextureNode::RhinoPerturbingPart1TextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -355,11 +355,11 @@ void RhinoPerturbingPart1TextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *uvw2_out = output("UVW2");
   ShaderOutput *uvw3_out = output("UVW3");
 
-  compiler.add_node(RHINO_NODE_PERTURBING_PART1_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(uvw1_out),
-                                           compiler.stack_assign(uvw2_out),
-                                           compiler.stack_assign(uvw3_out)));
+  compiler.add_node_packed(RHINO_NODE_PERTURBING_PART1_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.output(uvw1_out),
+                                           compiler.output(uvw2_out),
+                                           compiler.output(uvw3_out)));
 }
 
 void RhinoPerturbingPart1TextureNode::compile(OSLCompiler &compiler)
@@ -387,7 +387,7 @@ NODE_DEFINE(RhinoPerturbingPart2TextureNode)
   return type;
 }
 
-RhinoPerturbingPart2TextureNode::RhinoPerturbingPart2TextureNode() : ShaderNode(node_type)
+RhinoPerturbingPart2TextureNode::RhinoPerturbingPart2TextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -400,12 +400,12 @@ void RhinoPerturbingPart2TextureNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *uvw_out = output("Perturbed UVW");
 
-  compiler.add_node(RHINO_NODE_PERTURBING_PART2_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color3_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_out)),
+  compiler.add_node_packed(RHINO_NODE_PERTURBING_PART2_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(color2_in),
+                                           compiler.input_link(color3_in)),
+                    compiler.encode_uchar4(compiler.output(uvw_out)),
                     __float_as_int(amount));
 }
 
@@ -445,7 +445,7 @@ NODE_DEFINE(RhinoGradientTextureNode)
   return type;
 }
 
-RhinoGradientTextureNode::RhinoGradientTextureNode() : ShaderNode(node_type)
+RhinoGradientTextureNode::RhinoGradientTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -460,17 +460,17 @@ void RhinoGradientTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_GRADIENT_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_GRADIENT_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node((int)gradient_type, (int)flip_alternate, (int)use_custom_curve, point_width);
-  compiler.add_node(point_height);
+  compiler.add_node_packed((int)gradient_type, (int)flip_alternate, (int)use_custom_curve, point_width);
+  compiler.add_node_packed(point_height);
 }
 
 void RhinoGradientTextureNode::compile(OSLCompiler &compiler)
@@ -499,7 +499,7 @@ NODE_DEFINE(RhinoBlendTextureNode)
   return type;
 }
 
-RhinoBlendTextureNode::RhinoBlendTextureNode() : ShaderNode(node_type)
+RhinoBlendTextureNode::RhinoBlendTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -515,17 +515,17 @@ void RhinoBlendTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_BLEND_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(blend_color_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_BLEND_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.input_link(blend_color_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node((int)use_blend_color, __float_as_int(blend_factor));
+  compiler.add_node_packed((int)use_blend_color, __float_as_int(blend_factor));
 }
 
 void RhinoBlendTextureNode::compile(OSLCompiler &compiler)
@@ -551,7 +551,7 @@ NODE_DEFINE(RhinoExposureTextureNode)
   return type;
 }
 
-RhinoExposureTextureNode::RhinoExposureTextureNode() : ShaderNode(node_type)
+RhinoExposureTextureNode::RhinoExposureTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -562,13 +562,13 @@ void RhinoExposureTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(
+  compiler.add_node_packed(
       RHINO_NODE_EXPOSURE_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(color_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+                    compiler.encode_uchar4(compiler.input_link(color_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node(__float_as_int(exposure), __float_as_int(multiplier), __float_as_int(world_luminance), __float_as_int(max_luminance));
+  compiler.add_node_packed(__float_as_int(exposure), __float_as_int(multiplier), __float_as_int(world_luminance), __float_as_int(max_luminance));
 }
 
 void RhinoExposureTextureNode::compile(OSLCompiler &compiler)
@@ -598,7 +598,7 @@ NODE_DEFINE(RhinoFbmTextureNode)
   return type;
 }
 
-RhinoFbmTextureNode::RhinoFbmTextureNode() : ShaderNode(node_type)
+RhinoFbmTextureNode::RhinoFbmTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -613,17 +613,17 @@ void RhinoFbmTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(
+  compiler.add_node_packed(
       RHINO_NODE_FBM_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node((int)is_turbulent,
+  compiler.add_node_packed((int)is_turbulent,
                     max_octaves, __float_as_int(gain), __float_as_int(roughness));
 }
 
@@ -652,7 +652,7 @@ NODE_DEFINE(RhinoGridTextureNode)
   return type;
 }
 
-RhinoGridTextureNode::RhinoGridTextureNode() : ShaderNode(node_type)
+RhinoGridTextureNode::RhinoGridTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -667,16 +667,16 @@ void RhinoGridTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_GRID_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_GRID_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node(cells, __float_as_int(font_thickness));
+  compiler.add_node_packed(cells, __float_as_int(font_thickness));
 }
 
 void RhinoGridTextureNode::compile(OSLCompiler &compiler)
@@ -719,7 +719,7 @@ NODE_DEFINE(RhinoProjectionChangerTextureNode)
   return type;
 }
 
-RhinoProjectionChangerTextureNode::RhinoProjectionChangerTextureNode() : ShaderNode(node_type)
+RhinoProjectionChangerTextureNode::RhinoProjectionChangerTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -729,11 +729,11 @@ void RhinoProjectionChangerTextureNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *uvw_out = output("Output UVW");
 
-  compiler.add_node(
+  compiler.add_node_packed(
       RHINO_NODE_PROJECTION_CHANGER_TEXTURE,
-      compiler.encode_uchar4(compiler.stack_assign(uvw_in), compiler.stack_assign(uvw_out)));
+      compiler.encode_uchar4(compiler.input_link(uvw_in), compiler.output(uvw_out)));
 
-  compiler.add_node((int)input_projection_type, (int)output_projection_type, __float_as_int(azimuth), __float_as_int(altitude));
+  compiler.add_node_packed((int)input_projection_type, (int)output_projection_type, __float_as_int(azimuth), __float_as_int(altitude));
 }
 
 void RhinoProjectionChangerTextureNode::compile(OSLCompiler &compiler)
@@ -764,7 +764,7 @@ NODE_DEFINE(RhinoMaskTextureNode)
   return type;
 }
 
-RhinoMaskTextureNode::RhinoMaskTextureNode() : ShaderNode(node_type)
+RhinoMaskTextureNode::RhinoMaskTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -776,13 +776,13 @@ void RhinoMaskTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_MASK_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(color_in),
-                                           compiler.stack_assign(alpha_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_MASK_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(color_in),
+                                           compiler.input_link(alpha_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node((int)mask_type);
+  compiler.add_node_packed((int)mask_type);
 }
 
 void RhinoMaskTextureNode::compile(OSLCompiler &compiler)
@@ -812,7 +812,7 @@ NODE_DEFINE(RhinoPerlinMarbleTextureNode)
   return type;
 }
 
-RhinoPerlinMarbleTextureNode::RhinoPerlinMarbleTextureNode() : ShaderNode(node_type)
+RhinoPerlinMarbleTextureNode::RhinoPerlinMarbleTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -825,16 +825,16 @@ void RhinoPerlinMarbleTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(RHINO_NODE_PERLIN_MARBLE_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha_out)));
+  compiler.add_node_packed(RHINO_NODE_PERLIN_MARBLE_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(color2_in),
+                                           compiler.output(color_out)),
+                    compiler.encode_uchar4(compiler.output(alpha_out)));
 
-  compiler.add_node(
+  compiler.add_node_packed(
       levels, __float_as_int(noise_amount), __float_as_int(blur), __float_as_int(size));
-  compiler.add_node(__float_as_int(color1_sat), __float_as_int(color2_sat));
+  compiler.add_node_packed(__float_as_int(color1_sat), __float_as_int(color2_sat));
 }
 
 void RhinoPerlinMarbleTextureNode::compile(OSLCompiler &compiler)
@@ -865,7 +865,7 @@ NODE_DEFINE(RhinoPhysicalSkyTextureNode)
   return type;
 }
 
-RhinoPhysicalSkyTextureNode::RhinoPhysicalSkyTextureNode() : ShaderNode(node_type)
+RhinoPhysicalSkyTextureNode::RhinoPhysicalSkyTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -875,17 +875,17 @@ void RhinoPhysicalSkyTextureNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *color_out = output("Color");
 
-  compiler.add_node(RHINO_NODE_PHYSICAL_SKY_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color_out)));
+  compiler.add_node_packed(RHINO_NODE_PHYSICAL_SKY_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.output(color_out)));
 
-  compiler.add_node(make_float4(sun_dir.x, sun_dir.y, sun_dir.z, atmospheric_density));
-  compiler.add_node(__float_as_int(rayleigh_scattering),
+  compiler.add_node_packed(make_float4(sun_dir.x, sun_dir.y, sun_dir.z, atmospheric_density));
+  compiler.add_node_packed(__float_as_int(rayleigh_scattering),
                     __float_as_int(mie_scattering),
                     (int)show_sun,
                     __float_as_int(sun_brightness));
-  compiler.add_node(make_float4(sun_size, sun_color.x, sun_color.y, sun_color.z));
-  compiler.add_node(
+  compiler.add_node_packed(make_float4(sun_size, sun_color.x, sun_color.y, sun_color.z));
+  compiler.add_node_packed(
       make_float4(inv_wavelengths.x, inv_wavelengths.y, inv_wavelengths.z, exposure));
 }
 
@@ -921,7 +921,7 @@ NODE_DEFINE(RhinoTextureAdjustmentTextureNode)
   return type;
 }
 
-RhinoTextureAdjustmentTextureNode::RhinoTextureAdjustmentTextureNode() : ShaderNode(node_type)
+RhinoTextureAdjustmentTextureNode::RhinoTextureAdjustmentTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -931,16 +931,16 @@ void RhinoTextureAdjustmentTextureNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *color_out = output("Color");
 
-  compiler.add_node(
+  compiler.add_node_packed(
       RHINO_NODE_TEXTURE_ADJUSTMENT_TEXTURE,
-      compiler.encode_uchar4(compiler.stack_assign(color_in), compiler.stack_assign(color_out)));
+      compiler.encode_uchar4(compiler.input_link(color_in), compiler.output(color_out)));
 
-  compiler.add_node((int)grayscale, (int)invert, (int)clamp, (int)scale_to_clamp);
-  compiler.add_node(__float_as_int(multiplier),
+  compiler.add_node_packed((int)grayscale, (int)invert, (int)clamp, (int)scale_to_clamp);
+  compiler.add_node_packed(__float_as_int(multiplier),
                     __float_as_int(clamp_min),
                     __float_as_int(clamp_max),
                     __float_as_int(gain));
-  compiler.add_node(__float_as_int(gamma),
+  compiler.add_node_packed(__float_as_int(gamma),
                     __float_as_int(saturation),
                     __float_as_int(hue_shift),
                     (int)is_hdr);
@@ -977,7 +977,7 @@ NODE_DEFINE(RhinoTileTextureNode)
   return type;
 }
 
-RhinoTileTextureNode::RhinoTileTextureNode() : ShaderNode(node_type)
+RhinoTileTextureNode::RhinoTileTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -992,19 +992,19 @@ void RhinoTileTextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *alpha_out = output("Alpha");
 
-  compiler.add_node(
+  compiler.add_node_packed(
       RHINO_NODE_TILE_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(alpha1_in),
-                                           compiler.stack_assign(color2_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(alpha2_in),
-                                           compiler.stack_assign(color_out),
-                                           compiler.stack_assign(alpha_out)));
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(alpha1_in),
+                                           compiler.input_link(color2_in)),
+                    compiler.encode_uchar4(compiler.input_link(alpha2_in),
+                                           compiler.output(color_out),
+                                           compiler.output(alpha_out)));
 
-  compiler.add_node(
+  compiler.add_node_packed(
       (int)tile_type, __float_as_int(phase.x), __float_as_int(phase.y), __float_as_int(phase.z));
-  compiler.add_node(
+  compiler.add_node_packed(
       __float_as_int(join_width.x), __float_as_int(join_width.y), __float_as_int(join_width.z));
 }
 
@@ -1049,7 +1049,7 @@ NODE_DEFINE(RhinoDotsTextureNode)
   return type;
 }
 
-RhinoDotsTextureNode::RhinoDotsTextureNode() : ShaderNode(node_type)
+RhinoDotsTextureNode::RhinoDotsTextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -1061,16 +1061,16 @@ void RhinoDotsTextureNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *color_out = output("Color");
 
-  compiler.add_node(RHINO_NODE_DOTS_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color_out)));
+  compiler.add_node_packed(RHINO_NODE_DOTS_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.input_link(color1_in),
+                                           compiler.input_link(color2_in),
+                                           compiler.output(color_out)));
 
-  compiler.add_node(dots_data_count,
+  compiler.add_node_packed(dots_data_count,
                     dots_tree_node_count,
                     __float_as_int(sample_area_size), (int)rings);
-  compiler.add_node(__float_as_int(ring_radius), (int)falloff_type, (int)composition_type);
+  compiler.add_node_packed(__float_as_int(ring_radius), (int)falloff_type, (int)composition_type);
 }
 
 void RhinoDotsTextureNode::compile(OSLCompiler &compiler)
@@ -1097,7 +1097,7 @@ NODE_DEFINE(RhinoNormalPart1TextureNode)
   return type;
 }
 
-RhinoNormalPart1TextureNode::RhinoNormalPart1TextureNode() : ShaderNode(node_type)
+RhinoNormalPart1TextureNode::RhinoNormalPart1TextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -1114,16 +1114,16 @@ void RhinoNormalPart1TextureNode::compile(SVMCompiler &compiler)
   ShaderOutput *uvw7_out = output("UVW7");
   ShaderOutput *uvw8_out = output("UVW8");
 
-  compiler.add_node(RHINO_NODE_NORMAL_PART1_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(uvw_in),
-                                           compiler.stack_assign(uvw1_out),
-                                           compiler.stack_assign(uvw2_out),
-                                           compiler.stack_assign(uvw3_out)),
-                    compiler.encode_uchar4(compiler.stack_assign(uvw4_out),
-                                           compiler.stack_assign(uvw5_out),
-                                           compiler.stack_assign(uvw6_out),
-                                           compiler.stack_assign(uvw7_out)),
-                    compiler.encode_uchar4(compiler.stack_assign(uvw8_out)));
+  compiler.add_node_packed(RHINO_NODE_NORMAL_PART1_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(uvw_in),
+                                           compiler.output(uvw1_out),
+                                           compiler.output(uvw2_out),
+                                           compiler.output(uvw3_out)),
+                    compiler.encode_uchar4(compiler.output(uvw4_out),
+                                           compiler.output(uvw5_out),
+                                           compiler.output(uvw6_out),
+                                           compiler.output(uvw7_out)),
+                    compiler.encode_uchar4(compiler.output(uvw8_out)));
 }
 
 void RhinoNormalPart1TextureNode::compile(OSLCompiler &compiler)
@@ -1151,7 +1151,7 @@ NODE_DEFINE(RhinoNormalPart2TextureNode)
   return type;
 }
 
-RhinoNormalPart2TextureNode::RhinoNormalPart2TextureNode() : ShaderNode(node_type)
+RhinoNormalPart2TextureNode::RhinoNormalPart2TextureNode() : ShaderNode(get_node_type())
 {
 }
 
@@ -1168,16 +1168,16 @@ void RhinoNormalPart2TextureNode::compile(SVMCompiler &compiler)
 
   ShaderOutput *color_out = output("Color");
 
-  compiler.add_node(RHINO_NODE_NORMAL_PART2_TEXTURE,
-                    compiler.encode_uchar4(compiler.stack_assign(color1_in),
-                                           compiler.stack_assign(color2_in),
-                                           compiler.stack_assign(color3_in),
-                                           compiler.stack_assign(color4_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(color5_in),
-                                           compiler.stack_assign(color6_in),
-                                           compiler.stack_assign(color7_in),
-                                           compiler.stack_assign(color8_in)),
-                    compiler.encode_uchar4(compiler.stack_assign(color_out)));
+  compiler.add_node_packed(RHINO_NODE_NORMAL_PART2_TEXTURE,
+                    compiler.encode_uchar4(compiler.input_link(color1_in),
+                                           compiler.input_link(color2_in),
+                                           compiler.input_link(color3_in),
+                                           compiler.input_link(color4_in)),
+                    compiler.encode_uchar4(compiler.input_link(color5_in),
+                                           compiler.input_link(color6_in),
+                                           compiler.input_link(color7_in),
+                                           compiler.input_link(color8_in)),
+                    compiler.encode_uchar4(compiler.output(color_out)));
 }
 
 void RhinoNormalPart2TextureNode::compile(OSLCompiler &compiler)

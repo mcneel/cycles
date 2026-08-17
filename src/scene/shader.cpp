@@ -799,9 +799,6 @@ void ShaderManager::device_update_common(Device * /*device*/,
   dscene->data.tables.rhino_dots_dot_data_offset = (int)rhino_dots_dot_data_table_offset;
 }
 
-void ShaderManager::device_free_common(Device * /*device*/, DeviceScene *dscene, Scene * scene)
-}
-
 void ShaderManager::device_free_common(Device * /*device*/, DeviceScene *dscene, Scene *scene)
 {
   for (auto &entry : bsdf_tables) {

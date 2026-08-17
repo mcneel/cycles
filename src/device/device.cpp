@@ -316,9 +316,11 @@ static void record_gpu_failure(DeviceType type, const string &message)
   g_gpu_init_failures.push_back({type, message});
 }
 
+#include <sstream>
+
 static string crash_message(const CyclesDriverCrashException &e)
 {
-  ostringstream oss;
+  std::ostringstream oss;
   oss << "driver crash (code 0x" << std::hex << e.VDENumber() << ")";
   return oss.str();
 }

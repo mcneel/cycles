@@ -7,7 +7,7 @@
 #include "kernel/integrator/state_flow.h"
 #include "kernel/integrator/path_state.h"
 #include "kernel/integrator/state_util.h"
-#include "kernel/geom/geom.h"
+#include "kernel/geom/shader_data.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -43,7 +43,7 @@ ccl_device_inline bool kernel_shadow_catcher_is_path_split_bounce(KernelGlobals 
   }
 
   Ray ray ccl_optional_struct_init;
-  integrator_state_read_ray(kg, state, &ray);
+  integrator_state_read_ray(state, &ray);
 
   ShaderData sd;
   shader_setup_from_ray(kg, &sd, &ray, isect);

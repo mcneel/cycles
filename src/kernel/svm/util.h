@@ -212,6 +212,62 @@ ccl_device_inline const ccl_global T &svm_node_get(KernelGlobals kg, ccl_private
   return node;
 }
 
+/* Rhino compatibility layer.
+ *
+ * Mirrors SVMCompiler::add_node_packed (see scene/svm.h): Rhino's SVM nodes use
+ * the pre-5.2 packed layout of four uints per node, which in 5.2's flat uint
+ * node stream is simply four consecutive entries. */
+ccl_device_inline uint4 read_node(KernelGlobals kg, ccl_private int *offset)
+{
+  const uint4 node = make_uint4(kernel_data_fetch(svm_nodes, *offset + 0),
+                                kernel_data_fetch(svm_nodes, *offset + 1),
+                                kernel_data_fetch(svm_nodes, *offset + 2),
+                                kernel_data_fetch(svm_nodes, *offset + 3));
+  *offset += 4;
+  return node;
+}
+
+/* Reassembles the pre-5.2 uint4 node for Rhino's SVM cases. 5.2's interpreter
+ * consumes only the type uint before dispatching, so the remaining three uints
+ * of the packed row are read here. */
+ccl_device_inline uint4 svm_rhino_read_packed(KernelGlobals kg,
+                                              const uint node_type,
+                                              ccl_private int *offset)
+{
+  const uint4 node = make_uint4(node_type,
+                                kernel_data_fetch(svm_nodes, *offset + 0),
+                                kernel_data_fetch(svm_nodes, *offset + 1),
+                                kernel_data_fetch(svm_nodes, *offset + 2));
+  *offset += 3;
+  return node;
+}
+
+ccl_device_inline float4 read_node_float(KernelGlobals kg, ccl_private int *offset)
+{
+  const uint4 node = read_node(kg, offset);
+  return make_float4(__uint_as_float(node.x),
+                     __uint_as_float(node.y),
+                     __uint_as_float(node.z),
+                     __uint_as_float(node.w));
+}
+
+ccl_device_forceinline void svm_unpack_node_uchar2(uint i,
+                                                   ccl_private uint *x,
+                                                   ccl_private uint *y)
+{
+  *x = (i & 0xFF);
+  *y = ((i >> 8) & 0xFF);
+}
+
+ccl_device_forceinline void svm_unpack_node_uchar4(
+    uint i, ccl_private uint *x, ccl_private uint *y, ccl_private uint *z, ccl_private uint *w)
+{
+  *x = (i & 0xFF);
+  *y = ((i >> 8) & 0xFF);
+  *z = ((i >> 16) & 0xFF);
+  *w = ((i >> 24) & 0xFF);
+}
+
 ccl_device_inline float4 svm_node_get_data_float4(KernelGlobals kg, const int offset)
 {
   return make_float4(__uint_as_float(kernel_data_fetch(svm_nodes, offset)),

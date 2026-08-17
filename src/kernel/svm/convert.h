@@ -38,9 +38,9 @@ ccl_device_noinline void svm_node_convert(KernelGlobals kg,
       break;
     }
     case NODE_CONVERT_CF2: {
-      float3 f = stack_load_float3(stack, from);
-      float l = linear_rgb_to_luminance(kg, f);
-      stack_store_float(stack, to, l);
+      /* Rhino: colour to float using luminance weights. */
+      const float3 f = stack_load_float3(stack, node.from_offset);
+      stack_store_float(stack, node.to_offset, linear_rgb_to_luminance(kg, f));
       break;
     }
     case NODE_CONVERT_CI: {

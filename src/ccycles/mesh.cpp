@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+#include <cassert>
+
 #include "internal_types.h"
 
 #include "util/algorithm.h"
@@ -80,7 +82,7 @@ void cycles_geometry_set_shader(ccl::Session *session, ccl::Geometry *mesh_id, c
 
 void cycles_geometry_clear(ccl::Session* session, ccl::Geometry* geometry)
 {
-	ASSERT(geometry);
+	assert(geometry);
 
 	#if 0
 	if (geometry && session->scene)
@@ -107,7 +109,7 @@ void cycles_mesh_set_smooth(ccl::Session* session_id, ccl::Geometry* geometry, u
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
@@ -130,11 +132,11 @@ void cycles_mesh_reserve(ccl::Session* session_id, ccl::Geometry* geometry, unsi
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
-			mesh->reserve_mesh(vcount, fcount);
+			mesh->resize_mesh(vcount, fcount);
 		}
 	}
 }
@@ -146,7 +148,7 @@ void cycles_mesh_resize(ccl::Session* session_id, ccl::Geometry* geometry, unsig
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
@@ -163,13 +165,13 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
-			ccl::float3* generated = mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_float3();
+			ccl::float3* generated = mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_for_write<ccl::float3>();
 
-			auto& cycles_mesh_vertices = mesh->get_verts();
+			auto& cycles_mesh_vertices = mesh->get_position_for_write();
 
 			for (int i = 0U, j = 0U; i < in_vcount * 3; i += 3, j++)
 			{
@@ -198,11 +200,11 @@ void cycles_mesh_set_tris(ccl::Session *session_id, ccl::Geometry *geometry, int
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
-			mesh->reserve_mesh(fcount * 3, fcount);
+			mesh->resize_mesh(fcount * 3, fcount);
 
 			auto& cycles_mesh_triangles = mesh->get_triangles();
 
@@ -232,14 +234,14 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 	assert(false);
 
 	#if OLD_NOT_USED
-	ASSERT(geometry);
+	assert(geometry);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
@@ -262,14 +264,14 @@ void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 
 void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int v0, unsigned int v1, unsigned int v2, ccl::Shader *shader_id, unsigned int smooth)
 {
-	ASSERT(geometry);
+	assert(geometry);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
@@ -280,21 +282,21 @@ void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 
 void cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* geometry, float *uvs, unsigned int uvcount, const char* uvmap_name)
 {
-	ASSERT(geometry);
+	assert(geometry);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
 			ccl::ustring uvmap = uvmap_name ? ccl::ustring(uvmap_name) : ccl::ustring("uvmap1");
 
 			ccl::Attribute* attr = mesh->attributes.add(ccl::ATTR_STD_UV, uvmap);
-			ccl::float2* fdata = attr->data_float2();
+			ccl::float2* fdata = attr->data_for_write<ccl::float2>();
 
 			ccl::float2 f2;
 
@@ -310,19 +312,19 @@ void cycles_mesh_set_uvs(ccl::Session* session_id, ccl::Geometry* geometry, floa
 
 void cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* geometry, float *vnormals, unsigned int vnormalcount)
 {
-	ASSERT(geometry);
+	assert(geometry);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
 			ccl::Attribute* attr = mesh->attributes.add(ccl::ATTR_STD_VERTEX_NORMAL);
-			ccl::float3* fdata = attr->data_float3();
+			ccl::float3* fdata = attr->data_for_write<ccl::float3>();
 
 			ccl::float3 f3;
 
@@ -342,14 +344,14 @@ void cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* geo
 
 void cycles_mesh_set_vertex_colors(ccl::Session* session_id, ccl::Geometry* geometry, float *vcolors, unsigned int vcolorcount)
 {
-	ASSERT(geometry);
+	assert(geometry);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{
@@ -391,11 +393,11 @@ struct MikkUserData {
 		const ccl::AttributeSet& attributes = mesh->attributes;
 
 		ccl::Attribute *attr_vN = attributes.find(ccl::ATTR_STD_VERTEX_NORMAL);
-		vertex_normal = attr_vN->data_float3();
+		vertex_normal = attr_vN->data_for_write<ccl::float3>();
 
 		ccl::Attribute *attr_uv = attributes.find(layer_name);
 		if(attr_uv != NULL) {
-			texface = attr_uv->data_float2();
+			texface = attr_uv->data_for_write<ccl::float2>();
 		}
 	}
 
@@ -438,7 +440,7 @@ static void mikk_get_position(const SMikkTSpaceContext *context,
 	const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
 	const ccl::Mesh *mesh = userdata->mesh;
 	const int vertex_index = mikk_vertex_index(mesh, face_num, vert_num);
-	const ccl::float3 vP = mesh->get_verts()[vertex_index];
+	const ccl::float3 vP = mesh->get_position_for_write()[vertex_index];
 	P[0] = vP.x;
 	P[1] = vP.y;
 	P[2] = vP.z;
@@ -475,7 +477,7 @@ static void mikk_get_normal(const SMikkTSpaceContext *context, float N[3],
 	}
 	else {
 		const ccl::Mesh::Triangle tri = mesh->get_triangle(face_num);
-		vN = tri.compute_normal(&mesh->get_verts()[0]);
+		vN = tri.compute_normal(&mesh->get_position_for_write()[0]);
 	}
 
 	N[0] = vN.x;
@@ -506,7 +508,7 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 	auto uvattr = attributes.find(ccl::ATTR_STD_UV);
 	attr = attributes.add(ccl::ATTR_STD_UV_TANGENT, name);
 
-	ccl::float3 *tangent = attr->data_float3();
+	ccl::float3 *tangent = attr->data_for_write<ccl::float3>();
 	/* Create bitangent sign attribute. */
 	float *tangent_sign = NULL;
 	ccl::Attribute *attr_sign;
@@ -536,14 +538,14 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 
 void cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* geometry, const char* uvmap_name)
 {
-	ASSERT(geometry);
+	assert(geometry);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce))
 	{
 		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
 
-		ASSERT(mesh);
+		assert(mesh);
 
 		if (mesh)
 		{

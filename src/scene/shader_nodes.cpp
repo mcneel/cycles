@@ -210,7 +210,7 @@ SVMStackOffset TextureMapping::compile_begin(SVMCompiler &compiler,
                                              ShaderNode *node)
 {
   if (!skip()) {
-    const SVMStackOffset offset_in = compiler.stack_assign(vector_in);
+    const SVMStackOffset offset_in = compiler.input_link(vector_in);
     assert(vector_in->type() == SocketType::VECTOR || vector_in->type() == SocketType::POINT);
     const SVMStackOffset offset_out = compiler.stack_find_offset(vector_in);
 
@@ -219,7 +219,7 @@ SVMStackOffset TextureMapping::compile_begin(SVMCompiler &compiler,
     return offset_out;
   }
 
-  return compiler.stack_assign(vector_in);
+  return compiler.input_link(vector_in);
 }
 
 void TextureMapping::compile_end(SVMCompiler &compiler,
@@ -1940,7 +1940,7 @@ NODE_DEFINE(RGBToLuminanceNode)
 }
 
 RGBToLuminanceNode::RGBToLuminanceNode()
-	: ShaderNode(node_type)
+	: ShaderNode(get_node_type())
 {
 }
 
@@ -1954,10 +1954,10 @@ void RGBToLuminanceNode::constant_fold(const ConstantFolder& folder)
 
 void RGBToLuminanceNode::compile(SVMCompiler& compiler)
 {
-	compiler.add_node(NODE_CONVERT,
+	compiler.add_node_packed(NODE_CONVERT,
 		NODE_CONVERT_CF2,
-		compiler.stack_assign(inputs[0]),
-		compiler.stack_assign(outputs[0]));
+		compiler.input_link(inputs[0]),
+		compiler.output(outputs[0]));
 }
 
 void RGBToLuminanceNode::compile(OSLCompiler& compiler)
@@ -4438,33 +4438,33 @@ void RhinoTextureCoordinateNode::decal_setup(ShaderOutput *out,
   ShaderOutput *decalusage_out = output("DecalUsage");
   uint encoded = compiler.encode_uchar4(compiler.stack_assign_if_linked(decalforward_out),
                                         compiler.stack_assign_if_linked(decalusage_out));
-  compiler.add_node(texco_node, texcoord, compiler.stack_assign(out), encoded);
+  compiler.add_node_packed(texco_node, texcoord, compiler.output(out), encoded);
   //Transform ob_itfm = transform_inverse(ob_tfm);
-  //compiler.add_node(ob_tfm.x);
-  //compiler.add_node(ob_tfm.y);
-  //compiler.add_node(ob_tfm.z);
-  //compiler.add_node(ob_itfm.x);
-  //compiler.add_node(ob_itfm.y);
-  //compiler.add_node(ob_itfm.z);
-  compiler.add_node(pxyz.x);
-  compiler.add_node(pxyz.y);
-  compiler.add_node(pxyz.z);
-  compiler.add_node(nxyz.x);
-  compiler.add_node(nxyz.y);
-  compiler.add_node(nxyz.z);
-  compiler.add_node(uvw.x);
-  compiler.add_node(uvw.y);
-  compiler.add_node(uvw.z);
+  //compiler.add_node_packed(ob_tfm.x);
+  //compiler.add_node_packed(ob_tfm.y);
+  //compiler.add_node_packed(ob_tfm.z);
+  //compiler.add_node_packed(ob_itfm.x);
+  //compiler.add_node_packed(ob_itfm.y);
+  //compiler.add_node_packed(ob_itfm.z);
+  compiler.add_node_packed(pxyz.x);
+  compiler.add_node_packed(pxyz.y);
+  compiler.add_node_packed(pxyz.z);
+  compiler.add_node_packed(nxyz.x);
+  compiler.add_node_packed(nxyz.y);
+  compiler.add_node_packed(nxyz.z);
+  compiler.add_node_packed(uvw.x);
+  compiler.add_node_packed(uvw.y);
+  compiler.add_node_packed(uvw.z);
   // add information about alternate tiles. In Rhino box projection isn't used.
   // so add support only here
   uint encode = compiler.encode_uchar4(0, decal_projection);
-  compiler.add_node(encode, __float_as_int(radius), __float_as_int(height));
+  compiler.add_node_packed(encode, __float_as_int(radius), __float_as_int(height));
   // further add decal sweeps
-  compiler.add_node(make_float4(
+  compiler.add_node_packed(make_float4(
       horizontal_sweep_start, horizontal_sweep_end, vertical_sweep_start, vertical_sweep_end));
-  compiler.add_node(make_float4(decal_origin.x, decal_origin.y, decal_origin.z, 0.0f));
-  compiler.add_node(make_float4(decal_across.x, decal_across.y, decal_across.z, 0.0f));
-  compiler.add_node(make_float4(decal_up.x, decal_up.y, decal_up.z, 0.0f));
+  compiler.add_node_packed(make_float4(decal_origin.x, decal_origin.y, decal_origin.z, 0.0f));
+  compiler.add_node_packed(make_float4(decal_across.x, decal_across.y, decal_across.z, 0.0f));
+  compiler.add_node_packed(make_float4(decal_up.x, decal_up.y, decal_up.z, 0.0f));
 }
 
 void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
@@ -4474,141 +4474,133 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
   ShaderNodeType attr_node = NODE_ATTR;
   ShaderNodeType geom_node = NODE_GEOMETRY;
 
-  // temporarily disable
-  if (bump == SHADER_BUMP_DX) {
-    texco_node = NODE_TEX_COORD_BUMP_DX;
-    attr_node = NODE_ATTR_BUMP_DX;
-    geom_node = NODE_GEOMETRY_BUMP_DX;
-  }
-  else if (bump == SHADER_BUMP_DY) {
-    texco_node = NODE_TEX_COORD_BUMP_DY;
-    attr_node = NODE_ATTR_BUMP_DY;
-    geom_node = NODE_GEOMETRY_BUMP_DY;
-  }
+  /* 5.2 removed the NODE_*_BUMP_DX/DY node variants in favour of the
+   * dual-number derivative path (svm_node_tex_coord_derivative), so there is
+   * no bump-specific node to switch to here. */
 
   out = output("Generated");
   if (!out->links.empty()) {
     if (compiler.background) {
-      compiler.add_node(geom_node, NODE_GEOM_P, compiler.stack_assign(out));
+      compiler.add_node_packed(geom_node, NODE_GEOM_P, compiler.output(out));
     }
     else {
       if (from_dupli) {
-        compiler.add_node(texco_node, NODE_TEXCO_DUPLI_GENERATED, compiler.stack_assign(out));
+        compiler.add_node_packed(texco_node, NODE_TEXCO_DUPLI_GENERATED, compiler.output(out));
       }
       else if (compiler.output_type() == SHADER_TYPE_VOLUME) {
-        compiler.add_node(texco_node, NODE_TEXCO_VOLUME_GENERATED, compiler.stack_assign(out));
+        compiler.add_node_packed(texco_node, NODE_TEXCO_VOLUME_GENERATED, compiler.output(out));
       }
       else {
         int attr = compiler.attribute(ATTR_STD_GENERATED);
-        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
+        compiler.add_node_packed(attr_node, attr, compiler.output(out), NODE_ATTR_OUTPUT_FLOAT3);
       }
     }
   }
 
   out = output("Normal");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_NORMAL, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_NORMAL, compiler.output(out));
   }
 
   out = output("UV");
   if (!out->links.empty()) {
     if (from_dupli) {
-      compiler.add_node(texco_node, NODE_TEXCO_DUPLI_UV, compiler.stack_assign(out));
+      compiler.add_node_packed(texco_node, NODE_TEXCO_DUPLI_UV, compiler.output(out));
     }
     else {
       int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
-      compiler.add_node(texco_node, NODE_TEXCO_UV_MAYBE_PLANAR, compiler.stack_assign(out), attr);
+      compiler.add_node_packed(texco_node, NODE_TEXCO_UV_MAYBE_PLANAR, compiler.output(out), attr);
     }
   }
 
   out = output("Object");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_OBJECT, compiler.stack_assign(out), use_transform);
+    compiler.add_node_packed(texco_node, NODE_TEXCO_OBJECT, compiler.output(out), use_transform);
     if (use_transform) {
-      compiler.add_node(ob_tfm.x);
-      compiler.add_node(ob_tfm.y);
-      compiler.add_node(ob_tfm.z);
+      compiler.add_node_packed(ob_tfm.x);
+      compiler.add_node_packed(ob_tfm.y);
+      compiler.add_node_packed(ob_tfm.z);
     }
   }
 
   out = output("Camera");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_CAMERA, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_CAMERA, compiler.output(out));
   }
 
   out = output("Window");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_WINDOW, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_WINDOW, compiler.output(out));
   }
 
   out = output("Reflection");
   if (!out->links.empty()) {
     if (compiler.background) {
-      compiler.add_node(geom_node, NODE_GEOM_I, compiler.stack_assign(out));
+      compiler.add_node_packed(geom_node, NODE_GEOM_I, compiler.output(out));
     }
     else {
-      compiler.add_node(texco_node, NODE_TEXCO_REFLECTION, compiler.stack_assign(out));
+      compiler.add_node_packed(texco_node, NODE_TEXCO_REFLECTION, compiler.output(out));
     }
   }
 
   out = output("WcsBox");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_WCS_BOX, compiler.stack_assign(out), use_transform);
+    compiler.add_node_packed(texco_node, NODE_TEXCO_WCS_BOX, compiler.output(out), use_transform);
     if (use_transform) {
       Transform ob_itfm = transform_inverse(ob_tfm);
-      compiler.add_node(ob_itfm.x);
-      compiler.add_node(ob_itfm.y);
-      compiler.add_node(ob_itfm.z);
+      compiler.add_node_packed(ob_itfm.x);
+      compiler.add_node_packed(ob_itfm.y);
+      compiler.add_node_packed(ob_itfm.z);
     }
   }
 
   out = output("EnvSpherical");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_ENV_SPHERICAL, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_SPHERICAL, compiler.output(out));
   }
 
   out = output("EnvEmap");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_ENV_EMAP, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_EMAP, compiler.output(out));
   }
 
   out = output("EnvBox");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_ENV_BOX, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_BOX, compiler.output(out));
   }
 
   out = output("EnvLightProbe");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_ENV_LIGHTPROBE, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_LIGHTPROBE, compiler.output(out));
   }
 
   out = output("EnvCubemap");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_ENV_CUBEMAP, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_CUBEMAP, compiler.output(out));
   }
 
   out = output("EnvCubemapVerticalCross");
   if (!out->links.empty()) {
-    compiler.add_node(
-        texco_node, NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS, compiler.stack_assign(out));
+    compiler.add_node_packed(
+        texco_node, NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS, compiler.output(out));
   }
 
   out = output("EnvCubemapHorizontalCross");
   if (!out->links.empty()) {
-    compiler.add_node(
-        texco_node, NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS, compiler.stack_assign(out));
+    compiler.add_node_packed(
+        texco_node, NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS, compiler.output(out));
   }
 
   out = output("EnvHemi");
   if (!out->links.empty()) {
-    compiler.add_node(texco_node, NODE_TEXCO_ENV_HEMI, compiler.stack_assign(out));
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_HEMI, compiler.output(out));
   }
 
   out = output("DecalUv");
 
   if (!out->links.empty()) {
     int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
-    compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+    compiler.add_node_packed(attr_node, attr, compiler.output(out), NODE_ATTR_FLOAT3);
     decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_UV, compiler);
   }
 

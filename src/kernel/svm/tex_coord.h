@@ -709,7 +709,7 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
       break;
     }
     case NODE_TEXCO_WINDOW: {
-      if ((path_flag & PATH_RAY_CAMERA) && sd->object == OBJECT_NONE &&
+      if ((path_flag & PATH_RAY_VISIBILITY_CAMERA) && sd->object == OBJECT_NONE &&
           kernel_data.cam.type == CAMERA_ORTHOGRAPHIC)
         data = camera_world_to_ndc(kg, sd, sd->ray_P);
       else
@@ -860,11 +860,11 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
           data = zero_float3();
         }
         else if (desc.type == NODE_ATTR_FLOAT2) {
-          float2 f = primitive_surface_attribute_float2(kg, sd, desc, NULL, NULL);
+          float2 f = primitive_surface_attribute<float2>(kg, sd, desc);
           data = make_float3(f.x, f.y, 0.0f);
         }
         else {
-          data = primitive_surface_attribute_float3(kg, sd, desc, NULL, NULL);
+          data = primitive_surface_attribute<float3>(kg, sd, desc);
         }
       }
       else {

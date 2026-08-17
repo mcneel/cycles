@@ -362,11 +362,11 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	cam->set_full_width(512);
 	cam->compute_auto_viewplane();
 	cam->need_flags_update = true;
-	cam->update(session->scene);
+	cam->update(session->scene.get());
 
 	session->set_output_driver(std::make_unique<CCyclesOutputDriver>(passes, log_print, ccsession));
 
-	ccl::Scene *scene = session->scene;
+	ccl::Scene *scene = session->scene.get();
 	ccl::Integrator *integrator = scene->integrator;
 
 	integrator->set_use_light_tree(true);
@@ -385,13 +385,13 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 	{
 		scene->background->set_transparent_glass(true);
 		Shader *bgsh = scene->default_background;
-		ccl::ShaderGraph *graph = new ccl::ShaderGraph();
+		ccl::unique_ptr<ccl::ShaderGraph> graph = ccl::make_unique<ccl::ShaderGraph>();
 		ccl::OutputNode *out = graph->output();
 		ustring nodename("background_shader");
-		ccl::ShaderNode *shn = nullptr;
 		const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
-		shn = (ShaderNode *)ntype->create(ntype);
-		shn->set_owner(graph);
+		ccl::unique_ptr<ccl::Node> owned_node = ntype->create(ntype);
+		ccl::ShaderNode *shn = static_cast<ccl::ShaderNode *>(owned_node.get());
+		shn->set_owner(graph.get());
 		{
 			std::random_device r;
 			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
@@ -400,21 +400,22 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 			bgn->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
 			bgn->set_strength(1.5f);
 		}
-		graph->add(shn);
+		graph->add_node(ccl::unique_ptr<ccl::ShaderNode>(
+			static_cast<ccl::ShaderNode *>(owned_node.release())));
 		graph->connect(shn->output("Background"), out->input("Surface"));
-		bgsh->set_graph(graph);
+		bgsh->set_graph(std::move(graph));
 		bgsh->tag_update(scene);
 	}
 
 	{
 		auto default_surface_shader = scene->default_surface;
-		auto graph = new ccl::ShaderGraph();
+		ccl::unique_ptr<ccl::ShaderGraph> graph = ccl::make_unique<ccl::ShaderGraph>();
 		auto out = graph->output();
 		ustring nodename("diffuse_bsdf");
-		ccl::ShaderNode* shader_node = nullptr;
 		const ccl::NodeType *ntype = ccl::NodeType::find(nodename);
-		shader_node = (ShaderNode *)ntype->create(ntype);
-		shader_node->set_owner(graph);
+		ccl::unique_ptr<ccl::Node> owned_node = ntype->create(ntype);
+		ccl::ShaderNode *shader_node = static_cast<ccl::ShaderNode *>(owned_node.get());
+		shader_node->set_owner(graph.get());
 		{
 			std::random_device r;
 			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
@@ -423,9 +424,10 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 			diff->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
 			diff->set_roughness(1.0f);
 		}
-		graph->add(shader_node);
+		graph->add_node(ccl::unique_ptr<ccl::ShaderNode>(
+			static_cast<ccl::ShaderNode *>(owned_node.release())));
 		graph->connect(shader_node->output("BSDF"), out->input("Surface"));
-		default_surface_shader->set_graph(graph);
+		default_surface_shader->set_graph(std::move(graph));
 		default_surface_shader->tag_update(scene);
 
 		session->scene->shader_manager->set_rhino_perlin_noise_table(ccycles_rhino_perlin_noise_table);
@@ -544,7 +546,7 @@ CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, int width, int
 			//cam->set_full_height(full_height);
 			//cam->compute_auto_viewplane();
 			//cam->need_flags_update = true;
-			//cam->update(session->scene);
+			//cam->update(session->scene.get());
 
 			session->reset(ccsess->params, ccsess->buffer_params);
 		}

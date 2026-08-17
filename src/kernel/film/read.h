@@ -253,7 +253,6 @@ ccl_device_inline void film_get_pass_pixel_rgbe(const ccl_global KernelFilmConve
   pixel[2] = f.z;
 }
 
-ccl_device_inline void film_get_pass_pixel_float(const ccl_global KernelFilmConvert *ccl_restrict
 ccl_device_inline void film_get_pass_pixel_shadow_catcher_transparent_sample_count(
     ccl_global const KernelFilmConvert *ccl_restrict kfilm_convert,
     ccl_global const float *ccl_restrict buffer,

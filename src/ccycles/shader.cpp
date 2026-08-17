@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+#include <cassert>
+
 #include "internal_types.h"
 
 #ifdef WIN32
@@ -212,13 +214,13 @@ CCL_CAPI int CDECL cycles_sockettype_get_type(ccl::SocketType *sock)
 CCL_CAPI int CDECL cycles_get_shadernodetype_count()
 {
 	int count = 0;
-	auto &all_types = ccl::NodeType::types();
-	for (const auto [name, nodetype] : all_types) {
-		std::string nodename{name};
+	for (const ccl::ustring &name : ccl::NodeType::type_names()) {
+		const std::string nodename{name.c_str()};
 		if (std::string::npos != nodename.find("convert")) {
 			continue;
 		}
-		if (nodetype.type == ccl::NodeType::SHADER) {
+		const ccl::NodeType *nodetype = ccl::NodeType::find(name);
+		if (nodetype != nullptr && nodetype->type == ccl::NodeType::SHADER) {
 			count++;
 		}
 	}
@@ -228,15 +230,15 @@ CCL_CAPI int CDECL cycles_get_shadernodetype_count()
 CCL_CAPI const ccl::NodeType* CDECL cycles_get_shadernodetype(int idx)
 {
 	int count = 0;
-	auto &all_types = ccl::NodeType::types();
-	for (const auto [name, nodetype] : all_types) {
-		std::string nodename{name};
+	for (const ccl::ustring &name : ccl::NodeType::type_names()) {
+		const std::string nodename{name.c_str()};
 		if (std::string::npos != nodename.find("convert")) {
 			continue;
 		}
-		if (nodetype.type == ccl::NodeType::SHADER) {
+		const ccl::NodeType *nodetype = ccl::NodeType::find(name);
+		if (nodetype != nullptr && nodetype->type == ccl::NodeType::SHADER) {
 			if (count == idx) {
-				return &all_types[name];
+				return nodetype;
 			}
 			count++;
 		}
@@ -1543,7 +1545,7 @@ public:
 
 	unsigned char Lookup(unsigned char in)
 	{
-		ASSERT(in <= 255);
+		assert(in <= 255);
 		return lut[in];
 	}
 private:

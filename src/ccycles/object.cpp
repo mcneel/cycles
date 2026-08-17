@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 **/
 
+#include <cassert>
+
 #include "internal_types.h"
 
 ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
@@ -50,8 +52,8 @@ void cycles_scene_object_delete(ccl::Session* session, ccl::Object* obj)
 
 void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* object, ccl::Geometry* geometry)
 {
-	ASSERT(object);
-	ASSERT(geometry);
+	assert(object);
+	assert(geometry);
 
 	ccl::Scene* sce = session_id->scene;
 	if(sce) 
@@ -65,7 +67,7 @@ void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* obj
 
 void cycles_object_tag_update(ccl::Session* session_id, ccl::Object* object)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
@@ -77,7 +79,7 @@ void cycles_object_tag_update(ccl::Session* session_id, ccl::Object* object)
 
 void cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* object, unsigned int visibility)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
@@ -92,7 +94,7 @@ void cycles_scene_object_set_shader(ccl::Session *session_id,
 									ccl::Object *object,
 									ccl::Shader *shader_id)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = session_id->scene;
 	ccl::Geometry* geometry = object->get_geometry();
@@ -138,7 +140,7 @@ void cycles_scene_object_set_shader(ccl::Session *session_id,
 
 void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Object* object, bool is_shadowcatcher)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -150,7 +152,7 @@ void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Obj
 
 void cycles_scene_object_set_is_solid(ccl::Session* session_id, ccl::Object* object, bool is_solid)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -162,7 +164,7 @@ void cycles_scene_object_set_is_solid(ccl::Session* session_id, ccl::Object* obj
 
 void cycles_scene_object_set_mesh_light_no_cast_shadow(ccl::Session* session_id, ccl::Object* object, bool mesh_light_no_cast_shadow)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -202,7 +204,7 @@ void cycles_scene_object_set_matrix(ccl::Session* session_id, ccl::Object* objec
 	float i, float j, float k, float l
 	)
 {
-	ASSERT(object);
+	assert(object);
 
 	_cycles_scene_object_set_transform(session_id, object, 0,
 		a, b, c, d,
@@ -216,7 +218,7 @@ void cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object* ob
 	float i, float j, float k, float l
 	)
 {
-	ASSERT(object);
+	assert(object);
 
 	_cycles_scene_object_set_transform(session_id, object, 1,
 		a, b, c, d,
@@ -232,7 +234,7 @@ void cycles_scene_object_set_planar_uvw_mapping(ccl::Session* session_id, ccl::O
 	float i, float j, float k, float l
 	)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
@@ -254,7 +256,7 @@ void cycles_scene_object_set_planar_uvw_mapping(ccl::Session* session_id, ccl::O
 
 void cycles_object_set_pass_id(ccl::Session* session_id, ccl::Object* object, int pass_id)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
@@ -265,7 +267,7 @@ void cycles_object_set_pass_id(ccl::Session* session_id, ccl::Object* object, in
 
 void cycles_object_set_random_id(ccl::Session* session_id, ccl::Object* object, unsigned int random_id)
 {
-	ASSERT(object);
+	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {

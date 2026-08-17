@@ -33,7 +33,7 @@ limitations under the License.
 
 #include "scene/background.h"
 #include "scene/camera.h"
-#include "scene/colorspace.h"
+#include "util/colorspace.h"
 #include "device/device.h"
 #include "scene/film.h"
 #include "scene/shader_graph.h"
@@ -50,7 +50,7 @@ limitations under the License.
 #include "scene/shader.h"
 
 #include "util/color.h"
-#include "util/function.h"
+#include <functional>
 #include "util/progress.h"
 #include "util/string.h"
 #include "util/thread.h"
@@ -230,12 +230,14 @@ class CCyclesDisplayDriver : public ccl::DisplayDriver {
 		virtual void update_end() override;
 		virtual ccl::half4 *map_texture_buffer() override;
 		virtual void unmap_texture_buffer() override;
-		virtual void clear() override;
+		/* 5.2 renamed DisplayDriver::clear() to zero(). */
+		virtual void zero() override;
 		virtual void draw(const Params &params) override;
 
 // Optional
 
-		virtual GraphicsInterop graphics_interop_get() override;
+		/* 5.2 replaced graphics_interop_get() with graphics_interop_get_device(). */
+		virtual ccl::GraphicsInteropDevice graphics_interop_get_device() override;
 		virtual void graphics_interop_activate() override;
 		virtual void graphics_interop_deactivate() override;
 

@@ -22,11 +22,10 @@ ccl_device_noinline void svm_node_fresnel(ccl_private ShaderData *sd,
 
   eta = fmaxf(eta, 1e-5f);
   //eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
-  if (sd->flag & SD_BACKFACING) {
-      normal_in = -normal_in;
-  }
+  /* Rhino: flip for back faces. normal_in is const in 5.2, so work on a copy. */
+  const float3 normal = (sd->flag & SD_BACKFACING) ? -normal_in : normal_in;
 
-  const float f = fresnel_dielectric_cos(dot(sd->wi, normal_in), eta);
+  const float f = fresnel_dielectric_cos(dot(sd->wi, normal), eta);
 
   stack_store_float(stack, node.out_offset, f);
 }
@@ -40,6 +39,7 @@ ccl_device_noinline void svm_node_layer_weight(ccl_private ShaderData *sd,
 {
   float blend = stack_load(stack, node.blend);
   const float3 normal_in = stack_load_float3_default(stack, node.normal_offset, sd->N);
+  const float3 normal = normal_in;
 
   float f;
 
@@ -47,10 +47,10 @@ ccl_device_noinline void svm_node_layer_weight(ccl_private ShaderData *sd,
     float eta = fmaxf(1.0f - blend, 1e-5f);
     eta = (sd->flag & SD_BACKFACING) ? eta : 1.0f / eta;
 
-    f = fresnel_dielectric_cos(dot(sd->wi, normal_in), eta);
+    f = fresnel_dielectric_cos(dot(sd->wi, normal), eta);
   }
   else {
-    f = fabsf(dot(sd->wi, normal_in));
+    f = fabsf(dot(sd->wi, normal));
 
     if (blend != 0.5f) {
       blend = clamp(blend, 0.0f, 1.0f - 1e-5f);

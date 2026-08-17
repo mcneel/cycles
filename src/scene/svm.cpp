@@ -166,7 +166,7 @@ SVMCompiler::SVMCompiler(Scene *scene, Progress &progress) : scene(scene), progr
   compile_failed = false;
 
   /* This struct has one entry for every node, in order of ShaderNodeType definition. */
-  svm_node_types_used = (std::atomic_int *)&scene->dscene->data.svm_usage;
+  svm_node_types_used = (std::atomic_int *)&scene->dscene.data.svm_usage;
 }
 
 int SVMCompiler::stack_size(SocketType::Type type)
@@ -435,6 +435,69 @@ void SVMCompiler::add_node(ShaderNodeType type)
 {
   svm_node_types_used[type] = true;
   current_svm_nodes.push_back_slow(type);
+}
+
+/* Rhino compatibility layer - see svm.h. Reproduces the pre-5.2 packed node
+ * encoding so Rhino's SVM nodes and their kernel readers stay in sync. */
+SVMStackOffset SVMCompiler::stack_assign_if_linked(ShaderInput *input)
+{
+  if (input->link || input->constant_folded_in) {
+    return stack_assign(input);
+  }
+  return SVM_STACK_INVALID;
+}
+
+SVMStackOffset SVMCompiler::stack_assign_if_linked(ShaderOutput *output)
+{
+  if (!output->links.empty()) {
+    return stack_assign(output);
+  }
+  return SVM_STACK_INVALID;
+}
+
+SVMStackOffset SVMCompiler::input_link(ShaderInput *input)
+{
+  return stack_assign(input);
+}
+
+void SVMCompiler::add_node_packed(ShaderNodeType type, uint a, uint b, uint c)
+{
+  svm_node_types_used[type] = true;
+  current_svm_nodes.push_back_slow(type);
+  current_svm_nodes.push_back_slow(a);
+  current_svm_nodes.push_back_slow(b);
+  current_svm_nodes.push_back_slow(c);
+}
+
+void SVMCompiler::add_node_packed(uint a, uint b, uint c, uint d)
+{
+  current_svm_nodes.push_back_slow(a);
+  current_svm_nodes.push_back_slow(b);
+  current_svm_nodes.push_back_slow(c);
+  current_svm_nodes.push_back_slow(d);
+}
+
+void SVMCompiler::add_node_packed(ShaderNodeType type, const float3 &f)
+{
+  svm_node_types_used[type] = true;
+  current_svm_nodes.push_back_slow(type);
+  current_svm_nodes.push_back_slow(__float_as_int(f.x));
+  current_svm_nodes.push_back_slow(__float_as_int(f.y));
+  current_svm_nodes.push_back_slow(__float_as_int(f.z));
+}
+
+void SVMCompiler::add_node_packed(const float4 &f)
+{
+  current_svm_nodes.push_back_slow(__float_as_int(f.x));
+  current_svm_nodes.push_back_slow(__float_as_int(f.y));
+  current_svm_nodes.push_back_slow(__float_as_int(f.z));
+  current_svm_nodes.push_back_slow(__float_as_int(f.w));
+}
+
+uint SVMCompiler::encode_uchar4(uint x, uint y, uint z, uint w)
+{
+  assert(x <= 255 && y <= 255 && z <= 255 && w <= 255);
+  return (x) | (y << 8) | (z << 16) | (w << 24);
 }
 
 static ShaderNodeType svm_node_type_with_derivatives(ShaderNodeType type)

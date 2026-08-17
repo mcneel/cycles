@@ -52,7 +52,7 @@ ccl_device_inline float3 env_spherical(float3 R)
     phi = (z >= 0.0f ? 0.5f * M_PI_F : -0.5f * M_PI_F);
   }
   else {
-    theta = atan2(y, x);
+    theta = atan2f(y, x);
     if (theta < 0.0f)
       theta += 2.0f * M_PI_F;
 
@@ -100,7 +100,7 @@ ccl_device_inline float3 env_emap_act(float3 R)
   if (fDivisor < FLT_MIN)
     fDivisor = FLT_MIN;
 
-  float f = sin(0.5f * acos(z)) / fDivisor;
+  float f = sinf(0.5f * acosf(z)) / fDivisor;
 
   float px = -x * f;
   float py = y * f;
@@ -131,7 +131,7 @@ ccl_device_inline float3 env_light_probe(float3 R)
   if (fDivisor < FLT_MIN)
     fDivisor = FLT_MIN;
 
-  float f = (acos(z) / M_PI_F) / fDivisor;
+  float f = (acosf(z) / M_PI_F) / fDivisor;
 
   float px = x * f;
   float py = y * f;

@@ -54,7 +54,7 @@ Scene ::Scene(const SceneParams &params_, Device *device)
        */
       max_closure_global(1)
 {
-  memset((void *)&dscene->data, 0, sizeof(dscene->data));
+  memset((void *)&dscene.data, 0, sizeof(dscene.data));
 
   osl_manager = make_unique<OSLManager>(device);
   shader_manager = ShaderManager::create(device->info.has_osl ? params.shadingsystem :
@@ -155,7 +155,7 @@ void Scene::free_memory(bool final)
       image_manager->device_free_builtin(this);
     }
 
-    lookup_tables->device_free(device, dscene);
+    lookup_tables->device_free(device, &dscene);
   }
 
   if (final) {
@@ -272,7 +272,7 @@ void Scene::device_update(Device *device_, Progress &progress)
   }
 
   progress.set_status("Updating Clipping Planes");
-  object_manager->device_update_clipping_planes(device, dscene, this, progress);
+  object_manager->device_update_clipping_planes(device, &dscene, this, progress);
 
   procedural_manager->update(this, progress);
 
@@ -281,7 +281,7 @@ void Scene::device_update(Device *device_, Progress &progress)
   }
 
   progress.set_status("Updating Background");
-  background->device_update(device, dscene, this);
+  background->device_update(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -296,7 +296,7 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   /* Camera will be used by adaptive subdivision, so do early. */
   progress.set_status("Updating Camera");
-  camera->device_update(device, dscene, this);
+  camera->device_update(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -309,20 +309,20 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   /* Update objects after geometry preprocessing. */
   progress.set_status("Updating Objects");
-  object_manager->device_update(device, dscene, this, progress);
+  object_manager->device_update(device, &dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
   }
 
   progress.set_status("Updating Particle Systems");
-  particle_system_manager->device_update(device, dscene, this, progress);
+  particle_system_manager->device_update(device, &dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
     return;
 
   progress.set_status("Updating Lookup Tables");
-  lookup_tables->device_update(device, dscene, this);
+  lookup_tables->device_update(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -330,7 +330,7 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   /* Camera and shaders must be ready here for adaptive subdivision and displacement. */
   progress.set_status("Updating Meshes");
-  geometry_manager->device_update(device, dscene, this, progress);
+  geometry_manager->device_update(device, &dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -338,7 +338,7 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   /* Update object flags with final geometry. */
   progress.set_status("Updating Objects Flags");
-  object_manager->device_update_flags(device, dscene, this, progress);
+  object_manager->device_update_flags(device, &dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -346,7 +346,7 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   /* Update BVH primitive objects with final geometry. */
   progress.set_status("Updating Primitive Offsets");
-  object_manager->device_update_prim_offsets(device, dscene, this);
+  object_manager->device_update_prim_offsets(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -385,21 +385,21 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   /* Light manager needs shaders and final meshes for triangles in light tree. */
   progress.set_status("Updating Lights");
-  light_manager->device_update(device, dscene, this, progress);
+  light_manager->device_update(device, &dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
   }
 
   progress.set_status("Updating Integrator");
-  integrator->device_update(device, dscene, this);
+  integrator->device_update(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
   }
 
   progress.set_status("Updating Film");
-  film->device_update(device, dscene, this);
+  film->device_update(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
@@ -407,24 +407,24 @@ void Scene::device_update(Device *device_, Progress &progress)
 
   /* Update lookup tables a second time for film tables. */
   progress.set_status("Updating Lookup Tables");
-  lookup_tables->device_update(device, dscene, this);
+  lookup_tables->device_update(device, &dscene, this);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
   }
 
   progress.set_status("Updating Baking");
-  bake_manager->device_update(device, dscene, this, progress);
+  bake_manager->device_update(device, &dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error()) {
     return;
   }
 
   if (device->have_error() == false) {
-    dscene->data.volume_stack_size = get_volume_stack_size();
+    dscene.data.volume_stack_size = get_volume_stack_size();
 
     progress.set_status("Updating Device", "Writing constant memory");
-    device->const_copy_to("data", &(dscene->data), sizeof(dscene->data));
+    device->const_copy_to("data", &(dscene.data), sizeof(dscene.data));
   }
 
   device->optimize_for_scene(this);
@@ -647,7 +647,7 @@ void Scene::update_kernel_features()
   kernel_features |= integrator->get_kernel_features();
   kernel_features |= camera->get_kernel_features();
 
-  dscene->data.kernel_features = kernel_features;
+  dscene.data.kernel_features = kernel_features;
 
   /* Currently viewport render is faster with higher max_closures, needs
    * investigating. */
