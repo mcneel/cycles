@@ -1,41 +1,95 @@
-Prerequistes
-============
+# Building Cycles for Rhino
 
-Git (on the PATH)
-Svn (on the PATH) (Andy used https://sliksvn.com/download/)
+## Short version
 
-python (on the PATH) - type "python" - it needs to work)
+**You almost certainly do not need to build Cycles.** Open `Rhino.sln` and build
+as usual. Prebuilt `ccycles` binaries are restored automatically from
+`big_libs`, and nothing here requires CMake, CUDA, or an OptiX SDK.
 
-	Andy used:
-	https://www.python.org/ftp/python/3.11.3/python-3.11.3-amd64.exe
-	Make sure you check "Add python.exe to PATH"
+Read on only if you are changing Cycles or the C API itself.
 
-Powershell script executation rights (PS -> Set-ExecutionPolicy unrestricted -Scope CurrentUser)
+## Prerequisites
 
+Only needed when building Cycles from source:
 
-Building
-========
+| Tool | Notes |
+| --- | --- |
+| Visual Studio 2022 | With the *Desktop development with C++* workload. VS2019 is no longer required. |
+| CMake | On `PATH`. |
+| Git + Git LFS | Git LFS is how the precompiled dependency bundle is fetched. |
+| Python 3 | On `PATH`. |
 
-Ensure the development branch (jesterKing/8.x/manual_integration_cyclesx) is checked out, submodules updated:
+Optional, each enabling one GPU backend. Anything missing is switched off
+rather than failing the build, so a machine with none of these still produces a
+working CPU-only Cycles:
 
-From Powershell:
+| Backend | Detected via |
+| --- | --- |
+| CUDA | `CUDA_PATH`, or the newest toolkit under `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA` |
+| OptiX | `OPTIX_ROOT_DIR`, or the newest `OptiX SDK *` under `C:\ProgramData\NVIDIA Corporation` |
+| HIP | `HIP_PATH` |
+| oneAPI | `level-zero` inside the precompiled library bundle |
 
-1. The first time, run cmd cycles\make update
-2. run cycles\build_cycles_for_rhino.ps1  (Make sure you're in Powershell, not CMD!)
+Subversion is **not** required. Neither is ResourceHacker, unless you are
+stamping resources onto the prebuilt third-party DLLs (see below).
 
+## Building from Visual Studio
 
-Merge workflow
-=====================
+Set the `RHINOCYCLESDEV` environment variable to anything non-empty, then build
+`Rhino.sln`. The `ccycles` project under the *CCSycles* solution folder
+configures and builds Cycles into the Rhino `Plug-ins` output directory.
 
-There are feature branches for CyclesX manual integration in rhino.git, ccsycles.git, cycles.git and rhinocycles.git
+With `RHINOCYCLESDEV` unset the `ccycles` project does nothing and the prebuilt
+binaries are used. That is the default, and what most people want.
 
-Work in a branch called "localwork"
+## Building from the command line
 
-git fetch
-git rebase origin/jesterKing/8.x/manual_integration_cyclesx
-git checkout jesterKing/8.x/manual_integration_cyclesx
-git pull --ff-only
-git merge localwork
-git push
+```powershell
+cd cycles
+.\build_cycles.ps1 -Configuration Release
+```
 
+Useful switches:
 
+| Switch | Effect |
+| --- | --- |
+| `-Devices cpu` | Force a CPU-only build. |
+| `-Devices cuda,optix` | Enable a specific set instead of auto-detection. |
+| `-ConfigureOnly` | Configure and stop, leaving `build\Cycles.sln` to open in VS. |
+| `-CudaBinaries` | Build the full cubin set rather than PTX only. Slow. |
+| `-InstallDir <path>` | Override where binaries land. |
+
+The first run fetches the precompiled dependency bundle into `cycles/lib/` via
+`make update`. That is a large Git LFS download and takes a while.
+
+## Release builds
+
+`cycles/make_rhino_all.ps1` is the full release pipeline: clean, configure,
+build, stamp version resources, copy outputs into `big_libs/RhinoCycles`, and
+run the Docker-based HIP kernel build. `build_cycles.ps1` is the developer
+inner loop; `make_rhino_all.ps1` is what produces what ships.
+
+## Version resources and the OpenImageIO clash
+
+Rhino loads its own OpenImageIO, OpenEXR and TBB into the same process as
+Cycles. `ccycles.dll` therefore carries a Win32 side-by-side private assembly
+manifest listing the Cycles-side copies as assembly members, so the loader
+resolves them within the ccycles assembly context instead of by bare filename.
+
+That manifest, and `ccycles.dll`'s VERSIONINFO, are compiled in at link time by
+`cycles/src/ccycles/CMakeLists.txt` — see `ccycles_manifest.xml.in`. No manual
+step, no external tool.
+
+`versioninfo_changer.ps1` still exists for the binaries we ship but do not
+build: `openvdb.dll` and the oneAPI JIT DLL come out of the precompiled bundle,
+so resources can only be attached afterwards. It needs ResourceHacker on `PATH`
+and is invoked by `make_rhino_all.ps1`.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `cycles/` | The Cycles fork (submodule, `mcneel/cycles`). |
+| `cycles/src/ccycles/` | The C API around Cycles. Built by the Cycles CMake build. |
+| `csycles/` | The C# wrapper over the C API. Built by `Rhino.sln`. |
+| `ccycles.vcxproj` | Makefile-style project that drives the Cycles CMake build from `Rhino.sln`. |

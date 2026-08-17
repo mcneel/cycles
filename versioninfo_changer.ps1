@@ -1,59 +1,92 @@
+#requires -Version 5.1
+<#
+.SYNOPSIS
+    Stamps version resources and side-by-side manifests onto the prebuilt
+    third-party DLLs in the Cycles install tree.
+
+.DESCRIPTION
+    ccycles.dll no longer needs this: its VERSIONINFO and its SxS private
+    assembly manifest are compiled in at link time by src/ccycles/CMakeLists.txt.
+
+    What remains are binaries we ship but do not build - openvdb.dll and the
+    oneAPI JIT DLL come out of the precompiled Blender library bundle, so the
+    only way to attach resources to them is after the fact. That is what this
+    script still does.
+
+    Requires ResourceHacker on PATH (http://angusj.com/resourcehacker/).
+    Run it against a populated Cycles install tree.
+#>
 [CmdletBinding()]
 param(
-    [string]$RhinoBranchName
+    [string]$RhinoBranchName,
+
+    # Cycles install tree to operate on.
+    [string]$InstallDir
 )
 
-$bd = [System.DateTime]::UtcNow
+$ErrorActionPreference = 'Stop'
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 . (Join-Path $scriptRoot "rhino_branch_info.ps1")
 
+if (-not $InstallDir) { $InstallDir = Join-Path $scriptRoot "cycles\install" }
+
+if (-not (Test-Path $InstallDir)) {
+    throw "Cycles install tree not found at '$InstallDir'. Build Cycles first, or pass -InstallDir."
+}
+
+if (-not (Get-Command ResourceHacker -ErrorAction SilentlyContinue)) {
+    throw "ResourceHacker is not on PATH. Install it from http://angusj.com/resourcehacker/ and re-run."
+}
+
 $branchInfo = Resolve-RhinoBranchInfo -StartPath $scriptRoot -RhinoBranchName $RhinoBranchName
-$rhinoBranchRoot = $branchInfo.BranchRoot
-$rhinoBranchName = $branchInfo.BranchName
-$rhinoMajorVersion = $branchInfo.MajorVersion
 
-$yy = $bd.ToString("yy")
-$doy = $bd.DayOfYear.ToString("D3")
-$bhr = $bd.ToString("HH")
-$bmm = $bd.Minute.ToString("D2")
-
-$dotted = "$rhinoMajorVersion.0.$yy$doy.$bhr$bmm" + "1"
+$bd = [System.DateTime]::UtcNow
+$dotted = "{0}.0.{1}{2}.{3}{4}1" -f `
+    $branchInfo.MajorVersion,
+    $bd.ToString("yy"),
+    $bd.DayOfYear.ToString("D3"),
+    $bd.ToString("HH"),
+    $bd.Minute.ToString("D2")
 $commas = $dotted.Replace(".", ",")
 
-Write-Host "-> branch: $rhinoBranchName (major $rhinoMajorVersion, source $($branchInfo.Source))"
-Write-Host "-> $dotted"
-Write-Host "-> $commas"
+Write-Host "-> branch: $($branchInfo.BranchName) (major $($branchInfo.MajorVersion), source $($branchInfo.Source))"
+Write-Host "-> version: $dotted"
+Write-Host "-> install: $InstallDir"
 
-# Write .rc files
-# -- ccycles
-(Get-Content .\dll_version_replace.template).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\dll_version_replace.rc
-# -- openvdb
-(Get-Content .\openvdb_manifest_replace.template).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\openvdb_manifest_replace.rc
-# Write manifest files
-# -- ccycles
-(Get-Content .\ccycles_manifest.txt).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\ccycles_manifest.txt
-# -- openvdb
-(Get-Content .\openvdb_manifest.txt).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) | Set-Content .\cycles\install\openvdb_manifest.txt
+function Expand-Template([string]$Template, [string]$Destination) {
+    (Get-Content $Template -Raw).Replace("VERSIONCOMMAS", $commas).Replace("VERSIONDOTS", $dotted) |
+        Set-Content $Destination -NoNewline
+}
 
-Push-Location .\cycles\install
+Expand-Template (Join-Path $scriptRoot "dll_version_replace.template")      (Join-Path $InstallDir "dll_version_replace.rc")
+Expand-Template (Join-Path $scriptRoot "openvdb_manifest_replace.template") (Join-Path $InstallDir "openvdb_manifest_replace.rc")
+Expand-Template (Join-Path $scriptRoot "openvdb_manifest.txt")              (Join-Path $InstallDir "openvdb_manifest.txt")
 
-Remove-Item *gyd* -ErrorAction SilentlyContinue
-Remove-Item *_d.dll -ErrorAction SilentlyContinue
-Remove-Item *.so -ErrorAction SilentlyContinue
-Remove-Item *.so.* -ErrorAction SilentlyContinue
-Remove-Item lib\*.so -ErrorAction SilentlyContinue
-Remove-Item lib\*.so.* -ErrorAction SilentlyContinue
-Remove-Item *_d_*.dll -ErrorAction SilentlyContinue
+Push-Location $InstallDir
+try {
+    # Install-tree hygiene: strip debug and non-Windows artifacts that the
+    # library bundle drags along.
+    foreach ($pattern in '*gyd*', '*_d.dll', '*_d_*.dll', '*.so', '*.so.*', 'lib\*.so', 'lib\*.so.*') {
+        Remove-Item $pattern -ErrorAction SilentlyContinue
+    }
 
-cmd.exe /c "ResourceHacker -open .\dll_version_replace.rc -save .\dll_version_replace.res -action compile"
-cmd.exe /c "ResourceHacker -open .\openvdb_manifest_replace.rc -save .\openvdb_manifest_replace.res -action compile"
-cmd.exe /c "ResourceHacker -open openvdb.dll -save openvdb.dll -resource .\openvdb_manifest_replace.res -action addoverwrite -mask MANIFEST,,"
-cmd.exe /c "ResourceHacker -open cycles_kernel_oneapi_jit.dll -save cycles_kernel_oneapi_jit.dll -resource .\dll_version_replace.res -action addoverwrite -mask VERSIONINFO,,"
+    & ResourceHacker -open .\dll_version_replace.rc      -save .\dll_version_replace.res      -action compile
+    & ResourceHacker -open .\openvdb_manifest_replace.rc -save .\openvdb_manifest_replace.res -action compile
 
-Pop-Location
+    # openvdb.dll: SxS assembly manifest so it resolves tbb.dll within the
+    # Cycles assembly rather than picking up Rhino's copy.
+    & ResourceHacker -open openvdb.dll -save openvdb.dll `
+        -resource .\openvdb_manifest_replace.res -action addoverwrite -mask "MANIFEST,,"
 
-cmd.exe /c "ResourceHacker -script .\ccycles_resource_update.txt"
+    # oneAPI JIT DLL: version stamp only.
+    if (Test-Path .\cycles_kernel_oneapi_jit.dll) {
+        & ResourceHacker -open cycles_kernel_oneapi_jit.dll -save cycles_kernel_oneapi_jit.dll `
+            -resource .\dll_version_replace.res -action addoverwrite -mask "VERSIONINFO,,"
+    }
+}
+finally {
+    Pop-Location
+}
 
 Write-Host "ready"
-Write-Host ""

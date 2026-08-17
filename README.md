@@ -1,101 +1,40 @@
-C[CS]?ycles : CCycles and CSycles for Cycles
-============================================
+# C[CS]?ycles — a C and C# API for Cycles
 
-C[CS]?ycles aims to provide a C API around Cycles. Building on CCycles also a
-C# wrapper is available.
+This repository provides a C API around [Cycles](https://projects.blender.org/blender/cycles)
+(`ccycles`) and a C# wrapper over it (`csycles`), used by the RhinoCycles
+render plug-in.
 
-*Note 1* Cycles code is now pulled from upstream developer.blender.org. This is
-done through submodule, so after cloning be sure you init and pull for the
-submodule as well to get all changes. On subsequent pulls on master you'll have
-to `cd` into `cycles/` and pull there as well.
+See [BUILDING.md](BUILDING.md). Short version: you probably do not need to
+build Cycles — just build `Rhino.sln`.
 
-*Note 2* Boost 1.60.0 has been tested in the master branch. Download it from
-http://boost.org and extract it to the root of this repository. The folder
-should be called boost/.
+## Layout
 
-*Note 3* This is currently targeted at Windows 64bit platform only, but patches
-to improve cross-platform compiling and executing are likely candidates for
-acceptance
+| Path | What it is |
+| --- | --- |
+| `cycles/` | Submodule: the McNeel Cycles fork (`mcneel/cycles`). |
+| `cycles/src/ccycles/` | The C API. Lives inside the fork and is built by the Cycles CMake build. |
+| `csycles/` | The C# wrapper. Built by `Rhino.sln`. |
+| `ccycles.vcxproj` | Drives the Cycles CMake build from `Rhino.sln`. |
+| `tools/` | Shader exporter helper for Blender. |
+| `versioninfo_changer.ps1` | Stamps resources onto prebuilt third-party DLLs. |
 
-*Note 4* The grand plan is to improve CCycles and CSycles and prepare for
-submission to Blender upstream repository. There are still many hurdles to jump
-over before this project is ready for that. Until that moment main development
-of both parts is conducted in this repository.
+## Relationship to upstream Cycles
 
-*Note 5* No OSL support effort has been made, as for the RhinoCycles plugin the
-focus is on CUDA support.
+`mcneel/cycles` is a fork of upstream Cycles carrying Rhino-specific additions.
+The bulk of it is additive — Rhino procedural textures in SVM, the Rhino shader
+nodes, and the `ccycles` C API. A smaller set of upstream files is modified in
+place, mostly around texture coordinates, image sampling, shader graph handling
+and film output.
 
-*Note 6* The C[CS]?ycles main developer is Nathan Letwory. You can contact him
-at nathan@mcneel.com or find him as jesterKing in IRC channel #blendercoders of
-the Freenode network.
+Dependencies (OpenImageIO, OpenEXR, OpenVDB, TBB, OpenColorIO and the GPU
+toolkits) come from Blender's precompiled library bundle, fetched by
+`make update` into `cycles/lib/`.
 
-ROADMAP / TODO
-==============
+## Note on OSL
 
-See Notes above, most are TODO items that need to be tackled in a useful way
-before C[CS]?ycles is ready for upstream. In addition:
+There is no OSL support. RhinoCycles uses SVM.
 
-* Add the rest of shader and texture nodes
-* Documentation
-* Documentation
-* Improve csycles_tester to do complete XML support
-
-Cycles and dependencies
-=======================
-
-This folder contains the Cycles source code, C-API source code, C# wrapper
-source code and source code for the necessary dependencies pthreads, glew,
-clew, cuew and a modified OpenImageIO.
-
-The Cycles source
-=================
-
-The Cycles source code is added as a sub-module at the root of this repository.
-
-OpenImageIO tools
-=================
-
-Only a small part of the OpenImageIO library is used on the Rhino version
-of Cycles. Image loading is handled by Rhino existing image code. The
-OpenImageIO DLL is named `OpenImageIOv13.dll`.
-
-pthreads
-========
-
-pthreads contains the threading library used by Cycles. The library is
-compiled as a DLL.
-
-clew
-====
-
-clew is the OpenCL execution wrangler library
-
-cuew
-====
-
-cuew is the CUDA execution wrangler library
-
-C-API and C# wrapper code
-=========================
-
-ccycles (C API)
-csycles (C# wrapper around CCycles)
-csycles_tester (C# tester program, reimplementation of Cycles
-                standalone)
-csycles_diag (C# diagnostics program, text output only)
-
-Building
-========
-
-1. Clone repository, init submodule and pull cycles code as well
-2. Get Boost and extract it to the root of the repository, rename the folder to
-boost/
-3. Open cycles.sln
-4. Build solution for csycles_tester
-5. run csycles_tester with an XML test file
-
-License for CCycles and CSycles
-===============================
+## License
 
 Copyright 2014 Robert McNeel and Associates
 
