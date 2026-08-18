@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    # hybrid = what ships (Release kernels + RelWithDebInfo ccycles.dll/pdb).
+    # release = what ships (Release kernels + RelWithDebInfo ccycles.dll/pdb).
     # wrapper = wrapper-only fast rebuild; leaves kernels and kernel sources untouched.
-    [ValidateSet("hybrid", "wrapper")]
-    [string]$BuildType = "hybrid",
+    [ValidateSet("release", "wrapper")]
+    [string]$BuildType = "release",
     [string]$RhinoBranchName
 )
 
@@ -186,12 +186,12 @@ $dockerVolume = "${dockerHostRoot}:$dockerContainerRoot"
 $buildMode = $BuildType.ToLowerInvariant()
 
 $buildConfig = switch ($buildMode) {
-    "hybrid" { "Release" }
+    "release" { "Release" }
     "wrapper" { "RelWithDebInfo" }
     default { throw "Unsupported build mode '$BuildType'." }
 }
 
-$wrappersConfig = if ($buildMode -eq "hybrid") { "RelWithDebInfo" } else { $null }
+$wrappersConfig = if ($buildMode -eq "release") { "RelWithDebInfo" } else { $null }
 $isWrapperMode = ($buildMode -eq "wrapper")
 $script:SvnRetryCount = 500
 $script:SvnRetryDelaySeconds = 1
