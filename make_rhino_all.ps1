@@ -604,12 +604,15 @@ try {
             "-DWINDOWS_KITS_DIR=$windowsKitsDir"
         )
 
+        # No sm_90/sm_120 here: this Cycles' kernel/device/cuda/config.h only defines launch
+        # bounds up to __CUDA_ARCH__ 899 and #errors above that. Blackwell runs the compute_75
+        # PTX via JIT until that ladder is extended upstream.
         if ($isWrapperMode) {
             $cmakeArgs += @(
                 "-DWITH_CYCLES_DEVICE_CUDA=ON",
                 "-DWITH_CYCLES_DEVICE_OPTIX=ON",
                 "-DWITH_CYCLES_CUDA_BINARIES=OFF",
-                "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
+                "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;compute_75",
                 "-DOPTIX_ROOT_DIR=$optixRoot",
                 "-DWITH_CYCLES_DEVICE_HIP=ON",
                 "-DWITH_CYCLES_HIP_BINARIES=OFF",
@@ -621,7 +624,7 @@ try {
             $cmakeArgs += @(
                 "-DWITH_CYCLES_CUDA_BINARIES=ON",
                 "-DWITH_CYCLES_DEVICE_OPTIX=ON",
-                "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
+                "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;compute_75",
                 "-DOPTIX_ROOT_DIR=$optixRoot",
                 "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
                 "-DWITH_CYCLES_DEVICE_HIP=ON"
