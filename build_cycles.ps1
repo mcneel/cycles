@@ -261,12 +261,25 @@ else { Write-Missing 'HIP' 'set HIP_PATH to enable' }
 $levelZeroRoot = @($libModern, $libLegacy) |
     ForEach-Object { Join-Path $_ 'level-zero' } |
     Where-Object { Test-Path $_ } | Select-Object -First 1
-if ($levelZeroRoot) { $detected.Add('oneapi'); Write-Found 'oneAPI' $levelZeroRoot }
+if ($levelZeroRoot) { $detected.Add('oneapi'); Write-Found 'oneAPI' "$levelZeroRoot (available, off by default - RH-91240)" }
 else { Write-Missing 'oneAPI' 'level-zero not present in the library bundle' }
 
+# Detected is not the same as wanted. oneAPI stays out of the default set even
+# though the library bundle always ships level-zero, so detection always
+# succeeds: RH-91240 was Rhino crashing on exit, and the fix on the 4.4 line was
+# to turn OneAPI and SYCL8 off. Until that is understood and retested against
+# 5.2, defaulting it on would reintroduce a shipped crash. It stays in $detected
+# so that -Devices oneapi still validates and builds for anyone testing it.
+$defaultOff = @('oneapi')
+
 if (-not $Devices) {
-    $Devices = if ($detected.Count) { $detected.ToArray() } else { @('cpu') }
+    $auto = @($detected | Where-Object { $defaultOff -notcontains $_ })
+    $Devices = if ($auto.Count) { $auto } else { @('cpu') }
     Write-Host "   -> enabling: $($Devices -join ', ')" -ForegroundColor Cyan
+    $skipped = @($detected | Where-Object { $defaultOff -contains $_ })
+    if ($skipped.Count) {
+        Write-Host "   -> available but not enabled: $($skipped -join ', ')" -ForegroundColor DarkYellow
+    }
 }
 else {
     Write-Host "   -> requested: $($Devices -join ', ')" -ForegroundColor Cyan
