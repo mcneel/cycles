@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("release", "debug", "release_debuggable", "hybrid", "minimal")]
+    [ValidateSet("release", "debug", "release_debuggable", "hybrid", "wrapper")]
     [string]$BuildType = "release",
     [string]$RhinoBranchName
 )
@@ -32,6 +32,7 @@ catch {
 $script:LogPath = $logPath
 $script:TranscriptStarted = $transcriptStarted
 $script:StageTimings = New-Object System.Collections.Generic.List[object]
+$script:OutputErrors = New-Object System.Collections.Generic.List[string]
 
 function Write-Log {
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Message)
@@ -98,6 +99,47 @@ function Invoke-TimedStage {
     }
 }
 
+function Resolve-VsBuildEnv {
+    # Auto-detect the newest installed Visual Studio that this CMake can target (VS2019/VS2022;
+    # VS18+ has no CMake generator yet) and derive the generator name + MSVC redist dir from it.
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    if (-not (Test-Path $vswhere)) {
+        throw "vswhere.exe not found at '$vswhere'; cannot locate Visual Studio."
+    }
+
+    $query = @("-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+        "-version", "[16.0,18.0)", "-latest", "-property")
+    $installPath = (& $vswhere @query "installationPath") | Select-Object -First 1
+    $installVersion = (& $vswhere @query "installationVersion") | Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($installPath)) {
+        throw "No Visual Studio 2019/2022 with the C++ toolset (VC.Tools.x86.x64) was found."
+    }
+
+    $major = [int]($installVersion.Split('.')[0])
+    $generator = switch ($major) {
+        17 { "Visual Studio 17 2022" }
+        16 { "Visual Studio 16 2019" }
+        default { throw "Unsupported Visual Studio major version '$major' for this CMake's generators." }
+    }
+
+    $redistRoot = Join-Path $installPath "VC\Redist\MSVC"
+    if (-not (Test-Path $redistRoot)) {
+        throw "MSVC redist folder not found at '$redistRoot'."
+    }
+    $redistDir = Get-ChildItem $redistRoot -Directory |
+        Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
+        Sort-Object { [version]$_.Name } |
+        Select-Object -Last 1 -ExpandProperty FullName
+    if ([string]::IsNullOrWhiteSpace($redistDir)) {
+        throw "No numbered MSVC redist version folder found under '$redistRoot'."
+    }
+
+    return [PSCustomObject]@{
+        Generator = $generator
+        RedistDir = ($redistDir -replace '\\', '/')
+    }
+}
+
 $buildDirInput = if ($env:BUILD_DIR) { $env:BUILD_DIR } else { "build" }
 $buildDir = if ([System.IO.Path]::IsPathRooted($buildDirInput)) { [System.IO.Path]::GetFullPath($buildDirInput) } else { [System.IO.Path]::GetFullPath((Join-Path $scriptRoot $buildDirInput)) }
 $expectedBuildDir = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "build"))
@@ -127,7 +169,9 @@ $cmakeExe = if (Test-Path "C:\Tools\cmake329\bin\cmake.exe") { "C:\Tools\cmake32
 $optixRoot = "C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.6.0"
 $dpcppRoot = "..\lib\win64_vc15\dpcpp"
 $levelZeroRoot = "..\lib\win64_vc15\level-zero"
-$msvcRedistDir = "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Redist/MSVC/14.29.30133"
+$vsBuildEnv = Resolve-VsBuildEnv
+$vsGenerator = $vsBuildEnv.Generator
+$msvcRedistDir = $vsBuildEnv.RedistDir
 $windowsKitsDir = "C:/Program Files (x86)/Windows Kits/10"
 $rhinoBranchRoot = $branchInfo.BranchRoot
 $rhinoBranchName = $branchInfo.BranchName
@@ -143,12 +187,12 @@ $buildConfig = switch ($buildMode) {
     "release" { "Release" }
     "release_debuggable" { "RelWithDebInfo" }
     "hybrid" { "Release" }
-    "minimal" { "Release" }
+    "wrapper" { "RelWithDebInfo" }
     default { throw "Unsupported build mode '$BuildType'." }
 }
 
-$wrappersConfig = if ($buildMode -eq "hybrid" -or $buildMode -eq "minimal") { "RelWithDebInfo" } else { $null }
-$isMinimalMode = ($buildMode -eq "minimal")
+$wrappersConfig = if ($buildMode -eq "hybrid") { "RelWithDebInfo" } else { $null }
+$isWrapperMode = ($buildMode -eq "wrapper")
 $script:SvnRetryCount = 500
 $script:SvnRetryDelaySeconds = 1
 
@@ -272,16 +316,15 @@ function Remove-DirectorySafe {
 }
 
 function Copy-PrimaryBinaries {
-    $files = @("ccycles.dll")
-    if (-not $isMinimalMode) {
-        $files += @(
-            "cycles_kernel_oneapi_jit.dll",
-            "sycl6.dll",
-            "pi_level_zero.dll",
-            "xptifw.dll",
-            "ze_loader.dll"
-        )
-    }
+    $files = @(
+        "ccycles.dll",
+        "ccycles.pdb",
+        "cycles_kernel_oneapi_jit.dll",
+        "sycl6.dll",
+        "pi_level_zero.dll",
+        "xptifw.dll",
+        "ze_loader.dll"
+    )
 
     foreach ($file in $files) {
         $source = Join-Path $installDir $file
@@ -292,7 +335,9 @@ function Copy-PrimaryBinaries {
             Write-Log "Copied $file ($stamp)."
         }
         else {
-            Write-Log "WARNING: Missing '$source'."
+            # Do not stall the build, but record it so it is reported loudly at the end.
+            [void]$script:OutputErrors.Add("Missing build output: $source")
+            Write-Log "ERROR: Missing build output '$source'."
         }
     }
 }
@@ -310,6 +355,27 @@ function Copy-KernelArtifacts {
     }
 }
 
+function Copy-KernelSources {
+    # RhinoCyclesKernelCompiler compiles these at runtime; if they drift from
+    # ccycles.dll the KernelData layouts mismatch and GPU compiles break.
+    $installSourceDir = Join-Path $installDir "source"
+    if (-not (Test-Path $installSourceDir)) {
+        [void]$script:OutputErrors.Add("Missing build output: $installSourceDir")
+        Write-Log "ERROR: Missing kernel source tree '$installSourceDir'."
+        return
+    }
+
+    $sourceDest = Join-Path $dllDest "source"
+    robocopy $installSourceDir $sourceDest /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        [void]$script:OutputErrors.Add("Failed to copy kernel sources to '$sourceDest' (robocopy $LASTEXITCODE).")
+        Write-Log "ERROR: robocopy of kernel sources failed ($LASTEXITCODE)."
+    }
+    else {
+        Write-Log "Copied kernel source tree to '$sourceDest'."
+    }
+}
+
 function Copy-AllOutputs {
     New-Item -ItemType Directory -Path $dllDest -Force | Out-Null
     foreach ($destination in $kernelDestinations) {
@@ -318,6 +384,32 @@ function Copy-AllOutputs {
 
     Copy-PrimaryBinaries
     Copy-KernelArtifacts
+    Copy-KernelSources
+}
+
+function Copy-WrapperOnlyOutputs {
+    New-Item -ItemType Directory -Path $dllDest -Force | Out-Null
+
+    $wrapperDllSource = Join-Path $installDir "ccycles.dll"
+    if (-not (Test-Path $wrapperDllSource)) {
+        throw "Expected wrapper DLL was not found: '$wrapperDllSource'."
+    }
+    $wrapperDllDest = Join-Path $dllDest "ccycles.dll"
+    Copy-Item -LiteralPath $wrapperDllSource -Destination $wrapperDllDest -Force
+    $stamp = (Get-Item -LiteralPath $wrapperDllDest).LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+    Write-Log "Copied ccycles.dll ($stamp)."
+
+    $wrapperPdbSource = Join-Path $installDir "ccycles.pdb"
+    if (Test-Path $wrapperPdbSource) {
+        $wrapperPdbDest = Join-Path $dllDest "ccycles.pdb"
+        Copy-Item -LiteralPath $wrapperPdbSource -Destination $wrapperPdbDest -Force
+        Write-Log "Copied ccycles.pdb."
+    }
+    else {
+        Write-Log "WARNING: Wrapper symbols were not found at '$wrapperPdbSource'."
+    }
+
+    Copy-KernelSources
 }
 
 function Promote-DebuggableWrappersToInstall {
@@ -421,8 +513,10 @@ try {
     Write-Log "Script root: $scriptRoot"
     Write-Log "Build mode: $buildMode"
     Write-Log "Build config: $buildConfig"
-    if ($isMinimalMode) {
-        Write-Log "Minimal mode: ccycles.dll only (CUDA/OptiX/HIP/oneAPI disabled, hybrid-style wrapper promotion enabled)."
+    Write-Log "VS generator: $vsGenerator"
+    Write-Log "MSVC redist dir: $msvcRedistDir"
+    if ($isWrapperMode) {
+        Write-Log "Wrapper mode: wrapper-only build (CUDA/OptiX/HIP enabled with no kernel binaries, no oneAPI device, no Docker stage; version info still applied)."
     }
     if ($wrappersConfig) {
         Write-Log "Wrapper override config: $wrappersConfig"
@@ -446,7 +540,7 @@ try {
         }
         $cyclesLibVersion = Get-CyclesLibrariesVersion
         $svnLibBaseUrl = "https://svn.blender.org/svnroot/bf-blender/tags/blender-$cyclesLibVersion-release/lib"
-        if (-not $isMinimalMode) {
+        if (-not $isWrapperMode) {
             Ensure-SvnLib -LibName "linux_x86_64_glibc_228" -SvnLibBaseUrl $svnLibBaseUrl
         }
         Ensure-SvnLib -LibName "win64_vc15" -SvnLibBaseUrl $svnLibBaseUrl
@@ -460,9 +554,13 @@ try {
 
     Invoke-TimedStage -Name "Configure + Build ($buildMode)" -Action {
         $cmakeArgs = @(
+            "-S", $scriptRoot,
             "-B", $buildDir,
-            "-G", "Visual Studio 16 2019",
+            "-G", $vsGenerator,
             "-A", "x64",
+            # v142 (14.29) toolset: the bundled DPC++ (Clang 16) can't compile the VS2022 14.4x STL
+            # (needs Clang 19+). The cycles-only tree has no Rhino >=VS2022 guard. Drop when DPC++ is updated.
+            "-T", "v142",
             "-DWITH_CYCLES_ALEMBIC=OFF",
             "-DWITH_CYCLES_USD=OFF",
             "-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF",
@@ -472,12 +570,14 @@ try {
             "-DWINDOWS_KITS_DIR=$windowsKitsDir"
         )
 
-        if ($isMinimalMode) {
+        if ($isWrapperMode) {
             $cmakeArgs += @(
-                "-DWITH_CYCLES_DEVICE_CUDA=OFF",
-                "-DWITH_CYCLES_DEVICE_OPTIX=OFF",
+                "-DWITH_CYCLES_DEVICE_CUDA=ON",
+                "-DWITH_CYCLES_DEVICE_OPTIX=ON",
                 "-DWITH_CYCLES_CUDA_BINARIES=OFF",
-                "-DWITH_CYCLES_DEVICE_HIP=OFF",
+                "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
+                "-DOPTIX_ROOT_DIR=$optixRoot",
+                "-DWITH_CYCLES_DEVICE_HIP=ON",
                 "-DWITH_CYCLES_HIP_BINARIES=OFF",
                 "-DWITH_CYCLES_DEVICE_ONEAPI=OFF",
                 "-DWITH_CYCLES_ONEAPI_BINARIES=OFF"
@@ -487,7 +587,7 @@ try {
             $cmakeArgs += @(
                 "-DWITH_CYCLES_CUDA_BINARIES=ON",
                 "-DWITH_CYCLES_DEVICE_OPTIX=ON",
-                "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;compute_75",
+                "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
                 "-DOPTIX_ROOT_DIR=$optixRoot",
                 "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
                 "-DWITH_CYCLES_DEVICE_HIP=ON"
@@ -501,7 +601,8 @@ try {
 
         Push-Location $buildDir
         try {
-            & $cmakeExe --build . --target install --config $buildConfig | Out-Host
+            $buildTarget = if ($isWrapperMode) { "ccycles" } else { "install" }
+            & $cmakeExe --build . --target $buildTarget --config $buildConfig | Out-Host
             $buildExitCode = $LASTEXITCODE
         }
         finally {
@@ -509,7 +610,19 @@ try {
         }
 
         if ($buildExitCode -ne 0) {
+            if ($isWrapperMode) {
+                throw "Wrapper build failed with code $buildExitCode."
+            }
             throw "CMake build/install failed with code $buildExitCode."
+        }
+
+        if ($isWrapperMode) {
+            # Stage the wrapper into the install dir so versioninfo_changer.ps1
+            # can stamp version metadata onto ccycles.dll there.
+            New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+            Promote-DebuggableWrappersToInstall -WrapperConfig $buildConfig
+            Promote-CcyclesPdbToInstall -ConfigCandidates @($buildConfig)
+            return
         }
 
         if ($wrappersConfig) {
@@ -551,23 +664,25 @@ try {
     }
 
     Invoke-TimedStage -Name "Copy Build Outputs" -Action {
-        Copy-AllOutputs
-    }
-
-    Invoke-TimedStage -Name "Docker HIP Build" -Action {
-        if ($isMinimalMode) {
-            Write-Log "Skipping Docker HIP step in minimal mode."
-            return
-        }
-
-        if (Ensure-DockerReady) {
-            $dockerExitCode = Run-DockerHipFlow
-            if ($dockerExitCode -ne 0) {
-                Write-Log "Docker step failed with code $dockerExitCode. Build outputs are already copied."
-            }
+        if ($isWrapperMode) {
+            Copy-WrapperOnlyOutputs
         }
         else {
-            Write-Log "Skipping Docker HIP step."
+            Copy-AllOutputs
+        }
+    }
+
+    if (-not $isWrapperMode) {
+        Invoke-TimedStage -Name "Docker HIP Build" -Action {
+            if (Ensure-DockerReady) {
+                $dockerExitCode = Run-DockerHipFlow
+                if ($dockerExitCode -ne 0) {
+                    Write-Log "Docker step failed with code $dockerExitCode. Build outputs are already copied."
+                }
+            }
+            else {
+                Write-Log "Skipping Docker HIP step."
+            }
         }
     }
 
@@ -586,6 +701,19 @@ finally {
         Write-Log ("{0}: {1:N1}s ({2})" -f $entry.Name, $entry.Seconds, $entry.Status)
     }
     Write-Log ("Total elapsed: {0:N1}s" -f $overallSw.Elapsed.TotalSeconds)
+
+    if ($script:OutputErrors.Count -gt 0) {
+        if ($exitCode -eq 0) { $exitCode = 1 }
+        Write-Log ""
+        Write-Log "########################################################################"
+        Write-Log ("###  BUILD OUTPUT ERROR: {0} required file(s) missing  ###" -f $script:OutputErrors.Count)
+        foreach ($err in $script:OutputErrors) {
+            Write-Log "###    - $err"
+        }
+        Write-Log "###  (other outputs may have copied fine; the above did NOT)"
+        Write-Log "########################################################################"
+    }
+
     Write-Log "Final exit code: $exitCode"
 
     if ($script:TranscriptStarted) {
