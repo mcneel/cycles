@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
   Builds native Cycles + ccycles from inside Rhino.sln.
 
@@ -58,9 +58,9 @@
     <CyclesConfiguration Condition="'$(Configuration)'=='Debug'">Debug</CyclesConfiguration>
     <CyclesConfiguration Condition="'$(Configuration)'=='ReleaseDebuggable'">RelWithDebInfo</CyclesConfiguration>
 
-    <CyclesScript>$(MSBuildThisFileDirectory)cycles\build_cycles.ps1</CyclesScript>
+    <CyclesScript>$(MSBuildThisFileDirectory)..\..\build_cycles.ps1</CyclesScript>
     <CyclesInstallDir>$(RhinoBinDir)\$(Configuration)\Plug-ins</CyclesInstallDir>
-    <CyclesBuildDir>$(MSBuildThisFileDirectory)cycles\build</CyclesBuildDir>
+    <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
     <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
     <CyclesSkipMessage>echo ccycles: RHINOCYCLESDEV is not set, using prebuilt binaries. Set it to build Cycles from source.</CyclesSkipMessage>
@@ -82,9 +82,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="cycles\build_cycles.ps1" />
-    <None Include="cycles\src\ccycles\CMakeLists.txt" />
-    <None Include="cycles\src\ccycles\ccycles_manifest.xml.in" />
+    <None Include="..\..\build_cycles.ps1" />
+    <None Include="CMakeLists.txt" />
+    <None Include="ccycles_manifest.xml.in" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
