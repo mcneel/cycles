@@ -1,8 +1,12 @@
-// This file contains the version resources for ccycles.vcxproj
-// The version numbers and copyright information comes from the header file below.
-// Please do not modify this file unless you are certain you know what you are doing!
+// Version resources for ccycles.dll, compiled in by src/ccycles/CMakeLists.txt.
+// The version numbers and copyright information come from the header below.
+//
+// The path is relative to this file: src/ccycles -> src4, given this repo is
+// checked out as Rhino's RDK/cycles submodule. Rhino generates src4/version.h
+// during its build, so it only resolves inside a Rhino tree; CMake defines
+// STANDALONE when it is absent, falling back to the version.h beside this file.
 #if !defined(STANDALONE)
-#include "..\..\..\..\..\version.h"
+#include "..\..\..\..\..\..\version.h"
 #else
 #include "version.h"
 #endif
@@ -25,12 +29,15 @@ BEGIN
         BLOCK "080904e4"
         BEGIN
             VALUE "CompanyName", "Robert McNeel & Associates"
-            VALUE "FileDescription", "CCycles - C-API for Cycles. Part of C[CS]?ycles"
-            VALUE "FileVersion", VERSION_WITH_PERIODS
+            VALUE "FileDescription", "ccycles - C API for Cycles"
+            // Quoted form: VERSION_WITH_PERIODS is an unquoted token, and RC accepts
+            // it here but produces a StringFileInfo block that readers cannot parse -
+            // the file version came out blank in Explorer and FileVersionInfo.
+            VALUE "FileVersion", RMA_VERSION_WITH_PERIODS_STRING
             VALUE "InternalName", "ccycles.dll"
             VALUE "LegalCopyright", COPYRIGHT
             VALUE "OriginalFilename", "ccycles.dll"
-            VALUE "ProductName", "C[CS]?ycles - CCycles"
+            VALUE "ProductName", "Cycles for Rhino"
             VALUE "ProductVersion", RMA_VERSION_WITH_PERIODS_STRING
         END
     END
