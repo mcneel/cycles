@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>smoketest</AssemblyName>
+    <RootNamespace>smoketest</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="csycles">
+      <HintPath>C:\Users\Lars\dev\rhino\9.x\src4\rhino4\Plug-ins\RDK\cycles\csycles\bin\Release\csycles.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

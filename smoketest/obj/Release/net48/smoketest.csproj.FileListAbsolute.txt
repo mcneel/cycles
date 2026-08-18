@@ -1,0 +1,13 @@
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\bin\Release\net48\smoketest.exe.config
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\bin\Release\net48\smoketest.exe
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\bin\Release\net48\smoketest.pdb
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\bin\Release\net48\csycles.dll
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\bin\Release\net48\csycles.pdb
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.csproj.AssemblyReference.cache
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.AssemblyInfoInputs.cache
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.AssemblyInfo.cs
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.csproj.CoreCompileInputs.cache
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.csproj.Up2Date
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.exe
+C:\Users\Lars\dev\rhino\cycles52-merge\smoketest\obj\Release\net48\smoketest.pdb
