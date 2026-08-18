@@ -123,11 +123,37 @@ $kernelDestinations = @(
     (Join-Path $dllDest "lib")
 )
 
-$cmakeExe = if (Test-Path "C:\Tools\cmake329\bin\cmake.exe") { "C:\Tools\cmake329\bin\cmake.exe" } else { "cmake" }
-$optixRoot = "C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.6.0"
-$dpcppRoot = "..\lib\win64_vc15\dpcpp"
-$levelZeroRoot = "..\lib\win64_vc15\level-zero"
-$msvcRedistDir = "C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Redist/MSVC/14.29.30133"
+# Toolchain discovery. Everything below used to be a hardcoded absolute path,
+# which meant the release build only ran on one specific machine.
+$cmakeExe = (Get-Command cmake -ErrorAction SilentlyContinue).Source
+if (-not $cmakeExe) { throw "cmake was not found on PATH." }
+
+$vswhereExe = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+if (-not (Test-Path $vswhereExe)) { throw "vswhere.exe not found. Install Visual Studio 2022." }
+$vsInstallPath = & $vswhereExe -latest -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -version '[17.0,18.0)' -property installationPath
+if (-not $vsInstallPath) { throw "No Visual Studio 2022 with the C++ toolset found." }
+$cmakeGenerator = "Visual Studio 17 2022"
+
+$optixRoot = $env:OPTIX_ROOT_DIR
+if (-not $optixRoot) {
+    $optixRoot = Get-ChildItem 'C:\ProgramData\NVIDIA Corporation' -Directory -Filter 'OptiX SDK *' -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+}
+
+# Cycles 5.x puts precompiled libraries in lib/<platform> inside the repo;
+# 3.5 used a sibling ../lib/win64_vc15 populated from SVN.
+$libModernRoot = Join-Path $scriptRoot "lib\windows_x64"
+$libLegacyRoot = Join-Path $scriptRoot "..\lib\win64_vc15"
+$libBundleRoot = if (Test-Path $libModernRoot) { $libModernRoot } else { $libLegacyRoot }
+$dpcppRoot = Join-Path $libBundleRoot "dpcpp"
+$levelZeroRoot = Join-Path $libBundleRoot "level-zero"
+
+# The oneAPI kernel build needs these to locate the redistributables it links
+# against; derive them from the detected VS install instead of pinning 14.29.30133.
+$msvcRedistDir = Get-ChildItem (Join-Path $vsInstallPath 'VC\Redist\MSVC') -Directory -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
 $windowsKitsDir = "C:/Program Files (x86)/Windows Kits/10"
 $rhinoBranchRoot = $branchInfo.BranchRoot
 $rhinoBranchName = $branchInfo.BranchName
@@ -440,9 +466,36 @@ try {
         throw ($guardErrors -join " ")
     }
 
-    Invoke-TimedStage -Name "Ensure SVN Libraries" -Action {
+    Invoke-TimedStage -Name "Ensure Libraries" -Action {
+        # Cycles 4.2+ fetches precompiled libraries as a Git LFS submodule under
+        # lib/<platform> via 'make update'. Before that they came from
+        # svn.blender.org, which Blender has decommissioned - hence the 500-retry
+        # loop this stage used to run. Prefer 'make update' whenever the tree
+        # supports it and only fall back to SVN on the old layout.
+        $makeBat = Join-Path $scriptRoot "make.bat"
+        $usesGitLfsLibraries = Test-Path (Join-Path $scriptRoot ".gitmodules")
+
+        if ($usesGitLfsLibraries -and (Test-Path $makeBat)) {
+            if (Test-Path $libModernRoot) {
+                Write-Log "[libs] $libModernRoot already present."
+                return
+            }
+            Write-Log "[libs] Running 'make update'."
+            $updateProc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "`"$makeBat`"", 'update' `
+                -WorkingDirectory $scriptRoot -NoNewWindow -Wait -PassThru
+            if ($updateProc.ExitCode -ne 0) {
+                throw "'make update' failed with exit code $($updateProc.ExitCode)."
+            }
+            if (-not (Test-Path $libModernRoot)) {
+                throw "'make update' completed but '$libModernRoot' is missing."
+            }
+            Write-Log "[libs] Ready."
+            return
+        }
+
+        Write-Log "WARNING: falling back to the legacy SVN library checkout. svn.blender.org has been decommissioned; this stage is expected to fail until the tree is updated to Cycles 4.2 or newer."
         if (-not (Get-Command svn -ErrorAction SilentlyContinue)) {
-            throw "svn was not found on PATH."
+            throw "svn was not found on PATH, and this tree is too old to use 'make update'."
         }
         $cyclesLibVersion = Get-CyclesLibrariesVersion
         $svnLibBaseUrl = "https://svn.blender.org/svnroot/bf-blender/tags/blender-$cyclesLibVersion-release/lib"
@@ -460,17 +513,18 @@ try {
 
     Invoke-TimedStage -Name "Configure + Build ($buildMode)" -Action {
         $cmakeArgs = @(
+            "-S", $scriptRoot,
             "-B", $buildDir,
-            "-G", "Visual Studio 16 2019",
+            "-G", $cmakeGenerator,
             "-A", "x64",
             "-DWITH_CYCLES_ALEMBIC=OFF",
             "-DWITH_CYCLES_USD=OFF",
             "-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF",
             "-DSYCL_ROOT_DIR=$dpcppRoot",
             "-DLEVEL_ZERO_ROOT_DIR=$levelZeroRoot",
-            "-DMSVC_REDIST_DIR=$msvcRedistDir",
             "-DWINDOWS_KITS_DIR=$windowsKitsDir"
         )
+        if ($msvcRedistDir) { $cmakeArgs += "-DMSVC_REDIST_DIR=$msvcRedistDir" }
 
         if ($isMinimalMode) {
             $cmakeArgs += @(
@@ -484,14 +538,17 @@ try {
             )
         }
         else {
+            # CYCLES_CUDA_BINARIES_ARCH is deliberately left at the upstream
+            # default. The list pinned here previously still named sm_37, which
+            # Cycles dropped in 4.2, and it lagged behind newer architectures.
             $cmakeArgs += @(
                 "-DWITH_CYCLES_CUDA_BINARIES=ON",
                 "-DWITH_CYCLES_DEVICE_OPTIX=ON",
-                "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;compute_75",
-                "-DOPTIX_ROOT_DIR=$optixRoot",
                 "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
                 "-DWITH_CYCLES_DEVICE_HIP=ON"
             )
+            if ($optixRoot) { $cmakeArgs += "-DOPTIX_ROOT_DIR=$optixRoot" }
+            else { Write-Log "WARNING: no OptiX SDK found; set OPTIX_ROOT_DIR. OptiX device will fail to configure." }
         }
 
         & $cmakeExe @cmakeArgs | Out-Host
