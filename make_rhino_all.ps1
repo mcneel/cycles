@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-. (Join-Path $scriptRoot "..\rhino_branch_info.ps1")
+. (Join-Path $scriptRoot "rhino_branch_info.ps1")
 
 $branchInfo = Resolve-RhinoBranchInfo -StartPath $scriptRoot -RhinoBranchName $RhinoBranchName
 $logPath = Join-Path $scriptRoot "make_rhino_all.log"
@@ -595,7 +595,7 @@ try {
     }
 
     Invoke-TimedStage -Name "Update Version Info" -Action {
-        Push-Location ([System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..")))
+        Push-Location $scriptRoot
         try {
             & powershell -NoProfile -ExecutionPolicy Bypass -File ".\versioninfo_changer.ps1" -RhinoBranchName $rhinoBranchName | Out-Host
             if ($LASTEXITCODE -ne 0) {

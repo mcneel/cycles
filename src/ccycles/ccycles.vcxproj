@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Builds native Cycles + ccycles from inside Rhino.sln.
+
+  Cycles is a CMake project, which cannot be referenced from a .sln directly.
+  This is a Makefile-style vcxproj that drives cycles/build_cycles.ps1, so
+  Build and Rebuild in Visual Studio do the right thing and errors surface in
+  the Error List like any other project.
+
+  Two-tier by design, keyed off the existing RHINOCYCLESDEV switch:
+
+    RHINOCYCLESDEV unset (the default, and what almost everyone wants)
+        Does nothing. The prebuilt ccycles binaries are restored by
+        RhinoCyclesCore.csproj. Nobody needs CMake, CUDA or an OptiX SDK
+        to build Rhino.
+
+    RHINOCYCLESDEV set
+        Configures and builds Cycles from source into the Rhino Plug-ins
+        output directory. GPU backends are auto-detected; a machine with no
+        GPU SDKs installed still gets a working CPU-only build.
+-->
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseDebuggable|x64">
+      <Configuration>ReleaseDebuggable</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{4374CB1D-D754-4248-811B-A2B660EC79E3}</ProjectGuid>
+    <RootNamespace>ccycles</RootNamespace>
+    <Keyword>MakeFileProj</Keyword>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'!='Debug'">false</UseDebugLibraries>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <PropertyGroup>
+    <!-- build_cycles.ps1 understands Debug / Release / RelWithDebInfo. -->
+    <CyclesConfiguration>Release</CyclesConfiguration>
+    <CyclesConfiguration Condition="'$(Configuration)'=='Debug'">Debug</CyclesConfiguration>
+    <CyclesConfiguration Condition="'$(Configuration)'=='ReleaseDebuggable'">RelWithDebInfo</CyclesConfiguration>
+
+    <CyclesScript>$(MSBuildThisFileDirectory)cycles\build_cycles.ps1</CyclesScript>
+    <CyclesInstallDir>$(RhinoBinDir)\$(Configuration)\Plug-ins</CyclesInstallDir>
+    <CyclesBuildDir>$(MSBuildThisFileDirectory)cycles\build</CyclesBuildDir>
+
+    <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
+    <CyclesSkipMessage>echo ccycles: RHINOCYCLESDEV is not set, using prebuilt binaries. Set it to build Cycles from source.</CyclesSkipMessage>
+
+    <NMakeBuildCommandLine Condition="'$(RHINOCYCLESDEV)'!=''">$(CyclesInvoke)</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine Condition="'$(RHINOCYCLESDEV)'==''">$(CyclesSkipMessage)</NMakeBuildCommandLine>
+
+    <NMakeReBuildCommandLine Condition="'$(RHINOCYCLESDEV)'!=''">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesInvoke)</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine Condition="'$(RHINOCYCLESDEV)'==''">$(CyclesSkipMessage)</NMakeReBuildCommandLine>
+
+    <NMakeCleanCommandLine Condition="'$(RHINOCYCLESDEV)'!=''">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul</NMakeCleanCommandLine>
+    <NMakeCleanCommandLine Condition="'$(RHINOCYCLESDEV)'==''">$(CyclesSkipMessage)</NMakeCleanCommandLine>
+
+    <NMakeOutput>$(CyclesInstallDir)\ccycles.dll</NMakeOutput>
+
+    <!-- Gives IntelliSense something to work with when browsing ccycles sources. -->
+    <NMakePreprocessorDefinitions>CCL_CAPI_DLL;WITH_CUDA_DYNLOAD;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <NMakeIncludeSearchPath>$(MSBuildThisFileDirectory)cycles\src;$(MSBuildThisFileDirectory)cycles\third_party;$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="cycles\build_cycles.ps1" />
+    <None Include="cycles\src\ccycles\CMakeLists.txt" />
+    <None Include="cycles\src\ccycles\ccycles_manifest.xml.in" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
