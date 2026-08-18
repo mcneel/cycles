@@ -10,6 +10,26 @@ internal static class Program
 {
     // keep the delegate alive across the native call boundary
     private static CSycles.LoggerCallback s_logger;
+
+    private static IntPtr FindOutputNode(IntPtr shader)
+    {
+        int count = CSycles.shader_node_count(shader);
+        for (int i = 0; i < count; i++)
+        {
+            IntPtr n = CSycles.shader_node_get(shader, i);
+            string name = CSycles.shadernode_get_name(n);
+            Console.WriteLine("  graph node " + i + ": " + name);
+            if (name.IndexOf("output", StringComparison.OrdinalIgnoreCase) >= 0)
+                return n;
+        }
+        return IntPtr.Zero;
+    }
+    [System.Runtime.InteropServices.DllImport("ccycles", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void cycles_debug_scene_stats(IntPtr session);
+
+    [System.Runtime.InteropServices.DllImport("ccycles", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void cycles_debug_install_crash_handler();
+
     private static void Main()
     {
         string path = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".";
@@ -17,6 +37,7 @@ internal static class Program
         Directory.CreateDirectory(userpath);
 
         Console.WriteLine("path_init  : " + path);
+        cycles_debug_install_crash_handler();
         CSycles.path_init(path, userpath);
         CSycles.initialise(DeviceTypeMask.CPU);
         CSycles.log_to_stdout(true);
@@ -48,9 +69,13 @@ internal static class Program
         // transform from co/dir because 5.2 dropped those sockets.
         IntPtr diffuse = CSycles.create_shader(session);
         CSycles.shader_new_graph(diffuse);
-        IntPtr bsdf = CSycles.add_shader_node(diffuse, "diffuse_bsdf", "diff");
-        IntPtr outNode = CSycles.add_shader_node(diffuse, "output", "out");
-        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, "BSDF", outNode, "Surface");
+        // emission rather than diffuse: self-lit, so visibility does not depend
+        // on the light transform being right.
+        IntPtr bsdf = CSycles.add_shader_node(diffuse, "emission", "emit_surface");
+        // shader_new_graph already creates the graph's output node; adding another
+        // gives an orphan that nothing reads.
+        IntPtr outNode = FindOutputNode(diffuse);
+        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, "Emission", outNode, "Surface");
         Console.WriteLine("shader     : connected=" + connected);
 
         IntPtr mesh = CSycles.scene_add_mesh(session, diffuse);
@@ -65,6 +90,7 @@ internal static class Program
         CSycles.mesh_set_tris(session, mesh, ref tris, 2, diffuse, false);
         Console.WriteLine("mesh       : 4 verts, 2 tris");
 
+        if (Environment.GetEnvironmentVariable("SMOKE_NOMESH") != "1") {
         IntPtr obj = CSycles.scene_add_object(session);
         CSycles.object_set_geometry(session, obj, mesh);
         CSycles.object_set_matrix(session, obj, new Transform(
@@ -72,13 +98,15 @@ internal static class Program
             0f, 1f, 0f, 0f,
             0f, 0f, 1f, 0f));
         Console.WriteLine("object     : added");
+        }
 
         IntPtr lightShader = CSycles.create_shader(session);
         CSycles.shader_new_graph(lightShader);
         IntPtr emission = CSycles.add_shader_node(lightShader, "emission", "emit");
-        IntPtr lightOut = CSycles.add_shader_node(lightShader, "output", "lout");
+        IntPtr lightOut = FindOutputNode(lightShader);
         CSycles.shader_connect_nodes(lightShader, emission, "Emission", lightOut, "Surface");
 
+        if (Environment.GetEnvironmentVariable("SMOKE_NOLIGHT") != "1") {
         IntPtr light = CSycles.create_light(session, lightShader);
         CSycles.light_set_type(session, light, LightType.Point);
         CSycles.light_set_co(session, light, 0f, 0f, 6f);
@@ -86,12 +114,14 @@ internal static class Program
         CSycles.light_set_size(session, light, 1.0f);
         CSycles.light_tag_update(session, light);
         Console.WriteLine("light      : point at (0,0,6)");
+        }
 
         // Camera above the quad, looking down -Z.
         CSycles.camera_set_matrix(session, new Transform(
             1f, 0f, 0f, 0f,
             0f, 1f, 0f, 0f,
-            0f, 0f, 1f, 12f));
+            0f, 0f, 1f, float.Parse(Environment.GetEnvironmentVariable("SMOKE_CAMZ") ?? "-12",
+                System.Globalization.CultureInfo.InvariantCulture)));
         CSycles.camera_set_type(session, CameraType.Perspective);
         CSycles.camera_set_fov(session, 0.8f);
         CSycles.camera_update(session);
@@ -107,6 +137,7 @@ internal static class Program
             Console.WriteLine("clean exit without start");
             return;
         }
+        cycles_debug_scene_stats(session);
         int rc = CSycles.session_reset(session, (int)W, (int)H, 4, 0, 0, (int)W, (int)H, 1);
         Console.WriteLine("reset      : rc=" + rc);
 
@@ -152,6 +183,12 @@ internal static class Program
             double sum = 0.0;
             for (int i = 0; i < n; i++) sum += buf[i];
             Console.WriteLine("buffer sum : " + sum.ToString("F4"));
+            float mn = float.MaxValue, mx = float.MinValue;
+            for (int i = 0; i < n; i++) { if (buf[i] < mn) mn = buf[i]; if (buf[i] > mx) mx = buf[i]; }
+            Console.WriteLine("buffer rng : min=" + mn + " max=" + mx);
+            int mid = (int)((H / 2) * W + W / 2) * comps;
+            Console.WriteLine("centre px  : " + buf[mid] + " " + buf[mid+1] + " " + buf[mid+2] + " " + buf[mid+3]);
+            Console.WriteLine("corner px  : " + buf[0] + " " + buf[1] + " " + buf[2] + " " + buf[3]);
 
             string ppm = Path.Combine(path, "smoketest.ppm");
             using (var fs = new FileStream(ppm, FileMode.Create))

@@ -21,7 +21,14 @@ void cycles_camera_set_size(ccl::Session* session_id, unsigned int width, unsign
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
         // TODO: find out if need to set full_width and full_height
-        sce->camera->set_screen_size(width, height);
+		/* set_screen_size only sets the render-window size. The raster transform
+		 * is built from full_width/full_height, which otherwise keep their
+		 * defaults - the window then maps onto a corner of the full frame and
+		 * the camera points nowhere near the scene. Anything wanting a border
+		 * render sets full size explicitly afterwards. */
+		sce->camera->set_screen_size(width, height);
+		sce->camera->set_full_width(width);
+		sce->camera->set_full_height(height);
 		// TODO: APIfy need_[device_]update
 		sce->camera->need_flags_update = true;
 		sce->camera->need_device_update = true;

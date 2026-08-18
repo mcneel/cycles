@@ -159,3 +159,38 @@ CCL_CAPI void CDECL cycles_scene_unlock(ccl::Session* session)
 #ifdef __cplusplus
 }
 #endif
+
+/* Temporary diagnostic: report what the scene actually holds. Used by the
+ * smoke test to tell "the geometry never arrived" apart from "the camera is
+ * not looking at it". */
+extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id)
+{
+	ccl::Scene *sce = session_id->scene.get();
+	if (sce == nullptr) {
+		printf("stats: no scene\n");
+		return;
+	}
+
+	printf("stats: geometry=%zu objects=%zu shaders=%zu\n",
+	       sce->geometry.size(), sce->objects.size(), sce->shaders.size());
+
+	for (size_t i = 0; i < sce->objects.size(); i++) {
+		ccl::Object *ob = sce->objects[i];
+		ccl::Geometry *geo = ob->get_geometry();
+		printf("  object %zu geometry=%p vis=%u\n", i, (void *)geo, ob->get_visibility());
+		if (ccl::Mesh *mesh = dynamic_cast<ccl::Mesh *>(geo)) {
+			printf("    mesh verts=%d tris=%d used_shaders=%zu\n",
+			       (int)mesh->num_verts(), (int)mesh->num_triangles(),
+			       mesh->get_used_shaders().size());
+		}
+		else {
+			printf("    not a mesh (light?)\n");
+		}
+	}
+
+	const ccl::Transform &ctfm = sce->camera->get_matrix();
+	printf("  camera at (%.2f %.2f %.2f) %dx%d fov=%.3f\n", ctfm.x.w, ctfm.y.w, ctfm.z.w,
+	       sce->camera->get_full_width(), sce->camera->get_full_height(),
+	       sce->camera->get_fov());
+	fflush(stdout);
+}

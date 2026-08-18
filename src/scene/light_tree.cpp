@@ -81,6 +81,22 @@ LightTreeEmitter::LightTreeEmitter(Object *object, const int object_id) : object
   centroid = object->bounds.center();
   light_set_membership = object->get_light_set_membership();
 }
+Shader *rhino_emission_shader(const Scene *scene, Object *object, Mesh *mesh, const int prim_id)
+{
+  if (Shader *object_shader = object->get_shader()) {
+    return object_shader;
+  }
+
+  if (mesh != nullptr && prim_id >= 0 && prim_id < (int)mesh->get_shader().size()) {
+    const int shader_index = mesh->get_shader()[prim_id];
+    if (shader_index >= 0 && shader_index < (int)mesh->get_used_shaders().size()) {
+      return static_cast<Shader *>(mesh->get_used_shaders()[shader_index]);
+    }
+  }
+
+  return scene->default_surface;
+}
+
 
 LightTreeEmitter::LightTreeEmitter(Scene *scene,
                                    const int prim_id,
@@ -94,8 +110,7 @@ LightTreeEmitter::LightTreeEmitter(Scene *scene,
     float3 vertices[3];
     Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
     const Mesh::Triangle triangle = mesh->get_triangle(prim_id);
-    /* Rhino: object shader rather than the per-primitive shader. */
-    Shader *shader = object->get_shader();
+    Shader *shader = rhino_emission_shader(scene, object, mesh, prim_id);
 
     const packed_float3 *mesh_positions = mesh->get_position();
     for (int i = 0; i < 3; i++) {
@@ -255,23 +270,20 @@ static void sort_leaf(const int start, const int end, LightTreeEmitter *emitters
   }
 }
 
-bool LightTree::triangle_usable_as_light(Mesh *mesh, const int prim_id)
+bool LightTree::triangle_usable_as_light(Scene *scene, Object *object, Mesh *mesh, const int prim_id)
 {
-  const int shader_index = mesh->get_shader()[prim_id];
-  if (shader_index < mesh->get_used_shaders().size()) {
-    Shader *shader = static_cast<Shader *>(mesh->get_used_shaders()[shader_index]);
-    if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
-      return true;
-    }
-  }
-  return false;
+  /* Go through the same shader lookup the emitter constructor uses, or the two
+   * disagree: this says yes from the mesh shader and the constructor then reads
+   * emission off a null object shader. */
+  Shader *shader = rhino_emission_shader(scene, object, mesh, prim_id);
+  return shader != nullptr && shader->emission_sampling != EMISSION_SAMPLING_NONE;
 }
 
 void LightTree::add_mesh(Scene *scene, Mesh *mesh, const int object_id)
 {
   const size_t mesh_num_triangles = mesh->num_triangles();
   for (size_t i = 0; i < mesh_num_triangles; i++) {
-    if (triangle_usable_as_light(mesh, i)) {
+    if (triangle_usable_as_light(scene, scene->objects[object_id], mesh, (int)i)) {
       emitters_.emplace_back(scene, i, object_id);
     }
   }
@@ -395,7 +407,7 @@ LightTreeNode *LightTree::build(Scene *scene, DeviceScene *dscene)
       emitter.measure.reset();
       size_t const mesh_num_triangles = mesh->num_triangles();
       for (size_t i = 0; i < mesh_num_triangles; i++) {
-        if (triangle_usable_as_light(mesh, i)) {
+        if (triangle_usable_as_light(scene, object, mesh, (int)i)) {
           emitter.measure.add(LightTreeEmitter(scene, i, emitter.object_id, true).measure);
         }
       }

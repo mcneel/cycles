@@ -817,9 +817,10 @@ static void light_tree_leaf_emitters_copy_and_flatten(LightTreeFlatten &flatten,
       /* Triangle. */
       Object *object = flatten.scene->objects[emitter.object_id];
       Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
-      /* Rhino: object-level shader rather than the per-triangle shader. Re-applied
-       * here after 5.2 rewrote light-tree construction for light linking. */
-      Shader *shader = object->get_shader();
+      /* Rhino: object-level shader rather than the per-triangle shader, with the
+       * same fallbacks the light tree uses - an object without an override must
+       * not end up dereferencing null here. */
+      Shader *shader = rhino_emission_shader(flatten.scene, object, mesh, emitter.prim_id);
 
       kemitter.triangle.id = emitter.prim_id + mesh->prim_offset;
       kemitter.visibility_flag = light_object_visibility_flags(object);

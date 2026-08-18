@@ -174,9 +174,12 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 			 * sized. Resize before taking any pointer, otherwise the writes below
 			 * run past the end of a zero-length buffer. */
 			mesh->resize_mesh((int)in_vcount, (int)mesh->num_triangles());
+			/* ATTR_STD_GENERATED is TypePoint, and 5.2 stores points as packed_float3
+			 * - 12 bytes, not the 16 of float3. Writing float3 through this pointer
+			 * strides past the end of the buffer and corrupts the heap. */
 
-			ccl::float3 *generated =
-				mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_for_write<ccl::float3>();
+			ccl::packed_float3 *generated =
+				mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_for_write<ccl::packed_float3>();
 			ccl::packed_float3 *cycles_mesh_vertices = mesh->get_position_for_write();
 
 			if (cycles_mesh_vertices == nullptr || generated == nullptr) {
@@ -237,6 +240,16 @@ void cycles_mesh_set_tris(ccl::Session *session_id, ccl::Geometry *geometry, int
 
 			//ALB: IT looks like all meshes are triangles in CyclesX
 			//mesh->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
+
+			/* Writing straight into the socket arrays bypasses the generated
+			 * setters, so nothing marks them dirty and GeometryManager skips
+			 * the mesh entirely - it never reaches the BVH and the object
+			 * renders as empty space. Tag them by hand. */
+			mesh->tag_triangles_modified();
+			mesh->tag_shader_modified();
+			mesh->tag_smooth_modified();
+			mesh->tag_modified();
+			mesh->tag_update(sce, true);
 
 			cycles_geometry_set_shader(session_id, geometry, shader_id);
 		}

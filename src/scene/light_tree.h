@@ -17,6 +17,18 @@
 
 CCL_NAMESPACE_BEGIN
 
+class Mesh;
+
+/* Rhino overrides the surface shader at object level, where Cycles picks it
+ * per primitive. Prefer the object override, fall back to the mesh's own
+ * shader the way upstream does, and finally to the default surface.
+ *
+ * The fallbacks matter: the light tree decides a triangle is usable from the
+ * per-primitive shader but then read the emission from the object shader, so
+ * an object with no override dereferenced null and took the render thread
+ * down with it. */
+Shader *rhino_emission_shader(const Scene *scene, Object *object, Mesh *mesh, int prim_id);
+
 /* Orientation Bounds
  *
  * Bounds the normal axis of the lights,
@@ -455,7 +467,7 @@ class LightTree {
                     int &split_dim);
 
   /* Check whether the light tree can use this triangle as light-emissive. */
-  bool triangle_usable_as_light(Mesh *mesh, const int prim_id);
+  bool triangle_usable_as_light(Scene *scene, Object *object, Mesh *mesh, const int prim_id);
 
   /* Add all the emissive triangles of a mesh to the light tree. */
   void add_mesh(Scene *scene, Mesh *mesh, const int object_id);
