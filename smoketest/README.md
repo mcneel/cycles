@@ -30,6 +30,7 @@ could not.
 | `SMOKE_LIGHTZ` | `-6` | Light position on Z. Positive is behind the quad, so the quad goes dark. |
 | `SMOKE_SPOTZ` | unset | Makes the light a spot aimed along this Z. Set it to `1` and `-1`: only `1` lights the quad. This is what pinned down the light basis. |
 | `SMOKE_AREA` | unset | `1` makes it a 4x4 area light with explicit axisu/axisv. |
+| `SMOKE_EMIT` | unset | `1` drives emission rather than a BSDF, intended to make a texture's output land in the pixels directly. **Does not work yet** - the surface renders black, so the emission strength is not actually being set; the member name is a guess. |
 | `SMOKE_NODE` | unset | Drives the surface colour from one shader node by its registered name, e.g. `rhino_checker_texture`. One node per process, so a crash in one does not hide the rest. |
 | `SMOKE_NOMESH` | unset | `1` leaves the quad out. Isolates geometry faults from light faults. |
 | `SMOKE_NOLIGHT` | unset | `1` leaves the light out. |
@@ -43,6 +44,22 @@ The world is an explicitly black shader. That matters: the default background
 is a random colour per session, which swamps anything the light contributes
 and made every early reading meaningless. If you add a background, expect the
 absolute levels to stop meaning anything and compare within a single run.
+
+## Open question: are the texture patterns right?
+
+The node sweep proves all 22 Rhino nodes construct, compile through the SVM
+layer and execute without crashing. It does **not** prove they produce the
+right pattern - every procedural texture comes out flat here.
+
+Three things have been ruled out as explanations: the missing per-mesh
+attribute upload from the 4.4 line (porting it changed nothing), the
+texture-coordinate input (wiring `texture_coordinate` in changed nothing),
+and anything Rhino-specific - stock `checker_texture` and `noise_texture`
+are equally flat in this harness.
+
+So it is the harness, not the port. Confirming the patterns needs a real
+comparison against Rhino 8 with actual materials, which is the largest
+remaining unverified area of this work.
 
 ## When it crashes
 

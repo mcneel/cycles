@@ -71,7 +71,18 @@ internal static class Program
         CSycles.shader_new_graph(diffuse);
         // emission rather than diffuse: self-lit, so visibility does not depend
         // on the light transform being right.
-        IntPtr bsdf = CSycles.add_shader_node(diffuse, "diffuse_bsdf", "diff");
+        // SMOKE_EMIT drives emission instead of a BSDF, so a texture's output
+        // lands in the pixels directly. Under diffuse it is multiplied by the
+        // light and quantises to almost nothing, which is why patterns looked
+        // flat and told us nothing about whether the node actually works.
+        bool emit = Environment.GetEnvironmentVariable("SMOKE_EMIT") == "1";
+        IntPtr bsdf = CSycles.add_shader_node(diffuse, emit ? "emission" : "diffuse_bsdf", "surf");
+        if (emit) {
+            // Strength is not 1 by default here, so an emission surface with only
+            // its Color wired renders black - which looked exactly like a node that
+            // produces nothing.
+            CSycles.shadernode_set_member_float(bsdf, "strength", 4.0f);
+        }
 
         // SMOKE_NODE drives the surface colour from one Rhino shader node, which
         // is how the Rhino SVM nodes get exercised at all - nothing else in this
@@ -106,7 +117,7 @@ internal static class Program
         // shader_new_graph already creates the graph's output node; adding another
         // gives an orphan that nothing reads.
         IntPtr outNode = FindOutputNode(diffuse);
-        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, "BSDF", outNode, "Surface");
+        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, emit ? "Emission" : "BSDF", outNode, "Surface");
         Console.WriteLine("shader     : connected=" + connected);
 
         IntPtr mesh = CSycles.scene_add_mesh(session, diffuse);
