@@ -261,25 +261,32 @@ else { Write-Missing 'HIP' 'set HIP_PATH to enable' }
 $levelZeroRoot = @($libModern, $libLegacy) |
     ForEach-Object { Join-Path $_ 'level-zero' } |
     Where-Object { Test-Path $_ } | Select-Object -First 1
-if ($levelZeroRoot) { $detected.Add('oneapi'); Write-Found 'oneAPI' "$levelZeroRoot (available, off by default - RH-91240)" }
+# oneAPI is enabled when detected, deliberately.
+#
+# History, because it is not obvious and cost time to rediscover: RH-91240 was
+# Rhino crashing on exit, and the fix taken on the 4.4 line was simply to turn
+# OneAPI and SYCL8 off. That silenced the symptom without anyone establishing
+# the cause, and the decision was recorded only in a commit message - so this
+# script, written against the 3.5 tree, re-enabled it without knowing.
+#
+# It stays enabled on purpose: an uninvestigated crash is a reason to
+# investigate, not to ship without Intel GPU support indefinitely. Two things
+# worth knowing when it is looked at:
+#
+#   * the oneAPI kernel build warns about undefined intel_has_committed_hit,
+#     intel_get_hit_triangle_primitive_id and intel_ray_query_abandon, and says
+#     it "may result in runtime errors" - a plausible starting point
+#   * .\build_cycles.ps1 -Devices cpu,cuda,optix,hip reproduces the old
+#     behaviour if a build has to ship before the crash is understood. Note that
+#     form only works when the script is called from PowerShell; passed through
+#     pwsh -File, as ccycles.vcxproj does, a comma-separated list arrives as one
+#     string and ValidateSet rejects it.
+if ($levelZeroRoot) { $detected.Add('oneapi'); Write-Found 'oneAPI' $levelZeroRoot }
 else { Write-Missing 'oneAPI' 'level-zero not present in the library bundle' }
 
-# Detected is not the same as wanted. oneAPI stays out of the default set even
-# though the library bundle always ships level-zero, so detection always
-# succeeds: RH-91240 was Rhino crashing on exit, and the fix on the 4.4 line was
-# to turn OneAPI and SYCL8 off. Until that is understood and retested against
-# 5.2, defaulting it on would reintroduce a shipped crash. It stays in $detected
-# so that -Devices oneapi still validates and builds for anyone testing it.
-$defaultOff = @('oneapi')
-
 if (-not $Devices) {
-    $auto = @($detected | Where-Object { $defaultOff -notcontains $_ })
-    $Devices = if ($auto.Count) { $auto } else { @('cpu') }
+    $Devices = if ($detected.Count) { $detected.ToArray() } else { @('cpu') }
     Write-Host "   -> enabling: $($Devices -join ', ')" -ForegroundColor Cyan
-    $skipped = @($detected | Where-Object { $defaultOff -contains $_ })
-    if ($skipped.Count) {
-        Write-Host "   -> available but not enabled: $($skipped -join ', ')" -ForegroundColor DarkYellow
-    }
 }
 else {
     Write-Host "   -> requested: $($Devices -join ', ')" -ForegroundColor Cyan
