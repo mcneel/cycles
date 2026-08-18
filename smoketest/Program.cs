@@ -40,6 +40,62 @@ internal static class Program
         CSycles.camera_compute_auto_viewplane(session);
         CSycles.camera_update(session);
 
+        // ---- a real scene -------------------------------------------------
+        // A ground quad lit by a point light above it. This is what exercises
+        // the two riskiest parts of the port: the mesh upload (vertices moved
+        // into ATTR_STD_POSITION as packed_float3, and Mesh::add_triangle is
+        // gone) and CCyclesLight, which now has to build the light's Object
+        // transform from co/dir because 5.2 dropped those sockets.
+        IntPtr diffuse = CSycles.create_shader(session);
+        CSycles.shader_new_graph(diffuse);
+        IntPtr bsdf = CSycles.add_shader_node(diffuse, "diffuse_bsdf", "diff");
+        IntPtr outNode = CSycles.add_shader_node(diffuse, "output", "out");
+        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, "BSDF", outNode, "Surface");
+        Console.WriteLine("shader     : connected=" + connected);
+
+        IntPtr mesh = CSycles.scene_add_mesh(session, diffuse);
+        float[] verts = new float[] {
+            -5f, -5f, 0f,
+             5f, -5f, 0f,
+             5f,  5f, 0f,
+            -5f,  5f, 0f,
+        };
+        int[] tris = new int[] { 0, 1, 2, 0, 2, 3 };
+        CSycles.mesh_set_verts(session, mesh, ref verts, 4);
+        CSycles.mesh_set_tris(session, mesh, ref tris, 2, diffuse, false);
+        Console.WriteLine("mesh       : 4 verts, 2 tris");
+
+        IntPtr obj = CSycles.scene_add_object(session);
+        CSycles.object_set_geometry(session, obj, mesh);
+        CSycles.object_set_matrix(session, obj, new Transform(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f));
+        Console.WriteLine("object     : added");
+
+        IntPtr lightShader = CSycles.create_shader(session);
+        CSycles.shader_new_graph(lightShader);
+        IntPtr emission = CSycles.add_shader_node(lightShader, "emission", "emit");
+        IntPtr lightOut = CSycles.add_shader_node(lightShader, "output", "lout");
+        CSycles.shader_connect_nodes(lightShader, emission, "Emission", lightOut, "Surface");
+
+        IntPtr light = CSycles.create_light(session, lightShader);
+        CSycles.light_set_type(session, light, LightType.Point);
+        CSycles.light_set_co(session, light, 0f, 0f, 6f);
+        CSycles.light_set_dir(session, light, 0f, 0f, -1f);
+        CSycles.light_set_size(session, light, 1.0f);
+        CSycles.light_tag_update(session, light);
+        Console.WriteLine("light      : point at (0,0,6)");
+
+        // Camera above the quad, looking down -Z.
+        CSycles.camera_set_matrix(session, new Transform(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 12f));
+        CSycles.camera_set_type(session, CameraType.Perspective);
+        CSycles.camera_set_fov(session, 0.8f);
+        CSycles.camera_update(session);
+
         CSycles.session_add_pass(session, PassType.Combined);
         CSycles.session_set_samples(session, 4);
 
@@ -86,7 +142,10 @@ internal static class Program
 
         if (pixels != IntPtr.Zero && pixelSize > 0)
         {
-            int n = (int)(W * H) * pixelSize;
+            // pixelSize is the reset pixel_size (supersampling), not the component
+            // count. The Combined pass is RGBA.
+            const int comps = 4;
+            int n = (int)(W * H) * comps;
             float[] buf = new float[n];
             System.Runtime.InteropServices.Marshal.Copy(pixels, buf, 0, n);
 
@@ -101,10 +160,10 @@ internal static class Program
                 w.Write("P3\n" + W + " " + H + "\n255\n");
                 for (int i = 0; i < (int)(W * H); i++)
                 {
-                    int o = i * pixelSize;
+                    int o = i * comps;
                     int r = (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o])) * 255);
-                    int g = pixelSize > 1 ? (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o + 1])) * 255) : r;
-                    int b = pixelSize > 2 ? (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o + 2])) * 255) : r;
+                    int g = (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o + 1])) * 255);
+                    int b = (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o + 2])) * 255);
                     w.Write(r + " " + g + " " + b + "\n");
                 }
             }

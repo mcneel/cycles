@@ -169,9 +169,19 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 
 		if (mesh)
 		{
-			ccl::float3* generated = mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_for_write<ccl::float3>();
+			/* 5.2 keeps vertices in the ATTR_STD_POSITION attribute rather than a
+			 * plain array, and that attribute has no elements until the mesh is
+			 * sized. Resize before taking any pointer, otherwise the writes below
+			 * run past the end of a zero-length buffer. */
+			mesh->resize_mesh((int)in_vcount, (int)mesh->num_triangles());
 
+			ccl::float3 *generated =
+				mesh->attributes.add(ccl::ATTR_STD_GENERATED)->data_for_write<ccl::float3>();
 			ccl::packed_float3 *cycles_mesh_vertices = mesh->get_position_for_write();
+
+			if (cycles_mesh_vertices == nullptr || generated == nullptr) {
+				return;
+			}
 
 			for (int i = 0U, j = 0U; i < in_vcount * 3; i += 3, j++)
 			{
@@ -204,7 +214,11 @@ void cycles_mesh_set_tris(ccl::Session *session_id, ccl::Geometry *geometry, int
 
 		if (mesh)
 		{
-			mesh->resize_mesh(fcount * 3, fcount);
+			/* This was reserve_mesh before 5.2, which only reserved capacity.
+			 * resize_mesh actually reallocates, so sizing vertices to fcount * 3
+			 * here would discard whatever cycles_mesh_set_verts already uploaded.
+			 * Keep the current vertex count; set_verts does the same for tris. */
+			mesh->resize_mesh((int)mesh->num_verts(), (int)fcount);
 
 			auto& cycles_mesh_triangles = mesh->get_triangles();
 
