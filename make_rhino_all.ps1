@@ -1,8 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("release", "debug", "release_debuggable", "hybrid", "wrapper")]
-    [string]$BuildType = "release",
+    # hybrid = what ships (Release kernels + RelWithDebInfo ccycles.dll/pdb).
+    # wrapper = wrapper-only fast rebuild; leaves kernels and kernel sources untouched.
+    [ValidateSet("hybrid", "wrapper")]
+    [string]$BuildType = "hybrid",
     [string]$RhinoBranchName
 )
 
@@ -184,9 +186,6 @@ $dockerVolume = "${dockerHostRoot}:$dockerContainerRoot"
 $buildMode = $BuildType.ToLowerInvariant()
 
 $buildConfig = switch ($buildMode) {
-    "debug" { "Debug" }
-    "release" { "Release" }
-    "release_debuggable" { "RelWithDebInfo" }
     "hybrid" { "Release" }
     "wrapper" { "RelWithDebInfo" }
     default { throw "Unsupported build mode '$BuildType'." }
