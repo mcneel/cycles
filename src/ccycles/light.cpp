@@ -94,10 +94,12 @@ void CCyclesLight::flush()
 	 * and axisv directly; 5.2 takes all of it from the Object transform, with
 	 * the light pointing down local -Z.
 	 *
-	 * NOTE: verify against real scenes. This composes the same basis the old
-	 * sockets described, but a handedness or axis-order mistake here compiles
-	 * cleanly and simply renders lights in the wrong place. */
-	const ccl::float3 z = ccl::normalize(-dir);
+	 * The local axis is +Z, not -Z. SpotLight::copy_to_kernel reads the cone
+	 * axis as -column2, which reads as though it should be -dir here, but a
+	 * spot placed between the camera and a quad only lights the quad with the
+	 * sign below - see the smoke test's SMOKE_SPOTZ sweep. Position and cone
+	 * shape were checked the same way and are right. */
+	const ccl::float3 z = ccl::normalize(dir);
 	ccl::float3 x = axisu;
 	ccl::float3 y = axisv;
 

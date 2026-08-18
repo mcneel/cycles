@@ -71,11 +71,11 @@ internal static class Program
         CSycles.shader_new_graph(diffuse);
         // emission rather than diffuse: self-lit, so visibility does not depend
         // on the light transform being right.
-        IntPtr bsdf = CSycles.add_shader_node(diffuse, "emission", "emit_surface");
+        IntPtr bsdf = CSycles.add_shader_node(diffuse, "diffuse_bsdf", "diff");
         // shader_new_graph already creates the graph's output node; adding another
         // gives an orphan that nothing reads.
         IntPtr outNode = FindOutputNode(diffuse);
-        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, "Emission", outNode, "Surface");
+        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, "BSDF", outNode, "Surface");
         Console.WriteLine("shader     : connected=" + connected);
 
         IntPtr mesh = CSycles.scene_add_mesh(session, diffuse);
@@ -108,13 +108,34 @@ internal static class Program
 
         if (Environment.GetEnvironmentVariable("SMOKE_NOLIGHT") != "1") {
         IntPtr light = CSycles.create_light(session, lightShader);
-        CSycles.light_set_type(session, light, LightType.Point);
-        CSycles.light_set_co(session, light, 0f, 0f, 6f);
-        CSycles.light_set_dir(session, light, 0f, 0f, -1f);
+        // SMOKE_SPOTZ exercises the light basis rather than just its position:
+        // a point light only uses the translation of the object transform, a spot
+        // light has to be pointed the right way as well.
+        string spotDir = Environment.GetEnvironmentVariable("SMOKE_SPOTZ");
+        bool spot = spotDir != null;
+        CSycles.light_set_type(session, light, spot ? LightType.Spot : LightType.Point);
+        float lightX = float.Parse(Environment.GetEnvironmentVariable("SMOKE_LIGHTX") ?? "4",
+            System.Globalization.CultureInfo.InvariantCulture);
+        float lightZ = float.Parse(Environment.GetEnvironmentVariable("SMOKE_LIGHTZ") ?? "-6",
+            System.Globalization.CultureInfo.InvariantCulture);
+        CSycles.light_set_co(session, light, lightX, 0f, lightZ);
+        CSycles.light_set_dir(session, light, 0f, 0f, spot ? float.Parse(spotDir,
+            System.Globalization.CultureInfo.InvariantCulture) : 1f);
+        if (spot) {
+            CSycles.light_set_spot_angle(session, light, 1.2f);
+            CSycles.light_set_spot_smooth(session, light, 0.1f);
+        }
         CSycles.light_set_size(session, light, 1.0f);
         CSycles.light_tag_update(session, light);
-        Console.WriteLine("light      : point at (0,0,6)");
+        Console.WriteLine("light      : at (" + lightX + ",0," + lightZ + ")");
         }
+
+        // Black world: the default background is a random colour that swamps
+        // anything the light contributes.
+        IntPtr worldShader = CSycles.create_shader(session);
+        CSycles.shader_new_graph(worldShader);
+        CSycles.scene_set_background_shader(session, worldShader);
+        CSycles.shader_set_name(worldShader, "black_world");
 
         // Camera above the quad, looking down -Z.
         CSycles.camera_set_matrix(session, new Transform(

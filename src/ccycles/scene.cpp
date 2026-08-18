@@ -183,8 +183,14 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 			       (int)mesh->num_verts(), (int)mesh->num_triangles(),
 			       mesh->get_used_shaders().size());
 		}
+		else if (ccl::Light *lt = dynamic_cast<ccl::Light *>(geo)) {
+			const ccl::Transform &t = ob->get_tfm();
+			printf("    light type=%d co=(%.2f %.2f %.2f) -col2=(%.2f %.2f %.2f)\n",
+			       (int)lt->get_light_type(), t.x.w, t.y.w, t.z.w,
+			       -t.x.z, -t.y.z, -t.z.z);
+		}
 		else {
-			printf("    not a mesh (light?)\n");
+			printf("    unknown geometry\n");
 		}
 	}
 
