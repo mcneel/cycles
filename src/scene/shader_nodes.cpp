@@ -323,7 +323,6 @@ ImageParams ImageTextureNode::image_params() const
 void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
 {
   tiles.clear();
-  tiles.push_back_slow(1001);
   return;
 #if DONTUSEUVTILINGYET
   /* Box projection computes its own UVs that always lie in the

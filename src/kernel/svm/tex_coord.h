@@ -472,7 +472,9 @@ ccl_device_inline void decal_data_read(KernelGlobals kg,
   }
 
   // stack_store_float(stack, decal_forward_offset, dotp > 0.0f ? 1.0f : -1.0f);
-  stack_store_float(stack, decal_usage_offset, 1.0f);
+  if(stack_valid(decal_usage_offset)) {
+    stack_store_float(stack, decal_usage_offset, 1.0f);
+  }
 }
 
 /* Texture Coordinate Node */
