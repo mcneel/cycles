@@ -8,10 +8,12 @@
 
     Everything that used to be a hardcoded absolute path is now discovered:
 
-      * Visual Studio    - via vswhere. VS2022 only; the old scripts needed
-                           VS2022 Professional *and* VS2019 BuildTools side by
-                           side because the win64_vc15 library bundle was built
-                           with the VS2019 ABI.
+      * Visual Studio    - via vswhere, newest install with the C++ toolset,
+                           VS2022 or later, with the CMake generator derived
+                           from it. The old scripts needed VS2022 Professional
+                           *and* VS2019 BuildTools side by side, because the
+                           win64_vc15 library bundle was built with the VS2019
+                           ABI.
       * CUDA / OptiX /
         HIP / oneAPI     - probed from the usual environment variables and
                            install locations. Anything not found is switched
@@ -91,15 +93,33 @@ foreach ($tool in 'cmake', 'git', 'python') {
 }
 
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found. Install Visual Studio 2022." }
+if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found. Install Visual Studio 2022 or newer." }
 
+# No upper bound on the version. This used to pin [17.0,18.0) - VS 2022 only -
+# which would have stopped Cycles building at all the moment Rhino moved on:
+# Rhino 9's C++ projects already ask for PlatformToolset v145, which ships with
+# VS 2026. Take the newest install that has the C++ toolset and derive the CMake
+# generator from it rather than hardcoding one.
 $vsPath = & $vswhere -latest -products * `
     -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-    -version '[17.0,18.0)' -property installationPath
+    -version '[17.0,)' -property installationPath
 if (-not $vsPath) {
-    throw "No Visual Studio 2022 with the C++ toolset found. Install the 'Desktop development with C++' workload."
+    throw "No Visual Studio 2022 or newer with the C++ toolset found. Install the 'Desktop development with C++' workload."
 }
-Write-Found 'VS 2022' $vsPath
+
+$vsMajor = & $vswhere -latest -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -version '[17.0,)' -property installationVersion
+$vsMajor = ($vsMajor -split '\.')[0]
+
+$cmakeGenerator = switch ($vsMajor) {
+    '17'    { 'Visual Studio 17 2022' }
+    '18'    { 'Visual Studio 18 2026' }
+    default { throw "Unrecognised Visual Studio major version '$vsMajor'. Add its CMake generator name here." }
+}
+
+Write-Found "VS $vsMajor" $vsPath
+Write-Found 'generator' $cmakeGenerator
 
 # Enter the Visual Studio developer environment.
 #
@@ -290,7 +310,7 @@ if (-not [System.IO.Path]::IsPathRooted($BuildDir)) { $BuildDir = Join-Path $cyc
 $cmakeArgs = @(
     '-S', (ConvertTo-CMakePath $cyclesRoot)
     '-B', (ConvertTo-CMakePath $BuildDir)
-    '-G', 'Visual Studio 17 2022'
+    '-G', $cmakeGenerator
     '-A', 'x64'
     "-DCMAKE_INSTALL_PREFIX=$(ConvertTo-CMakePath $InstallDir)"
     '-DWITH_CYCLES_ALEMBIC=OFF'
