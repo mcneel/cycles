@@ -110,12 +110,37 @@ if (-not $vsPath) {
 $vsMajor = & $vswhere -latest -products * `
     -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
     -version '[17.0,)' -property installationVersion
-$vsMajor = ($vsMajor -split '\.')[0]
+$vsMajor = [int](($vsMajor -split '\.')[0])
 
-$cmakeGenerator = switch ($vsMajor) {
-    '17'    { 'Visual Studio 17 2022' }
-    '18'    { 'Visual Studio 18 2026' }
-    default { throw "Unrecognised Visual Studio major version '$vsMajor'. Add its CMake generator name here." }
+# The generator is chosen from what CMake actually offers, not derived from the
+# Visual Studio version. Deriving it looked obvious and was wrong: on a machine
+# with VS 18 it produced "Visual Studio 18 2026", which CMake 3.31 has never
+# heard of, and the configure died with "Could not create named generator".
+# CMake gains new Visual Studio generators in its own time, and this tree pins
+# an older CMake on purpose, so the two versions cannot be assumed to match.
+#
+# Ask CMake, keep the Visual Studio entries, and take the newest whose major
+# version is one we actually have installed.
+$cmakeGenerators = @(
+    & cmake --help 2>$null |
+        Select-String -Pattern '^\s*\*?\s*(Visual Studio (\d+) \d+)' |
+        ForEach-Object {
+            [pscustomobject]@{
+                Name  = $_.Matches[0].Groups[1].Value.Trim()
+                Major = [int]$_.Matches[0].Groups[2].Value
+            }
+        }
+)
+
+$cmakeGenerator = $cmakeGenerators |
+    Where-Object { $_.Major -le $vsMajor } |
+    Sort-Object Major -Descending |
+    Select-Object -First 1 -ExpandProperty Name
+
+if (-not $cmakeGenerator) {
+    throw ("CMake offers no Visual Studio generator at or below version $vsMajor. " +
+           "Installed CMake is $((& cmake --version | Select-Object -First 1)); " +
+           "either install a newer CMake or a Visual Studio it supports.")
 }
 
 Write-Found "VS $vsMajor" $vsPath
