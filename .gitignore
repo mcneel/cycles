@@ -29,5 +29,8 @@ bin-opt
 build*/
 install*/
 
+# make_rhino_all.ps1 transcript
+/make_rhino_all.log
+
 # OSL compiled examples
 examples/osl/*.oso
