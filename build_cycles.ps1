@@ -262,10 +262,24 @@ else {
 $cmakeConfig = if ($Configuration -eq 'Release') { 'RelWithDebInfo' } else { $Configuration }
 
 if (-not $InstallDir) {
-    # cycles -> RDK/cycles -> RDK -> Plug-ins -> rhino4 -> src4
-    $src4 = Resolve-Path (Join-Path $cyclesRoot '..\..\..\..\..') -ErrorAction SilentlyContinue
-    if ($src4) { $InstallDir = Join-Path $src4 "bin\$Configuration\Plug-ins" }
-    else { $InstallDir = Join-Path $cyclesRoot 'install' }
+    # This repository is Rhino's RDK/cycles submodule, so:
+    #   RDK/cycles -> RDK -> Plug-ins -> rhino4 -> src4
+    # It used to be one deeper, nested inside CCSycles, which is why this walked
+    # five levels rather than four.
+    $src4 = Resolve-Path (Join-Path $cyclesRoot '..\..\..\..') -ErrorAction SilentlyContinue
+    if ($src4 -and (Test-Path (Join-Path $src4 'rhino4'))) {
+        $InstallDir = Join-Path $src4 "bin\$Configuration\Plug-ins"
+    }
+    else {
+        $InstallDir = Join-Path $cyclesRoot 'install'
+    }
+}
+elseif ($InstallDir -notmatch '^([A-Za-z]:[\\/]|\\\\)') {
+    # IsPathRooted is not enough: .NET calls "C:Users\..." rooted, but Windows
+    # reads it as relative to the current directory on drive C:, so a path that
+    # lost its separators installs somewhere surprising and still reports
+    # success. Require a drive plus separator, or a UNC path.
+    throw "-InstallDir must be an absolute path, got '$InstallDir'. If this came from a build script, check that backslashes survived quoting - forward slashes are safest."
 }
 
 Write-Step "Configuring ($cmakeConfig)"
