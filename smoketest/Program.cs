@@ -39,7 +39,16 @@ internal static class Program
         Console.WriteLine("path_init  : " + path);
         cycles_debug_install_crash_handler();
         CSycles.path_init(path, userpath);
-        CSycles.initialise(DeviceTypeMask.CPU);
+        // SMOKE_DEVMASK exercises device enumeration beyond CPU. Rhino defaults to
+        // a GPU device, so CPU-only initialisation never touched the code path that
+        // matters most - and that is where Rhino died with the 5.2 library.
+        string devMask = Environment.GetEnvironmentVariable("SMOKE_DEVMASK");
+        DeviceTypeMask mask = DeviceTypeMask.CPU;
+        if (!string.IsNullOrEmpty(devMask)) {
+            mask = (DeviceTypeMask)Enum.Parse(typeof(DeviceTypeMask), devMask, true);
+        }
+        Console.WriteLine("devmask    : " + mask);
+        CSycles.initialise(mask);
         CSycles.log_to_stdout(true);
         s_logger = (msg) => Console.WriteLine("[ccycles] " + msg);
         CSycles.set_logger(s_logger);

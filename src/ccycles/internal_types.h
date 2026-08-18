@@ -62,12 +62,30 @@ limitations under the License.
 #define MULTIDEVICEOFFSET 100000
 #define ISMULTIDEVICE(id) (id>=MULTIDEVICEOFFSET)
 #define MULTIDEVICEIDX(id) (id-MULTIDEVICEOFFSET)
+/* Bounds-checked: an unavailable device type enumerates nothing, and indexing
+ * an empty device list killed the process inside ccl::DeviceInfo::operator=
+ * with no indication of why. Leaves puthere untouched and says so instead. */
 #define GETDEVICE(puthere, id) \
 	if (ISMULTIDEVICE(id)) { \
-		(puthere) = multi_devices[MULTIDEVICEIDX(id)]; \
+		const size_t _gd_idx = (size_t)MULTIDEVICEIDX(id); \
+		if (_gd_idx < multi_devices.size()) { \
+			(puthere) = multi_devices[_gd_idx]; \
+		} \
+		else { \
+			fprintf(stderr, \
+			        "GETDEVICE: multi-device %zu requested, only %zu available\n", \
+			        _gd_idx, \
+			        multi_devices.size()); \
+		} \
+	} \
+	else if ((size_t)(id) < devices.size()) { \
+		(puthere) = devices[id]; \
 	} \
 	else { \
-		(puthere) = devices[id]; \
+		fprintf(stderr, \
+		        "GETDEVICE: device %zu requested, only %zu available - was the requested device type detected?\n", \
+		        (size_t)(id), \
+		        devices.size()); \
 	}
 
 class CCSession;
