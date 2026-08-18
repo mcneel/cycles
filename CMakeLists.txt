@@ -244,6 +244,14 @@ option(WITH_STRICT_BUILD_OPTIONS "When requirements for a build option are not m
 
 include(CheckCXXCompilerFlag)
 include(detect_platform)
+# The precompiled libraries export only Debug and Release imported configs.
+# RelWithDebInfo and MinSizeRel have no mapping of their own, so CMake falls
+# back to whichever it finds first - Debug - and a RelWithDebInfo build ends up
+# linking OpenImageIO_d.dll, tbb12_debug.dll and friends. Map them at Release
+# explicitly, before anything calls find_package.
+set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release RelWithDebInfo "")
+set(CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL Release MinSizeRel "")
+
 include(external_libs)
 include(dependency_targets)
 include(configure_build)

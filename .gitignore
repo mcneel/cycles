@@ -31,3 +31,8 @@ install*/
 
 # OSL compiled examples
 examples/osl/*.oso
+
+# local verification artefacts
+smoketest/bin/
+smoketest/obj/
+smoketest/rel/
