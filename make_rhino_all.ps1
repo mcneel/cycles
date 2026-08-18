@@ -167,8 +167,9 @@ $kernelDestinations = @(
 
 $cmakeExe = if (Test-Path "C:\Tools\cmake329\bin\cmake.exe") { "C:\Tools\cmake329\bin\cmake.exe" } else { "cmake" }
 $optixRoot = "C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.6.0"
-$dpcppRoot = "..\lib\win64_vc15\dpcpp"
-$levelZeroRoot = "..\lib\win64_vc15\level-zero"
+# Absolute, so the build no longer depends on being launched from the cycles folder.
+$dpcppRoot = ([System.IO.Path]::GetFullPath((Join-Path $libRoot "win64_vc15\dpcpp"))) -replace '\\', '/'
+$levelZeroRoot = ([System.IO.Path]::GetFullPath((Join-Path $libRoot "win64_vc15\level-zero"))) -replace '\\', '/'
 $vsBuildEnv = Resolve-VsBuildEnv
 $vsGenerator = $vsBuildEnv.Generator
 $msvcRedistDir = $vsBuildEnv.RedistDir
@@ -343,6 +344,12 @@ function Copy-PrimaryBinaries {
 }
 
 function Copy-KernelArtifacts {
+    # PurgePatterns names the kernel families this run owns, so binaries for an arch
+    # that is no longer built cannot linger in the destination and get loaded later.
+    # A family is only purged when this run actually produced one, otherwise a failed
+    # or skipped stage would wipe good kernels (e.g. the HIP fatbins without Docker).
+    param([string[]]$PurgePatterns = @())
+
     $installLibDir = Join-Path $installDir "lib"
     if (-not (Test-Path $installLibDir)) {
         Write-Log "WARNING: Missing '$installLibDir'."
@@ -351,6 +358,23 @@ function Copy-KernelArtifacts {
 
     foreach ($destination in $kernelDestinations) {
         New-Item -ItemType Directory -Path $destination -Force | Out-Null
+
+        foreach ($pattern in $PurgePatterns) {
+            $fresh = @(Get-ChildItem -Path $installLibDir -Filter $pattern -File -ErrorAction SilentlyContinue)
+            if ($fresh.Count -eq 0) {
+                Write-Log "Not purging '$pattern' in '$destination'; this build produced none."
+                continue
+            }
+
+            $freshNames = $fresh.Name
+            Get-ChildItem -Path $destination -Filter $pattern -File -ErrorAction SilentlyContinue |
+                Where-Object { $freshNames -notcontains $_.Name } |
+                ForEach-Object {
+                    Remove-Item -LiteralPath $_.FullName -Force
+                    Write-Log "Purged stale kernel '$($_.Name)' from '$destination'."
+                }
+        }
+
         Copy-Item -Path (Join-Path $installLibDir "*") -Destination $destination -Force
     }
 }
@@ -358,10 +382,19 @@ function Copy-KernelArtifacts {
 function Copy-KernelSources {
     # RhinoCyclesKernelCompiler compiles these at runtime; if they drift from
     # ccycles.dll the KernelData layouts mismatch and GPU compiles break.
+    param([switch]$Optional)
+
     $installSourceDir = Join-Path $installDir "source"
     if (-not (Test-Path $installSourceDir)) {
-        [void]$script:OutputErrors.Add("Missing build output: $installSourceDir")
-        Write-Log "ERROR: Missing kernel source tree '$installSourceDir'."
+        if ($Optional) {
+            # Only the CMake install target stages install\source, so wrapper builds
+            # legitimately have none; they leave the deployed sources as they are.
+            Write-Log "WARNING: No kernel source tree at '$installSourceDir'; kernel sources NOT refreshed."
+        }
+        else {
+            [void]$script:OutputErrors.Add("Missing build output: $installSourceDir")
+            Write-Log "ERROR: Missing kernel source tree '$installSourceDir'."
+        }
         return
     }
 
@@ -383,7 +416,8 @@ function Copy-AllOutputs {
     }
 
     Copy-PrimaryBinaries
-    Copy-KernelArtifacts
+    # CUDA cubins and the OptiX/compute PTX all come from this Windows build.
+    Copy-KernelArtifacts -PurgePatterns @("kernel_sm_*.cubin", "kernel_*.ptx")
     Copy-KernelSources
 }
 
@@ -409,7 +443,7 @@ function Copy-WrapperOnlyOutputs {
         Write-Log "WARNING: Wrapper symbols were not found at '$wrapperPdbSource'."
     }
 
-    Copy-KernelSources
+    Copy-KernelSources -Optional
 }
 
 function Promote-DebuggableWrappersToInstall {
@@ -497,7 +531,8 @@ function Run-DockerHipFlow {
             return $LASTEXITCODE
         }
 
-        Copy-KernelArtifacts
+        # Only the Docker stage builds HIP fatbins, so only it may purge them.
+        Copy-KernelArtifacts -PurgePatterns @("kernel_gfx*.fatbin")
         return 0
     }
     finally {
@@ -575,7 +610,7 @@ try {
                 "-DWITH_CYCLES_DEVICE_CUDA=ON",
                 "-DWITH_CYCLES_DEVICE_OPTIX=ON",
                 "-DWITH_CYCLES_CUDA_BINARIES=OFF",
-                "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
+                "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
                 "-DOPTIX_ROOT_DIR=$optixRoot",
                 "-DWITH_CYCLES_DEVICE_HIP=ON",
                 "-DWITH_CYCLES_HIP_BINARIES=OFF",
@@ -587,7 +622,7 @@ try {
             $cmakeArgs += @(
                 "-DWITH_CYCLES_CUDA_BINARIES=ON",
                 "-DWITH_CYCLES_DEVICE_OPTIX=ON",
-                "-DCYCLES_CUDA_BINARIES_ARCH=sm_37;sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
+                "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;sm_120;compute_75",
                 "-DOPTIX_ROOT_DIR=$optixRoot",
                 "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
                 "-DWITH_CYCLES_DEVICE_HIP=ON"
