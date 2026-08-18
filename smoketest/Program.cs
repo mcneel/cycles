@@ -72,6 +72,37 @@ internal static class Program
         // emission rather than diffuse: self-lit, so visibility does not depend
         // on the light transform being right.
         IntPtr bsdf = CSycles.add_shader_node(diffuse, "diffuse_bsdf", "diff");
+
+        // SMOKE_NODE drives the surface colour from one Rhino shader node, which
+        // is how the Rhino SVM nodes get exercised at all - nothing else in this
+        // harness reaches them. One node per process so a crash in one does not
+        // hide the rest.
+        string nodeName = Environment.GetEnvironmentVariable("SMOKE_NODE");
+        if (!string.IsNullOrEmpty(nodeName)) {
+            IntPtr tex = CSycles.add_shader_node(diffuse, nodeName, "tex");
+            Console.WriteLine("node       : " + nodeName + " created=" + (tex != IntPtr.Zero));
+            if (tex == IntPtr.Zero) { Console.WriteLine("RESULT     : NOT-CREATED"); return; }
+            // Rhino textures pattern off their UVW input; left unconnected they
+            // evaluate at a single point and come out flat, which would let a
+            // broken SVM encoding pass unnoticed.
+            IntPtr texco = CSycles.add_shader_node(diffuse, "texture_coordinate", "texco");
+            foreach (string inName in new[] { "UVW", "Vector", "UVW1" }) {
+                if (CSycles.shader_connect_nodes(diffuse, texco, "Generated", tex, inName)) {
+                    Console.WriteLine("node       : uvw via " + inName);
+                    break;
+                }
+            }
+
+            bool wired = false;
+            foreach (string outName in new[] { "Color", "Vector", "UVW1", "Alpha" }) {
+                if (CSycles.shader_connect_nodes(diffuse, tex, outName, bsdf, "Color")) {
+                    Console.WriteLine("node       : wired via " + outName);
+                    wired = true;
+                    break;
+                }
+            }
+            if (!wired) { Console.WriteLine("RESULT     : NOT-WIRED"); return; }
+        }
         // shader_new_graph already creates the graph's output node; adding another
         // gives an orphan that nothing reads.
         IntPtr outNode = FindOutputNode(diffuse);

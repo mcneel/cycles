@@ -1508,10 +1508,27 @@ CCL_CAPI bool CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id,
 	if (shader_id && from_id && to_id)
 	{
 		ccl::ShaderInput *to_input = to_id->input(to);
+		ccl::ShaderOutput *from_output = from_id->output(from);
+
+		/* input() and output() return null for a name the node does not have, and
+		 * ShaderGraph::connect only asserts - so a socket renamed by a Cycles
+		 * upgrade took the whole process down here rather than reporting a bad
+		 * graph. Say which name was wrong; that is the thing worth knowing. */
+		if (to_input == nullptr || from_output == nullptr) {
+			fprintf(stderr,
+			        "cannot connect %s.%s to %s.%s: no such %s socket\n",
+			        from_id->name.c_str(),
+			        from,
+			        to_id->name.c_str(),
+			        to,
+			        (from_output == nullptr) ? "output" : "input");
+			return false;
+		}
+
 		// If to_input->link is not null we already had a link to this.
 		// return false in that case
 		res = to_input->link == nullptr;
-		shader_id->graph->connect(from_id->output(from), to_input);
+		shader_id->graph->connect(from_output, to_input);
 
 		if (!res) {
 			fprintf(stderr, "input %s already connected, trying from (%s)\n", to, from);
