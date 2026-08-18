@@ -390,6 +390,12 @@ if ($Devices -contains 'cuda') {
 if ($Devices -contains 'hip') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_HIP=ON'
     $cmakeArgs += "-DHIP_ROOT_DIR=$(ConvertTo-CMakePath $hipPath)"
+    # Device support and kernel binaries are separate switches, exactly as they
+    # are for CUDA, and WITH_CYCLES_HIP_BINARIES defaults to OFF. Enabling only
+    # the device gave a build with HIP compiled in and no HIP kernels, so Cycles
+    # found no usable AMD device at all - which is what crashed Rhino on a
+    # machine whose GPU the 3.5 build renders with quite happily.
+    $cmakeArgs += '-DWITH_CYCLES_HIP_BINARIES=ON'
 }
 if ($Devices -contains 'oneapi') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_ONEAPI=ON'
