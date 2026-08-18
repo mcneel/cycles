@@ -113,7 +113,8 @@ internal static class Program
         // light has to be pointed the right way as well.
         string spotDir = Environment.GetEnvironmentVariable("SMOKE_SPOTZ");
         bool spot = spotDir != null;
-        CSycles.light_set_type(session, light, spot ? LightType.Spot : LightType.Point);
+        bool area = Environment.GetEnvironmentVariable("SMOKE_AREA") == "1";
+        CSycles.light_set_type(session, light, area ? LightType.Area : spot ? LightType.Spot : LightType.Point);
         float lightX = float.Parse(Environment.GetEnvironmentVariable("SMOKE_LIGHTX") ?? "4",
             System.Globalization.CultureInfo.InvariantCulture);
         float lightZ = float.Parse(Environment.GetEnvironmentVariable("SMOKE_LIGHTZ") ?? "-6",
@@ -121,6 +122,14 @@ internal static class Program
         CSycles.light_set_co(session, light, lightX, 0f, lightZ);
         CSycles.light_set_dir(session, light, 0f, 0f, spot ? float.Parse(spotDir,
             System.Globalization.CultureInfo.InvariantCulture) : 1f);
+        if (area) {
+            // A 4x4 rectangle in the XY plane, so its axes are unambiguous and
+            // any mix-up between them and dir shows as a misplaced or dark quad.
+            CSycles.light_set_axisu(session, light, 1f, 0f, 0f);
+            CSycles.light_set_axisv(session, light, 0f, 1f, 0f);
+            CSycles.light_set_sizeu(session, light, 4f);
+            CSycles.light_set_sizev(session, light, 4f);
+        }
         if (spot) {
             CSycles.light_set_spot_angle(session, light, 1.2f);
             CSycles.light_set_spot_smooth(session, light, 0.1f);
