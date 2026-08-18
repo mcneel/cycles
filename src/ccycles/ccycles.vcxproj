@@ -59,7 +59,15 @@
     <CyclesConfiguration Condition="'$(Configuration)'=='ReleaseDebuggable'">RelWithDebInfo</CyclesConfiguration>
 
     <CyclesScript>$(MSBuildThisFileDirectory)..\..\build_cycles.ps1</CyclesScript>
-    <CyclesInstallDir>$(RhinoBinDir)\$(Configuration)\Plug-ins</CyclesInstallDir>
+    <!-- RhinoBinDir comes from Rhino's property sheets, which a Makefile-style
+         project does not import, so it is empty when building from Rhino.sln and
+         the install path came out as "\Release\Plug-ins" - the drive root.
+         Derive the same location from this file, and let RhinoBinDir win when a
+         caller does set it.
+           src/ccycles -> src -> cycles -> RDK -> Plug-ins -> rhino4 -> src4 -->
+    <CyclesBinDir Condition="'$(RhinoBinDir)'!=''">$(RhinoBinDir)</CyclesBinDir>
+    <CyclesBinDir Condition="'$(RhinoBinDir)'==''">$(MSBuildThisFileDirectory)..\..\..\..\..\..\bin</CyclesBinDir>
+    <CyclesInstallDir>$(CyclesBinDir)\$(Configuration)\Plug-ins</CyclesInstallDir>
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
     <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
