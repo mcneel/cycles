@@ -275,13 +275,33 @@ foreach ($base in 'C:\rocm', 'C:\Program Files\AMD\ROCm') {
     $hipCandidates += Get-ChildItem $base -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
 }
 $hip6 = $hipCandidates | Where-Object { (Split-Path -Leaf $_) -like '6.*' } | Sort-Object -Descending | Select-Object -First 1
-if ($hipPath -and (Split-Path -Leaf $hipPath.TrimEnd('\')) -notlike '6.*' -and $hip6) {
-    Write-Host ("   {0,-12} HIP_PATH points at {1}; using {2} instead (Cycles targets ROCm 6.x)" -f 'HIP', $hipPath, $hip6) -ForegroundColor DarkYellow
-    $hipPath = $hip6
+
+# An explicitly set HIP_PATH wins. This used to force ROCm 6.x whenever HIP_PATH
+# pointed elsewhere, on the assumption that Cycles targets 6.x - which made the
+# variable useless for its one real purpose, trying a different SDK. ROCm 6.4's
+# amd_hip_vector_types.h does not compile against this tree, so being unable to
+# select another version is a dead end rather than a safeguard.
+if ($env:HIP_PATH -and (Test-Path $env:HIP_PATH)) {
+    $hipPath = $env:HIP_PATH
+    Write-Host ("   {0,-12} using HIP_PATH as given: {1}" -f 'HIP', $hipPath) -ForegroundColor DarkYellow
 }
 elseif (-not $hipPath) { $hipPath = $hip6 }
-if ($hipPath -and (Test-Path $hipPath)) { $detected.Add('hip'); Write-Found 'HIP' $hipPath }
-else { Write-Missing 'HIP' 'set HIP_PATH to enable' }
+# HIP is detected but kept out of the automatic set, because its kernels do not
+# currently build: ROCm 6.4 and 7.1 both fail compiling AMD's own
+# amd_hip_vector_types.h against this tree ("non-const lvalue reference cannot
+# bind to a temporary"), on the first architecture, with matching hipcc and
+# headers. Leaving it in the default set fails every build, including the ones
+# driven from Rhino.sln.
+#
+# This is a regression to fix, not a decision: the 3.5 build renders on AMD
+# hardware. It is survivable only because GETDEVICE is bounds-checked now, so a
+# build without HIP degrades to CPU instead of crashing Rhino. Pass
+# -Devices cpu,hip to work on it.
+if ($hipPath -and (Test-Path $hipPath)) {
+    $hipAvailable = $true
+    Write-Found 'HIP' "$hipPath (not enabled by default - kernels do not compile, see RH-97816)"
+}
+else { $hipAvailable = $false; Write-Missing 'HIP' 'set HIP_PATH to enable' }
 
 $levelZeroRoot = @($libModern, $libLegacy) |
     ForEach-Object { Join-Path $_ 'level-zero' } |
@@ -316,6 +336,13 @@ if (-not $Devices) {
 else {
     Write-Host "   -> requested: $($Devices -join ', ')" -ForegroundColor Cyan
     foreach ($d in $Devices) {
+        # hip is deliberately absent from $detected, so check its own flag.
+        if ($d -eq 'hip') {
+            if (-not $hipAvailable) {
+                throw "'hip' was requested but no ROCm install was found. Set HIP_PATH."
+            }
+            continue
+        }
         if ($d -ne 'cpu' -and $detected -notcontains $d) {
             throw "'$d' was requested but its toolkit was not detected. Install it, set the matching environment variable, or drop it from -Devices."
         }
@@ -396,11 +423,21 @@ if ($Devices -contains 'hip') {
     # found no usable AMD device at all - which is what crashed Rhino on a
     # machine whose GPU the 3.5 build renders with quite happily.
     $cmakeArgs += '-DWITH_CYCLES_HIP_BINARIES=ON'
+} else {
+    # Every device switch is set explicitly, ON or OFF, on every configure.
+    # Only ever adding =ON meant the CMake cache remembered whatever a previous
+    # run enabled, so -Devices cpu still built HIP in an existing build
+    # directory - the flags described the difference from last time rather than
+    # what was asked for.
+    $cmakeArgs += '-DWITH_CYCLES_DEVICE_HIP=OFF'
+    $cmakeArgs += '-DWITH_CYCLES_HIP_BINARIES=OFF'
 }
 if ($Devices -contains 'oneapi') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_ONEAPI=ON'
     $cmakeArgs += "-D_LEVEL_ZERO_INCLUDE_DIR=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'include'))"
     $cmakeArgs += "-D_LEVEL_ZERO_LIBRARY=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'lib'))"
+} else {
+    $cmakeArgs += '-DWITH_CYCLES_DEVICE_ONEAPI=OFF'
 }
 
 Write-Host "   cmake $($cmakeArgs -join ' ')" -ForegroundColor DarkGray
