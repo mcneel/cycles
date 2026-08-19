@@ -1439,6 +1439,34 @@ int parse_driver_build_version(const sycl::device &device)
   return driver_build_version;
 }
 
+/* Rhino: sycl::platform::get_platforms() faults rather than reporting nothing
+ * when the Level Zero adapter has no driver to talk to - an access violation in
+ * ze_loader, reached through ur_adapter_level_zero_v2 and ur_loader. On a
+ * machine with no Intel GPU that takes Rhino down during startup, before any
+ * setting can be changed. Cycles 3.5 shipped sycl6 with no Unified Runtime layer
+ * and degraded quietly, so this arrived with the newer SYCL stack.
+ *
+ * The try below cannot help: an access violation is not a C++ exception. This is
+ * structured exception handling, which needs its own function - SEH is not
+ * allowed where objects require unwinding, hence the two-step. */
+#ifdef _WIN32
+static void get_platforms_unguarded(std::vector<sycl::platform> *out)
+{
+  *out = sycl::platform::get_platforms();
+}
+
+static bool get_platforms_guarded(std::vector<sycl::platform> *out)
+{
+  __try {
+    get_platforms_unguarded(out);
+    return true;
+  }
+  __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
+}
+#endif
+
 std::vector<sycl::device> available_sycl_devices(
     bool *multiple_level_zero_platforms_detected = nullptr)
 {
@@ -1450,7 +1478,17 @@ std::vector<sycl::device> available_sycl_devices(
 
   int level_zero_platform_counter = 0;
   try {
-    const std::vector<sycl::platform> &oneapi_platforms = sycl::platform::get_platforms();
+    std::vector<sycl::platform> guarded_platforms;
+#ifdef _WIN32
+    if (!get_platforms_guarded(&guarded_platforms)) {
+      LOG_WARNING << "Crash while enumerating SYCL platforms - no Level Zero driver? "
+                  << "Continuing without oneAPI devices.";
+      return available_devices;
+    }
+#else
+    guarded_platforms = sycl::platform::get_platforms();
+#endif
+    const std::vector<sycl::platform> &oneapi_platforms = guarded_platforms;
 
     for (const sycl::platform &platform : oneapi_platforms) {
       /* ignore OpenCL platforms to avoid using the same devices through both Level-Zero and
