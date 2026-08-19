@@ -16,6 +16,8 @@ limitations under the License.
 
 #include "internal_types.h"
 
+#include "util/version.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -113,6 +115,18 @@ CCL_CAPI const char* CDECL cycles_device_capabilities() {
 	return capabilities.c_str();
 }
 
+/* Which Cycles is actually loaded. Worth having somewhere reachable: telling a
+ * 3.5 ccycles.dll from a 5.x one otherwise meant comparing file sizes, and a
+ * stale prebuilt DLL sitting next to Rhino looks identical to a fresh one.
+ *
+ * This reports upstream's own version, so it reads 5.3.0 for the tree merged
+ * from the v5.2.0 tag - upstream bumps the number straight after tagging. */
+CCL_CAPI const char *CDECL cycles_version_string()
+{
+	static std::string version = CYCLES_VERSION_STRING;
+	return version.c_str();
+}
+
 CCL_CAPI int CDECL cycles_create_multidevice(int count, int* idx) {
 	int foundidx = -1;
 
@@ -123,6 +137,16 @@ CCL_CAPI int CDECL cycles_create_multidevice(int count, int* idx) {
 		subdevices.push_back(dev);
 	}
 	ccl::DeviceInfo themulti = ccl::Device::get_multi_device(subdevices, 0, true);
+
+	/* get_multi_device returns the device itself when handed exactly one, so
+	 * themulti can be an ordinary CPU or GPU DeviceInfo rather than a MULTI.
+	 * Renumbering that below would leave two DeviceInfos sharing an id but
+	 * differing in num, which is exactly what DeviceInfo::operator== asserts
+	 * against - and it fires on any CPU-only build as soon as a single device
+	 * gets "combined". Hand back the real index instead. */
+	if (themulti.id != "MULTI") {
+		return (count == 1) ? idx[0] : -1;
+	}
 
 	bool found = false;
 	for (auto multi : multi_devices)
