@@ -67,7 +67,16 @@
            src/ccycles -> src -> cycles -> RDK -> Plug-ins -> rhino4 -> src4 -->
     <CyclesBinDir Condition="'$(RhinoBinDir)'!=''">$(RhinoBinDir)</CyclesBinDir>
     <CyclesBinDir Condition="'$(RhinoBinDir)'==''">$(MSBuildThisFileDirectory)..\..\..\..\..\..\bin</CyclesBinDir>
-    <CyclesInstallDir>$(CyclesBinDir)\$(Configuration)\Plug-ins</CyclesInstallDir>
+    <!-- Install into big_libs rather than straight into bin. That is where the
+         prebuilt Cycles lives, and RhinoCyclesCore copies from there into bin for
+         everyone - so building Cycles now updates the prebuilt payload and takes
+         the same path into the output as a normal build. One tick of "Cycles
+         Core" in RhinoBuilder therefore does the whole job, and what a developer
+         who rebuilt Cycles ends up running is exactly what everyone else gets.
+         Commit the big_libs change afterwards to share it. -->
+    <CyclesPayloadDir>release</CyclesPayloadDir>
+    <CyclesPayloadDir Condition="'$(Configuration)'=='Debug'">debug</CyclesPayloadDir>
+    <CyclesInstallDir>$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\$(CyclesPayloadDir)</CyclesInstallDir>
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
     <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
