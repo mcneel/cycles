@@ -483,7 +483,21 @@ class ConvertNode : public ShaderNode {
   };
   ustring value_string;
 
-  static const int MAX_TYPE = 13;
+  /* node_types below is indexed by SocketType::Type value, so this has to cover
+   * the largest one the convert nodes use - not a hand-counted number, which is
+   * how it came to be wrong.
+   *
+   * It was 13, which fitted STRING exactly in 3.5. Then 5.2 added UINT64 to the
+   * enum and shifted everything after it up by one, putting STRING on 13 and
+   * writing node_types[from][STRING] one row past the end of the array. Upstream
+   * does not notice: without Rhino's COLOR2, which sits before STRING, their
+   * STRING is 12 and still fits. Two independent single-slot insertions, one on
+   * each side, and only the combination overruns.
+   *
+   * Debug builds catch it on the asserts in get_node_types; release builds just
+   * corrupt whatever follows. Derived from the enum now, so the next insertion
+   * anywhere among the scalar types cannot reintroduce it. */
+  static const int MAX_TYPE = SocketType::NODE + 1;
   static unique_ptr<Node> create(const NodeType *type);
   static const NodeType *(&get_node_types())[MAX_TYPE][MAX_TYPE];
   static bool register_on_init;
