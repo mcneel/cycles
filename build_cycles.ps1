@@ -397,6 +397,13 @@ if ($Devices -contains 'optix') {
 }
 
 if ($Devices -contains 'cuda') {
+    # WITH_CYCLES_DEVICE_CUDA is marked advanced and defaults to ON, so it was
+    # easy to leave alone - but the cache remembers an OFF from any earlier
+    # -Devices run that excluded CUDA, and with the device off find_package(CUDA)
+    # never runs. CUDA_NVCC_EXECUTABLE then stays empty, and the OptiX kernels
+    # call cuda_add_common_flags with an empty version argument, which CMake
+    # reports only as "invoked with incorrect arguments".
+    $cmakeArgs += '-DWITH_CYCLES_DEVICE_CUDA=ON'
     $cmakeArgs += '-DWITH_CYCLES_CUDA_BINARIES=ON'
     # Pass the toolkit explicitly. CMake's FindCUDA otherwise relies on
     # CUDA_PATH/PATH, which silently fails when a stale CUDA_PATH points at an
@@ -411,6 +418,7 @@ if ($Devices -contains 'cuda') {
     # cubin build was asked for; PTX-only keeps iteration times sane.
     if (-not $CudaBinaries) { $cmakeArgs += '-DCYCLES_CUDA_BINARIES_ARCH=compute_52' }
 } else {
+    $cmakeArgs += '-DWITH_CYCLES_DEVICE_CUDA=OFF'
     $cmakeArgs += '-DWITH_CYCLES_CUDA_BINARIES=OFF'
 }
 
