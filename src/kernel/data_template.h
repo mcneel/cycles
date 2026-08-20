@@ -212,8 +212,17 @@ KERNEL_STRUCT_MEMBER(integrator, int, use_volume_guiding)
 KERNEL_STRUCT_MEMBER(integrator, int, use_guiding_direct_light)
 KERNEL_STRUCT_MEMBER(integrator, int, use_guiding_mis_weights)
 
-/* Padding. */
+/* Rhino clipping. */
 KERNEL_STRUCT_MEMBER(integrator, int, num_clipping_planes)
+/* When set, clipping planes cut all rays (indirect bounces too), not just camera
+ * rays. Driven by the Product render preset (RH-95655). */
+KERNEL_STRUCT_MEMBER(integrator, int, clip_all_rays)
+
+/* Padding to keep KernelIntegrator size a multiple of 16 bytes
+ * (56 ints * 4 = 224 bytes). */
+KERNEL_STRUCT_MEMBER(integrator, int, clipping_pad0)
+KERNEL_STRUCT_MEMBER(integrator, int, clipping_pad1)
+KERNEL_STRUCT_MEMBER(integrator, int, clipping_pad2)
 KERNEL_STRUCT_END(KernelIntegrator)
 
 /* SVM. For shader specialization. */

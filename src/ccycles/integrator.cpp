@@ -151,6 +151,14 @@ CCL_CAPI void CDECL cycles_integrator_set_filter_glossy(ccl::Session* session_id
 	}
 }
 
+CCL_CAPI void CDECL cycles_integrator_set_clip_all_rays(ccl::Session* session_id, bool clip_all_rays)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->integrator->set_clip_all_rays(clip_all_rays);
+	}
+}
+
 CCL_CAPI void CDECL cycles_integrator_set_use_direct_light(ccl::Session *session_id, bool use_direct_light)
 {
 	ccl::Scene* sce = nullptr;

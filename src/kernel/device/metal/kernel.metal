@@ -194,7 +194,8 @@ bool metalrt_shadow_all_hit(constant KernelParamsMetal &launch_params_metal,
                             uint object,
                             uint prim,
                             const float2 barycentrics,
-                            const float ray_tmax)
+                            const float ray_tmax,
+                            const float3 hit_P)
 {
 #ifdef __SHADOW_RECORD_ALL__
 #  ifdef __VISIBILITY_FLAG__
@@ -228,6 +229,20 @@ bool metalrt_shadow_all_hit(constant KernelParamsMetal &launch_params_metal,
   if (intersection_skip_self_shadow(payload.self, object, prim)) {
     /* continue search */
     return true;
+  }
+
+  /* RH-95655: ignore hits on the clipped-away side so clipped geometry does not
+   * block direct light (Product preset). hit_P is the world-space hit point.
+   * Inlined (not point_is_clipped) because this free function has no
+   * MetalKernelContext; kernel_data here resolves via launch_params_metal. */
+  if (kernel_data.integrator.clip_all_rays) {
+    for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+      const float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
+      if (cpeq.x * hit_P.x + cpeq.y * hit_P.y + cpeq.z * hit_P.z + cpeq.w < 0.0f) {
+        /* continue search */
+        return true;
+      }
+    }
   }
 
 #  ifndef __TRANSPARENT_SHADOWS__
@@ -325,7 +340,8 @@ __anyhit__cycles_metalrt_shadow_all_hit_tri(
 
   TriangleIntersectionResult result;
   result.continue_search = metalrt_shadow_all_hit<METALRT_HIT_TRIANGLE>(
-      launch_params_metal, payload, object, prim, barycentrics, ray_tmax);
+      launch_params_metal, payload, object, prim, barycentrics, ray_tmax,
+      payload.ray_P + ray_tmax * payload.ray_D);
   result.accept = !result.continue_search;
   return result;
 }
@@ -503,7 +519,8 @@ ccl_device_inline void metalrt_intersection_curve_shadow(
   if (context.curve_intersect(
           NULL, &isect, ray_P, ray_D, ray_tmin, isect.t, object, prim, time, type)) {
     result.continue_search = metalrt_shadow_all_hit<METALRT_HIT_BOUNDING_BOX>(
-        launch_params_metal, payload, object, prim, float2(isect.u, isect.v), ray_tmax);
+        launch_params_metal, payload, object, prim, float2(isect.u, isect.v), ray_tmax,
+        payload.ray_P + isect.t * payload.ray_D);
     result.accept = !result.continue_search;
   }
 }
@@ -730,7 +747,8 @@ ccl_device_inline void metalrt_intersection_point_shadow(
   if (context.point_intersect(
           NULL, &isect, ray_P, ray_D, ray_tmin, isect.t, object, prim, time, type)) {
     result.continue_search = metalrt_shadow_all_hit<METALRT_HIT_BOUNDING_BOX>(
-        launch_params_metal, payload, object, prim, float2(isect.u, isect.v), ray_tmax);
+        launch_params_metal, payload, object, prim, float2(isect.u, isect.v), ray_tmax,
+        payload.ray_P + isect.t * payload.ray_D);
     result.accept = !result.continue_search;
 
     if (result.accept) {

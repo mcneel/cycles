@@ -211,6 +211,15 @@ ccl_device_inline
 
             /* shadow ray early termination */
             if (hit) {
+              /* RH-95655: skip hits on the clipped-away side so clipped geometry
+               * neither blocks nor filters direct light (Product preset). The
+               * world-space hit point is the original world ray at isect.t,
+               * which stays valid through instance transforms. */
+              if (kernel_data.integrator.clip_all_rays &&
+                  point_is_clipped(kg, ray->P + isect.t * ray->D)) {
+                continue;
+              }
+
               /* detect if this surface has a shader with transparent shadows */
               /* todo: optimize so primitive visibility flag indicates if
                * the primitive has a transparent shadow shader? */
