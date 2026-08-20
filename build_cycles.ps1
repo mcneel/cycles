@@ -278,28 +278,24 @@ $hip6 = $hipCandidates | Where-Object { (Split-Path -Leaf $_) -like '6.*' } | So
 
 # An explicitly set HIP_PATH wins. This used to force ROCm 6.x whenever HIP_PATH
 # pointed elsewhere, on the assumption that Cycles targets 6.x - which made the
-# variable useless for its one real purpose, trying a different SDK. ROCm 6.4's
-# amd_hip_vector_types.h does not compile against this tree, so being unable to
-# select another version is a dead end rather than a safeguard.
+# variable useless for its one real purpose, trying a different SDK. Worth
+# keeping: chasing the kernel compile failure through several ROCm versions was
+# only possible because of it, even though the fault turned out not to be ROCm's.
 if ($env:HIP_PATH -and (Test-Path $env:HIP_PATH)) {
     $hipPath = $env:HIP_PATH
     Write-Host ("   {0,-12} using HIP_PATH as given: {1}" -f 'HIP', $hipPath) -ForegroundColor DarkYellow
 }
 elseif (-not $hipPath) { $hipPath = $hip6 }
-# HIP is detected but kept out of the automatic set, because its kernels do not
-# currently build: ROCm 6.4 and 7.1 both fail compiling AMD's own
-# amd_hip_vector_types.h against this tree ("non-const lvalue reference cannot
-# bind to a temporary"), on the first architecture, with matching hipcc and
-# headers. Leaving it in the default set fails every build, including the ones
-# driven from Rhino.sln.
-#
-# This is a regression to fix, not a decision: the 3.5 build renders on AMD
-# hardware. It is survivable only because GETDEVICE is bounds-checked now, so a
-# build without HIP degrades to CPU instead of crashing Rhino. Pass
-# -Devices cpu,hip to work on it.
+# HIP was kept out of the automatic set for a while because its kernels failed to
+# compile, which looked like a ROCm problem - the error surfaces inside AMD's
+# amd_hip_vector_types.h. It was ours: a float4 divided by an int in
+# svm_rhino_procedurals.h, which routes through HIP's operator/=(U) template and
+# out through an overload 5.2 added. See the comment at that line. All 18
+# architectures build against ROCm 6.4 now, so HIP is back in the default set.
 if ($hipPath -and (Test-Path $hipPath)) {
     $hipAvailable = $true
-    Write-Found 'HIP' "$hipPath (not enabled by default - kernels do not compile, see RH-97816)"
+    $detected.Add('hip')
+    Write-Found 'HIP' $hipPath
 }
 else { $hipAvailable = $false; Write-Missing 'HIP' 'set HIP_PATH to enable' }
 
@@ -336,12 +332,8 @@ if (-not $Devices) {
 else {
     Write-Host "   -> requested: $($Devices -join ', ')" -ForegroundColor Cyan
     foreach ($d in $Devices) {
-        # hip is deliberately absent from $detected, so check its own flag.
-        if ($d -eq 'hip') {
-            if (-not $hipAvailable) {
-                throw "'hip' was requested but no ROCm install was found. Set HIP_PATH."
-            }
-            continue
+        if ($d -eq 'hip' -and -not $hipAvailable) {
+            throw "'hip' was requested but no ROCm install was found. Set HIP_PATH."
         }
         if ($d -ne 'cpu' -and $detected -notcontains $d) {
             throw "'$d' was requested but its toolkit was not detected. Install it, set the matching environment variable, or drop it from -Devices."

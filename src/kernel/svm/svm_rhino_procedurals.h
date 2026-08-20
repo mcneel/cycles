@@ -3666,7 +3666,27 @@ ccl_device float4 dots_texture(KernelGlobals kg,
   }
 
   if (composition_type == RHINO_DOTS_COMPOSITION_AVERAGE) {
-    color /= (colors_added == 0 ? 1 : colors_added);
+    /* Divide by a float, not an int. This one line cost HIP every kernel it has.
+     *
+     * On HIP, float4 is AMD's own HIP_vector_type<float, 4> - GPU builds use the
+     * native vector types. An int divisor deduces HIP's member template
+     * operator/=(U) exactly, so it beats the float4 overloads in
+     * util/math_float4.h, which would need an int -> float conversion. That
+     * template returns HIP_vector_type& and its body is
+     *
+     *     return *this /= HIP_vector_type{x};
+     *
+     * and 5.2 added operator/=(float4 &a, const float4 b), which is a better
+     * match for that inner expression than HIP's own member - and it returns
+     * float4 by value. Returning that temporary from a function declared to
+     * return a non-const reference is the error, and it surfaces inside AMD's
+     * header with nothing pointing back at this file. Cycles 3.5 declared only
+     * the float overload, so the inner division stayed on HIP's member.
+     *
+     * Upstream never trips it: nothing in Cycles divides a float4 by an int in
+     * device code. Only this procedural does. All 18 architectures build from
+     * one custom-build rule, so this single error meant no HIP kernels at all. */
+    color /= (float)(colors_added == 0 ? 1 : colors_added);
   }
   else if (composition_type == RHINO_DOTS_COMPOSITION_STANDARD) {
     color = (1.f - standard_composition_value) * original_background_color +
