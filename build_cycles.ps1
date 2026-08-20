@@ -9,11 +9,12 @@
     Everything that used to be a hardcoded absolute path is now discovered:
 
       * Visual Studio    - via vswhere, newest install with the C++ toolset,
-                           VS2022 or later, with the CMake generator derived
-                           from it. The old scripts needed VS2022 Professional
-                           *and* VS2019 BuildTools side by side, because the
-                           win64_vc15 library bundle was built with the VS2019
-                           ABI.
+                           VS2022 or later. Its toolchain is used through a
+                           developer shell; the build itself is driven by Ninja
+                           unless -Generator vs is passed. The old scripts needed
+                           VS2022 Professional *and* VS2019 BuildTools side by
+                           side, because the win64_vc15 library bundle was built
+                           with the VS2019 ABI.
       * CUDA / OptiX /
         HIP / oneAPI     - probed from the usual environment variables and
                            install locations. Anything not found is switched
@@ -47,11 +48,38 @@
 .PARAMETER ConfigureOnly
     Run the CMake configure step and stop, leaving a solution to open in VS.
 
+.PARAMETER Generator
+    ninja (the default) or vs.
+
+    Ninja is much faster here, and the GPU kernels are why. Every architecture's
+    kernel is an add_custom_command on one target, and MSBuild runs a project's
+    custom build steps strictly in order - its /m parallelism works across
+    projects, not within one. So the 18 HIP fatbins compiled one at a time, at
+    3m20s each: an hour of a 24-core machine sitting mostly idle. Ninja has no
+    such restriction and runs them concurrently.
+
+    "Ninja Multi-Config" is used rather than plain Ninja so --config keeps
+    working exactly as it does with the Visual Studio generators.
+
+    Pass -Generator vs to get a Cycles.sln to open in the IDE. Note that the
+    generator is an implementation detail of this script either way: ccycles.vcxproj
+    is a Makefile-style project that shells out to here, so Visual Studio never
+    sees what CMake generated.
+
+.PARAMETER Jobs
+    How many compiles to run at once. Defaults to a cap rather than the core
+    count, because the kernel compilers are memory-hungry - each clang building a
+    HIP kernel peaks around 1.2 GB, and letting all 18 architectures go at once
+    wants more RAM than a 32 GB machine has to spare.
+
 .EXAMPLE
     .\build_cycles.ps1 -Configuration Release
 
 .EXAMPLE
     .\build_cycles.ps1 -Devices cpu -ConfigureOnly
+
+.EXAMPLE
+    .\build_cycles.ps1 -Generator vs -ConfigureOnly
 #>
 [CmdletBinding()]
 param(
@@ -66,6 +94,12 @@ param(
     [switch]$CudaBinaries,
 
     [switch]$ConfigureOnly,
+
+    [ValidateSet('ninja', 'vs')]
+    [string]$Generator = 'ninja',
+
+    [ValidateRange(1, 256)]
+    [int]$Jobs,
 
     [string]$BuildDir = 'build'
 )
@@ -132,19 +166,46 @@ $cmakeGenerators = @(
         }
 )
 
-$cmakeGenerator = $cmakeGenerators |
+$vsGenerator = $cmakeGenerators |
     Where-Object { $_.Major -le $vsMajor } |
     Sort-Object Major -Descending |
     Select-Object -First 1 -ExpandProperty Name
 
-if (-not $cmakeGenerator) {
+if (-not $vsGenerator) {
     throw ("CMake offers no Visual Studio generator at or below version $vsMajor. " +
            "Installed CMake is $((& cmake --version | Select-Object -First 1)); " +
            "either install a newer CMake or a Visual Studio it supports.")
 }
 
 Write-Found "VS $vsMajor" $vsPath
-Write-Found 'generator' $cmakeGenerator
+
+# Ninja ships inside the Visual Studio install, under the C++ CMake tools
+# component, and that copy is preferred over anything on PATH: this machine had a
+# ninja 1.12 bundled with Strawberry Perl sitting ahead of Visual Studio's 1.13,
+# and silently building Cycles with whatever unrelated toolchain happens to be
+# first on PATH is not a dependency worth having. PATH stays as a fallback for a
+# machine where the VS component is not installed.
+$ninjaExe = $null
+if ($Generator -eq 'ninja') {
+    $ninjaExe = @(
+        (Join-Path $vsPath 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe')
+        (Get-Command ninja -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)
+    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+
+    if (-not $ninjaExe) {
+        Write-Missing 'ninja' 'not found, falling back to the Visual Studio generator'
+        $Generator = 'vs'
+    }
+}
+
+if ($Generator -eq 'ninja') {
+    $cmakeGenerator = 'Ninja Multi-Config'
+    Write-Found 'generator' "$cmakeGenerator ($ninjaExe)"
+}
+else {
+    $cmakeGenerator = $vsGenerator
+    Write-Found 'generator' $cmakeGenerator
+}
 
 # Enter the Visual Studio developer environment.
 #
@@ -155,12 +216,41 @@ Write-Found 'generator' $cmakeGenerator
 # resolved from the detected install rather than hardcoded, unlike the previous
 # scripts which pinned a VS2022 Professional path and then entered a VS2019
 # BuildTools environment.
+#
+# The MSVC toolset is pinned rather than left at the newest installed, because
+# CUDA decides for itself which host compilers it will accept. CUDA 12.9 rejects
+# MSVC 14.5x outright - "Only the versions between 2017 and 2022 (inclusive) are
+# supported" - and VS 18 installs 14.51 as its default.
+#
+# This never showed while the build ran through the Visual Studio generator,
+# which pinned the toolset itself: CMake 3.31 has no VS 18 generator, so it fell
+# back to "Visual Studio 17 2022" and nvcc was handed a 14.4x cl.exe whatever the
+# devshell said. Ninja has no such indirection - it uses the cl.exe on PATH - so
+# the constraint has to be stated here instead of arrived at by accident.
+#
+# Pinning also makes the build consistent for the first time: under the VS
+# generator the oneAPI kernel's clang++ picked up the devshell's 14.51 while
+# everything else compiled with 14.4x.
 $devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+$msvcVer = @('14.44', '14.43', '14.42', '14.41', '14.40') |
+    Where-Object {
+        Get-ChildItem (Join-Path $vsPath 'VC\Tools\MSVC') -Directory -ErrorAction SilentlyContinue |
+            Where-Object Name -Like "$_.*"
+    } | Select-Object -First 1
+
+if (-not $msvcVer) {
+    Write-Missing 'MSVC 14.4x' ('not installed; the newest toolset will be used and a CUDA build ' +
+                                'will likely be rejected by nvcc. Add "MSVC v143 - VS 2022 C++ ' +
+                                'x64/x86 build tools" in the Visual Studio installer.')
+}
+
 if (Test-Path $devShell) {
     if (-not $env:VSINSTALLDIR) {
+        $devCmdArgs = '-arch=x64 -host_arch=x64'
+        if ($msvcVer) { $devCmdArgs += " -vcvars_ver=$msvcVer" }
         Import-Module $devShell
-        Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
-        Write-Found 'VS devshell' 'entered (x64)'
+        Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments $devCmdArgs | Out-Null
+        Write-Found 'VS devshell' "entered (x64$(if ($msvcVer) { ", MSVC $msvcVer" }))"
     }
     else {
         Write-Found 'VS devshell' "already active ($env:VSINSTALLDIR)"
@@ -371,16 +461,40 @@ Write-Host "   install -> $(ConvertTo-CMakePath $InstallDir)"
 
 if (-not [System.IO.Path]::IsPathRooted($BuildDir)) { $BuildDir = Join-Path $cyclesRoot $BuildDir }
 
+# CMake refuses to reuse a build directory that was generated by a different
+# generator, and says so in a way that reads like a broken checkout. Switching
+# between -Generator ninja and vs is a normal thing to do, so recognise the case
+# and clear the directory instead of making the developer work it out.
+$cacheFile = Join-Path $BuildDir 'CMakeCache.txt'
+if (Test-Path $cacheFile) {
+    $match = Select-String -Path $cacheFile -Pattern '^CMAKE_GENERATOR:INTERNAL=(.*)$' |
+        Select-Object -First 1
+    $existing = if ($match) { $match.Matches[0].Groups[1].Value } else { $null }
+    if ($existing -and $existing -ne $cmakeGenerator) {
+        Write-Host "   regenerating: was '$existing', now '$cmakeGenerator'" -ForegroundColor DarkYellow
+        Remove-Item -LiteralPath $BuildDir -Recurse -Force
+    }
+}
+
 $cmakeArgs = @(
     '-S', (ConvertTo-CMakePath $cyclesRoot)
     '-B', (ConvertTo-CMakePath $BuildDir)
     '-G', $cmakeGenerator
-    '-A', 'x64'
     "-DCMAKE_INSTALL_PREFIX=$(ConvertTo-CMakePath $InstallDir)"
     '-DWITH_CYCLES_ALEMBIC=OFF'
     '-DWITH_CYCLES_USD=OFF'
     '-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF'
 )
+
+if ($Generator -eq 'ninja') {
+    # Ninja takes the architecture from the compiler it is handed, not from -A,
+    # which it rejects. The developer shell was entered as x64 above, so cl.exe
+    # and link.exe on PATH are already the right ones.
+    $cmakeArgs += "-DCMAKE_MAKE_PROGRAM=$(ConvertTo-CMakePath $ninjaExe)"
+}
+else {
+    $cmakeArgs += '-A', 'x64'
+}
 
 if ($Devices -contains 'optix') {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=ON', "-DOPTIX_ROOT_DIR=$(ConvertTo-CMakePath $optixPath)"
@@ -446,12 +560,28 @@ Write-Host "   cmake $($cmakeArgs -join ' ')" -ForegroundColor DarkGray
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE." }
 
 if ($ConfigureOnly) {
-    Write-Step "Configured. Open $BuildDir\Cycles.sln in Visual Studio, or re-run without -ConfigureOnly."
+    if ($Generator -eq 'ninja') {
+        Write-Step "Configured. Build with -Generator vs if you want a Cycles.sln to open."
+    }
+    else {
+        Write-Step "Configured. Open $BuildDir\Cycles.sln in Visual Studio, or re-run without -ConfigureOnly."
+    }
     return
 }
 
-Write-Step "Building ($cmakeConfig)"
-& cmake --build $BuildDir --config $cmakeConfig --target install --parallel
+# Bare --parallel means "use every core", which is fine for C++ but not for the
+# GPU kernels: each clang compiling a HIP architecture peaks around 1.2 GB, and
+# Ninja will happily start all 18 at once. On a 24-core, 32 GB machine that is
+# roughly 21 GB of compilers plus everything else. Cap it, leaving headroom, and
+# let -Jobs override for a machine that can take more.
+if (-not $Jobs) {
+    $cores = [int]$env:NUMBER_OF_PROCESSORS
+    if (-not $cores) { $cores = 4 }
+    $Jobs = [Math]::Max(2, [Math]::Min($cores - 2, 12))
+}
+
+Write-Step "Building ($cmakeConfig, $Jobs jobs)"
+& cmake --build $BuildDir --config $cmakeConfig --target install --parallel $Jobs
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 
 Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
