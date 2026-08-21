@@ -30,6 +30,8 @@ namespace fs = std::filesystem;
 #endif
 
 #include "internal_types.h"
+
+extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id);
 #include "device/device.h"
 #include "util/thread.h"
 
@@ -231,6 +233,8 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 			if (!tile.get_pass_pixels(
 					pass_type_as_string(pass_type), pass_info.num_components, tile_pass.data())) {
 				log_("Failed to read render pass pixels");
+				ccycles_diag("get_pass_pixels failed for tile pass '%s'\n",
+				             pass_type_as_string(pass_type));
 				return false;
 			}
 		}
@@ -277,6 +281,38 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 		}
 	}
 	else {
+		/* TEMPORARY: with a shadow catcher in the scene Cycles writes the picture
+		 * across combined, shadow_catcher_matte, shadow_catcher and background,
+		 * and reading only "combined" can legitimately give black. Report what is
+		 * in each of them once, at the last sample. */
+		static const bool want_probe = getenv("CCYCLES_PASS_PROBE") != nullptr;
+		if (want_probe && tile.get_sample() > 1) {
+			static bool probed = false;
+			if (!probed) {
+				probed = true;
+				const char *names[] = {"combined", "shadow_catcher_matte",
+				                       "shadow_catcher", "background"};
+				const int w = tile.full_size.x, h = tile.full_size.y;
+				std::vector<float> probe(size_t(w) * size_t(h) * 4);
+				for (const char *nm : names) {
+					if (!tile.get_pass_pixels(nm, 4, probe.data())) {
+						ccycles_diag("probe: pass '%s' unavailable\n", nm);
+						continue;
+					}
+					float lo = probe[0], hi = probe[0];
+					double sum = 0.0;
+					size_t nz = 0;
+					for (float v : probe) {
+						if (v < lo) lo = v;
+						if (v > hi) hi = v;
+						sum += v;
+						if (v != 0.0f) nz++;
+					}
+					ccycles_diag("probe: '%s' %dx%d nonzero=%zu min=%f max=%f mean=%f\n",
+					             nm, w, h, nz, lo, hi, sum / double(probe.size()));
+				}
+			}
+		}
 		for (auto &pass : *full_passes) {
 			bool upscale = tile.resolution_divider > ccsession_->params.pixel_size ||
 						   ccsession_->params.pixel_size > 1;
@@ -299,6 +335,8 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 									  pass_info.num_components,
 									  pass->pixels().data())) {
 				log_("Failed to read render pass pixels");
+				ccycles_diag("get_pass_pixels failed for tile pass '%s'\n",
+				             pass_type_as_string(pass->get_pass_type()));
 				pass->unlock();
 
 				return false;
@@ -571,6 +609,7 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		logger.logit("Starting session ", session_id);
+		cycles_debug_scene_stats(session_id);
 		session->start();
 	}
 }
@@ -610,13 +649,47 @@ CCL_CAPI void CDECL cycles_session_retain_float_buffer(
 	ccl::Session *session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		if (ccsess) {
+			bool found = false;
 			for (auto &pass : ccsess->passes) {
 				if (passtype == pass->get_pass_type() && width == pass->get_width() &&
 					height == pass->get_height()) {
 					pass->lock();
 					*pixels = pass->pixels().data();
 					*pixel_size = pass->get_pixel_size();
+					found = true;
+
+					/* TEMPORARY diagnostic: is the pass empty, or is the caller
+					 * losing pixels we handed over? */
+					{
+						const std::vector<float> &px = pass->pixels();
+						float lo = 0.0f, hi = 0.0f;
+						double sum = 0.0;
+						size_t nonzero = 0;
+						if (!px.empty()) {
+							lo = hi = px[0];
+							for (float v : px) {
+								if (v < lo) lo = v;
+								if (v > hi) hi = v;
+								sum += v;
+								if (v != 0.0f) nonzero++;
+							}
+						}
+						ccycles_diag("retain_float_buffer: pass %d %dx%d floats=%zu nonzero=%zu "
+						             "min=%f max=%f mean=%f pixel_size=%d\n",
+						             passtype, width, height, px.size(), nonzero, lo, hi,
+						             px.empty() ? 0.0 : sum / double(px.size()), *pixel_size);
+					}
 					break;
+				}
+			}
+			if (!found) {
+				/* Nothing matched, so *pixels keeps whatever the caller passed in.
+				 * Say so, and say what was on offer. */
+				ccycles_diag("retain_float_buffer: NO PASS for type %d at %dx%d\n",
+				             passtype, width, height);
+				for (auto &pass : ccsess->passes) {
+					ccycles_diag("  have pass type %d at %dx%d\n", pass->get_pass_type(),
+					             pass->get_width(), pass->get_height());
 				}
 			}
 		}

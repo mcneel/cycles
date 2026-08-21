@@ -61,6 +61,8 @@ limitations under the License.
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
+#include <cstdlib>
 
 #ifdef WIN32
 /* Declared rather than pulled in with windows.h. This header is included by
@@ -83,17 +85,40 @@ extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(const char *l
  * test executables that do have a console. */
 static inline void ccycles_diag(const char *fmt, ...)
 {
-	char msg[1024];
+	/* The prefix goes in the same buffer as the message. Two separate
+	 * OutputDebugStringA calls are two separate records to any listener, and a
+	 * listener that misses the second one shows a bare "ccycles:" with nothing
+	 * after it. */
+	char msg[1024] = "ccycles: ";
+	const size_t prefix_len = strlen(msg);
 	va_list args;
 	va_start(args, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, args);
+	vsnprintf(msg + prefix_len, sizeof(msg) - prefix_len, fmt, args);
 	va_end(args);
 
 	fprintf(stderr, "%s", msg);
 #ifdef WIN32
-	OutputDebugStringA("ccycles: ");
 	OutputDebugStringA(msg);
 #endif
+
+	/* OutputDebugString goes through a single 4KB system buffer with an event
+	 * handshake, and a listener that is a moment late simply loses the record.
+	 * That is fine for a stray message and useless for a burst, which is
+	 * exactly what a scene dump is. Set CCYCLES_DIAG_LOG to a path to get all
+	 * of them. */
+	static FILE *diag_file = nullptr;
+	static bool diag_file_tried = false;
+	if (!diag_file_tried) {
+		diag_file_tried = true;
+		const char *path = getenv("CCYCLES_DIAG_LOG");
+		if (path != nullptr && path[0] != 0) {
+			diag_file = fopen(path, "a");
+		}
+	}
+	if (diag_file != nullptr) {
+		fputs(msg, diag_file);
+		fflush(diag_file);
+	}
 }
 
 #define MULTIDEVICEOFFSET 100000

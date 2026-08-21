@@ -167,36 +167,153 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 {
 	ccl::Scene *sce = session_id->scene.get();
 	if (sce == nullptr) {
-		printf("stats: no scene\n");
+		ccycles_diag("stats: no scene\n");
 		return;
 	}
 
-	printf("stats: geometry=%zu objects=%zu shaders=%zu\n",
+	ccycles_diag("stats: geometry=%zu objects=%zu shaders=%zu\n",
 	       sce->geometry.size(), sce->objects.size(), sce->shaders.size());
 
 	for (size_t i = 0; i < sce->objects.size(); i++) {
 		ccl::Object *ob = sce->objects[i];
 		ccl::Geometry *geo = ob->get_geometry();
-		printf("  object %zu geometry=%p vis=%u\n", i, (void *)geo, ob->get_visibility());
+		ccycles_diag("  object %zu geometry=%p vis=%u\n", i, (void *)geo, ob->get_visibility());
 		if (ccl::Mesh *mesh = dynamic_cast<ccl::Mesh *>(geo)) {
-			printf("    mesh verts=%d tris=%d used_shaders=%zu\n",
+			ccycles_diag("    mesh verts=%d tris=%d used_shaders=%zu\n",
 			       (int)mesh->num_verts(), (int)mesh->num_triangles(),
 			       mesh->get_used_shaders().size());
+			/* A per-triangle index pointing at the wrong slot - or a slot holding
+			 * an empty shader - renders black with everything else looking
+			 * correct, so name the shader each slot resolves to. */
+			const ccl::array<ccl::Node *> &us = mesh->get_used_shaders();
+			for (size_t k = 0; k < us.size(); k++) {
+				ccl::Shader *sh = static_cast<ccl::Shader *>(us[k]);
+				ccycles_diag("      slot %zu -> '%s'\n", k,
+				             sh == nullptr ? "(null)" : sh->name.c_str());
+			}
+			const ccl::array<int> &tri_shader = mesh->get_shader();
+			int lo = -1, hi = -1;
+			for (size_t k = 0; k < tri_shader.size(); k++) {
+				if (k == 0 || tri_shader[k] < lo) lo = tri_shader[k];
+				if (k == 0 || tri_shader[k] > hi) hi = tri_shader[k];
+			}
+			ccycles_diag("      tri shader index count=%zu min=%d max=%d\n",
+			             tri_shader.size(), lo, hi);
 		}
 		else if (ccl::Light *lt = dynamic_cast<ccl::Light *>(geo)) {
 			const ccl::Transform &t = ob->get_tfm();
-			printf("    light type=%d co=(%.2f %.2f %.2f) -col2=(%.2f %.2f %.2f)\n",
+			ccycles_diag("    light type=%d co=(%.2f %.2f %.2f) -col2=(%.2f %.2f %.2f)\n",
 			       (int)lt->get_light_type(), t.x.w, t.y.w, t.z.w,
 			       -t.x.z, -t.y.z, -t.z.z);
 		}
 		else {
-			printf("    unknown geometry\n");
+			ccycles_diag("    unknown geometry\n");
 		}
 	}
 
 	const ccl::Transform &ctfm = sce->camera->get_matrix();
-	printf("  camera at (%.2f %.2f %.2f) %dx%d fov=%.3f\n", ctfm.x.w, ctfm.y.w, ctfm.z.w,
+	ccycles_diag("  camera at (%.2f %.2f %.2f) %dx%d fov=%.3f\n", ctfm.x.w, ctfm.y.w, ctfm.z.w,
 	       sce->camera->get_full_width(), sce->camera->get_full_height(),
 	       sce->camera->get_fov());
+
+	/* A render where the depth pass is right but the combined pass is black
+	 * means rays hit geometry and then found nothing to light it with, so
+	 * report what could be lighting it. Lights are Geometry in 5.x, so there
+	 * is no Scene::lights to walk. */
+	size_t num_lights = 0;
+	for (ccl::Geometry *geo : sce->geometry) {
+		if (ccl::Light *lt = dynamic_cast<ccl::Light *>(geo)) {
+			ccl::float3 st = lt->get_strength();
+			ccycles_diag("    light %zu type=%d strength=(%f %f %f) enabled=%d "
+			             "shadow=%d mis=%d max_bounces=%d shader=%p\n",
+			             num_lights, (int)lt->get_light_type(), st.x, st.y, st.z,
+			             (int)lt->get_is_enabled(), (int)lt->get_cast_shadow(),
+			             (int)lt->get_use_mis(), lt->get_max_bounces(),
+			             (void *)(lt->get_used_shaders().empty()
+			                          ? nullptr
+			                          : lt->get_used_shaders()[0]));
+			num_lights++;
+		}
+	}
+	ccycles_diag("  lights=%zu background_shader=%p background_vis=%u\n",
+	             num_lights, (void *)sce->background->get_shader(),
+	             sce->background->get_visibility());
+	ccycles_diag("  integrator: max_bounces=%d diffuse=%d glossy=%d transmission=%d "
+	             "volume=%d transparent=%d aa_samples=%d light_tree=%d\n",
+	             sce->integrator->get_max_bounce(),
+	             sce->integrator->get_max_diffuse_bounce(),
+	             sce->integrator->get_max_glossy_bounce(),
+	             sce->integrator->get_max_transmission_bounce(),
+	             sce->integrator->get_max_volume_bounce(),
+	             sce->integrator->get_transparent_max_bounce(),
+	             sce->integrator->get_aa_samples(),
+	             (int)sce->integrator->get_use_light_tree());
+	ccycles_diag("  integrator switches: direct=%d indirect=%d diffuse=%d glossy=%d "
+	             "transmission=%d emission=%d ao_factor=%f clamp_direct=%f "
+	             "clamp_indirect=%f\n",
+	             (int)sce->integrator->get_use_direct_light(),
+	             (int)sce->integrator->get_use_indirect_light(),
+	             (int)sce->integrator->get_use_diffuse(),
+	             (int)sce->integrator->get_use_glossy(),
+	             (int)sce->integrator->get_use_transmission(),
+	             (int)sce->integrator->get_use_emission(),
+	             sce->integrator->get_ao_factor(),
+	             sce->integrator->get_sample_clamp_direct(),
+	             sce->integrator->get_sample_clamp_indirect());
+	ccycles_diag("  film: exposure=%f approx_shadow_catcher=%d display_pass=%d\n",
+	             sce->film->get_exposure(),
+	             (int)sce->film->get_use_approximate_shadow_catcher(),
+	             (int)sce->film->get_display_pass());
+
+	/* Correct geometry, correct lights, no failed connections and still a
+	 * black image leaves the socket values themselves. Print what Cycles
+	 * actually holds for every unlinked input, which is the thing the C# side
+	 * believes it set. */
+	for (size_t si = 0; si < sce->shaders.size(); si++) {
+		ccl::Shader *sh = sce->shaders[si];
+		ccycles_diag("  shader %zu '%s' graph=%p\n", si, sh->name.c_str(),
+		             (void *)sh->graph.get());
+		if (sh->graph == nullptr) {
+			continue;
+		}
+		for (ccl::ShaderNode *nd : sh->graph->nodes) {
+			ccycles_diag("    node '%s' type=%s\n", nd->name.c_str(),
+			             nd->type->name.c_str());
+			for (ccl::ShaderInput *in : nd->inputs) {
+				if (in->link != nullptr) {
+					ccycles_diag("      %s <- linked\n", in->socket_type.name.c_str());
+					continue;
+				}
+				switch (in->socket_type.type) {
+					case ccl::SocketType::FLOAT:
+						ccycles_diag("      %s = %f\n", in->socket_type.name.c_str(),
+						             nd->get_float(in->socket_type));
+						break;
+					case ccl::SocketType::COLOR:
+					case ccl::SocketType::VECTOR:
+					case ccl::SocketType::POINT:
+					case ccl::SocketType::NORMAL: {
+						ccl::float3 v = nd->get_float3(in->socket_type);
+						ccycles_diag("      %s = (%f %f %f)\n",
+						             in->socket_type.name.c_str(), v.x, v.y, v.z);
+						break;
+					}
+					case ccl::SocketType::INT:
+					case ccl::SocketType::ENUM:
+						ccycles_diag("      %s = %d\n", in->socket_type.name.c_str(),
+						             nd->get_int(in->socket_type));
+						break;
+					case ccl::SocketType::BOOLEAN:
+						ccycles_diag("      %s = %d\n", in->socket_type.name.c_str(),
+						             (int)nd->get_bool(in->socket_type));
+						break;
+					default:
+						ccycles_diag("      %s = (type %d not printed)\n",
+						             in->socket_type.name.c_str(), (int)in->socket_type.type);
+						break;
+				}
+			}
+		}
+	}
 	fflush(stdout);
 }

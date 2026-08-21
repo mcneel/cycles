@@ -99,7 +99,14 @@ void CCyclesLight::flush()
 	 * spot placed between the camera and a quad only lights the quad with the
 	 * sign below - see the smoke test's SMOKE_SPOTZ sweep. Position and cone
 	 * shape were checked the same way and are right. */
-	const ccl::float3 z = ccl::normalize(dir);
+	/* A background light has no direction, so dir is still zero here and
+	 * normalize() of it is NaN. That NaN used to go into the object transform
+	 * below, and from there into the light tree, where it poisoned the
+	 * importance maths for every light in the scene - nothing was ever
+	 * sampled and the whole render came back black with a correct depth pass.
+	 * A light with no direction gets the identity basis. */
+	const bool have_dir = ccl::len_squared(dir) > 1e-12f;
+	const ccl::float3 z = have_dir ? ccl::normalize(dir) : ccl::make_float3(0.0f, 0.0f, 1.0f);
 	ccl::float3 x = axisu;
 	ccl::float3 y = axisv;
 

@@ -17,6 +17,7 @@ limitations under the License.
 #include "internal_types.h"
 
 #include "util/debug.h"
+#include "util/log.h"
 #include "util/path.h"
 #include "ccycles.h"
 
@@ -57,9 +58,29 @@ void cycles_putenv(const char* var, const char* val)
 #endif
 }
 
+/* Cycles logs through its own sink and ccycles never initialised it, so
+ * everything Cycles knows about devices, kernels, shader compilation and the
+ * light tree was being discarded. Send it to the same place as ccycles_diag
+ * when CCYCLES_DIAG_LOG asks for diagnostics. */
+static void ccycles_cycles_log(const ccl::LogLevel level,
+                               const char *file_line,
+                               const char *func,
+                               const char *msg)
+{
+	ccycles_diag("cycles[%s] %s: %s\n", ccl::log_level_to_string(level),
+	             func == nullptr ? "" : func, msg == nullptr ? "" : msg);
+}
+
 void cycles_initialise(unsigned int mask)
 {
 	if (!initialised) {
+		const char *diag = getenv("CCYCLES_DIAG_LOG");
+		if (diag != nullptr && diag[0] != 0) {
+			ccl::log_init(ccycles_cycles_log);
+			const char *lvl = getenv("CCYCLES_LOG_LEVEL");
+			ccl::log_level_set(lvl != nullptr && lvl[0] != 0 ? ccl::log_string_to_level(lvl)
+			                                                 : ccl::LOG_LEVEL_INFO);
+		}
 		devices.clear();
 		multi_devices.clear();
 		devices = ccl::Device::available_devices(mask);

@@ -139,7 +139,17 @@ void cycles_scene_object_set_shader(ccl::Session *session_id,
 	{
 		ccl::Mesh *mesh = static_cast<ccl::Mesh *>(geometry);
 		auto shids = mesh->get_shader();
-		for (int i = 0; i < shids.size(); i++)
+		/* Mesh::shader holds one entry per triangle. Whatever the array happened
+		 * to be sized to before, size it to the triangle count rather than
+		 * filling it end to end - meshes were arriving here with three entries
+		 * per triangle, one per corner. */
+		const size_t num_tris = (size_t)mesh->num_triangles();
+		if (shids.size() != num_tris) {
+			ccycles_diag("shader index array was %zu for %zu triangles; resizing\n",
+			             shids.size(), num_tris);
+			shids.resize(num_tris);
+		}
+		for (size_t i = 0; i < shids.size(); i++)
 		{
 			shids[i] = shid;
 		}
@@ -154,6 +164,17 @@ void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Obj
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
+		/* TEMPORARY experiment switch: a shadow catcher makes Cycles split the
+		 * image across combined/matte/background, so it is worth being able to
+		 * take them out of the picture without touching the document. */
+		const char *no_sc = getenv("CCYCLES_NO_SHADOW_CATCHER");
+		if (no_sc != nullptr && no_sc[0] == 0x31) {
+			if (is_shadowcatcher) {
+				ccycles_diag("ignoring shadow catcher flag on object %p\n",
+				             (void *)object);
+			}
+			is_shadowcatcher = false;
+		}
 		object->set_is_shadow_catcher(is_shadowcatcher);
 		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
