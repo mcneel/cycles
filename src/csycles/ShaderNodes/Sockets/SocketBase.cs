@@ -97,7 +97,16 @@ namespace ccl.ShaderNodes.Sockets
 #if DEBUG
 			)
 			{
-				System.Diagnostics.Debug.Assert(false, $"Trying to connect to {to.Parent.Name}:{to.UiName} which has already a connection");
+				/* Connect returns false for a socket that was already linked AND for a
+				 * socket name that does not exist on the node, so naming only the first
+				 * was actively misleading: a socket renamed by a Cycles upgrade reported
+				 * itself as a double connection. ccycles prints which of the two it was,
+				 * and to which socket, via OutputDebugString - so point at that rather
+				 * than guessing here. */
+				System.Diagnostics.Debug.Assert(false,
+					$"Could not connect {Parent.Name}:{UiName} to {to.Parent.Name}:{to.UiName} - " +
+					"either the target is already connected or one of those socket names does not " +
+					"exist on the node. See the ccycles: line in the Output window for which.");
 			}
 #else
 				;

@@ -47,7 +47,7 @@ namespace ccl.ShaderNodes
 			AddSocket(Value1);
 			Value2 = new FloatSocket(parentNode, "Value2", "value2");
 			AddSocket(Value2);
-			Value3 = new FloatSocket(parentNode, "Value2", "value3");
+			Value3 = new FloatSocket(parentNode, "Value3", "value3");
 			AddSocket(Value3);
 		}
 	}
