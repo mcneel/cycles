@@ -84,6 +84,16 @@ void cycles_scene_object_set_visibility(ccl::Session* session_id, ccl::Object* o
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) 
 	{
+		/* Object::visibility_for_tracing() asserts that no bit outside
+		 * PATH_RAY_VISIBILITY_ALL is set, and that assert fires on the mesh
+		 * upload thread where it stalls the whole render rather than pointing at
+		 * the caller. Say who sent the bad mask, then drop the stray bits. */
+		if (visibility & ~static_cast<unsigned int>(ccl::PATH_RAY_VISIBILITY_ALL)) {
+			ccycles_diag("cycles_scene_object_set_visibility: mask 0x%x has bits outside "
+			             "PATH_RAY_VISIBILITY_ALL (0x%x); ignoring them\n",
+			             visibility, static_cast<unsigned int>(ccl::PATH_RAY_VISIBILITY_ALL));
+			visibility &= static_cast<unsigned int>(ccl::PATH_RAY_VISIBILITY_ALL);
+		}
 		object->set_visibility(visibility);
 		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);

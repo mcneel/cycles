@@ -158,44 +158,35 @@ namespace ccl
 	}
 
 
+	/// <summary>
+	/// Object and background ray visibility. Mirrors ccl::PathRayVisibilityFlag in
+	/// kernel/types.h.
+	///
+	/// Up to Cycles 3.x this enum doubled as the path flags, so it ran to 20 bits
+	/// and mixed in Reflect, Singular, Transparent, Curve and the catcher/non-catcher
+	/// shadow split. 5.x split visibility off into its own seven-bit enum and
+	/// Object::visibility_for_tracing() now asserts that nothing outside
+	/// AllVisibility is set, so the retired bits cannot simply be left in place.
+	/// </summary>
 	[Flags]
 	public enum PathRay : uint
 	{
 		Hidden = 0,
-		Camera = 1 << 0,
-		Reflect = 1 << 1,
-		Transmit = 1 << 2,
-		Diffuse = 1 << 3,
-		Glossy = 1 << 4,
-		Singular = 1 << 5,
-		Transparent = 1 << 6,
 
-		ShadowOpaqueNonCatcher = 1 << 7,
-		ShadowOpaqueCatcher = 1 << 8,
-		ShadowOpaque = (ShadowOpaqueNonCatcher | ShadowOpaqueCatcher),
-		ShadowTransparentNonCatcher = 1 << 9,
-		ShadowTransparentCatcher = 1 << 10,
-		ShadowTransparent = (ShadowTransparentNonCatcher | ShadowTransparentCatcher),
-		ShadowNonCatcher = (ShadowOpaqueNonCatcher | ShadowTransparentNonCatcher),
+		Camera = 1 << 0,
+		Transmit = 1 << 1,
+		Diffuse = 1 << 2,
+		Glossy = 1 << 3,
+		VolumeScatter = 1 << 4,
+
+		ShadowOpaque = 1 << 5,
+		ShadowTransparent = 1 << 6,
 		Shadow = (ShadowOpaque | ShadowTransparent),
 
-		Curve = 1 << 11, /* visibility flag to define curve segments*/
-		VolumeScatter = 1 << 12,
+		AllVisibility = ((1 << 7) - 1),
 
-		NodeUnaligned = 1 << 13,
-
-		/* note that these can use maximum 12 bits, the other are for layers */
-
-		AllVisibility = ((1 << 14) - 1),
-
-		MisSkip = 1 << 15,
-		DiffuseAncestor = 1 << 16,
-		SinglePassDone = 1 << 17,
-		ShadowCatcher = 1 << 18,
-		StoreShadowInfo = 1 << 19,
-
-		/* we need layer member flags to be the 20 upper bits */
-		LayerShift = (32 - 20)
+		/* Only ever set on a BVH node, never on an object or the background. */
+		NodeUnaligned = 1 << 15,
 	}
 
 	public enum PassType : int

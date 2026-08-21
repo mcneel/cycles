@@ -365,7 +365,10 @@ void cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* geo
 		if (mesh)
 		{
 			ccl::Attribute* attr = mesh->attributes.add(ccl::ATTR_STD_VERTEX_NORMAL);
-			ccl::float3* fdata = attr->data_for_write<ccl::float3>();
+			/* Normals are stored octahedron-encoded since 5.x, so the buffer is
+			 * packed_normal and not float3. Asking for float3 trips the
+			 * data_sizeof() == sizeof(T) assert in Attribute::data_for_write. */
+			ccl::packed_normal* fdata = attr->data_for_write<ccl::packed_normal>();
 
 			ccl::float3 f3;
 
@@ -424,7 +427,7 @@ struct MikkUserData {
 	MikkUserData(
 			 ustring layer_name,
 			 const ccl::Mesh *mesh,
-			 ccl::float3 *tangent,
+			 ccl::packed_float3 *tangent,
 			 float *tangent_sign)
 		: mesh(mesh),
 		  texface(NULL),
@@ -434,7 +437,7 @@ struct MikkUserData {
 		const ccl::AttributeSet& attributes = mesh->attributes;
 
 		ccl::Attribute *attr_vN = attributes.find(ccl::ATTR_STD_VERTEX_NORMAL);
-		vertex_normal = attr_vN->data_for_write<ccl::float3>();
+		vertex_normal = attr_vN->data<ccl::packed_normal>();
 
 		ccl::Attribute *attr_uv = attributes.find(layer_name);
 		if(attr_uv != NULL) {
@@ -445,10 +448,10 @@ struct MikkUserData {
 	const ccl::Mesh *mesh;
 	int num_faces;
 
-	ccl::float3 *vertex_normal;
+	const ccl::packed_normal *vertex_normal;
 	ccl::float2 *texface;
 
-	ccl::float3 *tangent;
+	ccl::packed_float3 *tangent;
 	float *tangent_sign;
 };
 
@@ -514,7 +517,7 @@ static void mikk_get_normal(const SMikkTSpaceContext *context, float N[3],
 
 	if(mesh->get_smooth()[face_num]) {
 		const int vertex_index = mikk_vertex_index(mesh, face_num, vert_num);
-		vN = userdata->vertex_normal[vertex_index];
+		vN = userdata->vertex_normal[vertex_index].decode();
 	}
 	else {
 		const ccl::Mesh::Triangle tri = mesh->get_triangle(face_num);
@@ -549,7 +552,7 @@ static void mikk_compute_tangents(ccl::Mesh *mesh, ustring uvmap_name)
 	auto uvattr = attributes.find(ccl::ATTR_STD_UV);
 	attr = attributes.add(ccl::ATTR_STD_UV_TANGENT, name);
 
-	ccl::float3 *tangent = attr->data_for_write<ccl::float3>();
+	ccl::packed_float3 *tangent = attr->data_for_write<ccl::packed_float3>();
 	/* Create bitangent sign attribute. */
 	float *tangent_sign = NULL;
 	ccl::Attribute *attr_sign;

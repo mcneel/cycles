@@ -34,7 +34,8 @@ CCL_CAPI void CDECL cycles_scene_set_background_visibility(ccl::Session* session
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->background->set_visibility((ccl::PathRayFlag)path_ray_flag);
+		/* This is a PathRayVisibilityFlag mask, not a PathRayFlag one. */
+		sce->background->set_visibility(path_ray_flag & ccl::PATH_RAY_VISIBILITY_ALL);
 		sce->background->tag_update(sce);
 		logger.logit("Scene ", session_id, " set background path ray visibility ", path_ray_flag);
 	}
