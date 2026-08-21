@@ -564,11 +564,16 @@ CCL_CAPI void CDECL cycles_shadernode_texmapping_set_type(ccl::ShaderNode *shnod
  */
 CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const char *enum_name, int value)
 {
-	auto ename = std::string{enum_name};
+	/* The null check used to sit below, after shnode->type had already been
+	 * dereferenced - so it never protected anything. */
+	if (shnode == nullptr) {
+		return;
+	}
 
+	auto ename = std::string{enum_name};
 	auto shntype = shnode->type->name.string();
 
-	if (shnode) {
+	{
 	if (shntype == "math") {
 		ccl::MathNode *node = dynamic_cast<ccl::MathNode *>(shnode);
 		node->set_math_type((ccl::NodeMathType)value);
@@ -693,8 +698,28 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		ccl::NormalMapNode *node = dynamic_cast<ccl::NormalMapNode *>(shnode);
 		node->set_space((ccl::NodeNormalMapSpace)value);
 	}
+	else if (shntype == "separate_color") {
+		/* 5.2 folded separate_rgb and separate_hsv into separate_color, and
+		 * combine_rgb and combine_hsv into combine_color, moving the old distinction
+		 * into this enum. csycles keeps the four classes so the XML keys and the C#
+		 * API do not change, and each one sets color_type through here. */
+		ccl::SeparateColorNode *node = dynamic_cast<ccl::SeparateColorNode *>(shnode);
+		node->set_color_type((ccl::NodeCombSepColorType)value);
+	}
+	else if (shntype == "combine_color") {
+		ccl::CombineColorNode *node = dynamic_cast<ccl::CombineColorNode *>(shnode);
+		node->set_color_type((ccl::NodeCombSepColorType)value);
+	}
 	else {
-		assert(false);
+		/* assert(false) took Rhino down without saying which node type or which enum
+		 * was unhandled - which is how separate_color presented once 5.2 folded the
+		 * separate/combine nodes together. Upstream keeps reworking these, so name
+		 * both and carry on: an unset enum leaves the node on its default, which is
+		 * wrong but recoverable, unlike killing the process. */
+		ccycles_diag("cycles_shadernode_set_enum: unhandled enum '%s' on node type '%s'
+",
+					 ename.c_str(),
+					 shntype.c_str());
 	}
 	}
 }
