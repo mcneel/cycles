@@ -61,7 +61,7 @@ namespace ccl.ShaderNodes
 			AddSocket(Window);
 			Reflection = new VectorSocket(parentNode, "Reflection", "reflection");
 			AddSocket(Reflection);
-			WcsBox = new VectorSocket(parentNode, "WcsBox", "wscbox");
+			WcsBox = new VectorSocket(parentNode, "WcsBox", "wcsbox");
 			AddSocket(WcsBox);
 			EnvSpherical = new VectorSocket(parentNode, "EnvSpherical", "envspherical");
 			AddSocket(EnvSpherical);

@@ -31,10 +31,10 @@ namespace ccl.ShaderNodes
 		public VectorSocket SubsurfaceRadius { get; set; }
 		public FloatSocket Specular { get; set; }
 		public FloatSocket Roughness { get; set; }
-		public FloatSocket SpecularTint { get; set; }
+		public ColorSocket SpecularTint { get; set; }
 		public FloatSocket Anisotropic { get; set; }
 		public FloatSocket Sheen { get; set; }
-		public FloatSocket SheenTint { get; set; }
+		public ColorSocket SheenTint { get; set; }
 		public FloatSocket Clearcoat { get; set; }
 		public FloatSocket ClearcoatGloss { get; set; }
 		public FloatSocket IOR { get; set; }
@@ -51,29 +51,52 @@ namespace ccl.ShaderNodes
 		public PrincipledBsdfInputs(ShaderNode parentNode)
 		{
 
+			/* Blender 4.x reworked the principled BSDF and 5.2 carries that rework, so
+			 * most of these sockets were renamed and two were dropped. Every name below
+			 * was wrong for 5.2 - the values silently went nowhere and the connections
+			 * silently found no socket. The C# property names are deliberately left
+			 * alone: RhinoCycles assigns all of them, and renaming would churn a lot of
+			 * calling code to say the same thing.
+			 *
+			 * The mapping, for whoever meets 6.x:
+			 *   Subsurface            -> Subsurface Weight
+			 *   Specular              -> Specular IOR Level
+			 *   Sheen                 -> Sheen Weight
+			 *   Clearcoat             -> Coat Weight
+			 *   Clearcoat Roughness   -> Coat Roughness
+			 *   Clearcoat Normal      -> Coat Normal
+			 *   Transmission          -> Transmission Weight
+			 *   Emission              -> Emission Color
+			 *   Specular Tint         -> now a colour, was a scalar
+			 *   Sheen Tint            -> now a colour, was a scalar
+			 *   Subsurface Color      -> gone; base colour drives subsurface now
+			 *   Transmission Roughness-> gone; shares Roughness now
+			 *
+			 * The two that are gone are marked Retired rather than deleted, so the
+			 * RhinoCycles code that still feeds them keeps compiling while the values go
+			 * nowhere. Both need a real migration to render faithfully again. */
 			BaseColor = new ColorSocket(parentNode, "Base Color", "base_color");
-			//SpecularColor          = new ColorSocket(parentNode, "Specular Color");
-			Subsurface = new FloatSocket(parentNode, "Subsurface", "subsurface");
+			Subsurface = new FloatSocket(parentNode, "Subsurface Weight", "subsurface_weight");
 			SubsurfaceRadius = new VectorSocket(parentNode, "Subsurface Radius", "subsurface_radius");
-			SubsurfaceColor = new ColorSocket(parentNode, "Subsurface Color", "subsurface_color");
+			SubsurfaceColor = new ColorSocket(parentNode, "Subsurface Color", "subsurface_color") { Retired = true };
 			Metallic = new FloatSocket(parentNode, "Metallic", "metallic");
-			Specular = new FloatSocket(parentNode, "Specular", "specular");
-			SpecularTint = new FloatSocket(parentNode, "Specular Tint", "specular_tint");
+			Specular = new FloatSocket(parentNode, "Specular IOR Level", "specular_ior_level");
+			SpecularTint = new ColorSocket(parentNode, "Specular Tint", "specular_tint");
 			Roughness = new FloatSocket(parentNode, "Roughness", "roughness");
 			Anisotropic = new FloatSocket(parentNode, "Anisotropic", "anisotropic");
-			Sheen = new FloatSocket(parentNode, "Sheen", "sheen");
-			SheenTint = new FloatSocket(parentNode, "Sheen Tint", "sheen_tint");
-			Clearcoat = new FloatSocket(parentNode, "Clearcoat", "clearcoat");
-			ClearcoatGloss = new FloatSocket(parentNode, "Clearcoat Roughness", "clearcoat_roughness");
+			Sheen = new FloatSocket(parentNode, "Sheen Weight", "sheen_weight");
+			SheenTint = new ColorSocket(parentNode, "Sheen Tint", "sheen_tint");
+			Clearcoat = new FloatSocket(parentNode, "Coat Weight", "coat_weight");
+			ClearcoatGloss = new FloatSocket(parentNode, "Coat Roughness", "coat_roughness");
 			IOR = new FloatSocket(parentNode, "IOR", "ior");
-			Transmission = new FloatSocket(parentNode, "Transmission", "transmission");
-			TransmissionRoughness = new FloatSocket(parentNode, "Transmission Roughness", "transmission_roughness");
+			Transmission = new FloatSocket(parentNode, "Transmission Weight", "transmission_weight");
+			TransmissionRoughness = new FloatSocket(parentNode, "Transmission Roughness", "transmission_roughness") { Retired = true };
 			AnisotropicRotation = new FloatSocket(parentNode, "Anisotropic Rotation", "anisotropic_rotation");
-			Emission = new ColorSocket(parentNode, "Emission", "emission");
+			Emission = new ColorSocket(parentNode, "Emission Color", "emission_color");
 			EmissionStrength = new FloatSocket(parentNode, "Emission Strength", "emission_strength");
 			Alpha = new FloatSocket(parentNode, "Alpha", "alpha");
 			Normal = new VectorSocket(parentNode, "Normal", "normal");
-			ClearcoatNormal = new VectorSocket(parentNode, "Clearcoat Normal", "clearcoat_normal");
+			ClearcoatNormal = new VectorSocket(parentNode, "Coat Normal", "coat_normal");
 			Tangent = new VectorSocket(parentNode, "Tangent", "tangent");
 
 			AddSocket(BaseColor);
@@ -163,7 +186,7 @@ namespace ccl.ShaderNodes
 			ins.BaseColor.Value = new float4(0.7f, 0.6f, 0.5f, 1.0f);
 			ins.Metallic.Value = 0.0f;
 			ins.Specular.Value = 0.5f;
-			ins.SpecularTint.Value = 0.0f;
+			ins.SpecularTint.Value = new float4(0.0f, 0.0f, 0.0f, 1.0f);
 			ins.Subsurface.Value = 0.0f;
 			ins.SubsurfaceColor.Value = new float4(0.7f, 0.1f, 0.1f);
 			ins.SubsurfaceRadius.Value = new float4(0.7f, 1.0f, 1.0f, 1.0f);
@@ -171,7 +194,7 @@ namespace ccl.ShaderNodes
 			ins.Anisotropic.Value = 0.0f;
 			ins.AnisotropicRotation.Value = 0.0f;
 			ins.Sheen.Value = 0.0f;
-			ins.SheenTint.Value = 0.5f;
+			ins.SheenTint.Value = new float4(0.5f, 0.5f, 0.5f, 1.0f);
 			ins.Clearcoat.Value = 0.0f;
 			ins.ClearcoatGloss.Value = 1.0f;
 			ins.IOR.Value = 1.45f;
@@ -201,12 +224,12 @@ namespace ccl.ShaderNodes
 			Utilities.Instance.get_float4(ins.SubsurfaceColor, xmlNode);
 			Utilities.Instance.get_float(ins.Metallic, xmlNode);
 			Utilities.Instance.get_float(ins.Specular, xmlNode);
-			Utilities.Instance.get_float(ins.SpecularTint, xmlNode);
+			Utilities.Instance.get_float4(ins.SpecularTint, xmlNode);
 			Utilities.Instance.get_float(ins.Roughness, xmlNode);
 			Utilities.Instance.get_float(ins.Anisotropic, xmlNode);
 			Utilities.Instance.get_float(ins.AnisotropicRotation, xmlNode);
 			Utilities.Instance.get_float(ins.Sheen, xmlNode);
-			Utilities.Instance.get_float(ins.SheenTint, xmlNode);
+			Utilities.Instance.get_float4(ins.SheenTint, xmlNode);
 			Utilities.Instance.get_float(ins.Clearcoat, xmlNode);
 			Utilities.Instance.get_float(ins.ClearcoatGloss, xmlNode);
 			Utilities.Instance.get_float(ins.IOR, xmlNode);

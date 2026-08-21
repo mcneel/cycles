@@ -1416,7 +1416,18 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_int(ccl::ShaderNode *shnode_
 			break;
 		}
 	}
-	assert(set);
+	if (!set) {
+		/* assert(set) here killed Rhino for any socket that upstream has retired,
+		 * naming neither the socket nor the node - and 5.2 retired a lot of them
+		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
+		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
+		 * now it says which socket to go and fix. */
+		ccycles_diag("%s: node type '%s' has no socket '%s'
+",
+					 __func__,
+					 shnode_id->type->name.c_str(),
+					 attribute_name);
+	}
 }
 
 CCL_CAPI void CDECL cycles_shadernode_set_attribute_bool(ccl::ShaderNode *shnode_id,
@@ -1438,7 +1449,18 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_bool(ccl::ShaderNode *shnode
 			break;
 		}
 	}
-	assert(set);
+	if (!set) {
+		/* assert(set) here killed Rhino for any socket that upstream has retired,
+		 * naming neither the socket nor the node - and 5.2 retired a lot of them
+		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
+		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
+		 * now it says which socket to go and fix. */
+		ccycles_diag("%s: node type '%s' has no socket '%s'
+",
+					 __func__,
+					 shnode_id->type->name.c_str(),
+					 attribute_name);
+	}
 }
 
 #ifdef __cplusplus
@@ -1485,7 +1507,18 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_string(ccl::ShaderNode *shno
 			break;
 		}
 	}
-	assert(set);
+	if (!set) {
+		/* assert(set) here killed Rhino for any socket that upstream has retired,
+		 * naming neither the socket nor the node - and 5.2 retired a lot of them
+		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
+		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
+		 * now it says which socket to go and fix. */
+		ccycles_diag("%s: node type '%s' has no socket '%s'
+",
+					 __func__,
+					 shnode_id->type->name.c_str(),
+					 attribute_name);
+	}
 }
 
 /*
@@ -1510,7 +1543,18 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_float(ccl::ShaderNode *shnod
 			break;
 		}
 	}
-	assert(set);
+	if (!set) {
+		/* assert(set) here killed Rhino for any socket that upstream has retired,
+		 * naming neither the socket nor the node - and 5.2 retired a lot of them
+		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
+		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
+		 * now it says which socket to go and fix. */
+		ccycles_diag("%s: node type '%s' has no socket '%s'
+",
+					 __func__,
+					 shnode_id->type->name.c_str(),
+					 attribute_name);
+	}
 }
 
 /*
@@ -1535,7 +1579,18 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_vec(
 			break;
 		}
 	}
-	assert(set);
+	if (!set) {
+		/* assert(set) here killed Rhino for any socket that upstream has retired,
+		 * naming neither the socket nor the node - and 5.2 retired a lot of them
+		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
+		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
+		 * now it says which socket to go and fix. */
+		ccycles_diag("%s: node type '%s' has no socket '%s'
+",
+					 __func__,
+					 shnode_id->type->name.c_str(),
+					 attribute_name);
+	}
 }
 
 CCL_CAPI bool CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id,

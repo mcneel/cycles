@@ -26,6 +26,12 @@ namespace ccl.ShaderNodes.Sockets
 		/// </summary>
 		string UiName { get; set; }
 		/// <summary>
+		/// True when Cycles no longer has this socket. The socket stays on the C# node
+		/// so callers keep compiling, but nothing is pushed to Cycles and connecting it
+		/// is a no-op rather than a failed lookup.
+		/// </summary>
+		bool Retired { get; }
+		/// <summary>
 		/// Get or set the Internal Name for this socket.
 		/// </summary>
 		string InternalName { get; set; }
@@ -85,11 +91,24 @@ namespace ccl.ShaderNodes.Sockets
 		public string UiName { get; set; }
 		public string InternalName { get; set; }
 
+		/* Upstream retires sockets between releases - the 4.x principled BSDF rework
+		 * dropped Subsurface Color and Transmission Roughness outright. RhinoCycles
+		 * still assigns them, so removing the properties would break a lot of calling
+		 * code for no gain. Marking them retired keeps that code compiling and makes
+		 * both the value push and the connect skip them, instead of asking Cycles for
+		 * a socket that is not there. */
+		public bool Retired { get; internal set; }
+
 		public string XmlName => UiName.Replace(' ', '_').ToLowerInvariant();
 		public string CodeName => UiName.Replace(" ", string.Empty);
 
 		public void Connect(ISocket to)
 		{
+			if (Retired || to.Retired)
+			{
+				return;
+			}
+
 #if DEBUG
 			if (!
 #endif

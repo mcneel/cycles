@@ -36,7 +36,9 @@ namespace ccl.ShaderNodes
 
 		internal BevelOutputs(ShaderNode parentNode)
 		{
-			Normal = new VectorSocket(parentNode, "Normal", "normal");
+			/* The output's internal name is "bevel"; only the ui name is Normal, which
+			 * the input socket also uses. */
+			Normal = new VectorSocket(parentNode, "Normal", "bevel");
 			AddSocket(Normal);
 		}
 	}

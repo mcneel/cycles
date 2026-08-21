@@ -162,6 +162,10 @@ namespace ccl.ShaderNodes
 			{
 				foreach (var socket in inputs.Sockets)
 				{
+					/* A retired socket has no counterpart in Cycles, so pushing its value
+					 * would only fail the socket lookup. */
+					if (socket.Retired) continue;
+
 					if (socket is FloatSocket float_socket)
 					{
 						CSycles.shadernode_set_attribute_float(Id, float_socket.InternalName, float_socket.Value);

@@ -54,7 +54,7 @@ namespace ccl.ShaderNodes
 
 		internal GradientOutputs(ShaderNode parentNode)
 		{
-			Color = new ColorSocket(parentNode, "Color", "vector");
+			Color = new ColorSocket(parentNode, "Color", "color");
 			AddSocket(Color);
 			Fac = new FloatSocket(parentNode, "Fac", "fac");
 			AddSocket(Fac);

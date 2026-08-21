@@ -79,7 +79,7 @@ namespace ccl.ShaderNodes
 			AddSocket(Backfacing);
 			Pointiness = new FloatSocket(parentNode, "Pointiness", "pointiness");
 			AddSocket(Pointiness);
-			RandomPerIsland = new FloatSocket(parentNode, "RandomPerIsland", "random_per_island");
+			RandomPerIsland = new FloatSocket(parentNode, "Random Per Island", "random_per_island");
 			AddSocket(RandomPerIsland);
 		}
 	}
