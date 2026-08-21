@@ -12,6 +12,7 @@
 #include "device/denoise.h"
 #include "device/memory.h"
 
+#include "util/log.h"
 #include "util/profiling.h"
 #include "util/stats.h"
 #include "util/string.h"
@@ -121,9 +122,18 @@ class DeviceInfo {
       return rc;
     }
 
-    /* Multiple Devices with the same ID would be very bad. */
-    assert(id != info.id ||
-           (type == info.type && num == info.num && description == info.description));
+    /* Multiple Devices with the same ID would be very bad. Rhino: this was an
+     * assert, which takes the whole application down inside a debug build and
+     * says nothing about which two devices collided. Report them instead - the
+     * comparison below is what decides anything, and it only looks at the id. */
+    if (id == info.id &&
+        !(type == info.type && num == info.num && description == info.description))
+    {
+      LOG_WARNING << "Two devices share the id '" << id << "': type " << (int)type
+                  << "/" << (int)info.type << ", num " << num << "/" << info.num
+                  << ", description '" << description << "'/'" << info.description
+                  << "'.";
+    }
     return id == info.id && use_hardware_raytracing == info.use_hardware_raytracing &&
            kernel_optimization_level == info.kernel_optimization_level;
   }
