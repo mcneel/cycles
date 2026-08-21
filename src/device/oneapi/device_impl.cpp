@@ -8,6 +8,11 @@
 #  include <algorithm>
 #  include <sycl/sycl.hpp>
 
+#  ifdef _WIN32
+/* For the Intel GPU presence check below. */
+#    include <dxgi.h>
+#  endif
+
 #  include "device/oneapi/device_impl.h"
 
 #  include "util/log.h"
@@ -1441,15 +1446,67 @@ int parse_driver_build_version(const sycl::device &device)
 
 /* Rhino: sycl::platform::get_platforms() faults rather than reporting nothing
  * when the Level Zero adapter has no driver to talk to - an access violation in
- * ze_loader, reached through ur_adapter_level_zero_v2 and ur_loader. On a
- * machine with no Intel GPU that takes Rhino down during startup, before any
- * setting can be changed. Cycles 3.5 shipped sycl6 with no Unified Runtime layer
- * and degraded quietly, so this arrived with the newer SYCL stack.
+ * ze_loader, reached through ur_adapter_level_zero_v2 and ur_loader. On a machine
+ * with no Intel GPU that took Rhino down during startup, before any setting could
+ * be changed. Cycles 3.5 shipped sycl6 with no Unified Runtime layer and degraded
+ * quietly, so this arrived with the newer SYCL stack.
  *
- * The try below cannot help: an access violation is not a C++ exception. This is
- * structured exception handling, which needs its own function - SEH is not
- * allowed where objects require unwinding, hence the two-step. */
+ * The fix is not to catch the fault but to not provoke it: ask Windows whether an
+ * Intel GPU exists before handing control to the SYCL loader. Cycles' oneAPI
+ * device targets Intel GPUs only, so on any other machine there is nothing to
+ * enumerate and nothing is lost by not looking.
+ *
+ * DXGI is loaded by name rather than linked, so this needs no build changes, and
+ * anything unexpected there answers "present" and falls through to the guard
+ * rather than disabling oneAPI on a machine that can use it. */
 #ifdef _WIN32
+static bool intel_gpu_present()
+{
+  const HMODULE dxgi = LoadLibraryW(L"dxgi.dll");
+  if (dxgi == nullptr) {
+    return true;
+  }
+
+  using CreateFactoryFn = HRESULT(WINAPI *)(REFIID, void **);
+  const CreateFactoryFn create_factory = reinterpret_cast<CreateFactoryFn>(
+      GetProcAddress(dxgi, "CreateDXGIFactory1"));
+  if (create_factory == nullptr) {
+    FreeLibrary(dxgi);
+    return true;
+  }
+
+  IDXGIFactory1 *factory = nullptr;
+  if (FAILED(create_factory(__uuidof(IDXGIFactory1), reinterpret_cast<void **>(&factory))) ||
+      factory == nullptr)
+  {
+    FreeLibrary(dxgi);
+    return true;
+  }
+
+  bool found = false;
+  IDXGIAdapter1 *adapter = nullptr;
+  for (UINT i = 0; !found && factory->EnumAdapters1(i, &adapter) == S_OK; i++) {
+    DXGI_ADAPTER_DESC1 desc = {};
+    if (SUCCEEDED(adapter->GetDesc1(&desc))) {
+      /* 0x8086 is Intel. Skip the software adapter, which reports as Microsoft. */
+      if (desc.VendorId == 0x8086 && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0) {
+        found = true;
+      }
+    }
+    adapter->Release();
+    adapter = nullptr;
+  }
+
+  factory->Release();
+  FreeLibrary(dxgi);
+  return found;
+}
+
+/* Kept as a backstop for an Intel GPU whose Level Zero driver is broken or only
+ * half installed, which the check above cannot see. An access violation is not a
+ * C++ exception, so this is structured exception handling - SEH needs its own
+ * function because it is not allowed where objects require unwinding, hence the
+ * two-step. */
 static void get_platforms_unguarded(std::vector<sycl::platform> *out)
 {
   *out = sycl::platform::get_platforms();
@@ -1480,6 +1537,11 @@ std::vector<sycl::device> available_sycl_devices(
   try {
     std::vector<sycl::platform> guarded_platforms;
 #ifdef _WIN32
+    if (!intel_gpu_present()) {
+      LOG_INFO << "No Intel GPU present - not loading the SYCL platform stack.";
+      return available_devices;
+    }
+
     if (!get_platforms_guarded(&guarded_platforms)) {
       LOG_WARNING << "Crash while enumerating SYCL platforms - no Level Zero driver? "
                   << "Continuing without oneAPI devices.";
