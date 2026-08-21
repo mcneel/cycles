@@ -27,7 +27,7 @@ namespace ccl.ShaderNodes
 
 		public SeparateRgbInputs(ShaderNode parentNode)
 		{
-			Image = new ColorSocket(parentNode, "Image", "color");
+			Image = new ColorSocket(parentNode, "Color", "color");
 			AddSocket(Image);
 		}
 	}
@@ -40,11 +40,11 @@ namespace ccl.ShaderNodes
 
 		public SeparateRgbOutputs(ShaderNode parentNode)
 		{
-			R = new FloatSocket(parentNode, "R", "r");
+			R = new FloatSocket(parentNode, "Red", "r");
 			AddSocket(R);
-			G = new FloatSocket(parentNode, "G", "g");
+			G = new FloatSocket(parentNode, "Green", "g");
 			AddSocket(G);
-			B = new FloatSocket(parentNode, "B", "b");
+			B = new FloatSocket(parentNode, "Blue", "b");
 			AddSocket(B);
 		}
 	}
@@ -78,6 +78,32 @@ namespace ccl.ShaderNodes
 		internal override void ParseXml(XmlReader xmlNode)
 		{
 			Utilities.Instance.get_float4(ins.Image, xmlNode.GetAttribute("image"));
+		}
+
+		/* Cycles 5.2 removed separate_rgb, separate_hsv, combine_rgb and
+		 * combine_hsv, folding them into separate_color and combine_color with a
+		 * color_type enum. NodeType::find returned null for the old name and
+		 * ccycles dereferenced it, which took Rhino down as soon as anything built
+		 * a background shader.
+		 *
+		 * The attribute keeps the old name because it is also the XML key, and two
+		 * classes claiming "separate_color" would collide in
+		 * g_registered_shadernodes - it keeps the first one it enumerates and
+		 * silently drops the other. Overriding the Cycles type name separately is
+		 * the same shape the MathNode subclasses already use.
+		 *
+		 * Both socket names matter, for different things. The internal name is what
+		 * sets a value; the ui name is what Connect matches on, because
+		 * ShaderInput::name() returns socket_type.ui_name and csycles passes UiName.
+		 * separate_color keeps the internal names separate_rgb used - color, r, g, b
+		 * - but renamed the ui names to Color, Red, Green and Blue, so those had to
+		 * change here or every connection silently found no socket. The C#
+		 * properties stay Image, R, G and B. */
+		public override string ShaderNodeTypeName => "separate_color";
+
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "color_type", 0); /* NODE_COMBSEP_COLOR_RGB */
 		}
 	}
 }

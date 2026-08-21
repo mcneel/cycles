@@ -359,6 +359,24 @@ CCL_CAPI ccl::ShaderNode* CDECL cycles_add_shader_node(ccl::Shader *shader_id,
 										const char *name)
 {
 	const ccl::NodeType *node_type = ccl::NodeType::find(ustring(node_type_name));
+
+	/* NodeType::find returns null for a name it does not know, and dereferencing
+	 * that gave an access violation inside ccycles with nothing naming the node
+	 * type anywhere - which is exactly how 5.2 dropping separate_rgb presented.
+	 * Upstream retires node types between releases, so this will happen again.
+	 * Say which name failed and hand back null. */
+	if (node_type == nullptr) {
+		ccycles_diag("cycles_add_shader_node: no such node type '%s'\n", node_type_name);
+		return nullptr;
+	}
+
+	if (node_type->create == nullptr) {
+		ccycles_diag(
+				"cycles_add_shader_node: node type '%s' has no create function\n",
+				node_type_name);
+		return nullptr;
+	}
+
 	ccl::unique_ptr<ccl::Node> owned = node_type->create(node_type);
 	ccl::ShaderNode *node = static_cast<ccl::ShaderNode *>(owned.get());
 
@@ -1515,7 +1533,7 @@ CCL_CAPI bool CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id,
 		 * upgrade took the whole process down here rather than reporting a bad
 		 * graph. Say which name was wrong; that is the thing worth knowing. */
 		if (to_input == nullptr || from_output == nullptr) {
-			fprintf(stderr,
+			ccycles_diag(
 			        "cannot connect %s.%s to %s.%s: no such %s socket\n",
 			        from_id->name.c_str(),
 			        from,
@@ -1531,7 +1549,7 @@ CCL_CAPI bool CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id,
 		shader_id->graph->connect(from_output, to_input);
 
 		if (!res) {
-			fprintf(stderr, "input %s already connected, trying from (%s)\n", to, from);
+			ccycles_diag("input %s already connected, trying from (%s)\n", to, from);
 		}
 	}
 

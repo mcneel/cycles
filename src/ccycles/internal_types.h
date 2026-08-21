@@ -59,6 +59,43 @@ limitations under the License.
 
 #include "ccycles.h"
 
+#include <cstdarg>
+#include <cstdio>
+
+#ifdef WIN32
+/* Declared rather than pulled in with windows.h. This header is included by
+ * every ccycles translation unit, and windows.h brings min/max macros and a
+ * great deal else that Cycles headers do not want. The signature matches
+ * WINBASEAPI exactly, so a translation unit that includes windows.h anyway just
+ * sees a redeclaration. */
+extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(const char *lpOutputString);
+#endif
+
+/* Diagnostics from inside Rhino have to go to the debugger, not to stderr.
+ * Rhino is a GUI process with no console attached, so every fprintf(stderr)
+ * diagnostic in ccycles was written to a handle that goes nowhere - the messages
+ * meant to name a retired node type were not visible in the Rhino command line
+ * or in the build output, which is why a null node type still had to be found by
+ * hand in the debugger.
+ *
+ * OutputDebugString reaches the Visual Studio Output window (Debug pane) while
+ * debugging, and DebugView otherwise. stderr is kept too, for the standalone
+ * test executables that do have a console. */
+static inline void ccycles_diag(const char *fmt, ...)
+{
+	char msg[1024];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(msg, sizeof(msg), fmt, args);
+	va_end(args);
+
+	fprintf(stderr, "%s", msg);
+#ifdef WIN32
+	OutputDebugStringA("ccycles: ");
+	OutputDebugStringA(msg);
+#endif
+}
+
 #define MULTIDEVICEOFFSET 100000
 #define ISMULTIDEVICE(id) (id>=MULTIDEVICEOFFSET)
 #define MULTIDEVICEIDX(id) (id-MULTIDEVICEOFFSET)
@@ -72,7 +109,7 @@ limitations under the License.
 			(puthere) = multi_devices[_gd_idx]; \
 		} \
 		else { \
-			fprintf(stderr, \
+			ccycles_diag(\
 			        "GETDEVICE: multi-device %zu requested, only %zu available\n", \
 			        _gd_idx, \
 			        multi_devices.size()); \
@@ -82,7 +119,7 @@ limitations under the License.
 		(puthere) = devices[id]; \
 	} \
 	else { \
-		fprintf(stderr, \
+		ccycles_diag(\
 		        "GETDEVICE: device %zu requested, only %zu available - was the requested device type detected?\n", \
 		        (size_t)(id), \
 		        devices.size()); \

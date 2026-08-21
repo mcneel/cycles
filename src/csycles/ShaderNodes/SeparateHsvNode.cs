@@ -40,11 +40,17 @@ namespace ccl.ShaderNodes
 
 		public SeparateHsvOutputs(ShaderNode parentNode)
 		{
-			H = new FloatSocket(parentNode, "H", "h");
+			/* separate_color names its outputs r/g/b - ui names Red/Green/Blue -
+			 * whatever the colour type is, so the hsv components map onto those. Both
+			 * names have to match: the internal name is what sets a value, and the ui
+			 * name is what Connect matches on, because ShaderInput::name() returns
+			 * socket_type.ui_name and csycles passes UiName. The C# properties stay
+			 * H, S and V, so callers read the same as before. */
+			H = new FloatSocket(parentNode, "Red", "r");
 			AddSocket(H);
-			S = new FloatSocket(parentNode, "S", "s");
+			S = new FloatSocket(parentNode, "Green", "g");
 			AddSocket(S);
-			V = new FloatSocket(parentNode, "V", "v");
+			V = new FloatSocket(parentNode, "Blue", "b");
 			AddSocket(V);
 		}
 	}
@@ -78,6 +84,16 @@ namespace ccl.ShaderNodes
 		internal override void ParseXml(XmlReader xmlNode)
 		{
 			Utilities.Instance.get_float4(ins.Color, xmlNode.GetAttribute("color"));
+		}
+
+		/* separate_hsv is gone in 5.2; separate_color with color_type hsv does the
+		 * same work. See SeparateRgbNode for why the attribute name has to stay as
+		 * it is rather than becoming separate_color too. */
+		public override string ShaderNodeTypeName => "separate_color";
+
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "color_type", 1); /* NODE_COMBSEP_COLOR_HSV */
 		}
 	}
 }

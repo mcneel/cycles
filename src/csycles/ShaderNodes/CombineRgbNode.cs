@@ -29,11 +29,11 @@ namespace ccl.ShaderNodes
 
 		public CombineRgbInputs(ShaderNode parentNode)
 		{
-			R = new FloatSocket(parentNode, "R", "r");
+			R = new FloatSocket(parentNode, "Red", "r");
 			AddSocket(R);
-			G = new FloatSocket(parentNode, "G", "g");
+			G = new FloatSocket(parentNode, "Green", "g");
 			AddSocket(G);
-			B = new FloatSocket(parentNode, "B", "b");
+			B = new FloatSocket(parentNode, "Blue", "b");
 			AddSocket(B);
 		}
 	}
@@ -44,7 +44,8 @@ namespace ccl.ShaderNodes
 
 		public CombineRgbOutputs(ShaderNode parentNode)
 		{
-			Image = new ColorSocket(parentNode, "Image", "image");
+			/* combine_color calls its output color; combine_rgb called it image. */
+			Image = new ColorSocket(parentNode, "Color", "color");
 			AddSocket(Image);
 		}
 	}
@@ -85,6 +86,15 @@ namespace ccl.ShaderNodes
 			Utilities.Instance.get_float(ins.R, xmlNode.GetAttribute("r"));
 			Utilities.Instance.get_float(ins.G, xmlNode.GetAttribute("g"));
 			Utilities.Instance.get_float(ins.B, xmlNode.GetAttribute("b"));
+		}
+
+		/* combine_rgb is gone in 5.2; combine_color with color_type rgb replaces it.
+		 * See SeparateRgbNode for why the attribute name stays as it is. */
+		public override string ShaderNodeTypeName => "combine_color";
+
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "color_type", 0); /* NODE_COMBSEP_COLOR_RGB */
 		}
 	}
 }

@@ -29,11 +29,15 @@ namespace ccl.ShaderNodes
 
 		public CombineHsvInputs(ShaderNode parentNode)
 		{
-			H = new FloatSocket(parentNode, "H", "h");
+			/* combine_color names its inputs r/g/b - ui names Red/Green/Blue -
+			 * whatever the colour type is, so the hsv components map onto those. See
+			 * SeparateHsvNode for why both the internal and the ui name have to
+			 * match. The C# properties stay H, S and V. */
+			H = new FloatSocket(parentNode, "Red", "r");
 			AddSocket(H);
-			S = new FloatSocket(parentNode, "S", "s");
+			S = new FloatSocket(parentNode, "Green", "g");
 			AddSocket(S);
-			V = new FloatSocket(parentNode, "V", "v");
+			V = new FloatSocket(parentNode, "Blue", "b");
 			AddSocket(V);
 		}
 	}
@@ -85,6 +89,15 @@ namespace ccl.ShaderNodes
 			Utilities.Instance.get_float(ins.H, xmlNode.GetAttribute("h"));
 			Utilities.Instance.get_float(ins.S, xmlNode.GetAttribute("s"));
 			Utilities.Instance.get_float(ins.V, xmlNode.GetAttribute("v"));
+		}
+
+		/* combine_hsv is gone in 5.2; combine_color with color_type hsv replaces it.
+		 * See SeparateRgbNode for why the attribute name stays as it is. */
+		public override string ShaderNodeTypeName => "combine_color";
+
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "color_type", 1); /* NODE_COMBSEP_COLOR_HSV */
 		}
 	}
 }
