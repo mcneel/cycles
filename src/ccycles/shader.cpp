@@ -716,8 +716,7 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		 * separate/combine nodes together. Upstream keeps reworking these, so name
 		 * both and carry on: an unset enum leaves the node on its default, which is
 		 * wrong but recoverable, unlike killing the process. */
-		ccycles_diag("cycles_shadernode_set_enum: unhandled enum '%s' on node type '%s'
-",
+		ccycles_diag("cycles_shadernode_set_enum: unhandled enum '%s' on node type '%s'\n",
 					 ename.c_str(),
 					 shntype.c_str());
 	}
@@ -1422,8 +1421,7 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_int(ccl::ShaderNode *shnode_
 		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
 		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
 		 * now it says which socket to go and fix. */
-		ccycles_diag("%s: node type '%s' has no socket '%s'
-",
+		ccycles_diag("%s: node type '%s' has no socket '%s'\n",
 					 __func__,
 					 shnode_id->type->name.c_str(),
 					 attribute_name);
@@ -1455,8 +1453,7 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_bool(ccl::ShaderNode *shnode
 		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
 		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
 		 * now it says which socket to go and fix. */
-		ccycles_diag("%s: node type '%s' has no socket '%s'
-",
+		ccycles_diag("%s: node type '%s' has no socket '%s'\n",
 					 __func__,
 					 shnode_id->type->name.c_str(),
 					 attribute_name);
@@ -1513,8 +1510,7 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_string(ccl::ShaderNode *shno
 		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
 		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
 		 * now it says which socket to go and fix. */
-		ccycles_diag("%s: node type '%s' has no socket '%s'
-",
+		ccycles_diag("%s: node type '%s' has no socket '%s'\n",
 					 __func__,
 					 shnode_id->type->name.c_str(),
 					 attribute_name);
@@ -1549,8 +1545,7 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_float(ccl::ShaderNode *shnod
 		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
 		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
 		 * now it says which socket to go and fix. */
-		ccycles_diag("%s: node type '%s' has no socket '%s'
-",
+		ccycles_diag("%s: node type '%s' has no socket '%s'\n",
 					 __func__,
 					 shnode_id->type->name.c_str(),
 					 attribute_name);
@@ -1585,8 +1580,7 @@ CCL_CAPI void CDECL cycles_shadernode_set_attribute_vec(
 		 * (the whole 4.x principled BSDF rework, for one). A value that cannot be
 		 * set leaves the socket on its Cycles default: wrong, but recoverable, and
 		 * now it says which socket to go and fix. */
-		ccycles_diag("%s: node type '%s' has no socket '%s'
-",
+		ccycles_diag("%s: node type '%s' has no socket '%s'\n",
 					 __func__,
 					 shnode_id->type->name.c_str(),
 					 attribute_name);
