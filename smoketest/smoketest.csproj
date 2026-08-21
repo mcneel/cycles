@@ -9,7 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="csycles">
-      <HintPath>C:\Users\Lars\dev\rhino\9.x\src4\rhino4\Plug-ins\RDK\cycles\csycles\bin\Release\csycles.dll</HintPath>
+      <HintPath>$(MSBuildThisFileDirectory)..\src\csycles\bin\x64\Debug\csycles.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
