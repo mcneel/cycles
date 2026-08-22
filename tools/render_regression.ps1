@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Render a fixed model in a Rhino build and compare it against a stored image.
+  Render fixed models in a Rhino build and compare them against stored images.
 
 .DESCRIPTION
   A golden-image test for the whole render stack: Rhino, RhinoCycles, csycles and
@@ -10,45 +10,73 @@
   black while every build stayed green. A stored image catches that on the first
   run.
 
-  Two numbers make it usable. Rendering the same build twice differs by a mean of
-  about 0.05 per channel out of 255, so the renderer is very nearly deterministic
-  at these settings; and the difference between the 5.2 build and shipping Rhino 9
-  WIP on the same scene was 11.27. A tolerance of 1.0 therefore sits twenty times
-  above the noise and ten times below a real regression.
+  Two numbers make the threshold meaningful. Rendering the same build twice
+  differs by a mean of about 0.03 per channel out of 255, so the renderer is very
+  nearly deterministic at these settings; and the difference between the 5.2
+  build and shipping Rhino 9 WIP on the same scene was 11.27. A tolerance of 1.0
+  therefore sits thirty times above the noise and ten times below a real
+  regression.
+
+  Scenes have to set their own render resolution, since the render window
+  otherwise takes its size from the viewport and no two runs can be compared. The
+  two used here are 300x300 and 600x600 respectively.
 
   The model has to be passed on Rhino's command line rather than opened over MCP:
   opening a document tears the MCP listener down, and every call after it fails.
 
 .EXAMPLE
-  # Check a build against the stored image
+  # Check a build against the stored images
   powershell -ExecutionPolicy Bypass -File tools/render_regression.ps1
 
 .EXAMPLE
-  # Re-record the stored image, having decided the new output is correct
+  # Re-record them, having decided the new output is correct
   powershell -ExecutionPolicy Bypass -File tools/render_regression.ps1 -UpdateReference
 
 .EXAMPLE
-  # Compare a different build, e.g. an installed Rhino, on the same scene
+  # One scene only, or a scene of your own
+  powershell -ExecutionPolicy Bypass -File tools/render_regression.ps1 -Only rdk_material_scene
   powershell -ExecutionPolicy Bypass -File tools/render_regression.ps1 `
-      -Exe 'C:\Program Files\Rhino 9 WIP\System\Rhino.exe' -Port 10500 -Compare
+      -Model C:\path\to\scene.3dm -Reference C:\path\to\expected.png
 #>
 param(
   [string]$Exe = 'C:\Users\Lars\dev\rhino\9.x\src4\bin\Debug\Rhino.exe',
   [int]$Port = 10501,
-  [string]$Model = 'C:\Users\Lars\dev\rhino\9.x\src4\rhino4\assets\rdk_material_scene.3dm',
+  [string]$Model = '',
   [string]$Reference = '',
+  [string]$Only = '',
   [double]$Tolerance = 1.0,
   [switch]$UpdateReference,
-  [switch]$Compare,
   [int]$StartupTimeoutSeconds = 240
 )
 
 $ErrorActionPreference = 'Stop'
 $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (-not $Reference) {
-  $Reference = Join-Path $toolsDir 'reference\rdk_material_scene.png'
+$refDir = Join-Path $toolsDir 'reference'
+$assets = 'C:\Users\Lars\dev\rhino\9.x\src4\rhino4\assets'
+$rdkTools = 'C:\Users\Lars\dev\rhino\9.x\src4\rhino4\Plug-ins\RDK\Library\Tools'
+
+if ($Model) {
+  if (-not $Reference) { Write-Error 'give -Reference with -Model'; exit 2 }
+  $cases = @([pscustomobject]@{ Name = 'custom'; Model = $Model; Reference = $Reference })
 }
-$actual = Join-Path ([IO.Path]::GetTempPath()) ('render_regression_' + $Port + '.png')
+else {
+  $cases = @(
+    [pscustomobject]@{
+      Name      = 'rdk_material_scene'
+      Model     = (Join-Path $assets 'rdk_material_scene.3dm')
+      Reference = (Join-Path $refDir 'rdk_material_scene.png')
+    }
+    [pscustomobject]@{
+      Name      = 'material_scene_final'
+      Model     = (Join-Path $rdkTools 'Material_Scene_Final.3dm')
+      Reference = (Join-Path $refDir 'material_scene_final.png')
+    }
+  )
+  # @() matters: Where-Object returns a bare object for a single match, and a
+  # bare object has no .Count.
+  if ($Only) { $cases = @($cases | Where-Object { $_.Name -eq $Only }) }
+  if ($cases.Count -eq 0) { Write-Error "no case named '$Only'"; exit 2 }
+}
 
 function Invoke-Rhino([string]$tool, $arguments) {
   $payload = @{
@@ -89,72 +117,79 @@ function Measure-Difference([string]$pathA, [string]$pathB) {
   finally { $a.Dispose(); $b.Dispose() }
 }
 
-if (-not (Test-Path $Model)) { Write-Error "model not found: $Model"; exit 2 }
+function Invoke-Render([string]$model, [string]$outPath) {
+  Get-Process Rhino -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -eq $Exe } |
+    ForEach-Object { try { $_.Kill() } catch {} }
+  for ($i = 0; $i -lt 30; $i++) {
+    Start-Sleep -Seconds 1
+    if (-not (Get-Process Rhino -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $Exe })) { break }
+  }
+
+  # Post-build steps in this tree fail with 9009 when this is set, and it leaks
+  # in from some shells.
+  $env:NoDefaultCurrentDirectoryInExePath = $null
+
+  Start-Process -FilePath $Exe -ArgumentList @(('"' + $model + '"'), ('/runscript="_MCPStart ' + $Port + ' _Enter"')) | Out-Null
+
+  $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
+  $up = $false
+  while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 3
+    try { $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', $Port); $c.Close(); $up = $true; break } catch {}
+  }
+  if (-not $up) {
+    throw ("no MCP listener on port $Port after $StartupTimeoutSeconds s. " +
+           'A Debug build is slow to start; raise -StartupTimeoutSeconds if it is merely late.')
+  }
+
+  if ((Invoke-Rhino 'list_objects' @{}) -match '"count":0\b') {
+    throw ('the document is empty, so the model did not load. Rhino wants a ' +
+           'backslash path here; a forward-slash one fails silently.')
+  }
+
+  Invoke-Rhino 'run_command' @{ command = '_Render' } | Out-Null
+  if (Test-Path $outPath) { Remove-Item $outPath -Force }
+  Invoke-Rhino 'run_command' @{ command = ('-_SaveRenderWindowAs "' + $outPath + '"') } | Out-Null
+  if (-not (Test-Path $outPath)) { throw "the render was not saved to $outPath" }
+}
+
 if (-not (Test-Path $Exe)) { Write-Error "Rhino not found: $Exe"; exit 2 }
 
-Get-Process Rhino -ErrorAction SilentlyContinue |
-  Where-Object { $_.Path -eq $Exe } |
-  ForEach-Object { try { $_.Kill() } catch {} }
-for ($i = 0; $i -lt 30; $i++) {
-  Start-Sleep -Seconds 1
-  if (-not (Get-Process Rhino -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $Exe })) { break }
+$failed = 0
+foreach ($case in $cases) {
+  Write-Host ('--- ' + $case.Name)
+  if (-not (Test-Path $case.Model)) { Write-Host ('  model not found: ' + $case.Model); $failed++; continue }
+  $actual = Join-Path ([IO.Path]::GetTempPath()) ('render_regression_' + $case.Name + '.png')
+  try { Invoke-Render $case.Model $actual }
+  catch { Write-Host ('  ' + $_.Exception.Message); $failed++; continue }
+
+  if ($UpdateReference) {
+    if (-not (Test-Path $refDir)) { New-Item -ItemType Directory -Path $refDir | Out-Null }
+    Copy-Item $actual $case.Reference -Force
+    Write-Host ('  recorded ' + $case.Reference)
+    continue
+  }
+
+  if (-not (Test-Path $case.Reference)) {
+    Write-Host ('  no stored image at ' + $case.Reference +
+                ' - run once with -UpdateReference to record one, after checking the render by eye')
+    $failed++
+    continue
+  }
+
+  $d = Measure-Difference $case.Reference $actual
+  Write-Host ('  {0}x{1}  mean={2:N3}  worst={3}  tolerance={4:N3}' -f $d.Width, $d.Height, $d.Mean, $d.Worst, $Tolerance)
+  if ($d.Mean -gt $Tolerance) {
+    Write-Host ('  FAIL - the render moved. Compare ' + $actual + ' against ' + $case.Reference + ' by eye.')
+    Write-Host '  If the new output is right, re-record with -UpdateReference.'
+    $failed++
+  }
+  else { Write-Host '  ok' }
 }
 
-# Post-build steps in this tree fail with 9009 when this is set, and it leaks in
-# from some shells.
-$env:NoDefaultCurrentDirectoryInExePath = $null
-
-Write-Host ('launching  ' + $Exe)
-Start-Process -FilePath $Exe -ArgumentList @(('"' + $Model + '"'), ('/runscript="_MCPStart ' + $Port + ' _Enter"')) | Out-Null
-
-$deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
-$up = $false
-while ((Get-Date) -lt $deadline) {
-  Start-Sleep -Seconds 3
-  try { $c = New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1', $Port); $c.Close(); $up = $true; break } catch {}
-}
-if (-not $up) {
-  Write-Error ("no MCP listener on port $Port after $StartupTimeoutSeconds s. " +
-               'A Debug build is slow to start; raise -StartupTimeoutSeconds if it is merely late.')
-  exit 2
-}
-
-$objects = Invoke-Rhino 'list_objects' @{}
-if ($objects -match '"count":0\b') {
-  Write-Error ('the document is empty, so the model did not load. Rhino wants a ' +
-               'backslash path here; a forward-slash one fails silently.')
-  exit 2
-}
-
-Write-Host 'rendering'
-Invoke-Rhino 'run_command' @{ command = '_Render' } | Out-Null
-if (Test-Path $actual) { Remove-Item $actual -Force }
-Invoke-Rhino 'run_command' @{ command = ('-_SaveRenderWindowAs "' + $actual + '"') } | Out-Null
-if (-not (Test-Path $actual)) { Write-Error "the render was not saved to $actual"; exit 2 }
-
-if ($UpdateReference) {
-  $dir = Split-Path -Parent $Reference
-  if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
-  Copy-Item $actual $Reference -Force
-  Write-Host ('recorded   ' + $Reference)
-  exit 0
-}
-
-if ($Compare) { Write-Host ('wrote      ' + $actual); exit 0 }
-
-if (-not (Test-Path $Reference)) {
-  Write-Error ("no stored image at $Reference. Run once with -UpdateReference to record one, " +
-               'after checking by eye that the render is right.')
-  exit 2
-}
-
-$d = Measure-Difference $Reference $actual
-Write-Host ('{0}x{1}  mean={2:N3}  worst={3}  tolerance={4:N3}' -f $d.Width, $d.Height, $d.Mean, $d.Worst, $Tolerance)
-if ($d.Mean -gt $Tolerance) {
-  Write-Host ''
-  Write-Host ('FAIL - the render moved. Keep ' + $actual + ' and compare it against ' + $Reference + ' by eye.')
-  Write-Host 'If the new output is right, re-record with -UpdateReference.'
-  exit 1
-}
-Write-Host 'ok'
+Write-Host ''
+$total = @($cases).Count
+if ($failed) { Write-Host ("$failed of $total case(s) failed"); exit 1 }
+Write-Host "$total case(s) ok"
 exit 0

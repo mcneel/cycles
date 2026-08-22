@@ -30,7 +30,7 @@ could not.
 | `SMOKE_LIGHTZ` | `-6` | Light position on Z. Positive is behind the quad, so the quad goes dark. |
 | `SMOKE_SPOTZ` | unset | Makes the light a spot aimed along this Z. Set it to `1` and `-1`: only `1` lights the quad. This is what pinned down the light basis. |
 | `SMOKE_AREA` | unset | `1` makes it a 4x4 area light with explicit axisu/axisv. |
-| `SMOKE_EMIT` | unset | `1` drives emission rather than a BSDF, intended to make a texture's output land in the pixels directly. **Does not work yet** - the surface renders black, so the emission strength is not actually being set; the member name is a guess. |
+| `SMOKE_EMIT` | unset | `1` drives emission rather than a BSDF, intended to make a texture's output land in the pixels directly. **Does not work yet** - the surface renders black. The member name is not the reason: csycles' EmissionNode uses `strength`, which matches `SOCKET_IN_FLOAT(strength, "Strength", 10.0f)` in shader_nodes.cpp, and the socket audit agrees. Worth retrying, see below. |
 | `SMOKE_NODE` | unset | Drives the surface colour from one shader node by its registered name, e.g. `rhino_checker_texture`. One node per process, so a crash in one does not hide the rest. |
 | `SMOKE_NOMESH` | unset | `1` leaves the quad out. Isolates geometry faults from light faults. |
 | `SMOKE_NOLIGHT` | unset | `1` leaves the light out. |
@@ -57,9 +57,22 @@ texture-coordinate input (wiring `texture_coordinate` in changed nothing),
 and anything Rhino-specific - stock `checker_texture` and `noise_texture`
 are equally flat in this harness.
 
-So it is the harness, not the port. Confirming the patterns needs a real
-comparison against Rhino 8 with actual materials, which is the largest
-remaining unverified area of this work.
+That reasoning pointed at the harness rather than the port, and on the evidence
+listed it still does: a fault in Rhino's own nodes would not make stock
+`checker_texture` flat as well.
+
+It is worth re-running regardless. A port bug of very nearly this shape was found
+and fixed afterwards - `rhino_texture_coordinate` emitted its Generated output
+through the pre-5.2 packed SVM layout, so `out_offset` was read as zero and the
+node wrote to stack slot 0 while its consumer read the slot it had been
+promised. Every environment texture then sampled a degenerate direction, which is
+what made every render black. A constant vector arriving at a texture is exactly
+how a pattern comes out flat, so the two observations here deserve another look
+now that it is fixed, both this and SMOKE_EMIT.
+
+If they are still flat, the harness explanation stands and the remaining check is
+a comparison against shipping Rhino with real materials. `tools/render_regression.ps1`
+now does that part on Rhino's own material preview scenes.
 
 ## When it crashes
 
