@@ -188,7 +188,11 @@ namespace ccl.ShaderNodes
 			ins.BaseColor.Value = new float4(0.7f, 0.6f, 0.5f, 1.0f);
 			ins.Metallic.Value = 0.0f;
 			ins.Specular.Value = 0.5f;
-			ins.SpecularTint.Value = new float4(0.0f, 0.0f, 0.0f, 1.0f);
+			/* Specular Tint and Sheen Tint were floats before 4.x, where 0 meant
+			 * "untinted". They are colours now and untinted is white - Cycles itself
+			 * defaults both to one_float3(). Carrying the old 0 across as black asks
+			 * for no specular reflection at all. */
+			ins.SpecularTint.Value = new float4(1.0f, 1.0f, 1.0f, 1.0f);
 			ins.Subsurface.Value = 0.0f;
 			ins.SubsurfaceColor.Value = new float4(0.7f, 0.1f, 0.1f);
 			ins.SubsurfaceRadius.Value = new float4(0.7f, 1.0f, 1.0f, 1.0f);
@@ -196,7 +200,7 @@ namespace ccl.ShaderNodes
 			ins.Anisotropic.Value = 0.0f;
 			ins.AnisotropicRotation.Value = 0.0f;
 			ins.Sheen.Value = 0.0f;
-			ins.SheenTint.Value = new float4(0.5f, 0.5f, 0.5f, 1.0f);
+			ins.SheenTint.Value = new float4(1.0f, 1.0f, 1.0f, 1.0f);
 			ins.Clearcoat.Value = 0.0f;
 			/* 1.0 here used to mean a mirror-smooth coat, as gloss. Against
 			 * coat_roughness it asks for the roughest possible coat instead, so any

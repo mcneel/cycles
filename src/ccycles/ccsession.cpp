@@ -731,6 +731,48 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 			}
 		}
 
+		/* Experiment: 4.x turned specular_tint and sheen_tint from floats into
+		 * colours, where untinted is white. A scalar tint amount mapped straight
+		 * onto grey therefore asks for no specular at all when the amount is 0.
+		 * Forcing both white says how much of the gap against shipping Rhino that
+		 * accounts for, before rewiring anything. */
+		const char *white_tint = getenv("CCYCLES_WHITE_TINTS");
+		if (white_tint != nullptr && white_tint[0] == 0x31) {
+			ccl::Scene *wsce = session->scene.get();
+			int touched = 0;
+			if (wsce != nullptr) {
+				for (ccl::Shader *sh : wsce->shaders) {
+					if (sh->graph == nullptr) continue;
+					for (ccl::ShaderNode *nd : sh->graph->nodes) {
+						ccl::PrincipledBsdfNode *pb =
+						    dynamic_cast<ccl::PrincipledBsdfNode *>(nd);
+						if (pb == nullptr) continue;
+						ccl::ShaderInput *st = nd->input("Specular Tint");
+						ccl::ShaderInput *sn = nd->input("Sheen Tint");
+						if (st != nullptr && st->link == nullptr) {
+							pb->set_specular_tint(ccl::one_float3());
+						}
+						if (sn != nullptr && sn->link == nullptr) {
+							pb->set_sheen_tint(ccl::one_float3());
+						}
+						/* A linked tint has to be cut loose or the link wins. */
+						if (st != nullptr && st->link != nullptr) {
+							sh->graph->disconnect(st);
+							pb->set_specular_tint(ccl::one_float3());
+						}
+						if (sn != nullptr && sn->link != nullptr) {
+							sh->graph->disconnect(sn);
+							pb->set_sheen_tint(ccl::one_float3());
+						}
+						touched++;
+					}
+					sh->tag_update(wsce);
+				}
+			}
+			ccycles_diag("forced white specular/sheen tint on %d principled node(s)\n",
+			             touched);
+		}
+
 		const char *dump_bg = getenv("CCYCLES_DUMP_BG");
 		if (dump_bg != nullptr && dump_bg[0] != 0) {
 			ccl::Scene *dsce = session->scene.get();
