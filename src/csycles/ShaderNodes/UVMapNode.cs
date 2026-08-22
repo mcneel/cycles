@@ -32,11 +32,11 @@ namespace ccl.ShaderNodes
 
 	public class UvMapOutputs : Outputs
 	{
-		public FloatSocket UV { get; set; }
+		public VectorSocket UV { get; set; }
 
 		internal UvMapOutputs(ShaderNode parentNode)
 		{
-			UV = new FloatSocket(parentNode, "UV", "UV");
+			UV = new VectorSocket(parentNode, "UV", "UV");
 			AddSocket(UV);
 		}
 	}

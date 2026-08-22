@@ -40,11 +40,11 @@ namespace ccl.ShaderNodes
 
 	public class BrightnessContrastOutputs : Outputs
 	{
-		public ClosureSocket Color { get; set; }
+		public ColorSocket Color { get; set; }
 
 		public BrightnessContrastOutputs(ShaderNode parentNode)
 		{
-			Color = new ClosureSocket(parentNode, "Color", "color");
+			Color = new ColorSocket(parentNode, "Color", "color");
 			AddSocket(Color);
 		}
 	}

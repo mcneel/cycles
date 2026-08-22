@@ -38,7 +38,7 @@ namespace ccl.ShaderNodes
 		/// Random number for shaded object
 		/// </summary>
 		public FloatSocket Random { get; set; }
-		public FloatSocket Color { get; set; }
+		public ColorSocket Color { get; set; }
 		public FloatSocket Alpha { get; set; }
 
 		internal ObjectInfoOutputs(ShaderNode parentNode)
@@ -51,7 +51,7 @@ namespace ccl.ShaderNodes
 			AddSocket(MaterialIndex);
 			Random = new FloatSocket(parentNode, "Random", "random");
 			AddSocket(Random);
-			Color = new FloatSocket(parentNode, "Color", "color");
+			Color = new ColorSocket(parentNode, "Color", "color");
 			AddSocket(Color);
 			Alpha = new FloatSocket(parentNode, "Alpha", "alpha");
 			AddSocket(Alpha);
