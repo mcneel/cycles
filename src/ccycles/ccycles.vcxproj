@@ -18,6 +18,13 @@
         Configures and builds Cycles from source into the Rhino Plug-ins
         output directory. GPU backends are auto-detected; a machine with no
         GPU SDKs installed still gets a working CPU-only build.
+
+    Note that this project installs into big_libs, and it is
+    RhinoCyclesCore.csproj that copies from there into the plug-in output. So
+    building this project on its own updates big_libs but leaves the ccycles.dll
+    that Rhino actually loads untouched, and the next run silently uses the old
+    one. Build RhinoCyclesCore, or the solution, to deploy. Comparing the two
+    timestamps is the quickest way to catch it.
 -->
 <Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
