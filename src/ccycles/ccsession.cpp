@@ -736,6 +736,37 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 		 * onto grey therefore asks for no specular at all when the amount is 0.
 		 * Forcing both white says how much of the gap against shipping Rhino that
 		 * accounts for, before rewiring anything. */
+		/* Experiment: with no OCIO config, an "auto" colorspace no longer resolves
+		 * to sRGB for byte images - detect_known_colorspace only consults OCIO for
+		 * that - so it lands on scene linear and no decode happens. Set this to
+		 * data, srgb or linear to force every image texture and measure which way
+		 * it moves the render. */
+		const char *tex_cs = getenv("CCYCLES_TEX_COLORSPACE");
+		if (tex_cs != nullptr && tex_cs[0] != 0) {
+			ccl::ustring want;
+			if (strcmp(tex_cs, "data") == 0) want = ccl::u_colorspace_data;
+			else if (strcmp(tex_cs, "srgb") == 0) want = ccl::u_colorspace_srgb;
+			else if (strcmp(tex_cs, "linear") == 0) want = ccl::u_colorspace_scene_linear;
+			else ccycles_diag("CCYCLES_TEX_COLORSPACE: unknown value '%s'\n", tex_cs);
+			ccl::Scene *csce = session->scene.get();
+			int n = 0;
+			if (!want.empty() && csce != nullptr) {
+				for (ccl::Shader *sh : csce->shaders) {
+					if (sh->graph == nullptr) continue;
+					for (ccl::ShaderNode *nd : sh->graph->nodes) {
+						if (ccl::ImageTextureNode *it =
+						        dynamic_cast<ccl::ImageTextureNode *>(nd)) {
+							it->set_colorspace(want);
+							n++;
+						}
+					}
+					sh->tag_update(csce);
+				}
+				ccycles_diag("forced colorspace '%s' on %d image texture(s)\n",
+				             want.c_str(), n);
+			}
+		}
+
 		const char *white_tint = getenv("CCYCLES_WHITE_TINTS");
 		if (white_tint != nullptr && white_tint[0] == 0x31) {
 			ccl::Scene *wsce = session->scene.get();
