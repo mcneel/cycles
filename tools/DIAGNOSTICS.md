@@ -161,6 +161,20 @@ So texture colorspace is now eliminated twice: once by reasoning about builtin
 images, and once per-image with the resolver instrumented. The scene-specificity
 is the live lead; the colorspace is not it.
 
+**It is not the shadow catcher's visibility.** This branch changed how a shadow
+catcher is hidden from reflections, from `AllVisibility & ~PathRay.Reflect` to
+`& ~PathRay.Glossy`, because `Reflect` stopped being a visibility bit in 5.x. It
+is a real behavioural change, it is scene-specific in exactly the right way -
+only scenes with a shadow catcher see it, and the differing scene has one at
+`vis=119` - and it is mine, which made it the best candidate left.
+
+It is not the cause. Giving the catcher full visibility instead, verified in the
+scene dump as `vis=127` on that object, leaves the difference at 9.957 against
+9.956. Unchanged. That also matches what the enums predict: old `Reflect` was
+`1 << 1` and 5.2's bit 1 is `Transmit`, with reflections now falling under
+`Glossy`, so the mapping is right, and either way both versions keep *diffuse*
+visibility - which is what lights the floor.
+
 **It is not the materials.** Rendering the same scene with a plain material on the
 floor gives 0.9507, slightly *worse* than the full PBR scene's 0.9577. Whatever
 this is, it does not need a principled node to happen, so the 4.x Principled
