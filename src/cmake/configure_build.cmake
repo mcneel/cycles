@@ -46,7 +46,13 @@ if(APPLE)
   list(APPEND CMAKE_EXE_LINKER_FLAGS "-Xlinker -no_warn_duplicate_libraries")
   list(APPEND CMAKE_SHARED_LINKER_FLAGS "-Xlinker -no_warn_duplicate_libraries")
 elseif(MSVC)
-  set(CMAKE_CXX_FLAGS "/nologo /J /Gd /EHsc /bigobj /MP /std:c++17 /utf-8" CACHE STRING "MSVC MD C++ flags " FORCE)
+  # No /std: here. CMAKE_CXX_STANDARD above is 20 and CMake appends /std:c++20
+  # from it, so naming a standard in the flags as well means MSVC reports
+  # "D9025: overriding '/std:c++17' with '/std:c++20'" once per translation
+  # unit - 310 warnings in a full Rhino build, and an ambiguity about which one
+  # actually applies. Upstream: 6a66c1bf2 moved Cycles to C++20 without
+  # updating the flags f149da16f had set.
+  set(CMAKE_CXX_FLAGS "/nologo /J /Gd /EHsc /bigobj /MP /utf-8" CACHE STRING "MSVC MD C++ flags " FORCE)
   set(CMAKE_C_FLAGS "/nologo /J /Gd /MP /bigobj /utf-8" CACHE STRING "MSVC MD C++ flags " FORCE)
 
   if(CMAKE_CL_64)
