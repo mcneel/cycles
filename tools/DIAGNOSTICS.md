@@ -127,27 +127,39 @@ difference is systemic.
 
 **What distinguishes the two scenes is an image texture.** The RhinoCycles log
 for the material preview scene names `18_percent_greycard.jpg`; the scene that
-matches has no image asset in its log at all. And our build emits, exactly once:
+matches has no image asset in its log at all. That much stands, and it is where
+to look next.
 
-    get_processor: Colorspace  can't be converted to scene_linear:
-        ColorSpaceTransform: empty source color space name.
+**But the colorspace explanation for it is refuted.** The warning our build
+emits once,
+
     detect_known_colorspace: Colorspace  not found, using scene linear instead
 
-An **empty** colorspace, falling back to scene linear - which means no sRGB
-decode. Cycles caches colorspace lookups, so one warning can stand for many
-images. That is consistent with every property of the difference: it appears only
-where there is a texture, and skipping a decode is a power curve, which is why it
-grows with brightness.
+reads like a texture arriving with no colorspace and losing its sRGB decode. It
+is not. `u_colorspace_auto` is a **default-constructed, empty** `ustring` - in
+5.2 at `util/colorspace.cpp:24` and identically in 3.5 - so an empty request *is*
+the auto sentinel, and every `colorspace == u_colorspace_auto` test matches it.
 
-It also fits the bracket numbers that were previously written off. Forcing every
-texture to `srgb` overshoots shipping at 1.0642 while leaving them undecoded
-undershoots at 0.9577, and shipping sits between - exactly what you would expect
-if shipping decodes *some* textures and we decode none.
+Instrumenting `detect_known_colorspace` to name every resolution settles it. The
+whole scene resolves exactly two images:
 
-Not yet proven, and the remaining question is which image arrives with an empty
-colorspace and why. Note that 5.2 ignores `file_format` entirely - the parameter
-is `const char * /*file_format*/` - so 3.5's guess of sRGB for a float png or
-jpeg is gone.
+    requested='' file_hint=''                    is_float=1
+    requested='' file_hint='srgb_rec709_scene'   is_float=0
+
+The second is the byte JPEG, and its own file hint says sRGB, so 5.2's fallback
+gives it `u_colorspace_srgb` - it **is** decoded. The first is float with no hint,
+which resolves to scene linear, and for an EXR environment that is correct.
+
+That also disposes of the bracket numbers innocently, which had looked like
+evidence for a missing decode. Forcing every texture to `srgb` overshoots
+shipping at 1.0642 and forcing none undershoots at 0.9577 with shipping between,
+and the reason is simply that both builds already decode *some* textures and not
+others. No regression is needed to produce that spread, and it should never have
+been read as pointing at one.
+
+So texture colorspace is now eliminated twice: once by reasoning about builtin
+images, and once per-image with the resolver instrumented. The scene-specificity
+is the live lead; the colorspace is not it.
 
 **It is not the materials.** Rendering the same scene with a plain material on the
 floor gives 0.9507, slightly *worse* than the full PBR scene's 0.9577. Whatever
