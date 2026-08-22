@@ -235,20 +235,30 @@ so `KernelCache` stays empty, the GPU never becomes ready, and the render either
 falls back to the CPU or stalls in `new ccl::Session`. Nothing says "the GPU is
 unavailable".
 
-What it invalidates:
+What it invalidated, and where each claim now stands after re-measuring on a
+build that really does use the GPU:
 
 - **The renders that "never started".** Two of five runs stalling for 20-30
-  minutes was this, not a hang in the port. Note the earlier withdrawal of that
-  claim was wrong in the other direction: those runs really were stuck, just not
-  for the reason I first guessed and not for the reason I then said instead.
-- **"CPU and HIP agree to within the noise floor."** Both sides of that
-  comparison ran on the CPU - the device set to `-1` fell back - so it measured
-  CPU against CPU and says nothing about HIP. Withdrawn.
-- **"The 4.2% difference is not the device."** That rested on the parity
-  measurement above. Shipping's settings carry `SelectedDeviceStr=0` and shipping
-  has its kernel compiler, so shipping may well have been rendering on the GPU
-  while ours rendered on the CPU. The whole difference needs re-measuring with
-  both on the same device before any of its conclusions stand.
+  minutes was this, not a hang in the port. The earlier withdrawal of the hang
+  claim was also wrong: those runs really were stuck, just for neither of the
+  reasons I gave at the time.
+- **"CPU and HIP agree to within the noise floor" - withdrawn, then confirmed.**
+  The original measurement had the device set to `-1` falling back, so it compared
+  CPU against CPU and said nothing. Re-run with HIP genuinely active
+  (`device_hip_init: Found precompiled kernels` present, which it was not before):
+  mean absolute difference **0.036** per channel, worst channel 10, luminance
+  ratio 1.0000. So the two devices do agree - now on evidence rather than by
+  accident, and at coincidentally the same number.
+- **"The 4.2% difference is not the device" - withdrawn, then confirmed.**
+  Shipping carries `SelectedDeviceStr=0` and has its kernel compiler, so it may
+  have been on the GPU while ours was on the CPU, which would have made the whole
+  difference a device artefact. It is not: ours on HIP against shipping is 9.959
+  at a ratio of 0.9577, ours on CPU against shipping is 9.955 at the same 0.9577.
+  The difference is identical on both devices and the device is genuinely out.
+
+The lesson is not about any of those numbers. It is that a silently disabled GPU
+made three separate conclusions unsafe at once, and none of them announced itself
+- every render still produced a plausible image.
 
 Checks worth running before trusting a render:
 
