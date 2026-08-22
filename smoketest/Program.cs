@@ -227,10 +227,28 @@ internal static class Program
 
         // Poll rather than session_wait, so a stalled render is visible instead
         // of hanging.
+        // A debug ccycles spends a long time in "Updating Shaders" before the
+        // first sample - longer than the 60s this used to allow, so every render
+        // was cancelled before it produced a pixel and the harness reported a
+        // null buffer. That is what made every texture look flat and SMOKE_EMIT
+        // look black. SMOKE_TIMEOUT overrides it.
+        double budget = 600.0;
+        var budgetEnv = Environment.GetEnvironmentVariable("SMOKE_TIMEOUT");
+        if (!string.IsNullOrEmpty(budgetEnv))
+        {
+            double parsed;
+            if (double.TryParse(budgetEnv, System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out parsed) &&
+                parsed > 0.0)
+            {
+                budget = parsed;
+            }
+        }
+        Console.WriteLine("timeout    : " + budget.ToString("F0") + "s");
         var sw = System.Diagnostics.Stopwatch.StartNew();
         float progress = 0.0f;
         int lastSample = -1;
-        while (sw.Elapsed.TotalSeconds < 60.0)
+        while (sw.Elapsed.TotalSeconds < budget)
         {
             CSycles.progress_get_progress(session, out progress);
             int sample = CSycles.progress_get_sample(session);
