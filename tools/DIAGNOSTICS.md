@@ -196,30 +196,57 @@ shadow problem. It is not - that region contains no dark pixels at all. It is th
 brightest part of the floor, and it is consistent with the table above rather
 than an exception to it.
 
-### Suspects eliminated by reading
+### Suspects eliminated
 
-Each of these looked capable of producing a few percent on lit surfaces while
-leaving a directly-viewed background alone, and each turned out to be identical
-between the two versions. Recorded so nobody pays for them twice.
+Each looked capable of taking a few percent off lit surfaces while leaving a
+directly-viewed background alone. Recorded so nobody pays for them twice.
+
+**Identical between the two Cycles versions, checked by reading both:**
 
 - **Shadow-catcher compositing.** This scene really does use it -
   `approx_shadow_catcher` is on and all three shadow-catcher passes are written -
   and the composite is what produces the floor while the background comes
-  straight through, which is exactly the shape of the difference.
-  `film_calculate_shadow_catcher` and the matte-with-shadow path are the same in
-  3.5 and 5.2 apart from `const` placement.
+  straight through, which is the exact shape of the difference.
+  `film_calculate_shadow_catcher` and the matte-with-shadow path differ only in
+  `const` placement.
 - **Adaptive sampling.** It is on, so pixels carry different sample counts and
   are normalised individually, and convergence correlates with brightness. The
   convergence test and its error normalisation are unchanged.
 - **The new per-pass `scale`.** 5.2's `film_get_scale` returns
   `kfilm_convert->scale / sample_count` where 3.5 hardcoded `1.0f /
   sample_count`, which looks alarming. `PassInfo::scale` is 1.0 for everything
-  except the timing pass, so `combined` behaves as before.
-- **Clamping itself.** `film_clamp_light` and the times-three scaling from scene
-  value to kernel limit are unchanged, and both builds take the same clamp
-  values from RhinoCycles' defaults.
-- **Denoising.** Off in these renders - `log_kernel_features: Use Denoising
-  False` - so it cannot be smoothing one and not the other.
+  except the timing pass.
+- **Clamping.** `film_clamp_light` and the times-three scaling from scene value to
+  kernel limit are unchanged, and both builds take the same clamp values from
+  RhinoCycles' defaults.
+- **The light tree.** It landed in Blender 3.5, not 4.x - `light_tree.cpp` is on
+  the 3.5 branch and `use_light_tree` defaults true there too.
+- **Texture colorspace.** Rhino passes builtin float images, so `auto` resolves to
+  no decode in both. See the section above.
+- **Denoising.** Off in these renders (`Use Denoising False`).
+
+**Ruled out on the Rhino side, by diffing this branch against its merge base:**
+
+- **The device.** Measured properly once the GPU worked: 0.9577 on HIP and 0.9577
+  on CPU.
+- **Changed engine defaults.** `Settings/DefaultEngineSettings.cs` is purely
+  additive on this branch - 166 lines added, none removed - so no default that
+  reaches the integrator moved.
+- **The sampling pattern.** This branch changed `SamplingPattern.Sobol` to
+  `SobolBurley`, which reads like a behaviour change and is a rename: 3.5 has
+  `SAMPLING_PATTERN_SOBOL_BURLEY = 0` and csycles has `SobolBurley = 0`.
+- **The `BvhLayout.Default` to `Auto` change**, which sits inside `#if LEGACY` and
+  is not compiled.
+- **The procedural gamma gate.** `Utilities.cs` now skips the gamma decode for
+  trees with no image content or with simulated procedurals, which is a real
+  colour change of about the right size and shape. It is not the difference:
+  it comes from `60f40ce` (RH-92750, 2026-07-24) and David Eränen's `93c8441`
+  and `4a9ee01` (2026-08-06), all reachable from `origin/rhino-9.x`, and the
+  shipping build is `9.0.26226` from 2026-08-14 - so shipping has them too.
+
+What is left is the Cycles version itself, which is the thing being changed. A
+version bisect through the 4.4 branches would name the upstream commit; nothing
+cheaper has worked.
 
 ## The GPU never rendered, and why that poisoned everything
 
