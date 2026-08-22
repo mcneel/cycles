@@ -13,6 +13,28 @@ Exits 1 if anything real is wrong, so it can be used as a build gate.
 import re, glob, os, sys
 
 SRC = 'src'
+
+# Cycles' SOCKET_ macro type -> the csycles socket classes that match it.
+#
+# What matters is the shape of the value, not its spelling. A scalar where Cycles
+# wants a triple is how SpecularTint broke: the name still matched, so a
+# name-only audit saw nothing, and the old float became a black colour meaning no
+# specular at all. Whether a float3 is spelled Color, Vector, Normal, Point or
+# Float4 in this tree is not worth a failure.
+TRIPLE = {'Color', 'Vector', 'Normal', 'Point', 'Point2', 'Float4'}
+KIND_OK = {
+    'FLOAT': {'Float'},
+    'COLOR': TRIPLE,
+    'VECTOR': TRIPLE,
+    'NORMAL': TRIPLE,
+    'POINT': TRIPLE,
+    'POINT2': TRIPLE,
+    'CLOSURE': {'Closure'},
+    'STRING': {'String'},
+    'INT': {'Int'},
+    'BOOLEAN': {'Bool', 'Boolean'},
+    'TRANSFORM': {'Transform'},
+}
 CYCLES_NODE_SOURCES = ['scene/shader_nodes.cpp', 'scene/rhino_shader_nodes.cpp']
 
 
@@ -42,16 +64,18 @@ def cycles_nodes():
         tn = re.search(r'NodeType::add\(\s*"([^"]+)"', body)
         if not tn:
             continue
-        ent = {'in': {}, 'out': {}, 'param': {}, 'svm_internal': set()}
+        ent = {'in': {}, 'out': {}, 'param': {}, 'svm_internal': set(), 'kind': {}}
         # The tail carries the flags, but it must not run past the next SOCKET_:
         # some calls (base_color) wrap across lines, so keying on ');' swallowed
         # the socket that followed.
         pat = (r'SOCKET_(IN_|OUT_)?(\w+)\(\s*(\w+)\s*,\s*"([^"]*)"'
                r'(.*?)(?=SOCKET_|\Z)')
         for sm in re.finditer(pat, body, re.S):
-            direction, internal, ui, rest = sm.group(1), sm.group(3), sm.group(4), sm.group(5)
+            direction, internal_type = sm.group(1), sm.group(2)
+            internal, ui, rest = sm.group(3), sm.group(4), sm.group(5)
             key = 'in' if direction == 'IN_' else 'out' if direction == 'OUT_' else 'param'
             ent[key][ui] = internal
+            ent['kind'][(key, ui)] = internal_type
             if 'SVM_INTERNAL' in rest:
                 ent['svm_internal'].add(ui)
         out[tn.group(1)] = ent
@@ -76,8 +100,9 @@ def csycles_nodes():
             blk = after[:nxt.start()] if nxt else after
             socks = {}
             for sm in re.finditer(
-                    r'new\s+\w*Socket\s*\(\s*\w+\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?([^;]*)', blk):
-                socks[sm.group(1)] = (sm.group(2), 'Retired' in (sm.group(3) or ''))
+                    r'new\s+(\w*)Socket\s*\(\s*\w+\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?([^;]*)', blk):
+                socks[sm.group(2)] = (sm.group(3), 'Retired' in (sm.group(4) or ''),
+                                      sm.group(1))
             containers[cm.group(1)] = (which, socks)
 
     nodes = []
@@ -107,7 +132,8 @@ def main():
     known_missing_types = {'anisotropic_bsdf', 'musgrave_texture', 'velvet_bsdf',
                            'shadernode base', 'texture_node_base'}
 
-    bad_types, bad_sockets, bad_internal = [], [], []
+    bad_types, bad_sockets, bad_internal, bad_kind = [], [], [], []
+    odd_kind = []
     for ctype, cls, base, inc, outc in nodes:
         if ctype not in cyc:
             if ctype not in known_missing_types:
@@ -116,13 +142,22 @@ def main():
         for cname, which in ((inc, 'in'), (outc, 'out')):
             if not cname or cname not in containers:
                 continue
-            for ui, (internal, retired) in containers[cname][1].items():
+            for ui, (internal, retired, kind) in containers[cname][1].items():
                 if retired:
                     continue
                 if ui in cyc[ctype][which]:
                     want = cyc[ctype][which][ui]
                     if internal and internal != 'UNSET' and internal.lower() != want.lower():
                         bad_internal.append((ctype, which, ui, internal, want, base))
+                    wanted_kind = cyc[ctype].get('kind', {}).get((which, ui))
+                    ok = KIND_OK.get(wanted_kind)
+                    if ok and kind and kind not in ok:
+                        # An input's type decides how a value is pushed across the
+                        # API, so a mismatch there is a real fault. An output's is a
+                        # label - ccycles connects by name - so it is worth saying
+                        # and not worth failing over.
+                        (bad_kind if which == 'in' else odd_kind).append(
+                            (ctype, which, ui, kind, wanted_kind, base))
                 elif not any(ui.lower() == k.lower() for k in cyc[ctype]['param']):
                     bad_sockets.append((ctype, which, ui, base, sorted(cyc[ctype][which])))
 
@@ -155,7 +190,14 @@ def main():
         print()
         print('%d socket(s) Cycles offers that csycles does not expose' % total)
 
-    n = len(bad_types) + len(bad_sockets) + len(bad_internal)
+    for ctype, which, ui, kind, wanted, base in bad_kind:
+        print(f"SOCKET TYPE {ctype} {which} {ui!r} ({base}) is {kind}Socket, "
+              f"Cycles declares it {wanted}")
+    for ctype, which, ui, kind, wanted, base in odd_kind:
+        print(f"mislabelled {ctype} {which} {ui!r} ({base}) is {kind}Socket, "
+              f"Cycles declares it {wanted} - a label only, connections go by name")
+
+    n = len(bad_types) + len(bad_sockets) + len(bad_internal) + len(bad_kind)
     print(f"\naudit_sockets: {len(nodes)} csycles nodes vs {len(cyc)} Cycles node types - "
           f"{n} problem(s)")
     return 1 if n else 0
