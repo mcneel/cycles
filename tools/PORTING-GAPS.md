@@ -34,36 +34,51 @@ the standard path the same two were left as TODOs rather than decided:
     1119  // TODO principledbsdf117.ins.SubsurfaceColor.Value = ...
     1133  // TODO principledbsdf117.ins.Roughness.Value = part.RefractionRoughness;
 
-### Why adopting it as written would gain nothing
+### What actually survived in 4.4
 
 Both of those mappings connect a *second* graph to an input that is already
-connected - `BaseColor` is taken at line 757 by the base-colour-with-AO graph,
-and `Roughness` is taken at line 768. `SocketBase.Connect` returns false for an
-already-linked socket, and asserts in DEBUG. So the first connection wins: in
-release both mappings silently do nothing, and in debug they assert.
+taken - `BaseColor` at line 757 by the base-colour-with-AO graph, and
+`Roughness` at line 768 by `PbrRoughness`. `ShaderGraph::connect` refuses that:
 
-The effective behaviour is therefore the same as ours today, minus the assert.
-This is not a case of prior work we failed to pick up - it is prior work that
-recorded an intent without landing it, and the assert is a plausible contributor
-to that branch being remembered as unstable.
+    if (to->link) {
+      LOG_WARNING << "Graph connect: input already connected.";
+      return;
+    }
 
-### What actually needs deciding
+so the **first** connection wins and the later one is dropped. It is
+unconditional rather than occasional, because `PbrGraphForSlot` always builds a
+`ValueNode` or `ColorNode` and connects it whether or not the slot is switched
+on, so `Roughness` and `BaseColor` are never free by the time lines 788 and 778
+run.
 
-Doing this properly means *combining* rather than connecting twice, and each
-combination is a user-visible choice:
+What survived in 4.4 was therefore the surface roughness and the ordinary base
+colour, with the opacity-roughness and subsurface-colour mappings silently
+dropped. Two things are worth being precise about, because both were stated
+wrongly at first: `ccycles` reports the drop through `ccycles_diag` ("input %s
+already connected"), and the only assertion involved is csycles-side and
+`#if DEBUG` only - `ShaderGraph::connect` merely logs a warning. So this is not a
+crash and is not what made that branch unstable.
 
-- **Base colour.** The subsurface colour has to be mixed into the base-colour
-  graph before it reaches `BaseColor`, not connected alongside it. Mixed by
-  what - the subsurface weight, or replacing base colour outright when
-  subsurface is active?
-- **Roughness.** Rhino exposes surface roughness and opacity roughness
-  separately; 4.x has one number. Either the opacity control stops having an
-  effect, or it changes the surface reflection with it. There is no mapping that
-  preserves both.
+### The decision: keep it
 
-Blender has its own conversion for old files and matching it would be the
-defensible default, but that code is not in this repository, so implementing it
-from memory would be guesswork.
+Asked which of Rhino's two roughness controls should survive and how the SSS
+colour should reach base colour, the answer was "what survived in 4.4" and "same
+as 4.4 for now". Since 4.4 effectively kept the surface roughness and ignored the
+subsurface colour, and our `Retired` sockets do exactly that, **the current
+behaviour is the decision and no code change follows.** The difference is only
+that we drop the two inputs deliberately and visibly rather than by losing a
+race between two connections.
+
+Two Rhino controls consequently have no effect and should eventually be hidden or
+marked in the UI rather than silently ignored:
+
+- PBR opacity roughness, and `RefractionRoughness` on the standard path
+- PBR subsurface scattering colour
+
+Revisiting means combining rather than connecting twice - mixing the subsurface
+colour into the base-colour graph before it reaches `BaseColor`, and choosing a
+single roughness. Both are user-visible and neither is forced by 5.2, which is
+why they can wait.
 
 ## Three node types are not registered
 
