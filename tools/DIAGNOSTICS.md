@@ -196,6 +196,57 @@ shadow problem. It is not - that region contains no dark pixels at all. It is th
 brightest part of the floor, and it is consistent with the table above rather
 than an exception to it.
 
+### Suspects eliminated by reading
+
+Each of these looked capable of producing a few percent on lit surfaces while
+leaving a directly-viewed background alone, and each turned out to be identical
+between the two versions. Recorded so nobody pays for them twice.
+
+- **Shadow-catcher compositing.** This scene really does use it -
+  `approx_shadow_catcher` is on and all three shadow-catcher passes are written -
+  and the composite is what produces the floor while the background comes
+  straight through, which is exactly the shape of the difference.
+  `film_calculate_shadow_catcher` and the matte-with-shadow path are the same in
+  3.5 and 5.2 apart from `const` placement.
+- **Adaptive sampling.** It is on, so pixels carry different sample counts and
+  are normalised individually, and convergence correlates with brightness. The
+  convergence test and its error normalisation are unchanged.
+- **The new per-pass `scale`.** 5.2's `film_get_scale` returns
+  `kfilm_convert->scale / sample_count` where 3.5 hardcoded `1.0f /
+  sample_count`, which looks alarming. `PassInfo::scale` is 1.0 for everything
+  except the timing pass, so `combined` behaves as before.
+- **Clamping itself.** `film_clamp_light` and the times-three scaling from scene
+  value to kernel limit are unchanged, and both builds take the same clamp
+  values from RhinoCycles' defaults.
+- **Denoising.** Off in these renders - `log_kernel_features: Use Denoising
+  False` - so it cannot be smoothing one and not the other.
+
+## An intermittent spin before the session starts
+
+Two of three measurement runs today never rendered. Rhino came up, the MCP
+listener answered, the document loaded, and then one thread span at 100% while
+the other 124 waited - 268 seconds of CPU on a single thread and climbing, with
+no further output.
+
+It is worth knowing exactly how far it gets, because that bounds the search.
+`cycles_debug_scene_stats` runs on the line immediately before
+`session->start()`, and its output never appears. So the spin is *before* the
+Cycles session starts, which puts it in the Rhino-side conversion of the scene
+rather than in Cycles' shader compilation or device update. That is despite the
+smoketest reporting its own hang as "Updating Shaders", which happens inside
+session start - so the two may not be the same fault, and neither should be
+assumed to be the other.
+
+It is not caused by any switch in this document: it happened first under
+`CCYCLES_NO_LIGHT_TREE` and then again under `CCYCLES_NO_CLAMP`, and in both
+cases the switch's own diagnostic line never reached the log, so neither had run
+yet. A rerun with no switches at all rendered normally.
+
+Practical consequence for anyone measuring: check that the run produced a
+`stats: geometry=...` line before believing a timeout, and expect to repeat
+runs. There is no diagnosis here yet - no debugger is installed on this machine,
+and one spinning thread with no symbols is as far as it went.
+
 ## Measuring, rather than looking
 
 `tools/render_regression.ps1` renders fixed scenes and compares them against
