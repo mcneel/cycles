@@ -38,6 +38,10 @@ namespace ccl
 		Multi,
 		Optix,
 		Hip,
+		/* 5.x inserted HIPRT here. Leaving it out put Metal, OneApi and Dummy one
+		 * short of their ccl::DeviceType values, so DeviceTypeMask.METAL was really
+		 * HIPRT's bit and ONEAPI was Metal's. */
+		Hiprt,
 		Metal,
 		OneApi,
 		Dummy,
@@ -189,11 +193,15 @@ namespace ccl
 		NodeUnaligned = 1 << 15,
 	}
 
+	/// <summary>
+	/// Render passes. Mirrors ccl::PassType in kernel/types.h - the numbering is
+	/// what crosses the C API, so it has to match entry for entry.
+	/// </summary>
 	public enum PassType : int
 	{
 		None = 0,
 
-		/* Light Passes */
+		/* Light passes */
 		Combined = 1,
 		Emission,
 		Background,
@@ -210,6 +218,8 @@ namespace ccl
 		Volume,
 		VolumeDirect,
 		VolumeIndirect,
+		VolumeScatter,
+		VolumeTransmit,
 		CategoryLightEnd = 31,
 
 		/* Data passes */
@@ -233,21 +243,33 @@ namespace ccl
 		GlossyColor,
 		TransmissionColor,
 		Mist,
-		DenoisingNormal,
-		DenoisingAlbedo,
-		DenoisingDepth,
-		DenoisingPrevious,
+		RenderTime,
 		ShadowCatcher,
 		ShadowCatcherSampleCount,
 		ShadowCatcherMatte,
 		GuidingColor,
 		GuidingProbability,
 		GuidingAvgRoughness,
+		VolumeMajorant,
+		VolumeMajorantSampleCount,
 		CategoryDataEnd = 63,
 
-		BakePrimitive,
+		/* Denoising passes. These moved out of the data range in 4.x; csycles had
+		 * them inline after Mist, which put every later entry on the wrong value. */
+		DenoisingAlbedo = 64,
+		DenoisingSpecularAlbedo,
+		DenoisingNormal,
+		DenoisingRoughness,
+		DenoisingDepth,
+		DenoisingBackwardMotion,
+		CategoryDenoisingEnd = 95,
+
+		BakePrimitive = 96,
+		BakeSeed,
 		BakeDifferential,
-		CategoryBakeEnd = 95,
+		CategoryBakeEnd = 127,
+
+		DenoisingPrevious,
 
 		Num
 	}
