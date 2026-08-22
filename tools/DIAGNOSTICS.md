@@ -77,6 +77,7 @@ is enough to tell a real direction from all zeros.
 | `CCYCLES_NO_SHADOW_CATCHER=1` | Ignore every object's shadow-catcher flag. |
 | `CCYCLES_NO_LIGHT_TREE=1` | Force the old light distribution. Note RhinoCycles never sets `use_light_tree`, so this only bites where ccycles does. |
 | `CCYCLES_BG_SKY_FROM_COLOR=1` | Force `sky_color_or_texture`'s Fac to 0, taking the environment image out of the skylight path. |
+| `CCYCLES_NO_CLAMP=1` | Set both sample clamps to 0, which Cycles reads as no limit at all. Takes the clamp's bias out of a comparison. |
 
 Use these to size a suspicion before changing code. `CCYCLES_WHITE_TINTS` moved
 the material preview scene from 11.27 against shipping Rhino 9 WIP to 9.96, and
