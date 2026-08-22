@@ -418,6 +418,17 @@ Two things learned the hard way:
   `/p:SolutionDir=<repo>/src4/BuildSolutions/`, because that copy step resolves
   `$(SolutionDir)..\..\big_libs` and the solutions live in `BuildSolutions`, not
   `src4`. Skipping it is what disabled the GPU above.
+- **Check the binary is newer than your edit before believing a render.** Stale
+  output has produced three wrong conclusions here: a Cycles change that never
+  deployed, a missing kernel compiler that silently disabled the GPU, and a
+  RhinoCyclesCore build that failed because a leftover Rhino held
+  `RhinoWindows.dll` while the script rendered anyway. A build that fails on a
+  file lock still leaves the previous binary in place, and the render looks
+  perfectly normal. Kill Rhino first, then compare timestamps and abort if the
+  binary is older than the source:
+
+      if ((Get-Item $dll).LastWriteTime -lt (Get-Item $src).LastWriteTime) { exit 1 }
+
 - **`error C1001` from MSVC is usually transient.** A full build died with an
   internal compiler error in `Rhino3Utilities.cpp`, reporting a garbled compiler
   filename, which points at memory corruption in the compiler rather than at the
