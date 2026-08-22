@@ -1,0 +1,115 @@
+# Diagnosing a Rhino render through ccycles
+
+Every switch here is read from the environment and off unless set, so a build
+with all of them compiled in behaves exactly as before. They exist because the
+faults on the 3.5 → 5.2 port share a shape: the build is green, nothing asserts,
+and the pixels are wrong. Reading the code does not settle those; measuring does.
+
+Set them before launching Rhino. For a locally built Rhino, see
+`tools/render_regression.ps1` for the launch that works — the model goes on the
+command line, because opening a document over MCP tears the MCP listener down.
+
+## Getting anything out at all
+
+| Variable | Effect |
+| --- | --- |
+| `CCYCLES_DIAG_LOG=<path>` | Append every `ccycles_diag` line to that file. |
+| `CCYCLES_LOG_LEVEL=<level>` | Route Cycles' own log to the same file. `info` or `debug`. |
+
+Start with these two. `OutputDebugString` alone loses records: it goes through a
+single 4KB system buffer with an event handshake, and a listener a moment late
+simply drops one, which turns a scene dump into a row of bare prefixes.
+
+`CCYCLES_LOG_LEVEL` matters more than it sounds. ccycles never called
+`ccl::log_init`, so everything Cycles knew about devices, kernels, passes, shader
+compilation and the light tree was being discarded. `"Number of lights sent to
+the device: 1"` in a scene holding two is the sort of line that ends an
+investigation early.
+
+With `CCYCLES_DIAG_LOG` set, session start also dumps the scene: geometry,
+objects, per-mesh shader slots, lights with their strength and transform, the
+integrator's bounces and switches, the film state, and every shader graph with
+the value Cycles holds for each unlinked input.
+
+## Where are the pixels
+
+| Variable | Effect |
+| --- | --- |
+| `CCYCLES_PASS_PROBE=1` | Once per session, report min, max, mean and non-zero count for `combined`, and try `shadow_catcher_matte`, `shadow_catcher` and `background`. |
+
+This separates "Cycles produced nothing" from "the pixels were lost on the way
+out". A combined pass of exactly 0.0 for RGB with alpha exactly 1.0 everywhere,
+against a sensible depth pass, says rays hit geometry and shading returned
+nothing — which is a very different search from a readback bug.
+
+The three shadow-catcher passes are usually reported as unavailable: they are
+written with empty names, and `get_pass_pixels` matches on name.
+
+## Which node is wrong
+
+| Variable | Effect |
+| --- | --- |
+| `CCYCLES_SIMPLE_BACKGROUND=1` | Replace Rhino's background graph with one white `background_shader`. |
+| `CCYCLES_BG_TAP=<node name>` | Wire that node's first colour, float or vector output straight into `final_bg`'s Color. |
+| `CCYCLES_DUMP_BG=<path>` | Write the background shader graph as graphviz. |
+
+These three found the black render. Rhino's background graph is around forty
+nodes of `light_path` gating, so the first question is whose fault it is:
+`CCYCLES_SIMPLE_BACKGROUND` lit the scene immediately, which put Cycles in the
+clear and Rhino's graph under suspicion.
+
+`CCYCLES_BG_TAP` then makes a render *show* what any node in that graph evaluates
+to, so a chain can be bisected in a handful of runs. It was white as far as
+`gradient_or_other` and black from `sky_color_or_texture` on; following the
+texture's vector chain, every node read zero, including the first. That first
+node was `rhino_texture_coordinate`, whose Generated output was being written to
+SVM stack slot 0 instead of the slot its consumer read.
+
+A tapped vector shows as a colour, so negative components clamp to black. That
+is enough to tell a real direction from all zeros.
+
+## Narrowing a difference against another build
+
+| Variable | Effect |
+| --- | --- |
+| `CCYCLES_WHITE_TINTS=1` | Force `specular_tint` and `sheen_tint` white on every principled node, cutting links. |
+| `CCYCLES_TEX_COLORSPACE=data\|srgb\|linear` | Force every image texture's colorspace. |
+| `CCYCLES_NO_SHADOW_CATCHER=1` | Ignore every object's shadow-catcher flag. |
+| `CCYCLES_NO_LIGHT_TREE=1` | Force the old light distribution. Note RhinoCycles never sets `use_light_tree`, so this only bites where ccycles does. |
+| `CCYCLES_BG_SKY_FROM_COLOR=1` | Force `sky_color_or_texture`'s Fac to 0, taking the environment image out of the skylight path. |
+
+Use these to size a suspicion before changing code. `CCYCLES_WHITE_TINTS` moved
+the material preview scene from 11.27 against shipping Rhino 9 WIP to 9.96, and
+the real fix then landed on exactly 9.96 — which is how you know the fix did what
+the probe predicted and nothing more.
+
+`CCYCLES_TEX_COLORSPACE` is the cautionary one. It brackets rather than answers:
+`data` and `linear` are identical to `auto` at a 0.9575 ratio, `srgb` overshoots
+to 1.0642, and shipping sits between them. One texture swings the whole frame by
+eleven percent, so it is worth knowing about, but it is not the answer.
+
+## Measuring, rather than looking
+
+`tools/render_regression.ps1` renders fixed scenes and compares them against
+stored images. Two numbers make its threshold meaningful: the same build twice
+differs by a mean of 0.03 per channel out of 255, and the gap to shipping Rhino
+on the same scene is around 10. Anything above 1 is real.
+
+Before believing any difference between two builds, render one of them twice and
+measure that first. It is the only way to know what your noise floor is, and here
+it is small enough that a 0.05 result means the renderer is deterministic rather
+than that the comparison failed.
+
+## The static audits
+
+These need no build and no Rhino:
+
+    python tools/audit_sockets.py               # node types, socket names, socket types
+    python tools/audit_sockets.py --unexposed   # what Cycles offers that csycles does not
+    python tools/audit_enums.py                 # enum members and values against Cycles
+    python tools/audit_svm_nodes.py             # add_node_packed on stock node types
+
+Each exits non-zero on a real problem, so any of them can gate a build. Between
+them they cover the three ways this port has silently drifted: a renamed or
+retyped socket, a renumbered enum, and a stock SVM node emitted in Rhino's packed
+layout.
