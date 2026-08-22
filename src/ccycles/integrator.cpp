@@ -228,8 +228,7 @@ static float ccycles_clamp_override(float value, const char *which)
 {
 	const char *no_clamp = getenv("CCYCLES_NO_CLAMP");
 	if (no_clamp != nullptr && no_clamp[0] == 0x31 && value != 0.0f) {
-		ccycles_diag("disabling %s clamp (was %f)
-", which, value);
+		ccycles_diag("disabling %s clamp (was %f)\n", which, value);
 		return 0.0f;
 	}
 	return value;
