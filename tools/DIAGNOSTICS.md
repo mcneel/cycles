@@ -128,31 +128,44 @@ it comes out at 1.0004, a mean absolute difference of 0.14 per channel against a
 noise floor of 0.03. The environment as seen by camera rays is right. It is only
 surfaces *lit* by it that are dark.
 
-**It is graded by brightness, and dark pixels are brighter rather than darker.**
-Bucketing by the shipping render's luminance:
+**It is graded by brightness.** Bucketing by the shipping render's luminance,
+with both images smoothed by a 7x7 box first:
 
 | shipping luminance | ours/shipping |
 | --- | --- |
-| 43-84 | 1.0657 |
-| 85-127 | 0.9990 |
-| 128-170 | 0.9936 |
-| 171-212 | 0.9752 |
-| 213-255 | 0.9589 |
+| 85-127 | 0.9998 |
+| 128-170 | 0.9981 |
+| 171-212 | 0.9721 |
+| 213-255 | 0.9526 |
 
 That rules out both of the cheap explanations. A global gain would be flat across
 every band; a gamma would pull the midtones off worst and both ends toward 1.
-This does neither - it grows monotonically with brightness, and the darkest band
-overshoots.
+This does neither - the midtones match to within 0.2% and the loss grows
+monotonically with brightness.
 
-Energy leaving the bright end while the dark end gains is what clamping does, and
-this scene clamps: `clamp_direct` and `clamp_indirect` are both 3, which
-`Integrator` multiplies by 3 to give a kernel limit of 9. Neither the clamp
-values (both builds use RhinoCycles' defaults, and neither settings file
-overrides them) nor the code changed - `film_clamp_light` and the times-three
-scaling are the same in 3.5 and 5.2, checked line by line. So clamping is not the
-fault. It is the amplifier: it is biased by construction, so anything that makes
-per-sample radiance spikier turns into a brightness-graded loss at a clamp value
-nobody touched.
+The smoothing is not cosmetic, and this table should not be produced without it.
+Bucketing on one image and averaging the other within each bucket is regression
+to the mean: if one render were merely noisier than the other, that alone would
+produce a monotonic ratio trend of exactly this shape and nothing else. Smoothing
+both first removes it, and the trend survives, so it is a real difference. For
+the record the two renders are about equally noisy - high-frequency rms of 8.48
+for ours against 8.916 for shipping, so if anything ours is the cleaner of the
+two.
+
+An earlier version of this note also claimed the darkest pixels come out
+*brighter* in ours, at a ratio of 1.0657, and read that as energy being moved
+from the bright end to the dark end. That rested on 81 pixels and does not
+survive smoothing, which leaves too few dark pixels in this scene to bucket at
+all. The monotonic loss is the finding; the redistribution is not.
+
+Energy leaving the bright end is what clamping does, and this scene clamps:
+`clamp_direct` and `clamp_indirect` are both 3, which `Integrator` multiplies by
+3 to give a kernel limit of 9. Neither the clamp values (both builds use
+RhinoCycles' defaults, and neither settings file overrides them) nor the code
+changed - `film_clamp_light` and the times-three scaling are the same in 3.5 and
+5.2, checked line by line. So clamping is not the fault. It is the amplifier: it
+is biased by construction, so anything that makes per-sample radiance spikier
+turns into a brightness-graded loss at a clamp value nobody touched.
 
 That points the search at what changed in per-sample radiance for light coming
 from the background, and `CCYCLES_NO_CLAMP=1` exists to take the amplifier out of
