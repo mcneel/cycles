@@ -36,7 +36,9 @@ namespace ccl.ShaderNodes
 		public FloatSocket Sheen { get; set; }
 		public ColorSocket SheenTint { get; set; }
 		public FloatSocket Clearcoat { get; set; }
-		public FloatSocket ClearcoatGloss { get; set; }
+		/* Was ClearcoatGloss. The 4.x socket is Coat Roughness - the inverse
+		 * quantity - so the old name invited exactly the wrong value. */
+		public FloatSocket CoatRoughness { get; set; }
 		public FloatSocket IOR { get; set; }
 		public FloatSocket Transmission { get; set; }
 		public FloatSocket TransmissionRoughness { get; set; }
@@ -87,7 +89,7 @@ namespace ccl.ShaderNodes
 			Sheen = new FloatSocket(parentNode, "Sheen Weight", "sheen_weight");
 			SheenTint = new ColorSocket(parentNode, "Sheen Tint", "sheen_tint");
 			Clearcoat = new FloatSocket(parentNode, "Coat Weight", "coat_weight");
-			ClearcoatGloss = new FloatSocket(parentNode, "Coat Roughness", "coat_roughness");
+			CoatRoughness = new FloatSocket(parentNode, "Coat Roughness", "coat_roughness");
 			IOR = new FloatSocket(parentNode, "IOR", "ior");
 			Transmission = new FloatSocket(parentNode, "Transmission Weight", "transmission_weight");
 			TransmissionRoughness = new FloatSocket(parentNode, "Transmission Roughness", "transmission_roughness") { Retired = true };
@@ -113,7 +115,7 @@ namespace ccl.ShaderNodes
 			AddSocket(Sheen);
 			AddSocket(SheenTint);
 			AddSocket(Clearcoat);
-			AddSocket(ClearcoatGloss);
+			AddSocket(CoatRoughness);
 			AddSocket(IOR);
 			AddSocket(Transmission);
 			AddSocket(TransmissionRoughness);
@@ -196,7 +198,11 @@ namespace ccl.ShaderNodes
 			ins.Sheen.Value = 0.0f;
 			ins.SheenTint.Value = new float4(0.5f, 0.5f, 0.5f, 1.0f);
 			ins.Clearcoat.Value = 0.0f;
-			ins.ClearcoatGloss.Value = 1.0f;
+			/* 1.0 here used to mean a mirror-smooth coat, as gloss. Against
+			 * coat_roughness it asks for the roughest possible coat instead, so any
+			 * material with coat weight above zero came out fully rough. Cycles'
+			 * own default is 0.03. */
+			ins.CoatRoughness.Value = 0.03f;
 			ins.IOR.Value = 1.45f;
 			ins.Transmission.Value = 0.0f;
 			ins.TransmissionRoughness.Value = 0.0f;
@@ -231,7 +237,7 @@ namespace ccl.ShaderNodes
 			Utilities.Instance.get_float(ins.Sheen, xmlNode);
 			Utilities.Instance.get_float4(ins.SheenTint, xmlNode);
 			Utilities.Instance.get_float(ins.Clearcoat, xmlNode);
-			Utilities.Instance.get_float(ins.ClearcoatGloss, xmlNode);
+			Utilities.Instance.get_float(ins.CoatRoughness, xmlNode);
 			Utilities.Instance.get_float(ins.IOR, xmlNode);
 			Utilities.Instance.get_float(ins.Transmission, xmlNode);
 			Utilities.Instance.get_float(ins.TransmissionRoughness, xmlNode);
