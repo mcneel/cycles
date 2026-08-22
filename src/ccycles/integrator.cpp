@@ -215,11 +215,31 @@ CCL_CAPI void CDECL cycles_integrator_set_sampling_pattern(ccl::Session* session
 	}
 }
 
+/* Experiment switch: clamping is biased by design - it discards the part of a
+ * sample's radiance above the limit - so any change in the per-sample radiance
+ * distribution shows up as a brightness-graded difference even when the clamp
+ * value itself is untouched. CCYCLES_NO_CLAMP=1 sets both limits to 0, which
+ * Cycles reads as FLT_MAX, so a render can be compared with the bias removed.
+ *
+ * Note that Integrator multiplies whatever it is given by 3 before handing it
+ * to the kernel, so a scene value of 3 is a kernel limit of 9. That scaling is
+ * the same in 3.5 and 5.2. */
+static float ccycles_clamp_override(float value, const char *which)
+{
+	const char *no_clamp = getenv("CCYCLES_NO_CLAMP");
+	if (no_clamp != nullptr && no_clamp[0] == 0x31 && value != 0.0f) {
+		ccycles_diag("disabling %s clamp (was %f)
+", which, value);
+		return 0.0f;
+	}
+	return value;
+}
+
 CCL_CAPI void CDECL cycles_integrator_set_sample_clamp_direct(ccl::Session* session_id, float sample_clamp_direct)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_sample_clamp_direct(sample_clamp_direct);
+		sce->integrator->set_sample_clamp_direct(ccycles_clamp_override(sample_clamp_direct, "direct"));
 	}
 }
 
@@ -227,7 +247,7 @@ CCL_CAPI void CDECL cycles_integrator_set_sample_clamp_indirect(ccl::Session* se
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_sample_clamp_indirect(sample_clamp_indirect);
+		sce->integrator->set_sample_clamp_indirect(ccycles_clamp_override(sample_clamp_indirect, "indirect"));
 	}
 }
 

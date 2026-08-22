@@ -111,6 +111,58 @@ and the file-format guess between the two versions. That is a real behavioural
 change and it would bite anything passing Cycles a filename. It does not bite
 here.
 
+## What the remaining difference against shipping is, and is not
+
+The gap against shipping Rhino 9 WIP on the material preview scene is a ratio of
+0.9577 - ours is 4.2% darker. Three measurements place it, and each one removes a
+suspect rather than adding one.
+
+**It is not the materials.** Rendering the same scene with a plain material on the
+floor gives 0.9507, slightly *worse* than the full PBR scene's 0.9577. Whatever
+this is, it does not need a principled node to happen, so the 4.x Principled
+rework is not the cause.
+
+**It is not the environment itself.** A background-only render with no geometry in
+it comes out at 1.0004, a mean absolute difference of 0.14 per channel against a
+noise floor of 0.03. The environment as seen by camera rays is right. It is only
+surfaces *lit* by it that are dark.
+
+**It is graded by brightness, and dark pixels are brighter rather than darker.**
+Bucketing by the shipping render's luminance:
+
+| shipping luminance | ours/shipping |
+| --- | --- |
+| 43-84 | 1.0657 |
+| 85-127 | 0.9990 |
+| 128-170 | 0.9936 |
+| 171-212 | 0.9752 |
+| 213-255 | 0.9589 |
+
+That rules out both of the cheap explanations. A global gain would be flat across
+every band; a gamma would pull the midtones off worst and both ends toward 1.
+This does neither - it grows monotonically with brightness, and the darkest band
+overshoots.
+
+Energy leaving the bright end while the dark end gains is what clamping does, and
+this scene clamps: `clamp_direct` and `clamp_indirect` are both 3, which
+`Integrator` multiplies by 3 to give a kernel limit of 9. Neither the clamp
+values (both builds use RhinoCycles' defaults, and neither settings file
+overrides them) nor the code changed - `film_clamp_light` and the times-three
+scaling are the same in 3.5 and 5.2, checked line by line. So clamping is not the
+fault. It is the amplifier: it is biased by construction, so anything that makes
+per-sample radiance spikier turns into a brightness-graded loss at a clamp value
+nobody touched.
+
+That points the search at what changed in per-sample radiance for light coming
+from the background, and `CCYCLES_NO_CLAMP=1` exists to take the amplifier out of
+the picture while looking.
+
+One thing to be careful of when reading a region map of this scene: the
+middle-left ninth measures 0.8691, much the worst of the nine, which reads like a
+shadow problem. It is not - that region contains no dark pixels at all. It is the
+brightest part of the floor, and it is consistent with the table above rather
+than an exception to it.
+
 ## Measuring, rather than looking
 
 `tools/render_regression.ps1` renders fixed scenes and compares them against
