@@ -319,6 +319,32 @@ that throws would otherwise leave the previous good run's image sitting at the
 expected path, looking exactly like a result. A wrapper script here duly copied
 one out as a result, timestamped before its own run had started.
 
+## Building
+
+Build the **solution**, not single projects:
+
+    MSBuild src4/BuildSolutions/Rhino.sln /p:Configuration=Debug /p:Platform=x64 /m:4
+
+Set `RHINOCYCLESDEV=1` first if Cycles itself should be rebuilt from source;
+without it the prebuilt payload from `big_libs` is used, which is what almost
+everyone wants. A full incremental pass is about seven minutes here and reports
+0 warnings and 0 errors.
+
+Two things learned the hard way:
+
+- **Single-project builds leave the tree inconsistent.** Building
+  `ccycles.vcxproj` alone updates `big_libs` but not the plug-in output, because
+  `RhinoCyclesCore.csproj` is what copies from there. Building
+  `RhinoCyclesKernelCompiler.csproj` alone needs
+  `/p:SolutionDir=<repo>/src4/BuildSolutions/`, because that copy step resolves
+  `$(SolutionDir)..\..ig_libs` and the solutions live in `BuildSolutions`, not
+  `src4`. Skipping it is what disabled the GPU above.
+- **`error C1001` from MSVC is usually transient.** A full build died with an
+  internal compiler error in `Rhino3Utilities.cpp`, reporting a garbled compiler
+  filename, which points at memory corruption in the compiler rather than at the
+  code. The same build passed on retry with `/m:4`. Retry before investigating,
+  and lower the parallelism.
+
 ## Reading the RhinoCycles log
 
 This is how the above was found without a debugger, and it is the first place to
