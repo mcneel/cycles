@@ -291,6 +291,13 @@ ustring ColorSpaceManager::detect_known_colorspace(ustring colorspace,
                                                    const char * /*file_format*/,
                                                    bool is_float)
 {
+  /* Port diagnostic: name every image whose colorspace is resolved, because an
+   * empty request silently becomes scene linear and skips the sRGB decode. 5.2
+   * also ignores file_format, so the 3.5 guess of sRGB for a float png/jpeg is
+   * gone. Visible at info level only. */
+  LOG_INFO << "detect_known_colorspace: requested='" << colorspace
+           << "' file_hint='" << (file_colorspace ? file_colorspace : "")
+           << "' is_float=" << is_float;
 #ifdef WITH_OCIO
   OCIO::ConstConfigRcPtr config = nullptr;
   try {

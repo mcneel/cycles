@@ -114,9 +114,40 @@ here.
 
 ## What the remaining difference against shipping is, and is not
 
-The gap against shipping Rhino 9 WIP on the material preview scene is a ratio of
-0.9577 - ours is 4.2% darker. Three measurements place it, and each one removes a
-suspect rather than adding one.
+**It is one scene, not the port.** The second regression case,
+`Material_Scene_Final.3dm` at 600x600, renders **identically** on 5.2 and
+shipping: mean absolute difference 0.013 per channel against a run-to-run noise
+floor of 0.036, luminance ratio 1.0000, and flat across every luminance band
+(0.9996 to 1.0000). So Cycles 5.2 and 3.5 agree exactly on a real scene, and the
+4.2% belongs to `rdk_material_scene.3dm` specifically.
+
+That is the single most useful measurement in this file, and it was cheap - two
+renders of a scene the harness already knew about. Take it before assuming a
+difference is systemic.
+
+**What distinguishes the two scenes is an image texture.** The RhinoCycles log
+for the material preview scene names `18_percent_greycard.jpg`; the scene that
+matches has no image asset in its log at all. And our build emits, exactly once:
+
+    get_processor: Colorspace  can't be converted to scene_linear:
+        ColorSpaceTransform: empty source color space name.
+    detect_known_colorspace: Colorspace  not found, using scene linear instead
+
+An **empty** colorspace, falling back to scene linear - which means no sRGB
+decode. Cycles caches colorspace lookups, so one warning can stand for many
+images. That is consistent with every property of the difference: it appears only
+where there is a texture, and skipping a decode is a power curve, which is why it
+grows with brightness.
+
+It also fits the bracket numbers that were previously written off. Forcing every
+texture to `srgb` overshoots shipping at 1.0642 while leaving them undecoded
+undershoots at 0.9577, and shipping sits between - exactly what you would expect
+if shipping decodes *some* textures and we decode none.
+
+Not yet proven, and the remaining question is which image arrives with an empty
+colorspace and why. Note that 5.2 ignores `file_format` entirely - the parameter
+is `const char * /*file_format*/` - so 3.5's guess of sRGB for a float png or
+jpeg is gone.
 
 **It is not the materials.** Rendering the same scene with a plain material on the
 floor gives 0.9507, slightly *worse* than the full PBR scene's 0.9577. Whatever
