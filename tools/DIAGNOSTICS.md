@@ -327,6 +327,31 @@ that throws would otherwise leave the previous good run's image sitting at the
 expected path, looking exactly like a result. A wrapper script here duly copied
 one out as a result, timestamped before its own run had started.
 
+## Two facts about the test scene, and a dead end
+
+**`rdk_material_scene.3dm` is lit only by its environment.** The RhinoCycles log
+says so plainly:
+
+    ConvertLight Distant: enabled=False intensity=1 strength=0 ... radius=0
+
+The one non-environment light in the scene is disabled with zero strength. That
+explains why every measurement here is a measurement of environment lighting, and
+why this scene cannot separate "the environment lights surfaces differently" from
+"light transport differs generally" - there is no other light to compare against.
+Answering that needs a scene lit by a local light with the skylight off.
+
+**Scripting this Debug build does not work.** Both `run_python` over MCP and
+`-_RunPythonScript` at startup fail to produce output - MCP hits its fixed
+300-second cap on even `print("hello")`, and a startup script produced nothing
+after ten minutes while Rhino sat idle at 56 seconds of CPU, so it is waiting
+rather than working. After a timed-out `run_python`, MCP reports "Rhino is already
+running a command" and no further command gets through, so the session is spent.
+
+That matters because authoring a test scene is the obvious way to answer the
+question above, and the obvious route to authoring one is closed. Build the scene
+by hand in a Release Rhino and commit the .3dm, rather than trying to script a
+Debug one.
+
 ## Building
 
 Build the **solution**, not single projects:
