@@ -221,48 +221,38 @@ between the two versions. Recorded so nobody pays for them twice.
 - **Denoising.** Off in these renders - `log_kernel_features: Use Denoising
   False` - so it cannot be smoothing one and not the other.
 
-## An intermittent spin before the session starts
+## How long a run takes, and how not to misread one
 
-Two of three measurement runs today never rendered. Rhino came up, the MCP
-listener answered, the document loaded, and then one thread span at 100% while
-the other 124 waited - 268 seconds of CPU on a single thread and climbing, with
-no further output.
+A full `render_regression.ps1` cycle against `rdk_material_scene.3dm` - kill any
+running Rhino, launch a Debug build, wait for the MCP port, render 32 samples,
+save - takes **six to seven minutes** on this machine. Budget that before
+concluding anything about a run that has not finished.
 
-It is worth knowing exactly how far it gets, because that bounds the search.
-`cycles_debug_scene_stats` runs on the line immediately before
-`session->start()`, and its output never appears. So the spin is *before* the
-Cycles session starts, which puts it in the Rhino-side conversion of the scene
-rather than in Cycles' shader compilation or device update. That is despite the
-smoketest reporting its own hang as "Updating Shaders", which happens inside
-session start - so the two may not be the same fault, and neither should be
-assumed to be the other.
+Two things look like a hang and are not:
 
-Whether a switch in this document causes it is **open**, and an earlier version
-of this section got the reasoning wrong. It said the switches were in the clear
-because neither probe's own diagnostic line ever reached the log, so neither
-could have run. That does not follow: a thread stuck *inside* the diagnostic
-call, or anywhere after it in the same function, leaves exactly the same absence.
+- **The diag log stops at device enumeration for the whole render.** The scene
+  dump comes from `cycles_debug_scene_stats`, which runs on the line immediately
+  before `session->start()`. Until a render session is actually created, the log
+  holds nothing but the device list - and that is the normal state for the entire
+  gap between Rhino starting and the render finishing. An absent
+  `stats: geometry=...` line means the session has not started yet, which during
+  a render is exactly what you should expect.
+- **One thread pinned at 100% with the rest waiting.** That is what the host
+  side of a GPU render looks like.
 
-What the runs actually say is thinner than that. Three attempts: one with no
-switch beyond `CCYCLES_DIAG_LOG`, which rendered; one under
-`CCYCLES_NO_LIGHT_TREE`, which span; two under `CCYCLES_NO_CLAMP`, which both
-span. `CCYCLES_DIAG_LOG` on its own is fine - the successful run used it and
-produced a full scene dump. So the correlation with the two probes is real but
-rests on three runs, and both probes are read inside integrator setters that
-then call `ccycles_diag`, which makes the probe body and the diagnostic call
-equally suspect.
+I misread both today and killed at least two runs that were probably working,
+then wrote them up as an intermittent pre-session spin. That claim is withdrawn.
+What remains unexplained is a single run that was watched for over twenty
+minutes with CPU climbing steadily and never produced an image - three times the
+normal duration, so still worth a note, but one observation and not a pattern.
 
-`ccycles_diag` is worth a look if this is chased further. It is `static inline`
-in a header with function-local statics, so every translation unit gets its own
-`diag_file` and opens the log separately, and the `diag_file_tried` check is an
-unguarded race between threads because both statics are constant-initialised and
-so carry no thread-safe-init guard. None of that is a spin on inspection, but it
-is not code to trust while investigating a hang either.
+The smoketest hang is separate and better evidenced, because it reports progress
+rather than being inferred from silence: 0.0% after 600 seconds with the status
+stuck on "Updating Shaders", which is inside session start.
 
-Practical consequence for anyone measuring: check that the run produced a
-`stats: geometry=...` line before believing a timeout, and expect to repeat
-runs. There is no diagnosis here yet - no debugger is installed on this machine,
-and one spinning thread with no symbols is as far as it went.
+If a run really does need checking, look at whether Rhino's CPU time is still
+climbing and give it fifteen minutes before killing it. Killing early costs
+another seven-minute cycle and, worse, produces confident nonsense.
 
 ## Measuring, rather than looking
 
