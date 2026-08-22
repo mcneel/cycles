@@ -6,6 +6,8 @@ or read, what the safe current behaviour is, and what the choice is, so nobody
 has to rediscover the shape of the problem before making it.
 
 See `DIAGNOSTICS.md` for the switches and tooling used to establish any of this.
+See `PORT-HISTORY.md` for where the earlier 4.x attempts live and what they
+already decided.
 
 ## Two principled inputs are silently dropped
 

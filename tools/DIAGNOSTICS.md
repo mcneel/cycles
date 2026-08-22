@@ -266,6 +266,12 @@ measure that first. It is the only way to know what your noise floor is, and her
 it is small enough that a 0.05 result means the renderer is deterministic rather
 than that the comparison failed.
 
+## Prior attempts at this port
+
+`PORT-HISTORY.md` says where the earlier 4.x work lives, what it does and does
+not save (measured, not estimated), and where Nathan's csycles generator is and
+what reviving it costs. Read it before rewriting anything on the Rhino side.
+
 ## Gaps that are decisions, not bugs
 
 `PORTING-GAPS.md` lists what works differently from shipping and is waiting on a
