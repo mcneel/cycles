@@ -243,6 +243,14 @@ CCL_CAPI void CDECL cycles_integrators_set_use_light_tree(ccl::Session* session_
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
+		/* Experiment switch: the light tree is how 5.x picks an emitter, and a
+		 * background emitter goes through it differently than a local light.
+		 * CCYCLES_NO_LIGHT_TREE forces the older distribution instead. */
+		const char *no_tree = getenv("CCYCLES_NO_LIGHT_TREE");
+		if (no_tree != nullptr && no_tree[0] == 0x31) {
+			ccycles_diag("forcing use_light_tree off (was %d)\n", (int)use_light_tree);
+			use_light_tree = false;
+		}
 		sce->integrator->set_use_light_tree(use_light_tree);
 	}
 }

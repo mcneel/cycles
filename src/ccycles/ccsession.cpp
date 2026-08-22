@@ -285,6 +285,33 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 		 * across combined, shadow_catcher_matte, shadow_catcher and background,
 		 * and reading only "combined" can legitimately give black. Report what is
 		 * in each of them once, at the last sample. */
+		/* Shader flags like emission_estimate and has_surface_spatial_varying are
+		 * only filled in by ShaderManager::device_update, which runs after
+		 * session start - reading them in cycles_debug_scene_stats gives zeros
+		 * for every shader and means nothing. Report them once from here, where
+		 * compilation has definitely happened. */
+		static const bool want_shader_flags = getenv("CCYCLES_DIAG_LOG") != nullptr;
+		if (want_shader_flags) {
+			static bool shader_flags_done = false;
+			if (!shader_flags_done && ccsession_ != nullptr && ccsession_->session != nullptr) {
+				shader_flags_done = true;
+				ccl::Scene *sc = ccsession_->session->scene.get();
+				if (sc != nullptr) {
+					for (size_t si = 0; si < sc->shaders.size(); si++) {
+						ccl::Shader *sh = sc->shaders[si];
+						ccycles_diag("compiled shader %zu '%s' emission=(%f %f %f) "
+						             "sampling=%d surface=%d spatial_varying=%d "
+						             "light_path=%d const_emission=%d\n",
+						             si, sh->name.c_str(), sh->emission_estimate.x,
+						             sh->emission_estimate.y, sh->emission_estimate.z,
+						             (int)sh->emission_sampling, (int)sh->has_surface,
+						             (int)sh->has_surface_spatial_varying,
+						             (int)sh->has_light_path_node,
+						             (int)sh->emission_is_constant);
+					}
+				}
+			}
+		}
 		static const bool want_probe = getenv("CCYCLES_PASS_PROBE") != nullptr;
 		if (want_probe && tile.get_sample() > 1) {
 			static bool probed = false;

@@ -271,6 +271,11 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 	 * believes it set. */
 	for (size_t si = 0; si < sce->shaders.size(); si++) {
 		ccl::Shader *sh = sce->shaders[si];
+		/* Nothing post-compile here on purpose: emission_estimate, has_surface
+		 * and friends are filled in by ShaderManager::device_update, which runs
+		 * after session start, so reading them here reports zero for every
+		 * shader and reads as "nothing emits". The tile callback reports them
+		 * once compilation has actually happened. */
 		ccycles_diag("  shader %zu '%s' graph=%p\n", si, sh->name.c_str(),
 		             (void *)sh->graph.get());
 		if (sh->graph == nullptr) {
