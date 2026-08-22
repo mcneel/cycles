@@ -30,6 +30,9 @@ namespace fs = std::filesystem;
 #endif
 
 #include "internal_types.h"
+#include "scene/background.h"
+#include "scene/shader_nodes.h"
+#include "scene/shader_graph.h"
 
 extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id);
 #include "device/device.h"
@@ -636,6 +639,132 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
 		logger.logit("Starting session ", session_id);
+
+		/* Experiment switch: Rhino's background graph is thirty-odd nodes with
+		 * light_path gating, so "the environment does not light anything" could
+		 * be that graph or it could be background light sampling underneath.
+		 * CCYCLES_SIMPLE_BACKGROUND swaps in the smallest graph that must emit -
+		 * one background_shader wired to the output - to tell those apart. */
+		/* The background graph is ~40 nodes of light_path gating and the static
+		 * socket values do not say which branch a given ray takes. Dump the
+		 * topology so the path to final_bg can be traced. */
+		/* The background graph feeds skylight colour from an environment texture
+		 * (assets/RhinoStudio8.exr) through sky_color_or_texture, whose Fac is a
+		 * plain 1.0 selecting the texture over the solid colour. Flipping it to 0
+		 * takes the image sampling out of the path while leaving every gate and
+		 * factor intact - which separates "the image samples black" from
+		 * "the gating picks a black branch". */
+		/* Static socket values cannot show what a node actually evaluates to, and
+		 * SVM will not tell you either. CCYCLES_BG_TAP=<node name> rewires that
+		 * node's first colour output straight into final_bg's Color, so the render
+		 * shows what that point in the graph produces. Bisecting a chain with it
+		 * takes a handful of runs. */
+		const char *tap = getenv("CCYCLES_BG_TAP");
+		if (tap != nullptr && tap[0] != 0) {
+			ccl::Scene *tsce = session->scene.get();
+			ccl::Shader *tsh = (tsce != nullptr)
+			                       ? static_cast<ccl::Shader *>(tsce->background->get_shader())
+			                       : nullptr;
+			if (tsh != nullptr && tsh->graph != nullptr) {
+				ccl::ShaderNode *srcnode = nullptr;
+				ccl::ShaderNode *bgnode = nullptr;
+				for (ccl::ShaderNode *nd : tsh->graph->nodes) {
+					if (nd->name == ccl::ustring(tap)) srcnode = nd;
+					if (nd->name == ccl::ustring("final_bg")) bgnode = nd;
+				}
+				if (srcnode == nullptr || bgnode == nullptr) {
+					ccycles_diag("tap: node '%s' or final_bg not found\n", tap);
+				}
+				else {
+					ccl::ShaderOutput *from = nullptr;
+					for (ccl::ShaderOutput *o : srcnode->outputs) {
+						if (o->type() == ccl::SocketType::COLOR ||
+						    o->type() == ccl::SocketType::FLOAT ||
+						    o->type() == ccl::SocketType::VECTOR ||
+						    o->type() == ccl::SocketType::POINT ||
+						    o->type() == ccl::SocketType::NORMAL) {
+							from = o;
+							break;
+						}
+					}
+					ccl::ShaderInput *to = bgnode->input("Color");
+					if (from != nullptr && to != nullptr) {
+						tsh->graph->disconnect(to);
+						tsh->graph->connect(from, to);
+						ccycles_diag("tap: final_bg.Color <- %s.%s\n", tap,
+						             from->socket_type.name.c_str());
+						tsh->tag_update(tsce);
+						tsce->background->tag_update(tsce);
+					}
+					else {
+						ccycles_diag("tap: no colour output on '%s'\n", tap);
+					}
+				}
+			}
+		}
+
+		const char *sky_from_color = getenv("CCYCLES_BG_SKY_FROM_COLOR");
+		if (sky_from_color != nullptr && sky_from_color[0] == 0x31) {
+			ccl::Scene *fsce = session->scene.get();
+			ccl::Shader *fsh = (fsce != nullptr)
+			                       ? static_cast<ccl::Shader *>(fsce->background->get_shader())
+			                       : nullptr;
+			if (fsh != nullptr && fsh->graph != nullptr) {
+				for (ccl::ShaderNode *nd : fsh->graph->nodes) {
+					if (nd->name == ccl::ustring("sky_color_or_texture")) {
+						ccl::MixNode *mixnd = dynamic_cast<ccl::MixNode *>(nd);
+						if (mixnd != nullptr) {
+							ccycles_diag("forcing sky_color_or_texture Fac %f -> 0\n",
+							             mixnd->get_fac());
+							mixnd->set_fac(0.0f);
+						}
+					}
+					/* Report every environment texture and the file it points at. */
+					if (ccl::EnvironmentTextureNode *env =
+					        dynamic_cast<ccl::EnvironmentTextureNode *>(nd)) {
+						ccycles_diag("  env texture '%s' filename='%s'\n",
+						             nd->name.c_str(), env->get_filename().c_str());
+					}
+				}
+				fsh->tag_update(fsce);
+				fsce->background->tag_update(fsce);
+			}
+		}
+
+		const char *dump_bg = getenv("CCYCLES_DUMP_BG");
+		if (dump_bg != nullptr && dump_bg[0] != 0) {
+			ccl::Scene *dsce = session->scene.get();
+			ccl::Shader *dsh = (dsce != nullptr)
+			                       ? static_cast<ccl::Shader *>(dsce->background->get_shader())
+			                       : nullptr;
+			if (dsh != nullptr && dsh->graph != nullptr) {
+				dsh->graph->dump_graph(dump_bg);
+				ccycles_diag("dumped background graph to %s\n", dump_bg);
+			}
+		}
+
+		const char *simple_bg = getenv("CCYCLES_SIMPLE_BACKGROUND");
+		if (simple_bg != nullptr && simple_bg[0] == 0x31) {
+			ccl::Scene *bgsce = session->scene.get();
+			ccl::Shader *bgshader =
+			    (bgsce != nullptr)
+			        ? static_cast<ccl::Shader *>(bgsce->background->get_shader())
+			        : nullptr;
+			if (bgshader != nullptr) {
+				auto graph = ccl::make_unique<ccl::ShaderGraph>();
+				ccl::BackgroundNode *bg = graph->create_node<ccl::BackgroundNode>();
+				bg->set_color(ccl::make_float3(0.8f, 0.8f, 0.8f));
+				bg->set_strength(1.0f);
+				graph->connect(bg->output("Background"),
+				               graph->output()->input("Surface"));
+				bgshader->set_graph(std::move(graph));
+				bgshader->tag_update(bgsce);
+				bgsce->background->tag_update(bgsce);
+				ccycles_diag("replaced background shader '%s' with a plain white "
+				             "background_shader\n", bgshader->name.c_str());
+			}
+		}
+
 		cycles_debug_scene_stats(session_id);
 		session->start();
 	}

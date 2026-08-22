@@ -47,6 +47,13 @@ void SVMShaderManager::device_update_shader(Scene *scene,
   SVMCompiler::Summary summary;
   SVMCompiler compiler(scene, progress);
   compiler.background = (shader == scene->background->get_shader(scene));
+  /* Rhino: whether a shader compiles as the background decides what the
+   * texture coordinate node emits for Generated - the ray direction, or an
+   * ATTR_STD_GENERATED lookup that reads zero when there is no geometry. Worth
+   * being able to see. */
+  LOG_INFO << "SVM compile \"" << shader->name << "\" background="
+           << compiler.background << " (scene background shader is \""
+           << scene->background->get_shader(scene)->name << "\")";
   compiler.compile(shader, *svm_nodes, 0, &summary);
 
   LOG_DEBUG << "Compilation summary:\n"

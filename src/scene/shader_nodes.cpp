@@ -1953,10 +1953,16 @@ void RGBToLuminanceNode::constant_fold(const ConstantFolder& folder)
 
 void RGBToLuminanceNode::compile(SVMCompiler& compiler)
 {
-	compiler.add_node_packed(NODE_CONVERT,
-		NODE_CONVERT_CF2,
-		compiler.input_link(inputs[0]),
-		compiler.output(outputs[0]));
+	/* NODE_CONVERT is a stock Cycles node, so it must be emitted in 5.2's
+	 * structured form. add_node_packed is only correct for the RHINO_NODE_*
+	 * types, whose kernel readers still use the old packed layout. */
+	compiler.add_node(this,
+		NODE_CONVERT,
+		SVMNodeConvert{
+			.convert_type = NODE_CONVERT_CF2,
+			.from_offset = compiler.input_link(inputs[0]),
+			.to_offset = compiler.output(outputs[0]),
+		});
 }
 
 void RGBToLuminanceNode::compile(OSLCompiler& compiler)
@@ -4480,7 +4486,15 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
   out = output("Generated");
   if (!out->links.empty()) {
     if (compiler.background) {
-      compiler.add_node_packed(geom_node, NODE_GEOM_P, compiler.output(out));
+      compiler.add_node(this,
+                        geom_node,
+                        SVMNodeGeometry{
+                            .geom_type = NODE_GEOM_P,
+                            .bump_offset = NODE_BUMP_OFFSET_CENTER,
+                            .store_derivatives = false,
+                            .out_offset = compiler.output(out),
+                            .bump_filter_width = 0.0f,
+                        });
     }
     else {
       if (from_dupli) {
@@ -4491,7 +4505,16 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
       }
       else {
         int attr = compiler.attribute(ATTR_STD_GENERATED);
-        compiler.add_node_packed(attr_node, attr, compiler.output(out), NODE_ATTR_OUTPUT_FLOAT3);
+        compiler.add_node(this,
+                          attr_node,
+                          SVMNodeAttr{
+                              .attr = attr,
+                              .out_offset = compiler.output(out),
+                              .output_type = NODE_ATTR_OUTPUT_FLOAT3,
+                              .bump_offset = NODE_BUMP_OFFSET_CENTER,
+                              .store_derivatives = false,
+                              .bump_filter_width = 0.0f,
+                          });
       }
     }
   }
@@ -4535,7 +4558,15 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
   out = output("Reflection");
   if (!out->links.empty()) {
     if (compiler.background) {
-      compiler.add_node_packed(geom_node, NODE_GEOM_I, compiler.output(out));
+      compiler.add_node(this,
+                        geom_node,
+                        SVMNodeGeometry{
+                            .geom_type = NODE_GEOM_I,
+                            .bump_offset = NODE_BUMP_OFFSET_CENTER,
+                            .store_derivatives = false,
+                            .out_offset = compiler.output(out),
+                            .bump_filter_width = 0.0f,
+                        });
     }
     else {
       compiler.add_node_packed(texco_node, NODE_TEXCO_REFLECTION, compiler.output(out));
@@ -4599,7 +4630,19 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
 
   if (!out->links.empty()) {
     int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
-    compiler.add_node_packed(attr_node, attr, compiler.output(out), NODE_ATTR_FLOAT3);
+    /* NODE_ATTR_FLOAT3 is a NodeAttributeType; this field wants a
+     * NodeAttributeOutputType. The packed layout put it where the kernel never
+     * read it, so the mistake was invisible. */
+    compiler.add_node(this,
+                      attr_node,
+                      SVMNodeAttr{
+                          .attr = attr,
+                          .out_offset = compiler.output(out),
+                          .output_type = NODE_ATTR_OUTPUT_FLOAT3,
+                          .bump_offset = NODE_BUMP_OFFSET_CENTER,
+                          .store_derivatives = false,
+                          .bump_filter_width = 0.0f,
+                      });
     decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_UV, compiler);
   }
 
