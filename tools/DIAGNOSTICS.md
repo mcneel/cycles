@@ -293,6 +293,32 @@ Checks worth running before trusting a render:
     ls "<data>/gpus/"*.task                                    # should not just accumulate
     ls "<local>/RhinoCycles/KernelCache"                       # empty means no kernels
 
+## How long a run takes
+
+A full `render_regression.ps1` cycle against `rdk_material_scene.3dm` - kill any
+running Rhino, launch a Debug build, wait for the MCP port, render 32 samples,
+save - takes **six to seven minutes** on this machine. Budget that before
+concluding anything about a run that has not finished; killing a working render
+at the six-minute mark and calling it a hang is a mistake already made here.
+
+Two things look like a hang and are not:
+
+- **The diag log stops at device enumeration for the whole render.** The scene
+  dump comes from `cycles_debug_scene_stats`, which runs on the line immediately
+  before `session->start()`, so its absence is the normal state until a session
+  exists - which, during a render, is most of the time.
+- **One thread pinned at 100% with the rest waiting.** That is what the host side
+  of a GPU render looks like.
+
+A genuine failure shows up as a clean timeout: `_Render` hitting the script's
+1800-second limit with `Rhino call "run_command" failed: The request was aborted`.
+
+**And check the timestamp of any image you collect.** `render_regression.ps1`
+deletes its output before rendering rather than after, precisely because a render
+that throws would otherwise leave the previous good run's image sitting at the
+expected path, looking exactly like a result. A wrapper script here duly copied
+one out as a result, timestamped before its own run had started.
+
 ## Reading the RhinoCycles log
 
 This is how the above was found without a debugger, and it is the first place to
