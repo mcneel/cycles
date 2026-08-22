@@ -337,7 +337,7 @@ Two things learned the hard way:
   `RhinoCyclesCore.csproj` is what copies from there. Building
   `RhinoCyclesKernelCompiler.csproj` alone needs
   `/p:SolutionDir=<repo>/src4/BuildSolutions/`, because that copy step resolves
-  `$(SolutionDir)..\..ig_libs` and the solutions live in `BuildSolutions`, not
+  `$(SolutionDir)..\..\big_libs` and the solutions live in `BuildSolutions`, not
   `src4`. Skipping it is what disabled the GPU above.
 - **`error C1001` from MSVC is usually transient.** A full build died with an
   internal compiler error in `Rhino3Utilities.cpp`, reporting a garbled compiler
