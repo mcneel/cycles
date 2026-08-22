@@ -178,23 +178,31 @@ smoketest sees. Unexplained, one occurrence, and a rerun without the switch
 rendered normally.
 
 Energy leaving the bright end is what clamping does, and this scene clamps:
-`clamp_direct` and `clamp_indirect` are both 3, which `Integrator` multiplies by
-3 to give a kernel limit of 9. Neither the clamp values (both builds use
-RhinoCycles' defaults, and neither settings file overrides them) nor the code
-changed - `film_clamp_light` and the times-three scaling are the same in 3.5 and
-5.2, checked line by line. So clamping is not the fault. It is the amplifier: it
-is biased by construction, so anything that makes per-sample radiance spikier
-turns into a brightness-graded loss at a clamp value nobody touched.
+`clamp_direct` and `clamp_indirect` are both 3, which `Integrator` multiplies by 3
+for a kernel limit of 9. That made clamping the obvious mechanism - not as the
+fault, since `film_clamp_light` and the scaling are identical between versions,
+but as an *amplifier*: clamping is biased by construction, so anything making
+per-sample radiance spikier becomes a brightness-graded loss at a clamp value
+nobody touched.
 
-That points the search at what changed in per-sample radiance for light coming
-from the background, and `CCYCLES_NO_CLAMP=1` exists to take the amplifier out of
-the picture while looking.
+**That is wrong, and it was worth the one render to find out.** With
+`CCYCLES_NO_CLAMP=1`, confirmed applied both by the probe's own log lines and by
+the integrator dump reading `clamp_direct=0.000000 clamp_indirect=0.000000`, the
+difference against shipping is **9.957** against 9.956 with clamping on. No
+effect whatsoever. Clamping does not bite on this scene at this exposure, so it
+cannot be amplifying anything.
 
-One thing to be careful of when reading a region map of this scene: the
-middle-left ninth measures 0.8691, much the worst of the nine, which reads like a
-shadow problem. It is not - that region contains no dark pixels at all. It is the
-brightest part of the floor, and it is consistent with the table above rather
-than an exception to it.
+So the brightness grading is not a clipping artefact. It is a real difference in
+how much light arrives, growing with the amount of light arriving - which is a
+harder thing to explain and rules out the whole class of "bias knob" theories.
+
+One tooling note from the same experiment. Setting `SampleClampDirect` and
+`SampleClampIndirect` in `settings-Scheme__Default.xml` changed nothing, and that
+is not evidence about clamping - it is that `ModalRenderEngine` wraps document
+settings in a quality preset (`Draft`/`Good`/`Final`/`Low`) unless
+`UseDocumentSamples` is set, and the preset supplies its own values. Use the
+environment probes rather than the settings file when the point is to change what
+Cycles receives, and confirm from the integrator dump that it landed.
 
 ### Suspects eliminated
 
