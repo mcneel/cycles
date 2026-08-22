@@ -396,9 +396,12 @@ everyone wants. A full incremental pass is about seven minutes here and reports
 
 Two things learned the hard way:
 
-- **Single-project builds leave the tree inconsistent.** Building
-  `ccycles.vcxproj` alone updates `big_libs` but not the plug-in output, because
-  `RhinoCyclesCore.csproj` is what copies from there. Building
+- **Single-project builds leave the tree inconsistent, in both directions.**
+  Building `ccycles.vcxproj` alone updates `big_libs` but not the plug-in output,
+  because `RhinoCyclesCore.csproj` is what copies from there - and building
+  `RhinoCyclesCore.csproj` alone copies whatever is already in `big_libs` without
+  rebuilding Cycles, even with `RHINOCYCLESDEV` set. Editing a Cycles source file
+  therefore needs both, in that order, or just the solution. Building
   `RhinoCyclesKernelCompiler.csproj` alone needs
   `/p:SolutionDir=<repo>/src4/BuildSolutions/`, because that copy step resolves
   `$(SolutionDir)..\..\big_libs` and the solutions live in `BuildSolutions`, not
