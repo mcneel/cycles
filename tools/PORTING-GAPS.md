@@ -10,36 +10,60 @@ See `DIAGNOSTICS.md` for the switches and tooling used to establish any of this.
 ## Two principled inputs are silently dropped
 
 Blender 4.0 removed `Subsurface Color` and `Transmission Roughness` from the
-Principled BSDF. csycles keeps both sockets, marked `Retired` rather than
-deleted, and `Retired` means a real no-op: `SocketBase.Connect` returns early and
-`ShaderNode` skips the socket when pushing values. Nothing throws and nothing
-reaches Cycles.
+Principled BSDF. csycles keeps both sockets marked `Retired`, which is a real
+no-op: `SocketBase.Connect` returns early and `ShaderNode` skips the socket when
+pushing values. Nothing throws and nothing reaches Cycles.
 
-RhinoCycles still writes to both, so two Rhino inputs currently have no effect:
+RhinoCycles still writes to both, so two Rhino inputs have no effect: the PBR
+subsurface scattering colour, and the PBR opacity roughness (plus
+`RefractionRoughness` on the standard path).
 
-| Rhino input | csycles socket | RhinoFullNxt.cs |
-| --- | --- | --- |
-| PBR subsurface scattering colour | `SubsurfaceColor` | connected at the PBR path, and given a grey default on the standard path |
-| PBR opacity roughness, and `RefractionRoughness` on the standard path | `TransmissionRoughness` | connected at the PBR path, set from `part.RefractionRoughness` on the standard path |
+### What the 4.4 attempt decided
 
-So a material with subsurface scattering loses its scattering colour, and glass
-with a refraction roughness distinct from its surface roughness loses that
-distinction.
+Worth reading before deciding again, because this ground has been covered twice.
+On `origin/build/lars/UpdateToVersion44_RebaseOn9`, `Shaders/RhinoFullNxt.cs`:
 
-**The choice.** In 4.x, subsurface takes its colour from `Base Color`, and
-transmission takes its roughness from the main `Roughness`. Both therefore mean
-folding one Rhino input into another, and which one wins is visible to users:
+    768   PbrRoughness            -> principled.ins.Roughness
+    778   PbrSubsurfaceColor      -> principled.ins.BaseColor   (guarded on radius and weight > 0)
+    788   PbrTransmissionRoughness -> principled.ins.Roughness
 
-- Subsurface colour could be mixed into base colour by the subsurface weight, or
-  simply ignored when the weight is zero (which is the common case and costs
-  nothing).
-- Refraction roughness and surface roughness have to become one number. Rhino
-  exposes them separately, so either the refraction control stops working or the
-  surface reflection changes with it.
+which is the Blender-consistent direction: subsurface takes its colour from base
+colour in 4.x, and transmission takes its roughness from the main roughness. On
+the standard path the same two were left as TODOs rather than decided:
+
+    1119  // TODO principledbsdf117.ins.SubsurfaceColor.Value = ...
+    1133  // TODO principledbsdf117.ins.Roughness.Value = part.RefractionRoughness;
+
+### Why adopting it as written would gain nothing
+
+Both of those mappings connect a *second* graph to an input that is already
+connected - `BaseColor` is taken at line 757 by the base-colour-with-AO graph,
+and `Roughness` is taken at line 768. `SocketBase.Connect` returns false for an
+already-linked socket, and asserts in DEBUG. So the first connection wins: in
+release both mappings silently do nothing, and in debug they assert.
+
+The effective behaviour is therefore the same as ours today, minus the assert.
+This is not a case of prior work we failed to pick up - it is prior work that
+recorded an intent without landing it, and the assert is a plausible contributor
+to that branch being remembered as unstable.
+
+### What actually needs deciding
+
+Doing this properly means *combining* rather than connecting twice, and each
+combination is a user-visible choice:
+
+- **Base colour.** The subsurface colour has to be mixed into the base-colour
+  graph before it reaches `BaseColor`, not connected alongside it. Mixed by
+  what - the subsurface weight, or replacing base colour outright when
+  subsurface is active?
+- **Roughness.** Rhino exposes surface roughness and opacity roughness
+  separately; 4.x has one number. Either the opacity control stops having an
+  effect, or it changes the surface reflection with it. There is no mapping that
+  preserves both.
 
 Blender has its own conversion for old files and matching it would be the
 defensible default, but that code is not in this repository, so implementing it
-from memory would be guesswork. Not done on purpose.
+from memory would be guesswork.
 
 ## Three node types are not registered
 
