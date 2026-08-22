@@ -75,7 +75,7 @@ is enough to tell a real direction from all zeros.
 | `CCYCLES_WHITE_TINTS=1` | Force `specular_tint` and `sheen_tint` white on every principled node, cutting links. |
 | `CCYCLES_TEX_COLORSPACE=data\|srgb\|linear` | Force every image texture's colorspace. |
 | `CCYCLES_NO_SHADOW_CATCHER=1` | Ignore every object's shadow-catcher flag. |
-| `CCYCLES_NO_LIGHT_TREE=1` | Force the old light distribution. Note RhinoCycles never sets `use_light_tree`, so this only bites where ccycles does. |
+| `CCYCLES_NO_LIGHT_TREE=1` | Force the old light distribution. Of little use for comparing against shipping - see below - and one run under it hung before the session started. |
 | `CCYCLES_BG_SKY_FROM_COLOR=1` | Force `sky_color_or_texture`'s Fac to 0, taking the environment image out of the skylight path. |
 | `CCYCLES_NO_CLAMP=1` | Set both sample clamps to 0, which Cycles reads as no limit at all. Takes the clamp's bias out of a comparison. |
 
@@ -157,6 +157,25 @@ An earlier version of this note also claimed the darkest pixels come out
 from the bright end to the dark end. That rested on 81 pixels and does not
 survive smoothing, which leaves too few dark pixels in this scene to bucket at
 all. The monotonic loss is the finding; the redistribution is not.
+
+**The light tree is not it either, and this is worth stating because it looks
+like a good candidate.** Many-light sampling changes the per-sample radiance
+distribution, which is exactly the kind of thing being hunted here. But it landed
+in Blender 3.5, not 4.x: `src/scene/light_tree.cpp` is present on the 3.5 branch
+and `use_light_tree` defaults to true there as well. Both builds render with it
+on, so it cannot be the difference. Ruled out by reading rather than by
+measuring, which is cheaper and in this case just as conclusive.
+
+One caveat on the switch that turns it off. RhinoCycles does now apply its
+`UseLightTree` setting - a line was added for that during this port, because the
+native session init hardcoded the tree to on and the setting had never reached
+Cycles at all. A run with `CCYCLES_NO_LIGHT_TREE=1` then hung, spinning one core
+for twenty minutes without ever starting a session. Do not read that as the
+switch being at fault: the probe's own "forcing use_light_tree off" line never
+appeared in the log, and neither did the session's scene dump, so the hang
+happened before the probe could have run. It resembles the pre-session hang the
+smoketest sees. Unexplained, one occurrence, and a rerun without the switch
+rendered normally.
 
 Energy leaving the bright end is what clamping does, and this scene clamps:
 `clamp_direct` and `clamp_indirect` are both 3, which `Integrator` multiplies by
