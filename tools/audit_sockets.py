@@ -17,7 +17,11 @@ CYCLES_NODE_SOURCES = ['scene/shader_nodes.cpp', 'scene/rhino_shader_nodes.cpp']
 
 
 def cycles_nodes():
-    """type name -> {'in','out','param'}: ui name -> internal name."""
+    """type name -> {'in','out','param'}: ui name -> internal name.
+
+    Also 'svm_internal': the ui names Cycles marks SVM_INTERNAL, which exist only
+    for the compiler and are not something a wrapper should expose.
+    """
     src = ''
     for f in CYCLES_NODE_SOURCES:
         p = os.path.join(SRC, f)
@@ -38,11 +42,18 @@ def cycles_nodes():
         tn = re.search(r'NodeType::add\(\s*"([^"]+)"', body)
         if not tn:
             continue
-        ent = {'in': {}, 'out': {}, 'param': {}}
-        for sm in re.finditer(r'SOCKET_(IN_|OUT_)?(\w+)\(\s*(\w+)\s*,\s*"([^"]*)"', body):
-            direction, internal, ui = sm.group(1), sm.group(3), sm.group(4)
+        ent = {'in': {}, 'out': {}, 'param': {}, 'svm_internal': set()}
+        # The tail carries the flags, but it must not run past the next SOCKET_:
+        # some calls (base_color) wrap across lines, so keying on ');' swallowed
+        # the socket that followed.
+        pat = (r'SOCKET_(IN_|OUT_)?(\w+)\(\s*(\w+)\s*,\s*"([^"]*)"'
+               r'(.*?)(?=SOCKET_|\Z)')
+        for sm in re.finditer(pat, body, re.S):
+            direction, internal, ui, rest = sm.group(1), sm.group(3), sm.group(4), sm.group(5)
             key = 'in' if direction == 'IN_' else 'out' if direction == 'OUT_' else 'param'
             ent[key][ui] = internal
+            if 'SVM_INTERNAL' in rest:
+                ent['svm_internal'].add(ui)
         out[tn.group(1)] = ent
     return out
 
@@ -121,6 +132,28 @@ def main():
         print(f"SOCKET     {ctype} {which} {ui!r} ({base}) does not exist; Cycles has {have}")
     for ctype, which, ui, internal, want, base in bad_internal:
         print(f"INTERNAL   {ctype} {which} {ui!r} ({base}) internal={internal!r}, Cycles wants {want!r}")
+
+    # Sockets Cycles has that csycles never exposes. Not a defect - they fall back
+    # to Cycles' own defaults - but it is what Rhino cannot drive, and the list is
+    # invisible otherwise. Off by default so this stays a clean build gate.
+    if '--unexposed' in sys.argv:
+        print()
+        total = 0
+        for ctype, cls, base, inc, outc in sorted(nodes):
+            if ctype not in cyc:
+                continue
+            exposed = set()
+            for cname in (inc, outc):
+                if cname and cname in containers:
+                    exposed |= {ui.lower() for ui in containers[cname][1]}
+            missing = [ui for ui in sorted(cyc[ctype]['in'])
+                       if ui.lower() not in exposed
+                       and ui not in cyc[ctype].get('svm_internal', set())]
+            if missing:
+                total += len(missing)
+                print('UNEXPOSED  %s: %s' % (ctype, ', '.join(missing)))
+        print()
+        print('%d socket(s) Cycles offers that csycles does not expose' % total)
 
     n = len(bad_types) + len(bad_sockets) + len(bad_internal)
     print(f"\naudit_sockets: {len(nodes)} csycles nodes vs {len(cyc)} Cycles node types - "
