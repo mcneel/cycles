@@ -83,10 +83,33 @@ the material preview scene from 11.27 against shipping Rhino 9 WIP to 9.96, and
 the real fix then landed on exactly 9.96 — which is how you know the fix did what
 the probe predicted and nothing more.
 
-`CCYCLES_TEX_COLORSPACE` is the cautionary one. It brackets rather than answers:
-`data` and `linear` are identical to `auto` at a 0.9575 ratio, `srgb` overshoots
-to 1.0642, and shipping sits between them. One texture swings the whole frame by
-eleven percent, so it is worth knowing about, but it is not the answer.
+`CCYCLES_TEX_COLORSPACE` is the cautionary one, and it has now been run down.
+It brackets rather than answers: `data` and `linear` are identical to `auto` at a
+0.9575 ratio, `srgb` overshoots to 1.0642, and shipping sits between them. One
+texture swings the whole frame by eleven percent, so the switch is worth having.
+
+But it is not the difference against shipping, and the reason is worth writing
+down because the obvious reading is wrong. Without an OCIO config, 5.2 resolves
+`auto` as
+
+    (is_float && file_colorspace is not srgb_rec709_*) ? scene_linear : srgb
+
+so a *byte* image is still decoded as sRGB; only float images come through
+untouched. 3.5 decoded byte images as sRGB too, and for float images asked for
+`file_colorspace` of "sRGB"/"GammaCorrected" or an empty one with a png, jpeg,
+tiff, dpx or jpeg2000 *file format*.
+
+Rhino never hands Cycles a file. Textures arrive as builtin in-memory images
+through `builtin_image_float_pixels`, which leaves both `file_colorspace` and
+`file_format` empty. So under 3.5 the format test failed and the image was `raw`;
+under 5.2 it is `scene_linear`. Neither decodes, and the two agree. That also
+confirms these images are float rather than byte - if they were byte, `auto`
+would already equal `srgb` and forcing `linear` could not have moved the frame.
+
+The named-colorspace path did lose the old "sRGB" and "GammaCorrected" spellings
+and the file-format guess between the two versions. That is a real behavioural
+change and it would bite anything passing Cycles a filename. It does not bite
+here.
 
 ## Measuring, rather than looking
 
