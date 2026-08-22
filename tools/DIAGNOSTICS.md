@@ -237,10 +237,27 @@ smoketest reporting its own hang as "Updating Shaders", which happens inside
 session start - so the two may not be the same fault, and neither should be
 assumed to be the other.
 
-It is not caused by any switch in this document: it happened first under
-`CCYCLES_NO_LIGHT_TREE` and then again under `CCYCLES_NO_CLAMP`, and in both
-cases the switch's own diagnostic line never reached the log, so neither had run
-yet. A rerun with no switches at all rendered normally.
+Whether a switch in this document causes it is **open**, and an earlier version
+of this section got the reasoning wrong. It said the switches were in the clear
+because neither probe's own diagnostic line ever reached the log, so neither
+could have run. That does not follow: a thread stuck *inside* the diagnostic
+call, or anywhere after it in the same function, leaves exactly the same absence.
+
+What the runs actually say is thinner than that. Three attempts: one with no
+switch beyond `CCYCLES_DIAG_LOG`, which rendered; one under
+`CCYCLES_NO_LIGHT_TREE`, which span; two under `CCYCLES_NO_CLAMP`, which both
+span. `CCYCLES_DIAG_LOG` on its own is fine - the successful run used it and
+produced a full scene dump. So the correlation with the two probes is real but
+rests on three runs, and both probes are read inside integrator setters that
+then call `ccycles_diag`, which makes the probe body and the diagnostic call
+equally suspect.
+
+`ccycles_diag` is worth a look if this is chased further. It is `static inline`
+in a header with function-local statics, so every translation unit gets its own
+`diag_file` and opens the log separately, and the `diag_file_tried` check is an
+unguarded race between threads because both statics are constant-initialised and
+so carry no thread-safe-init guard. None of that is a spin on inspection, but it
+is not code to trust while investigating a hang either.
 
 Practical consequence for anyone measuring: check that the run produced a
 `stats: geometry=...` line before believing a timeout, and expect to repeat
