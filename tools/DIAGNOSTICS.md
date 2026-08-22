@@ -266,6 +266,13 @@ measure that first. It is the only way to know what your noise floor is, and her
 it is small enough that a 0.05 result means the renderer is deterministic rather
 than that the comparison failed.
 
+## Gaps that are decisions, not bugs
+
+`PORTING-GAPS.md` lists what works differently from shipping and is waiting on a
+choice rather than on a diagnosis: two principled inputs that csycles accepts and
+silently drops, three node types that are not registered and have no Rhino
+callers, and the 4.2% difference described above.
+
 ## The static audits
 
 All the checks run from one entry point:
