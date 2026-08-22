@@ -148,8 +148,13 @@ function Invoke-Render([string]$model, [string]$outPath) {
            'backslash path here; a forward-slash one fails silently.')
   }
 
-  Invoke-Rhino 'run_command' @{ command = '_Render' } | Out-Null
+  # Delete the target *before* rendering, not after. If the render throws - a
+  # timeout, a hang - the removal never runs, and a stale image from a previous
+  # good run sits there looking exactly like a result. That nearly scored a
+  # failed run as a pass.
   if (Test-Path $outPath) { Remove-Item $outPath -Force }
+
+  Invoke-Rhino 'run_command' @{ command = '_Render' } | Out-Null
   Invoke-Rhino 'run_command' @{ command = ('-_SaveRenderWindowAs "' + $outPath + '"') } | Out-Null
   if (-not (Test-Path $outPath)) { throw "the render was not saved to $outPath" }
 }

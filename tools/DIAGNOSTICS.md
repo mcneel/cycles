@@ -221,50 +221,49 @@ between the two versions. Recorded so nobody pays for them twice.
 - **Denoising.** Off in these renders - `log_kernel_features: Use Denoising
   False` - so it cannot be smoothing one and not the other.
 
-## How long a run takes, and how not to misread one
+## How long a run takes, and the renders that never start
 
 A full `render_regression.ps1` cycle against `rdk_material_scene.3dm` - kill any
 running Rhino, launch a Debug build, wait for the MCP port, render 32 samples,
 save - takes **six to seven minutes** on this machine. Budget that before
-concluding anything about a run that has not finished.
+concluding anything about a run that has not finished. Two things look like a
+hang and are not: the diag log stops at device enumeration for the whole render
+(the scene dump comes from `cycles_debug_scene_stats`, on the line immediately
+before `session->start()`, so its absence is the normal state until a session
+exists), and one thread pinned at 100% is what the host side of a GPU render
+looks like. I misread both and killed working runs at the six-minute mark.
 
-Two things look like a hang and are not:
+**There is a real hang underneath that, now confirmed properly.** Two runs in five
+never produced an image. The confirmed one was left alone deliberately:
 
-- **The diag log stops at device enumeration for the whole render.** The scene
-  dump comes from `cycles_debug_scene_stats`, which runs on the line immediately
-  before `session->start()`. Until a render session is actually created, the log
-  holds nothing but the device list - and that is the normal state for the entire
-  gap between Rhino starting and the render finishing. An absent
-  `stats: geometry=...` line means the session has not started yet, which during
-  a render is exactly what you should expect.
-- **One thread pinned at 100% with the rest waiting.** That is what the host
-  side of a GPU render looks like.
+    23 minutes elapsed, 1418s CPU - one core pinned continuously
+    Rhino call "run_command" failed: The request was aborted: The operation has timed out.
 
-I misread both today and killed at least two runs that were probably working,
-then wrote them up as an intermittent pre-session spin. That claim is withdrawn.
-What remains unexplained is a single run that was watched for over twenty
-minutes with CPU climbing steadily and never produced an image - three times the
-normal duration, so still worth a note, but one observation and not a pattern.
+so `_Render` hit `render_regression.ps1`'s 1800-second limit, and
+`stats: geometry=...` never appeared in the diag log. The Cycles session never
+started. Rhino was responsive on MCP throughout - the listener answered and the
+document had loaded - and one thread held 100% of a core for the whole thirty
+minutes while the other 124 waited.
 
-The smoketest hang is separate and better evidenced, because it reports progress
-rather than being inferred from silence: 0.0% after 600 seconds with the status
-stuck on "Updating Shaders", which is inside session start.
+That places it before `session->start()`, in the Rhino-side conversion of the
+scene rather than in Cycles' shader compilation or device update. Note this is a
+*different* place from the smoketest's hang, which reports 0.0% with the status on
+"Updating Shaders" - a string set inside `Scene::device_update`, after the session
+has started. Two hangs, two phases; do not assume they are one fault.
 
-If a run really does need checking, look at whether Rhino's CPU time is still
-climbing and give it fifteen minutes before killing it. Killing early costs
-another seven-minute cycle and, worse, produces confident nonsense.
+Undiagnosed. No debugger is installed on this machine and one spinning thread
+without symbols is as far as it went. What is established: it is intermittent at
+roughly two runs in five, it is not caused by any switch in this document (it
+happened under `CCYCLES_NO_CLAMP=0`, which reads the variable and then does
+nothing), and the signature to look for is a clean thirty-minute timeout rather
+than a run that has merely not finished yet.
 
-## Measuring, rather than looking
-
-`tools/render_regression.ps1` renders fixed scenes and compares them against
-stored images. Two numbers make its threshold meaningful: the same build twice
-differs by a mean of 0.03 per channel out of 255, and the gap to shipping Rhino
-on the same scene is around 10. Anything above 1 is real.
-
-Before believing any difference between two builds, render one of them twice and
-measure that first. It is the only way to know what your noise floor is, and here
-it is small enough that a 0.05 result means the renderer is deterministic rather
-than that the comparison failed.
+**One trap when a run does fail.** `render_regression.ps1` used to delete its
+output file after rendering. When the render threw, that deletion never ran, so a
+stale image from the previous good run sat at the expected path looking exactly
+like a result - and a wrapper script copied it out as one, timestamped before the
+run had even started. The deletion now happens before the render. If you write
+your own wrapper around this, check the timestamp of whatever you collect.
 
 ## Prior attempts at this port
 
