@@ -221,49 +221,59 @@ between the two versions. Recorded so nobody pays for them twice.
 - **Denoising.** Off in these renders - `log_kernel_features: Use Denoising
   False` - so it cannot be smoothing one and not the other.
 
-## How long a run takes, and the renders that never start
+## The GPU never rendered, and why that poisoned everything
 
-A full `render_regression.ps1` cycle against `rdk_material_scene.3dm` - kill any
-running Rhino, launch a Debug build, wait for the MCP port, render 32 samples,
-save - takes **six to seven minutes** on this machine. Budget that before
-concluding anything about a run that has not finished. Two things look like a
-hang and are not: the diag log stops at device enumeration for the whole render
-(the scene dump comes from `cycles_debug_scene_stats`, on the line immediately
-before `session->start()`, so its absence is the normal state until a session
-exists), and one thread pinned at 100% is what the host side of a GPU render
-looks like. I misread both and killed working runs at the six-minute mark.
+**`RhinoCyclesKernelCompiler.exe` was missing from the plug-in output.** It is in
+`Rhino.sln` and three other solutions, so a full build produces it - but every
+build in this investigation was a single project (`ccycles.vcxproj`,
+`RhinoCyclesCore.csproj`) invoked directly, and the tree kept a stale
+`RhinoCyclesKernelCompiler.dll` from the day before with no apphost beside it.
 
-**There is a real hang underneath that, now confirmed properly.** Two runs in five
-never produced an image. The confirmed one was left alone deliberately:
+The failure is entirely silent. RhinoCycles writes one `.task` file per render
+into `<data>/gpus/`, launches the compiler that is not there, never gets kernels,
+so `KernelCache` stays empty, the GPU never becomes ready, and the render either
+falls back to the CPU or stalls in `new ccl::Session`. Nothing says "the GPU is
+unavailable".
 
-    23 minutes elapsed, 1418s CPU - one core pinned continuously
-    Rhino call "run_command" failed: The request was aborted: The operation has timed out.
+What it invalidates:
 
-so `_Render` hit `render_regression.ps1`'s 1800-second limit, and
-`stats: geometry=...` never appeared in the diag log. The Cycles session never
-started. Rhino was responsive on MCP throughout - the listener answered and the
-document had loaded - and one thread held 100% of a core for the whole thirty
-minutes while the other 124 waited.
+- **The renders that "never started".** Two of five runs stalling for 20-30
+  minutes was this, not a hang in the port. Note the earlier withdrawal of that
+  claim was wrong in the other direction: those runs really were stuck, just not
+  for the reason I first guessed and not for the reason I then said instead.
+- **"CPU and HIP agree to within the noise floor."** Both sides of that
+  comparison ran on the CPU - the device set to `-1` fell back - so it measured
+  CPU against CPU and says nothing about HIP. Withdrawn.
+- **"The 4.2% difference is not the device."** That rested on the parity
+  measurement above. Shipping's settings carry `SelectedDeviceStr=0` and shipping
+  has its kernel compiler, so shipping may well have been rendering on the GPU
+  while ours rendered on the CPU. The whole difference needs re-measuring with
+  both on the same device before any of its conclusions stand.
 
-That places it before `session->start()`, in the Rhino-side conversion of the
-scene rather than in Cycles' shader compilation or device update. Note this is a
-*different* place from the smoketest's hang, which reports 0.0% with the status on
-"Updating Shaders" - a string set inside `Scene::device_update`, after the session
-has started. Two hangs, two phases; do not assume they are one fault.
+Checks worth running before trusting a render:
 
-Undiagnosed. No debugger is installed on this machine and one spinning thread
-without symbols is as far as it went. What is established: it is intermittent at
-roughly two runs in five, it is not caused by any switch in this document (it
-happened under `CCYCLES_NO_CLAMP=0`, which reads the variable and then does
-nothing), and the signature to look for is a clean thirty-minute timeout rather
-than a run that has merely not finished yet.
+    ls src4/bin/Debug/Plug-ins/RhinoCyclesKernelCompiler.exe   # must exist
+    ls "<data>/gpus/"*.task                                    # should not just accumulate
+    ls "<local>/RhinoCycles/KernelCache"                       # empty means no kernels
 
-**One trap when a run does fail.** `render_regression.ps1` used to delete its
-output file after rendering. When the render threw, that deletion never ran, so a
-stale image from the previous good run sat at the expected path looking exactly
-like a result - and a wrapper script copied it out as one, timestamped before the
-run had even started. The deletion now happens before the render. If you write
-your own wrapper around this, check the timestamp of whatever you collect.
+## Reading the RhinoCycles log
+
+This is how the above was found without a debugger, and it is the first place to
+look. RhinoCycles writes `RhinoCycles<timestamp>-<pid>-<salt>.log` into its own
+`data` directory next to `settings`, and a dedicated thread flushes it every
+200ms - so the log of a stalled run is on disk and current, even while the
+process is wedged.
+
+Set `VerboseLogging` to `True` in `settings-Scheme__Default.xml` for the full
+trace. The stage lines are coarse but enough to bisect: `RenderWithCycles entry`,
+`CreateWorld`, `ModalRenderEngine.Renderer entry`, `CreateSession`,
+`ApplyEnvironmentChanges`, `ConvertLight`, `ApplyMeshChanges`.
+
+The trick that located this fault was comparing file *sizes*. Every stalled run's
+log was exactly 5414 bytes and every good one was 42516 or more, so they diverged
+at a single point - the last line being `ModalRenderEngine.Renderer CreateSession`
+with no `Created session ...` after it, which puts the stall inside
+`new ccl::Session` and therefore in device creation.
 
 ## Prior attempts at this port
 
