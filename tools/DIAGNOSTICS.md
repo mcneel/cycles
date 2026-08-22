@@ -261,7 +261,16 @@ than that the comparison failed.
 
 ## The static audits
 
-These need no build and no Rhino:
+All the checks run from one entry point:
+
+    powershell -ExecutionPolicy Bypass -File tools/run_checks.ps1            # audits only
+    powershell -ExecutionPolicy Bypass -File tools/run_checks.ps1 -Render    # and the renders
+
+It exits non-zero if anything that ran failed, so it can gate a build. The
+audits need no build and no Rhino and take about a second; `-Render` needs a
+built Rhino and takes minutes.
+
+Individually:
 
     python tools/audit_sockets.py               # node types, socket names, socket types
     python tools/audit_sockets.py --unexposed   # what Cycles offers that csycles does not
