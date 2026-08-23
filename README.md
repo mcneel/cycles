@@ -25,78 +25,34 @@ For the OSL scene you need to enable the OSL shading system:
 
     ./cycles --shadingsys osl scene_osl_stripes.xml
 	
-## Instructions for updating ccycles.dll
+## Building ccycles for Rhino
 
-How to Update ccycles.dll Properly
+Cycles builds from Visual Studio like any other Rhino project. Set
+`RHINOCYCLESDEV=1` and build `src4/BuildSolutions/Rhino.sln`; `ccycles.vcxproj`
+configures and builds Cycles, installs it into
+`big_libs/RhinoCycles/ccycles/win/{debug,release}`, and `RhinoCyclesCore.csproj`
+copies it into the plug-in output. Without `RHINOCYCLESDEV` nothing is built from
+source and the prebuilt payload is used, so no CMake, CUDA or OptiX SDK is
+needed.
 
-Ensure both the **Mac** and the **Windows** sections are completed.
+Building a single project is the usual mistake: `ccycles.vcxproj` alone updates
+`big_libs` but not the plug-in output, and `RhinoCyclesCore.csproj` alone copies
+whatever `big_libs` already holds without rebuilding Cycles. Do both, or the
+solution.
 
-### Mac
+To publish a payload, commit the installed files in `big_libs` on a branch. Only
+the release payload is tracked; a `Debug/` rule in `big_libs/.gitignore` catches
+the debug one, so it stays local unless force-added.
 
-1. **For Apple Silicon devices:**
-   - Ensure you have the universal binaries.
-     Download them [here](https://drive.google.com/file/d/10UxUQBOm9kRH1y6GN1NXLdFU4dpu-dCq/view?usp=sharing).
-   - Use the Terminal to delete the quarantine attribute from the zip-file: `xattr -d com.apple.quarantine darwin_universal.zip`.
-   - Unzip the binaries to `RDK/cycles/lib/darwin_universal`.
+See `RHINO-CYCLES-5.md` for the state of the port, and `tools/DIAGNOSTICS.md` for
+the diagnostic switches and what each one established.
 
-2. **For non-Apple Silicon devices:**
-   - Navigate to `RDK/cycles/cycles`.
-   - Run the command `make update`.
-
-3. Go to `RDK/cycles/cycles` and run `make clean && make release`.
-
-4. Execute `cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/`.
-
-5. Go to `big_libs`, create a branch if needed and execute:
-
- ```
-git add -f RhinoCycles/ccycles/osx/release/libccycles.dylib
-git commit
-git push <branch_name>
- ```
-
-### Windows
-
-1. Checkout the `big_libs` branch made above.
-
-2. Navigate to `RDK/cycles/cycles`.
-
-3. Execute `rm -fr build/`.
-
-4. Run `./make_rhino.bat release all`.
-- This will end with a build error.
-
-5. Open `Cycles.sln`.
-- Switch the target to Release.
-- Right-click the `cycles_device` project and select `Open folder in File Explorer`.
-
-6. Open `cycles_device.vcxproj` with a text editor.
-- Search for the string `/J /bigobj`.
-- Ensure you found the one for the Release target and change it to `/J /bigobj /Zc:__cplusplus`.
-
-7. Go back to `Cycles.sln`, reload the project, and then press `Build`.
-
-8. After the build is finished, explicitly build the `INSTALL` project.
-
-9. Download [ResourceHacker](http://www.angusj.com/resourcehacker/) if you haven't and ensure the executable is in Windows' PATH.
-
-10. Navigate to `RDK/cycles` with PowerShell and execute the script:
- ```
- .\versioninfo_changer.ps1
- ```
-
-11. Copy the following two files:
- - `RDK/cycles/cycles/install/ccycles.dll`
- - `RDK/cycles/cycles/install/cycles_kernel_oneapi_jit.dll`
-
- To the following folder: `big_libs\RhinoCycles\ccycles\win\release`
-
-12. Go to `big_libs` and execute:
- ```
- git add -f RhinoCycles/ccycles/win/release/ccycles.dll RhinoCycles/ccycles/win/release/cycles_kernel_oneapi_jit.dll
- git commit
- git push
- ```
+The previous procedure for this - twelve manual steps per platform, editing
+`cycles_device.vcxproj` by hand, ResourceHacker, and copying DLLs into `big_libs`
+- no longer applies: it assumed a nested `RDK/cycles/cycles` directory and a
+`Cycles.sln`, neither of which exists since the submodule collapse. It is
+preserved in this file's history (`git log -p -- README.md`) in case the Mac
+notes are still wanted.
 
 ## Contact
 
