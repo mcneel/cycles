@@ -114,86 +114,36 @@ directly-viewed background is exact to within the noise floor.
 
 ## How a Cycles source build should be triggered
 
-**Decided: the CMake build tree is the switch.** `ccycles.vcxproj` builds from
-source when `RHINOCYCLESDEV` is set *or* when `cycles/build/CMakeCache.txt`
-exists. The options below are kept because the reasoning rules out the obvious
-alternatives, and someone will propose them again.
+**Decided: a solution configuration.** `Debug+Cycles` and `Release+Cycles` build
+Cycles from source; the plain configurations use the prebuilt payload from
+`big_libs`, exactly as Rhino 9.x did. Visual Studio shows them in its
+configuration dropdown and RhinoBuilder in its Configurations list, so the same
+switch exists in both tools with no checkbox, no environment variable and nothing
+to remember. Off by default and impossible to trip by accident.
 
-### What is true today
+### Why not automatically
 
-A source build happens if and only if `RHINOCYCLESDEV` is non-empty.
-`ccycles.vcxproj` tests it; nothing else in the tree reads it. Unset, the whole
-build step is one `echo`, and the prebuilt payload in `big_libs` is used.
-`tools/cycles_dev.ps1` sets, clears and reports it.
+Two automatic schemes were built and thrown away, so the reasoning is worth
+keeping.
 
-**Normal developers already match Rhino 9.x, by the same mechanism.** The 9.x
-branch pins `big_libs` at `161a4919`, which carries
-`RhinoCycles/ccycles/win/release/ccycles.dll` plus 34 precompiled kernel files -
-Windows release only, no debug, exactly as now. Neither branch builds Cycles for
-a normal solution build. The only differences are that `ccycles` is now in
-`Rhino.sln` (9.x had it only in `RhinoWithExtras.sln`, and 9.x's `Rhino.sln` has
-no reference to it at all) and that `csycles` moved from `cycles/csycles` to
-`cycles/src/csycles`. Neither costs a developer anything.
+**Timestamps cannot work.** A Makefile-style vcxproj declares no source files, so
+MSBuild has nothing to compare. Supplying the file list does not rescue it either:
+git sets mtime to checkout time, so on a fresh clone the sources and the payload
+get the same mtime in an arbitrary order and staleness becomes a coin flip. A cold
+walk of the 891 sources also took about 10s here.
 
-So nothing here is a regression against 9.x. The question is only whether a
-*Cycles* developer should have to know about a flag.
+**Content comparison works but is not worth it.** A fingerprint of the sources -
+the cycles commit plus a hash of local modifications - stamped into the payload
+does detect changes correctly, and was verified doing so. It was dropped anyway,
+because it rests on a rule a person can forget: whoever changes Cycles must commit
+a rebuilt payload, and if they do not, everyone else quietly runs binaries that do
+not match their tree. Trading an explicit choice for a silent failure mode is a
+bad trade. An earlier variant keyed on the CMake build tree existing had the same
+shape of problem in reverse - Clean would have silently switched it off.
 
-### Why the obvious mechanism does not work
-
-Making the build detect staleness by file timestamps fails, for two measured
-reasons:
-
-- **git rewrites mtimes on checkout.** After a pull, a clean tree looks newer
-  than the payload, so every developer would be told to build Cycles - the exact
-  outcome that has to be avoided.
-- **Walking the tree is not free.** 891 Cycles source files, and a cold
-  enumeration took about 10s on Windows here.
-
-The payload also carries no record of what produced it: there is no stamp,
-version or revision file anywhere in
-`big_libs/RhinoCycles/ccycles/win/release`. So nothing can currently compare
-"what is in the tree" against "what the payload is".
-
-### The options
-
-**Chosen: the build tree.** A fresh clone has no `cycles/build` - it is gitignored
-as `build*/` - and only CMake creates one, so its presence is a deliberate act and
-a reliable signal. No timestamps, no git queries, no stamp file, and nothing that
-a checkout can scramble. A normal developer is untouched and cannot trigger it by
-accident; a Cycles developer finds the flag once and then never thinks about it
-again, because the tree keeps source builds on. The costs are that `-Off` no
-longer suffices on its own, and that Clean had to stop deleting the tree - both
-recorded in `RHINO-CYCLES-5.md`.
-
-The rejected options follow.
-
-**A. Keep the flag.** No risk, no change. A Cycles developer must know
-`RHINOCYCLESDEV` exists, must know a running Visual Studio ignores it until
-restarted, and must know that only a solution build deploys. That knowledge is
-now written down, which is most of the cost removed.
-
-**B. Detect by revision.** `build_cycles.ps1` records the cycles commit it built
-from into a stamp beside the payload, committed with it. Each build compares that
-stamp against `git rev-parse HEAD` plus whether the tree is dirty - cheap, and
-immune to checkout mtimes. Clean and matching means no work at all; dirty or
-moved means build from source. A Cycles developer then configures nothing: edit,
-build, and Ninja rebuilds only what changed, kernels included.
-
-  The cost is borne by people who did not ask for it. A checkout where the cycles
-  submodule was bumped without a rebuilt payload committed alongside it looks
-  stale to everybody, so everybody gets a warning they cannot act on. It also
-  adds a `git` call per build, roughly 0.1-0.3s.
-
-**C. B, gated on the toolchain.** Check for CMake/Ninja first; if absent, skip
-detection entirely and use the payload silently. A machine that cannot build
-Cycles gets no warning, because no warning there could prompt an action. The
-proxy is imperfect in both directions: someone with CMake installed for
-unrelated reasons still gets the check, and a genuinely mismatched payload goes
-unmentioned on the machines least able to notice it.
-
-**D. B, hard-failing instead of warning.** Honest and blocking. Rejected on
-sight for a plug-in most developers never touch, but recorded so nobody proposes
-it as new.
+The version that lost is recorded here rather than in the code: see
+`tools/cycles_build_if_needed.ps1` at cycles commit 06b0060b1 if it is ever wanted
+back.
 
 ### Independent of the above
 

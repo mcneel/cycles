@@ -415,11 +415,10 @@ Build the **solution**, not single projects:
 
     MSBuild src4/BuildSolutions/Rhino.sln /p:Configuration=Debug /p:Platform=x64 /m:4
 
-Cycles is rebuilt from source automatically when its sources differ from the
-fingerprint the prebuilt payload was stamped with, and left alone otherwise -
-which is what almost everyone gets. `RHINOCYCLESDEV=1` forces a build anyway.
-For the rest of it, including why native debugging needs a local Debug build,
-see *Building* in `RHINO-CYCLES-5.md`. A full incremental pass is about seven minutes here and reports
+Cycles itself is only built in the `Debug+Cycles` and `Release+Cycles`
+configurations; the plain ones use the prebuilt payload, which is what almost
+everyone wants. For the rest of it, including why native debugging needs a local
+Debug build, see *Building* in `RHINO-CYCLES-5.md`. A full incremental pass is about seven minutes here and reports
 0 warnings and 0 errors.
 
 Two things learned the hard way:
@@ -428,7 +427,7 @@ Two things learned the hard way:
   Building `ccycles.vcxproj` alone updates `big_libs` but not the plug-in output,
   because `RhinoCyclesCore.csproj` is what copies from there - and building
   `RhinoCyclesCore.csproj` alone copies whatever is already in `big_libs` without
-  rebuilding Cycles, even with `RHINOCYCLESDEV` set. Editing a Cycles source file
+  rebuilding Cycles, even in a `+Cycles` configuration. Editing a Cycles source file
   therefore needs both, in that order, or just the solution. Building
   `RhinoCyclesKernelCompiler.csproj` alone needs
   `/p:SolutionDir=<repo>/src4/BuildSolutions/`, because that copy step resolves

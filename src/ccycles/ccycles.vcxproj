@@ -7,20 +7,17 @@
   Build and Rebuild in Visual Studio do the right thing and errors surface in
   the Error List like any other project.
 
-  Nothing has to be switched on. tools/cycles_build_if_needed.ps1 compares the
-  Cycles sources against the fingerprint the prebuilt payload was stamped with,
-  and builds only when they differ:
+  Which configuration you build decides whether Cycles is built:
 
-    unchanged
+    Debug / Release / ReleaseDebuggable
         Does nothing. The prebuilt ccycles binaries are restored by
         RhinoCyclesCore.csproj. Nobody needs CMake, CUDA or an OptiX SDK
         to build Rhino.
 
-    changed
-        Configures and builds Cycles from source, installs it into big_libs and
-        re-stamps it. GPU backends are auto-detected; a machine with no GPU SDKs
-        installed still gets a working CPU-only build, and one with no CMake at
-        all is told rather than blocked.
+    Debug+Cycles / Release+Cycles
+        Configures and builds Cycles from source and installs it into big_libs.
+        GPU backends are auto-detected; a machine with no GPU SDKs installed
+        still gets a working CPU-only build.
 
     Note that this project installs into big_libs, and it is
     RhinoCyclesCore.csproj that copies from there into the plug-in output. So
@@ -41,6 +38,14 @@
     </ProjectConfiguration>
     <ProjectConfiguration Include="ReleaseDebuggable|x64">
       <Configuration>ReleaseDebuggable</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug+Cycles|x64">
+      <Configuration>Debug+Cycles</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release+Cycles|x64">
+      <Configuration>Release+Cycles</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
@@ -65,7 +70,7 @@
   <PropertyGroup>
     <!-- build_cycles.ps1 understands Debug / Release / RelWithDebInfo. -->
     <CyclesConfiguration>Release</CyclesConfiguration>
-    <CyclesConfiguration Condition="'$(Configuration)'=='Debug'">Debug</CyclesConfiguration>
+    <CyclesConfiguration Condition="$(Configuration.StartsWith('Debug'))">Debug</CyclesConfiguration>
     <CyclesConfiguration Condition="'$(Configuration)'=='ReleaseDebuggable'">RelWithDebInfo</CyclesConfiguration>
 
     <CyclesScript>$(MSBuildThisFileDirectory)..\..\build_cycles.ps1</CyclesScript>
@@ -85,33 +90,45 @@
          who rebuilt Cycles ends up running is exactly what everyone else gets.
          Commit the big_libs change afterwards to share it. -->
     <CyclesPayloadDir>release</CyclesPayloadDir>
-    <CyclesPayloadDir Condition="'$(Configuration)'=='Debug'">debug</CyclesPayloadDir>
+    <CyclesPayloadDir Condition="$(Configuration.StartsWith('Debug'))">debug</CyclesPayloadDir>
     <CyclesInstallDir>$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\$(CyclesPayloadDir)</CyclesInstallDir>
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
     <!--
-      Decide, do not ask.
+      Building Cycles is a solution configuration, not a hidden switch.
 
-      ccycles is rebuilt when the Cycles sources differ from the ones the
-      prebuilt payload was built from, and not otherwise. Nobody has to set
-      anything: change Cycles, build Rhino with RhinoBuilder or Visual Studio,
-      and ccycles and its kernels are regenerated. Change nothing and this costs
-      one PowerShell start, where Rhino 9.x cost nothing at all because it never
-      built Cycles from a normal solution build.
+        Debug / Release / ReleaseDebuggable   do nothing, as in Rhino 9.x. The
+                                             prebuilt payload from big_libs is
+                                             used and nobody needs CMake or a
+                                             GPU SDK.
 
-      The comparison lives in tools/cycles_build_if_needed.ps1, which explains
-      why it is content-derived rather than timestamp-based: git rewrites mtimes
-      on checkout, so timestamps would make a fresh clone a coin flip.
+        Debug+Cycles / Release+Cycles         build Cycles and its kernels from
+                                             source, install them into big_libs,
+                                             and let RhinoCyclesCore deploy them.
 
-      Rebuild forces a from-scratch build by clearing the build directory first.
-      Clean deliberately leaves it alone - wiping an hour of CMake output is not
-      something Clean Solution should do as a side effect.
+      Visual Studio shows these in the configuration dropdown and RhinoBuilder in
+      its Configurations list, so the same choice exists in both tools without a
+      checkbox, an environment variable or anything to remember. Off by default,
+      and it cannot be tripped by accident.
+
+      Why not detect it automatically: a Makefile-style project declares no source
+      files, so MSBuild has nothing to compare, and git rewrites mtimes on checkout
+      so timestamps cannot stand in. An explicit choice is the honest option.
     -->
-    <CyclesDecide>powershell -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildThisFileDirectory)..\..\tools\cycles_build_if_needed.ps1" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesDecide>
+    <CyclesBuildFromSource>false</CyclesBuildFromSource>
+    <CyclesBuildFromSource Condition="$(Configuration.Contains('Cycles'))">true</CyclesBuildFromSource>
 
-    <NMakeBuildCommandLine>$(CyclesDecide)</NMakeBuildCommandLine>
-    <NMakeReBuildCommandLine>rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesDecide)</NMakeReBuildCommandLine>
-    <NMakeCleanCommandLine>echo ccycles: leaving the Cycles build tree in cycles\build. Rebuild wipes it for a from-scratch build.</NMakeCleanCommandLine>
+    <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
+    <CyclesSkipMessage>echo ccycles: using the prebuilt Cycles from big_libs. Pick the Debug+Cycles or Release+Cycles configuration to build it from source.</CyclesSkipMessage>
+
+    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>
+
+    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesInvoke)</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeReBuildCommandLine>
+
+    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul</NMakeCleanCommandLine>
+    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeCleanCommandLine>
 
     <NMakeOutput>$(CyclesInstallDir)\ccycles.dll</NMakeOutput>
 

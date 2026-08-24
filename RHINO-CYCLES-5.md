@@ -1,4 +1,4 @@
-# Rhino + Cycles 5.2 — current state
+﻿# Rhino + Cycles 5.2 — current state
 
 Rhino 10's Cycles integration, moved from 3.5 to 5.2. **It renders correctly, on
 CPU and on HIP, and the full Rhino solution builds clean.** One scene still
@@ -32,51 +32,34 @@ Build the **solution**, not single projects:
 
     MSBuild src4/BuildSolutions/Rhino.sln /p:Configuration=Debug /p:Platform=x64 /m:4
 
-That is all most people need, and it is all there is to know. Cycles comes
-prebuilt from `big_libs`, so no CMake, CUDA or OptiX SDK is required.
+That is all most people need. Cycles comes prebuilt from `big_libs`, so no
+CMake, CUDA or OptiX SDK is required.
 
-### If you change Cycles, the next build rebuilds it
+### Building Cycles itself
 
-Nothing to set, and no difference between RhinoBuilder and Visual Studio. Edit
-Cycles, build Rhino, and `ccycles` and any affected kernels are regenerated,
-installed into `big_libs`, and deployed by `RhinoCyclesCore` - in that order,
-because the solution depends on it. Change nothing and nothing happens.
+Pick a different configuration. That is the whole mechanism.
 
-The comparison is content-based, and has to be. The payload carries
-`ccycles.stamp` beside `ccycles.dll`, holding a fingerprint of the sources it was
-built from: the cycles commit, plus a hash of any local modifications. Every build
-recomputes that fingerprint and compares. It is the same on every machine at the
-same revision, and changes the moment anyone edits a Cycles source.
-
-Timestamps cannot do this job. git sets mtime to checkout time, so on a fresh
-clone the sources and the payload get the same mtime in an arbitrary order and
-staleness becomes a coin flip. Walking the 891 source files is not free either.
-
-**One rule comes with it: if you change Cycles, commit the rebuilt release
-payload.** That is already the documented way to publish Cycles, and it is what
-keeps everyone else from ever building it. The decision logic and its wording live
-in `tools/cycles_build_if_needed.ps1`.
-
-What happens in each case:
-
-| Situation | Result |
+| Configuration | Cycles |
 | --- | --- |
-| Sources match the stamp | Nothing. One PowerShell start. |
-| You edited Cycles | Rebuilt and deployed on this build |
-| Sources differ, no CMake or Ninja here | Says so, uses the payload, never blocks |
-| Payload has no stamp yet | Treated as current, so old payloads stay usable |
+| `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload, as in Rhino 9.x |
+| `Debug+Cycles`, `Release+Cycles` | built from source, kernels included |
 
-The last two are the cases where somebody changed Cycles without committing a
-rebuilt payload. Neither stops a developer who never asked to touch Cycles - they
-get one line explaining it, not an hour of kernels.
+Visual Studio lists them in the configuration dropdown; RhinoBuilder lists them
+in Configurations. Same choice, both tools, nothing to set up and nothing to
+remember. The plain configurations are untouched, so a developer who never edits
+Cycles cannot trip it.
 
-`RHINOCYCLESDEV` survives only as an escape hatch, and normal use never needs it:
-`1` forces a build regardless of the stamp, `0` forbids one. `cycles_dev.ps1`
-reports the current decision and can set either.
+Picking a `+Cycles` configuration builds Cycles, installs it into `big_libs`, and
+deploys it through `RhinoCyclesCore` - all in that one build, because the solution
+depends on it. The first pass configures CMake and compiles every architecture's
+kernels, so it is slow; later passes are incremental.
 
-**Clean does not delete the CMake build tree.** Wiping an hour of output is not
-something Clean Solution should do as a side effect. Rebuild does, because it
-ends by building again.
+To share what you built, commit the payload in `big_libs`.
+
+Why this is a choice rather than automatic: `ccycles.vcxproj` drives CMake and so
+declares no source files, leaving MSBuild nothing to compare - and git rewrites
+mtimes on checkout, so timestamps would make a fresh clone a coin flip. An
+explicit configuration is the honest way to say it.
 
 ### From Visual Studio
 
@@ -94,7 +77,7 @@ Two things are still worth knowing:
   `debug` payload only when that folder exists in `big_libs`, and only `release`
   is committed — the debug one is 444 MB and gitignored. So on a fresh checkout a
   Debug Rhino runs *release* Cycles and stepping into `ccycles` gets you nothing.
-  One Debug build with `RHINOCYCLESDEV=1` produces one.
+  One `Debug+Cycles` build produces one.
 
 Two traps, both of which have cost real time:
 
