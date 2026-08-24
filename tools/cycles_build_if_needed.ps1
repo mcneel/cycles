@@ -62,9 +62,19 @@ function Test-Tool($name) {
   return $null -ne $cmd
 }
 
-# Everything that can change what ccycles.dll or a kernel comes out as. Kept
-# deliberately narrow: docs and tools must not trigger an hour of kernels.
-$sourcePaths = @('src', 'CMakeLists.txt', 'build_cycles.ps1', 'cmake')
+# Everything that can change what ccycles.dll or a kernel comes out as, and
+# nothing else. 'src' as a whole was wrong: most of it is src/csycles, which is
+# C# built by csycles.csproj and cannot affect a native binary - 17 of the 34
+# files changed since the last payload was published were exactly that, so a
+# binding edit would have triggered an hour of kernels for nothing. src/doc,
+# src/test, src/app and src/hydra are excluded for the same reason.
+$sourcePaths = @(
+  'src/ccycles',
+  'src/bvh', 'src/device', 'src/graph', 'src/integrator', 'src/kernel',
+  'src/scene', 'src/session', 'src/subd', 'src/util',
+  'src/cmake', 'src/CMakeLists.txt',
+  'CMakeLists.txt', 'cmake', 'build_cycles.ps1'
+)
 
 function Get-SourceFingerprint {
   # Returns a string, or $null when it cannot be determined - in which case the
