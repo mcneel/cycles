@@ -58,26 +58,30 @@ So the flag has to be found exactly once:
 argument it reports which trigger is active, whether a running Visual Studio is
 using a stale environment, and which payloads `big_libs` actually holds.
 
-Two consequences of the build tree being the switch:
+The flag has three states, and they exist so that something can always override
+the build tree:
 
-- **`-Off` alone will not stop source builds** once you have a build tree. Delete
-  `cycles/build` for that. `cycles_dev.ps1` says so rather than letting the next
-  build surprise you, and does not delete it for you — rebuilding costs an hour.
-- **Clean no longer deletes the build tree**, where it used to. Deleting it now
-  changes what every later build does, which is far too much to happen as a side
-  effect of Clean Solution. Rebuild still wipes it, because that ends by building
-  again.
+| `RHINOCYCLESDEV` | Result |
+| --- | --- |
+| unset | the build tree decides — the normal state |
+| `1`, or anything else non-empty | always build from source |
+| `0`, `false`, `no`, `off` | never build from source, beating the build tree |
 
-**`RHINOCYCLESDEV=0` means on.** The project tests the variable for being
-non-empty, not for a truthy value, so `0`, `false` and `no` all enable a source
-build — an hour of GPU kernels for anyone who sets it that way expecting the
-opposite. Off means *removed*, which is what `-Off` does.
+An explicit off is what makes `-Off` work without deleting an hour of CMake
+output, and it is why `0` no longer means the opposite of what it says. Comparison
+is case-insensitive, so `False` and `OFF` count too.
 
-RhinoBuilder's "Cycles Core" checkbox overrides the environment in both
-directions: ticked it passes `/p:RHINOCYCLESDEV=1`, unticked it passes the
-property as empty, and an explicit global property beats an inherited
-environment variable. So the box means what it says even on a machine set up for
-Visual Studio source builds.
+**Clean no longer deletes the build tree**, where it used to. Deleting it now
+changes what every later build does, which is far too much to happen as a side
+effect of Clean Solution. Rebuild still wipes it, because that ends by building
+again.
+
+RhinoBuilder's "Cycles Core" checkbox stays meaningful in both directions: ticked
+it passes `/p:RHINOCYCLESDEV=1`, unticked it passes `0`. It has to pass an
+explicit off rather than nothing, because both an inherited environment variable
+and a build tree would otherwise make an unticked box spend an hour building
+Cycles. A global property beats the environment, and the explicit off beats the
+tree.
 
 ### From Visual Studio
 

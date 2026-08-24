@@ -106,9 +106,19 @@
       remember a variable. Deleting cycles/build goes back to the prebuilt
       payload, and the message below says so at the moment it is relevant.
     -->
-    <CyclesBuildFromSource Condition="'$(RHINOCYCLESDEV)'!=''">true</CyclesBuildFromSource>
+    <!--
+      Three states, in priority order. RHINOCYCLESDEV used to be tested only for
+      being non-empty, which meant RHINOCYCLESDEV=0 switched source builds *on* -
+      and once the build tree became a trigger there was no way to say "not this
+      build" at all, so RhinoBuilder's unticked checkbox could not mean what it
+      said. An explicit off fixes both. MSBuild string comparison is
+      case-insensitive, so False and OFF are covered too.
+    -->
+    <CyclesBuildFromSource Condition="'$(RHINOCYCLESDEV)'=='0' Or '$(RHINOCYCLESDEV)'=='false' Or '$(RHINOCYCLESDEV)'=='no' Or '$(RHINOCYCLESDEV)'=='off'">false</CyclesBuildFromSource>
+    <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'=='' And '$(RHINOCYCLESDEV)'!=''">true</CyclesBuildFromSource>
     <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'=='' And Exists('$(CyclesBuildDir)\CMakeCache.txt')">true</CyclesBuildFromSource>
     <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'==''">false</CyclesBuildFromSource>
+    <CyclesExplicitlyOff Condition="'$(CyclesBuildFromSource)'!='true' And '$(RHINOCYCLESDEV)'!=''">true</CyclesExplicitlyOff>
 
     <!-- Announce the source build before starting it, and say which of the two
          reasons applies. Otherwise the only clue that this is about to spend an
@@ -116,7 +126,8 @@
     <CyclesAnnounce Condition="'$(RHINOCYCLESDEV)'!=''">echo ccycles: RHINOCYCLESDEV is set, building Cycles from source. GPU kernels make the first pass slow.</CyclesAnnounce>
     <CyclesAnnounce Condition="'$(RHINOCYCLESDEV)'==''">echo ccycles: found a Cycles build tree, building Cycles from source. Delete cycles\build to go back to the prebuilt payload.</CyclesAnnounce>
     <CyclesInvoke>$(CyclesAnnounce) &amp; powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
-    <CyclesSkipMessage>echo ccycles: using prebuilt Cycles from big_libs. Set RHINOCYCLESDEV to build it from source instead.</CyclesSkipMessage>
+    <CyclesSkipMessage Condition="'$(CyclesExplicitlyOff)'=='true'">echo ccycles: source builds turned off for this build (RHINOCYCLESDEV=$(RHINOCYCLESDEV)), using prebuilt Cycles from big_libs.</CyclesSkipMessage>
+    <CyclesSkipMessage Condition="'$(CyclesExplicitlyOff)'!='true'">echo ccycles: using prebuilt Cycles from big_libs. Set RHINOCYCLESDEV to build it from source instead.</CyclesSkipMessage>
 
     <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
     <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Turn building Cycles from source on or off, and report whether the switch has
   actually taken effect.
@@ -9,10 +9,14 @@
   /p:RHINOCYCLESDEV=1; Visual Studio has no equivalent UI and can only inherit
   it from the environment. This script is that missing UI.
 
-    -On       Persist RHINOCYCLESDEV=1 for the current user.
-    -Off      Remove it.
-    -Status   Report what is set, what a new build would see, and whether a
-              running Visual Studio is out of date. This is the default.
+    -On       Always build Cycles from source (RHINOCYCLESDEV=1).
+    -Off      Never build it from source (RHINOCYCLESDEV=0). This beats the
+              build tree, so it works without deleting an hour of CMake output.
+    -Auto     Remove the variable and let the build tree decide. This is the
+              natural state: a fresh checkout has no tree and so uses the
+              prebuilt payload, and one source build turns it on for good.
+    -Status   Report which trigger is active, whether a running Visual Studio is
+              out of date, and what big_libs holds. This is the default.
 
   Two things this reports that are easy to get wrong:
 
@@ -45,13 +49,14 @@
 param(
   [switch]$On,
   [switch]$Off,
+  [switch]$Auto,
   [switch]$Status
 )
 
 $ErrorActionPreference = 'Stop'
 
-if ($On -and $Off) {
-  Write-Host 'cycles_dev: -On and -Off are mutually exclusive.' -ForegroundColor Red
+if (@($On, $Off, $Auto | Where-Object { $_ }).Count -gt 1) {
+  Write-Host 'cycles_dev: -On, -Off and -Auto are mutually exclusive.' -ForegroundColor Red
   exit 1
 }
 
@@ -75,44 +80,42 @@ function Show-Status {
   $machine = [Environment]::GetEnvironmentVariable($varName, 'Machine')
   $session = $env:RHINOCYCLESDEV
 
-  # A vcxproj condition tests for non-empty, so anything at all counts as on.
+  # Three states, matching ccycles.vcxproj exactly:
+  #   an explicit off (0/false/no/off) wins over everything
+  #   any other non-empty value means always build from source
+  #   empty means the build tree decides
   #
-  # There are two answers, not one. A build started from this shell inherits the
-  # session value; a newly launched VS or shell gets the persisted one. Reporting
-  # only the persisted value would have called this OFF in a shell that was about
-  # to build Cycles.
-  $persistedEffective = if (![string]::IsNullOrEmpty($persisted)) { $persisted }
-                        elseif (![string]::IsNullOrEmpty($machine)) { $machine }
-                        else { '' }
-  $hereEffective = if (![string]::IsNullOrEmpty($session)) { $session } else { $persistedEffective }
+  # And two answers, not one: a build from this shell inherits the session value,
+  # a newly launched VS gets the persisted one.
+  $persistedFlag = if (![string]::IsNullOrEmpty($persisted)) { $persisted }
+                   elseif (![string]::IsNullOrEmpty($machine)) { $machine }
+                   else { '' }
+  $hereFlag = if (![string]::IsNullOrEmpty($session)) { $session } else { $persistedFlag }
 
-  # The build tree is the second trigger, and the one that matters day to day:
-  # ccycles.vcxproj builds from source when the flag is set OR when
-  # cycles/build/CMakeCache.txt exists. So once you have built Cycles here, the
-  # flag stops mattering.
   $buildTree = Join-Path $cyclesDir 'build\CMakeCache.txt'
   $haveTree = Test-Path $buildTree
 
-  function Format-State($value) {
-    if ([string]::IsNullOrEmpty($value)) { return 'OFF - prebuilt payload from big_libs' }
-    return "ON  - $varName=$value, so build_cycles.ps1 runs"
+  function Resolve-State($flag) {
+    if ($flag -match '^\s*(0|false|no|off)\s*$') { return 'OFF - turned off explicitly, which beats the build tree' }
+    if (![string]::IsNullOrEmpty($flag))           { return "ON  - $varName=$flag" }
+    if ($haveTree)                                 { return 'ON  - a Cycles build tree exists' }
+    return 'OFF - no flag and no build tree, so the prebuilt payload is used'
   }
+
+  $hereState = Resolve-State $hereFlag
+  $newState = Resolve-State $persistedFlag
 
   Write-Host ''
   Write-Host 'Cycles source builds' -ForegroundColor Cyan
-  if ($haveTree) {
-    Write-Host '  ON for every build - a Cycles build tree exists, which is enough on its own.' -ForegroundColor Green
+  Write-Host ("  from this shell        : {0}" -f $hereState) -ForegroundColor $(if ($hereState.StartsWith('ON')) { 'Green' } else { 'Gray' })
+  Write-Host ("  from a new shell or VS : {0}" -f $newState) -ForegroundColor $(if ($newState.StartsWith('ON')) { 'Green' } else { 'Gray' })
+  if ($hereState -ne $newState) {
+    Write-Host '  These differ, so where you build from decides what happens.' -ForegroundColor Yellow
+  }
+  if ($haveTree -and [string]::IsNullOrEmpty($hereFlag)) {
     Write-Host '  Edit Cycles, press Build, and only what you changed is rebuilt.'
-    Write-Host '  To stop: delete the build tree (below). The flag is not what is keeping this on.'
-  } else {
-    Write-Host '  No Cycles build tree, so the flag alone decides:'
-    $hereColour = if ([string]::IsNullOrEmpty($hereEffective)) { 'Gray' } else { 'Green' }
-    $newColour = if ([string]::IsNullOrEmpty($persistedEffective)) { 'Gray' } else { 'Green' }
-    Write-Host ("    from this shell        : {0}" -f (Format-State $hereEffective)) -ForegroundColor $hereColour
-    Write-Host ("    from a new shell or VS : {0}" -f (Format-State $persistedEffective)) -ForegroundColor $newColour
-    if ($hereEffective -ne $persistedEffective) {
-      Write-Host '    These differ, so where you build from decides what happens.' -ForegroundColor Yellow
-    }
+    Write-Host '  Use -Off to stop without discarding the build tree.'
+  } elseif (-not $haveTree) {
     Write-Host '  After one source build the tree exists and keeps it on by itself.'
   }
 
@@ -122,17 +125,6 @@ function Show-Status {
     Write-Host ("  present : {0}" -f (Split-Path -Parent $buildTree))
   } else {
     Write-Host '  none    - a fresh checkout has no build tree, and only CMake creates one.'
-  }
-
-  # The project tests for non-empty, not for truth, so these all mean ON - the
-  # opposite of what anyone setting them intends.
-  foreach ($v in @($hereEffective, $persistedEffective) | Select-Object -Unique) {
-    if ($v -match '^\s*(0|false|no|off)\s*$') {
-      Write-Host ''
-      Write-Host "  Careful: '$v' still counts as ON. The build tests whether the" -ForegroundColor Yellow
-      Write-Host '  variable is non-empty, not whether it looks true, so this builds' -ForegroundColor Yellow
-      Write-Host '  Cycles and its GPU kernels. Off means removed - use -Off.' -ForegroundColor Yellow
-    }
   }
 
   Write-Host ''
@@ -169,27 +161,28 @@ function Show-Status {
   Write-Host ''
 }
 
-if ($On -or $Off) {
-  $value = if ($On) { '1' } else { $null }
+if ($On -or $Off -or $Auto) {
+  # 1 = always build from source. 0 = never, beating the build tree as well.
+  # Removed = let the build tree decide, which is the natural state.
+  $value = if ($On) { '1' } elseif ($Off) { '0' } else { $null }
   [Environment]::SetEnvironmentVariable($varName, $value, 'User')
 
   if ($On) {
     Write-Host "cycles_dev: $varName=1 persisted for this user." -ForegroundColor Green
     Write-Host '            Cycles will be built from source by the next build. The first'
     Write-Host '            pass configures CMake and is slow; later ones are incremental.'
+  } elseif ($Off) {
+    Write-Host "cycles_dev: $varName=0 persisted for this user." -ForegroundColor Green
+    Write-Host '            Source builds are off, and stay off even though a build tree'
+    Write-Host '            exists - an explicit off beats it. Your build tree is left'
+    Write-Host '            alone, so -On picks up where you left off rather than'
+    Write-Host '            reconfiguring CMake from scratch.'
   } else {
     Write-Host "cycles_dev: $varName removed for this user." -ForegroundColor Green
-
-    # Removing the flag is not enough once a build tree exists - that is the
-    # whole point of the second trigger, so say so rather than let the next
-    # build surprise them.
     if (Test-Path (Join-Path $cyclesDir 'build\CMakeCache.txt')) {
-      Write-Host '            But a Cycles build tree exists, and that keeps source builds on by' -ForegroundColor Yellow
-      Write-Host '            itself. Delete it to go back to the prebuilt payload:' -ForegroundColor Yellow
-      Write-Host ("              {0}" -f (Join-Path $cyclesDir 'build')) -ForegroundColor Yellow
-      Write-Host '            Not deleted automatically - rebuilding it costs an hour.' -ForegroundColor Yellow
+      Write-Host '            A Cycles build tree exists, so source builds are ON again.'
     } else {
-      Write-Host '            Builds go back to the prebuilt payload in big_libs.'
+      Write-Host '            No build tree either, so builds use the prebuilt payload.'
     }
   }
 
