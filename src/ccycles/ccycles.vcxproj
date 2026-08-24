@@ -86,7 +86,12 @@
     <CyclesInstallDir>$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\$(CyclesPayloadDir)</CyclesInstallDir>
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
-    <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
+    <!-- Announce the source build before starting it. Otherwise the only clue
+         that this is about to spend an hour on GPU kernels is the script's own
+         output further down the log, and the two cases were asymmetric: the
+         skip said so plainly, the build did not. -->
+    <CyclesAnnounce>echo ccycles: RHINOCYCLESDEV is set, building Cycles from source. GPU kernels make the first pass slow.</CyclesAnnounce>
+    <CyclesInvoke>$(CyclesAnnounce) &amp; powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
     <CyclesSkipMessage>echo ccycles: RHINOCYCLESDEV is not set, using prebuilt binaries. Set it to build Cycles from source.</CyclesSkipMessage>
 
     <NMakeBuildCommandLine Condition="'$(RHINOCYCLESDEV)'!=''">$(CyclesInvoke)</NMakeBuildCommandLine>
