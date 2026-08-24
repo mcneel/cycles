@@ -415,9 +415,11 @@ Build the **solution**, not single projects:
 
     MSBuild src4/BuildSolutions/Rhino.sln /p:Configuration=Debug /p:Platform=x64 /m:4
 
-Set `RHINOCYCLESDEV=1` first if Cycles itself should be rebuilt from source;
-without it the prebuilt payload from `big_libs` is used, which is what almost
-everyone wants. A full incremental pass is about seven minutes here and reports
+Set `RHINOCYCLESDEV=1` first if Cycles itself should be rebuilt from source
+(`tools/cycles_dev.ps1 -On`); without it the prebuilt payload from `big_libs` is
+used, which is what almost everyone wants. For the Visual Studio side of this —
+which layers need the flag at all, why a running VS ignores it, and why native
+debugging needs a local Debug build — see *Building* in `RHINO-CYCLES-5.md`. A full incremental pass is about seven minutes here and reports
 0 warnings and 0 errors.
 
 Two things learned the hard way:

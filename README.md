@@ -28,7 +28,9 @@ For the OSL scene you need to enable the OSL shading system:
 ## Building ccycles for Rhino
 
 Cycles builds from Visual Studio like any other Rhino project. Set
-`RHINOCYCLESDEV=1` and build `src4/BuildSolutions/Rhino.sln`; `ccycles.vcxproj`
+`RHINOCYCLESDEV=1` — `tools/cycles_dev.ps1 -On` / `-Off` does it, and with no
+argument reports whether it took effect — and build
+`src4/BuildSolutions/Rhino.sln`; `ccycles.vcxproj`
 configures and builds Cycles, installs it into
 `big_libs/RhinoCycles/ccycles/win/{debug,release}`, and `RhinoCyclesCore.csproj`
 copies it into the plug-in output. Without `RHINOCYCLESDEV` nothing is built from

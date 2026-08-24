@@ -37,6 +37,50 @@ CUDA or OptiX SDK is required. To build Cycles *from source* instead, set
 `RHINOCYCLESDEV=1` first; GPU backends are auto-detected and a machine with no GPU
 SDK still gets a working CPU build.
 
+### Turning source builds on and off
+
+    powershell -ExecutionPolicy Bypass -File tools/cycles_dev.ps1         # what is my state?
+    powershell -ExecutionPolicy Bypass -File tools/cycles_dev.ps1 -On     # then restart VS
+    powershell -ExecutionPolicy Bypass -File tools/cycles_dev.ps1 -Off
+
+`-On` persists `RHINOCYCLESDEV=1` for the current user; `-Off` removes it. With no
+argument it reports where the flag is set, whether a running Visual Studio is
+using a stale environment, and which payloads `big_libs` actually holds.
+
+### From Visual Studio
+
+**You never have to leave VS to build or debug Cycles.** RhinoBuilder's "Cycles
+Core" checkbox is not a capability — it only adds `/p:RHINOCYCLESDEV=1` to its
+MSBuild call. VS has no equivalent UI, and takes the flag from its environment
+instead; that is the only difference between the two routes.
+
+| Editing | Needs `RHINOCYCLESDEV` |
+| --- | --- |
+| `RhinoCycles`, `RhinoCyclesCore` — the C# plug-in | No |
+| `csycles` — the C# bindings | No |
+| `ccycles`, or Cycles itself | Yes |
+
+Four things worth knowing before the first attempt:
+
+- **`devenv.exe` reads the environment once, at launch.** Setting the variable
+  while VS is open changes nothing until VS restarts, and the build output keeps
+  saying the flag is unset. `cycles_dev.ps1` counts running instances for exactly
+  this reason.
+- **`ccycles` is already in the solution** — under `Cycles/CCSycles` next to
+  `csycles`, and built in every x64 configuration. With the flag unset its whole
+  build step is one `echo`, which is why it looks like it never runs. MSBuild's
+  Makefile `Build` target has no inputs or outputs, so the command executes on
+  every build; the flag, not an up-to-date check, is what decides whether it does
+  any work.
+- **Build, not Rebuild.** Build re-invokes `build_cycles.ps1`, which reuses its
+  CMake build directory, so an edited Cycles source is picked up incrementally.
+  Rebuild deletes that directory first and rebuilds Cycles from scratch.
+- **Native debugging needs the debug payload.** `RhinoCyclesCore` copies the
+  `debug` payload only when that folder exists in `big_libs`, and only `release`
+  is committed — the debug one is 444 MB and gitignored. So on a fresh checkout a
+  Debug Rhino runs *release* Cycles and stepping into `ccycles` gets you nothing,
+  whatever the flag says. One Debug solution build with the flag on fixes it.
+
 Two traps, both of which have cost real time:
 
 - **Single-project builds leave the tree inconsistent, both ways.**
