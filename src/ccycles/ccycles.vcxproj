@@ -7,17 +7,20 @@
   Build and Rebuild in Visual Studio do the right thing and errors surface in
   the Error List like any other project.
 
-  Two-tier by design, keyed off the existing RHINOCYCLESDEV switch:
+  Nothing has to be switched on. tools/cycles_build_if_needed.ps1 compares the
+  Cycles sources against the fingerprint the prebuilt payload was stamped with,
+  and builds only when they differ:
 
-    RHINOCYCLESDEV unset (the default, and what almost everyone wants)
+    unchanged
         Does nothing. The prebuilt ccycles binaries are restored by
         RhinoCyclesCore.csproj. Nobody needs CMake, CUDA or an OptiX SDK
         to build Rhino.
 
-    RHINOCYCLESDEV set
-        Configures and builds Cycles from source into the Rhino Plug-ins
-        output directory. GPU backends are auto-detected; a machine with no
-        GPU SDKs installed still gets a working CPU-only build.
+    changed
+        Configures and builds Cycles from source, installs it into big_libs and
+        re-stamps it. GPU backends are auto-detected; a machine with no GPU SDKs
+        installed still gets a working CPU-only build, and one with no CMake at
+        all is told rather than blocked.
 
     Note that this project installs into big_libs, and it is
     RhinoCyclesCore.csproj that copies from there into the plug-in output. So
@@ -87,65 +90,28 @@
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
     <!--
-      Two ways to be a Cycles developer, and only the first needs to be known.
+      Decide, do not ask.
 
-      RHINOCYCLESDEV set        an explicit request, from RhinoBuilder's checkbox,
-                                cycles_dev.ps1, or the environment.
+      ccycles is rebuilt when the Cycles sources differ from the ones the
+      prebuilt payload was built from, and not otherwise. Nobody has to set
+      anything: change Cycles, build Rhino with RhinoBuilder or Visual Studio,
+      and ccycles and its kernels are regenerated. Change nothing and this costs
+      one PowerShell start, where Rhino 9.x cost nothing at all because it never
+      built Cycles from a normal solution build.
 
-      cycles/build exists       you have built Cycles here before, so keep doing
-                                it. The build directory is gitignored (build*/),
-                                so a fresh clone never has one and CMake is the
-                                only thing that creates it. Its presence is
-                                therefore a deliberate act, and a reliable one -
-                                no timestamps, no git queries, nothing to get
-                                wrong on a checkout.
+      The comparison lives in tools/cycles_build_if_needed.ps1, which explains
+      why it is content-derived rather than timestamp-based: git rewrites mtimes
+      on checkout, so timestamps would make a fresh clone a coin flip.
 
-      The point is that the flag only has to be found once. After the first
-      source build the build tree keeps it going, so editing Cycles and pressing
-      Build simply works - Ninja rebuilds what changed - and nobody has to
-      remember a variable. Deleting cycles/build goes back to the prebuilt
-      payload, and the message below says so at the moment it is relevant.
+      Rebuild forces a from-scratch build by clearing the build directory first.
+      Clean deliberately leaves it alone - wiping an hour of CMake output is not
+      something Clean Solution should do as a side effect.
     -->
-    <!--
-      Three states, in priority order. RHINOCYCLESDEV used to be tested only for
-      being non-empty, which meant RHINOCYCLESDEV=0 switched source builds *on* -
-      and once the build tree became a trigger there was no way to say "not this
-      build" at all, so RhinoBuilder's unticked checkbox could not mean what it
-      said. An explicit off fixes both. MSBuild string comparison is
-      case-insensitive, so False and OFF are covered too.
-    -->
-    <CyclesBuildFromSource Condition="'$(RHINOCYCLESDEV)'=='0' Or '$(RHINOCYCLESDEV)'=='false' Or '$(RHINOCYCLESDEV)'=='no' Or '$(RHINOCYCLESDEV)'=='off'">false</CyclesBuildFromSource>
-    <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'=='' And '$(RHINOCYCLESDEV)'!=''">true</CyclesBuildFromSource>
-    <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'=='' And Exists('$(CyclesBuildDir)\CMakeCache.txt')">true</CyclesBuildFromSource>
-    <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'==''">false</CyclesBuildFromSource>
-    <CyclesExplicitlyOff Condition="'$(CyclesBuildFromSource)'!='true' And '$(RHINOCYCLESDEV)'!=''">true</CyclesExplicitlyOff>
+    <CyclesDecide>powershell -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildThisFileDirectory)..\..\tools\cycles_build_if_needed.ps1" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesDecide>
 
-    <!-- Announce the source build before starting it, and say which of the two
-         reasons applies. Otherwise the only clue that this is about to spend an
-         hour on GPU kernels is the script's own output further down the log. -->
-    <CyclesAnnounce Condition="'$(RHINOCYCLESDEV)'!=''">echo ccycles: RHINOCYCLESDEV is set, building Cycles from source. GPU kernels make the first pass slow.</CyclesAnnounce>
-    <CyclesAnnounce Condition="'$(RHINOCYCLESDEV)'==''">echo ccycles: found a Cycles build tree, building Cycles from source. Delete cycles\build to go back to the prebuilt payload.</CyclesAnnounce>
-    <CyclesInvoke>$(CyclesAnnounce) &amp; powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
-    <CyclesSkipMessage Condition="'$(CyclesExplicitlyOff)'=='true'">echo ccycles: source builds turned off for this build (RHINOCYCLESDEV=$(RHINOCYCLESDEV)), using prebuilt Cycles from big_libs.</CyclesSkipMessage>
-    <CyclesSkipMessage Condition="'$(CyclesExplicitlyOff)'!='true'">echo ccycles: using prebuilt Cycles from big_libs. Set RHINOCYCLESDEV to build it from source instead.</CyclesSkipMessage>
-
-    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
-    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>
-
-    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesInvoke)</NMakeReBuildCommandLine>
-    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeReBuildCommandLine>
-
-    <!--
-      Clean deliberately leaves cycles\build alone, where it used to delete it.
-      The build tree is now what keeps source builds switched on, so deleting it
-      changes what every later build does - far too much to happen as a side
-      effect of Clean Solution, which people run for unrelated reasons. Rebuild
-      still wipes it, because that ends by building again and so leaves the tree
-      in place either way.
-    -->
-    <CyclesCleanMessage>echo ccycles: leaving the Cycles build tree in cycles\build. Delete it by hand for a from-scratch build, or to go back to the prebuilt payload.</CyclesCleanMessage>
-    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesCleanMessage)</NMakeCleanCommandLine>
-    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeCleanCommandLine>
+    <NMakeBuildCommandLine>$(CyclesDecide)</NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesDecide)</NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>echo ccycles: leaving the Cycles build tree in cycles\build. Rebuild wipes it for a from-scratch build.</NMakeCleanCommandLine>
 
     <NMakeOutput>$(CyclesInstallDir)\ccycles.dll</NMakeOutput>
 

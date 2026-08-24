@@ -1,4 +1,4 @@
-Cycles Renderer
+﻿Cycles Renderer
 ===============
 
 Cycles is a path tracing renderer focused on interactivity and ease of use, while supporting many production features.
@@ -27,23 +27,24 @@ For the OSL scene you need to enable the OSL shading system:
 	
 ## Building ccycles for Rhino
 
-Cycles builds from Visual Studio like any other Rhino project. Set
-`RHINOCYCLESDEV=1` — `tools/cycles_dev.ps1 -On` / `-Off` does it, and with no
-argument reports whether it took effect — and build
-`src4/BuildSolutions/Rhino.sln`; `ccycles.vcxproj`
-configures and builds Cycles, installs it into
-`big_libs/RhinoCycles/ccycles/win/{debug,release}`, and `RhinoCyclesCore.csproj`
-copies it into the plug-in output. Without `RHINOCYCLESDEV` nothing is built from
-source and the prebuilt payload is used, so no CMake, CUDA or OptiX SDK is
-needed.
+Cycles builds from Visual Studio like any other Rhino project, and needs nothing
+switched on. Build `src4/BuildSolutions/Rhino.sln`; `ccycles.vcxproj` rebuilds
+Cycles whenever its sources differ from the ones the prebuilt payload was stamped
+with, installs it into `big_libs/RhinoCycles/ccycles/win/{debug,release}`, and
+`RhinoCyclesCore.csproj` copies it into the plug-in output. When the sources match the stamp nothing is
+built and the prebuilt payload is used, so no CMake, CUDA or OptiX SDK is needed.
+`tools/cycles_dev.ps1` reports the current decision; `RHINOCYCLESDEV=1` forces a
+build and `0` forbids one, but normal use needs neither.
 
 Building a single project is the usual mistake: `ccycles.vcxproj` alone updates
 `big_libs` but not the plug-in output, and `RhinoCyclesCore.csproj` alone copies
 whatever `big_libs` already holds without rebuilding Cycles. Do both, or the
 solution.
 
-To publish a payload, commit the installed files in `big_libs` on a branch. Only
-the release payload is tracked; a `Debug/` rule in `big_libs/.gitignore` catches
+To publish a payload, commit the installed files in `big_libs` on a branch -
+**including `ccycles.stamp`**, which is what tells every other checkout that the
+payload matches the sources and stops them all rebuilding Cycles. Only the release
+payload is tracked; a `Debug/` rule in `big_libs/.gitignore` catches
 the debug one, so it stays local unless force-added.
 
 See `RHINO-CYCLES-5.md` for the state of the port, and `tools/DIAGNOSTICS.md` for
