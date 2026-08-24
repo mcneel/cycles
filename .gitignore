@@ -36,3 +36,7 @@ examples/osl/*.oso
 smoketest/bin/
 smoketest/obj/
 smoketest/rel/
+
+# MSBuild writes these next to a project when MSBUILDEMITSOLUTION is set.
+*.metaproj
+*.metaproj.tmp
