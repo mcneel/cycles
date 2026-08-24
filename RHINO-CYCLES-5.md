@@ -173,6 +173,13 @@ Deliberate, and worth knowing before touching the surrounding code.
    RhinoCycles branch. Otherwise document and park it.
 4. **Fix the smoketest**, or drop it in favour of `run_checks.ps1 -Render`, which
    does work.
+5. **Decide how a source build should be triggered.** Normal developers already
+   match 9.x exactly and need nothing; a Cycles developer currently has to know
+   a flag exists. Whether the build should detect that for itself is an open
+   decision, with the options and their costs in `tools/PORTING-GAPS.md`. Two
+   fixes there are independent of it and worth doing either way: a solution
+   dependency so deploying cannot be forgotten, and saying in the build output
+   which payload was used.
 
 ## Going deeper
 

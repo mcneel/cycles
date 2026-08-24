@@ -111,3 +111,86 @@ texture colorspace, not the light tree, not shadow-catcher compositing, not
 adaptive sampling, not denoising, and not the device. It only affects surfaces
 lit by the environment, it grows monotonically with pixel brightness, and the
 directly-viewed background is exact to within the noise floor.
+
+## How a Cycles source build should be triggered
+
+Undecided. The current behaviour is safe and needs no action from anyone, but it
+asks a developer to declare something the build could work out for itself.
+
+### What is true today
+
+A source build happens if and only if `RHINOCYCLESDEV` is non-empty.
+`ccycles.vcxproj` tests it; nothing else in the tree reads it. Unset, the whole
+build step is one `echo`, and the prebuilt payload in `big_libs` is used.
+`tools/cycles_dev.ps1` sets, clears and reports it.
+
+**Normal developers already match Rhino 9.x, by the same mechanism.** The 9.x
+branch pins `big_libs` at `161a4919`, which carries
+`RhinoCycles/ccycles/win/release/ccycles.dll` plus 34 precompiled kernel files -
+Windows release only, no debug, exactly as now. Neither branch builds Cycles for
+a normal solution build. The only differences are that `ccycles` is now in
+`Rhino.sln` (9.x had it only in `RhinoWithExtras.sln`, and 9.x's `Rhino.sln` has
+no reference to it at all) and that `csycles` moved from `cycles/csycles` to
+`cycles/src/csycles`. Neither costs a developer anything.
+
+So nothing here is a regression against 9.x. The question is only whether a
+*Cycles* developer should have to know about a flag.
+
+### Why the obvious mechanism does not work
+
+Making the build detect staleness by file timestamps fails, for two measured
+reasons:
+
+- **git rewrites mtimes on checkout.** After a pull, a clean tree looks newer
+  than the payload, so every developer would be told to build Cycles - the exact
+  outcome that has to be avoided.
+- **Walking the tree is not free.** 891 Cycles source files, and a cold
+  enumeration took about 10s on Windows here.
+
+The payload also carries no record of what produced it: there is no stamp,
+version or revision file anywhere in
+`big_libs/RhinoCycles/ccycles/win/release`. So nothing can currently compare
+"what is in the tree" against "what the payload is".
+
+### The options
+
+**A. Keep the flag.** No risk, no change. A Cycles developer must know
+`RHINOCYCLESDEV` exists, must know a running Visual Studio ignores it until
+restarted, and must know that only a solution build deploys. That knowledge is
+now written down, which is most of the cost removed.
+
+**B. Detect by revision.** `build_cycles.ps1` records the cycles commit it built
+from into a stamp beside the payload, committed with it. Each build compares that
+stamp against `git rev-parse HEAD` plus whether the tree is dirty - cheap, and
+immune to checkout mtimes. Clean and matching means no work at all; dirty or
+moved means build from source. A Cycles developer then configures nothing: edit,
+build, and Ninja rebuilds only what changed, kernels included.
+
+  The cost is borne by people who did not ask for it. A checkout where the cycles
+  submodule was bumped without a rebuilt payload committed alongside it looks
+  stale to everybody, so everybody gets a warning they cannot act on. It also
+  adds a `git` call per build, roughly 0.1-0.3s.
+
+**C. B, gated on the toolchain.** Check for CMake/Ninja first; if absent, skip
+detection entirely and use the payload silently. A machine that cannot build
+Cycles gets no warning, because no warning there could prompt an action. The
+proxy is imperfect in both directions: someone with CMake installed for
+unrelated reasons still gets the check, and a genuinely mismatched payload goes
+unmentioned on the machines least able to notice it.
+
+**D. B, hard-failing instead of warning.** Honest and blocking. Rejected on
+sight for a plug-in most developers never touch, but recorded so nobody proposes
+it as new.
+
+### Independent of the above
+
+Two fixes stand on their own and do not depend on which option wins:
+
+- `RhinoCyclesCore` has **no solution dependency** on `ccycles` - it has no
+  `ProjectDependencies` entry at all. Adding one makes the deploy trap
+  impossible instead of documented: building the plug-in would build Cycles
+  first, so "build both, in that order" stops being knowledge anyone needs.
+- The build says nothing about **which** payload it copied, or whether Cycles was
+  built from source. Both states are currently invisible and both have produced
+  wrong conclusions in this port. Two one-line messages retire most of the
+  "check the binary is newer than your edit" ritual.
