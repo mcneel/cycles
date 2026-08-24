@@ -86,22 +86,55 @@
     <CyclesInstallDir>$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\$(CyclesPayloadDir)</CyclesInstallDir>
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
-    <!-- Announce the source build before starting it. Otherwise the only clue
-         that this is about to spend an hour on GPU kernels is the script's own
-         output further down the log, and the two cases were asymmetric: the
-         skip said so plainly, the build did not. -->
-    <CyclesAnnounce>echo ccycles: RHINOCYCLESDEV is set, building Cycles from source. GPU kernels make the first pass slow.</CyclesAnnounce>
+    <!--
+      Two ways to be a Cycles developer, and only the first needs to be known.
+
+      RHINOCYCLESDEV set        an explicit request, from RhinoBuilder's checkbox,
+                                cycles_dev.ps1, or the environment.
+
+      cycles/build exists       you have built Cycles here before, so keep doing
+                                it. The build directory is gitignored (build*/),
+                                so a fresh clone never has one and CMake is the
+                                only thing that creates it. Its presence is
+                                therefore a deliberate act, and a reliable one -
+                                no timestamps, no git queries, nothing to get
+                                wrong on a checkout.
+
+      The point is that the flag only has to be found once. After the first
+      source build the build tree keeps it going, so editing Cycles and pressing
+      Build simply works - Ninja rebuilds what changed - and nobody has to
+      remember a variable. Deleting cycles/build goes back to the prebuilt
+      payload, and the message below says so at the moment it is relevant.
+    -->
+    <CyclesBuildFromSource Condition="'$(RHINOCYCLESDEV)'!=''">true</CyclesBuildFromSource>
+    <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'=='' And Exists('$(CyclesBuildDir)\CMakeCache.txt')">true</CyclesBuildFromSource>
+    <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'==''">false</CyclesBuildFromSource>
+
+    <!-- Announce the source build before starting it, and say which of the two
+         reasons applies. Otherwise the only clue that this is about to spend an
+         hour on GPU kernels is the script's own output further down the log. -->
+    <CyclesAnnounce Condition="'$(RHINOCYCLESDEV)'!=''">echo ccycles: RHINOCYCLESDEV is set, building Cycles from source. GPU kernels make the first pass slow.</CyclesAnnounce>
+    <CyclesAnnounce Condition="'$(RHINOCYCLESDEV)'==''">echo ccycles: found a Cycles build tree, building Cycles from source. Delete cycles\build to go back to the prebuilt payload.</CyclesAnnounce>
     <CyclesInvoke>$(CyclesAnnounce) &amp; powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
-    <CyclesSkipMessage>echo ccycles: RHINOCYCLESDEV is not set, using prebuilt binaries. Set it to build Cycles from source.</CyclesSkipMessage>
+    <CyclesSkipMessage>echo ccycles: using prebuilt Cycles from big_libs. Set RHINOCYCLESDEV to build it from source instead.</CyclesSkipMessage>
 
-    <NMakeBuildCommandLine Condition="'$(RHINOCYCLESDEV)'!=''">$(CyclesInvoke)</NMakeBuildCommandLine>
-    <NMakeBuildCommandLine Condition="'$(RHINOCYCLESDEV)'==''">$(CyclesSkipMessage)</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>
 
-    <NMakeReBuildCommandLine Condition="'$(RHINOCYCLESDEV)'!=''">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesInvoke)</NMakeReBuildCommandLine>
-    <NMakeReBuildCommandLine Condition="'$(RHINOCYCLESDEV)'==''">$(CyclesSkipMessage)</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesInvoke)</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeReBuildCommandLine>
 
-    <NMakeCleanCommandLine Condition="'$(RHINOCYCLESDEV)'!=''">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul</NMakeCleanCommandLine>
-    <NMakeCleanCommandLine Condition="'$(RHINOCYCLESDEV)'==''">$(CyclesSkipMessage)</NMakeCleanCommandLine>
+    <!--
+      Clean deliberately leaves cycles\build alone, where it used to delete it.
+      The build tree is now what keeps source builds switched on, so deleting it
+      changes what every later build does - far too much to happen as a side
+      effect of Clean Solution, which people run for unrelated reasons. Rebuild
+      still wipes it, because that ends by building again and so leaves the tree
+      in place either way.
+    -->
+    <CyclesCleanMessage>echo ccycles: leaving the Cycles build tree in cycles\build. Delete it by hand for a from-scratch build, or to go back to the prebuilt payload.</CyclesCleanMessage>
+    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesCleanMessage)</NMakeCleanCommandLine>
+    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeCleanCommandLine>
 
     <NMakeOutput>$(CyclesInstallDir)\ccycles.dll</NMakeOutput>
 

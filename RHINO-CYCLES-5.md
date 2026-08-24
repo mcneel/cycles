@@ -34,18 +34,39 @@ Build the **solution**, not single projects:
 
 That is all most people need — Cycles comes prebuilt from `big_libs`, so no CMake,
 CUDA or OptiX SDK is required. To build Cycles *from source* instead, set
-`RHINOCYCLESDEV=1` first; GPU backends are auto-detected and a machine with no GPU
+`RHINOCYCLESDEV=1` once; after the first source build the `cycles/build` directory
+keeps it on by itself. GPU backends are auto-detected and a machine with no GPU
 SDK still gets a working CPU build.
 
-### Turning source builds on and off
+### Becoming a Cycles developer, once
+
+**Cycles is built from source when either the flag is set or `cycles/build`
+exists.** The second is what matters: the build directory is gitignored, so a
+fresh clone never has one and only CMake creates it. Building Cycles once
+therefore leaves the switch on permanently, and after that editing Cycles and
+pressing Build simply works — Ninja rebuilds what changed, `ccycles` installs to
+`big_libs`, and `RhinoCyclesCore` deploys it, in that order, because the solution
+now depends on it.
+
+So the flag has to be found exactly once:
 
     powershell -ExecutionPolicy Bypass -File tools/cycles_dev.ps1         # what is my state?
     powershell -ExecutionPolicy Bypass -File tools/cycles_dev.ps1 -On     # then restart VS
     powershell -ExecutionPolicy Bypass -File tools/cycles_dev.ps1 -Off
 
 `-On` persists `RHINOCYCLESDEV=1` for the current user; `-Off` removes it. With no
-argument it reports where the flag is set, whether a running Visual Studio is
+argument it reports which trigger is active, whether a running Visual Studio is
 using a stale environment, and which payloads `big_libs` actually holds.
+
+Two consequences of the build tree being the switch:
+
+- **`-Off` alone will not stop source builds** once you have a build tree. Delete
+  `cycles/build` for that. `cycles_dev.ps1` says so rather than letting the next
+  build surprise you, and does not delete it for you — rebuilding costs an hour.
+- **Clean no longer deletes the build tree**, where it used to. Deleting it now
+  changes what every later build does, which is far too much to happen as a side
+  effect of Clean Solution. Rebuild still wipes it, because that ends by building
+  again.
 
 **`RHINOCYCLESDEV=0` means on.** The project tests the variable for being
 non-empty, not for a truthy value, so `0`, `false` and `no` all enable a source
@@ -65,11 +86,11 @@ Core" checkbox is not a capability — it only adds `/p:RHINOCYCLESDEV=1` to its
 MSBuild call. VS has no equivalent UI, and takes the flag from its environment
 instead; that is the only difference between the two routes.
 
-| Editing | Needs `RHINOCYCLESDEV` |
+| Editing | Needs the flag |
 | --- | --- |
 | `RhinoCycles`, `RhinoCyclesCore` — the C# plug-in | No |
 | `csycles` — the C# bindings | No |
-| `ccycles`, or Cycles itself | Yes |
+| `ccycles`, or Cycles itself | Once, then never again |
 
 Four things worth knowing before the first attempt:
 
@@ -78,11 +99,11 @@ Four things worth knowing before the first attempt:
   saying the flag is unset. `cycles_dev.ps1` counts running instances for exactly
   this reason.
 - **`ccycles` is already in the solution** — under `Cycles/CCSycles` next to
-  `csycles`, and built in every x64 configuration. With the flag unset its whole
-  build step is one `echo`, which is why it looks like it never runs. MSBuild's
-  Makefile `Build` target has no inputs or outputs, so the command executes on
-  every build; the flag, not an up-to-date check, is what decides whether it does
-  any work.
+  `csycles`, and built in every x64 configuration. With no flag and no build tree
+  its whole build step is one `echo`, which is why it looks like it never runs.
+  MSBuild's Makefile `Build` target has no inputs or outputs, so the command
+  executes on every build; the trigger, not an up-to-date check, is what decides
+  whether it does any work.
 - **Build, not Rebuild.** Build re-invokes `build_cycles.ps1`, which reuses its
   CMake build directory, so an edited Cycles source is picked up incrementally.
   Rebuild deletes that directory first and rebuilds Cycles from scratch.
@@ -94,16 +115,20 @@ Four things worth knowing before the first attempt:
 
 Two traps, both of which have cost real time:
 
-- **Single-project builds leave the tree inconsistent, both ways.**
-  `ccycles.vcxproj` alone updates `big_libs` but not the plug-in output;
-  `RhinoCyclesCore.csproj` alone copies `big_libs` without rebuilding Cycles. A
-  Cycles edit needs both, in that order — or just the solution.
+- **Single-project builds from the command line still leave the tree
+  inconsistent.** `ccycles.vcxproj` alone updates `big_libs` but not the plug-in
+  output; `RhinoCyclesCore.csproj` alone copies `big_libs` without rebuilding
+  Cycles. Inside the solution this is handled — `RhinoCyclesCore` now depends on
+  `ccycles`, so Build in Visual Studio does both in the right order — but a
+  solution dependency does not exist outside the solution, so `MSBuild
+  RhinoCyclesCore.csproj` on its own is still the old trap.
 - **Two separate things compile GPU kernels. Do not confuse them.**
 
-  *At build time*, and only with `RHINOCYCLESDEV` set, `build_cycles.ps1`
+  *At build time*, and only when a source build is triggered, `build_cycles.ps1`
   compiles every architecture's kernel. This is the expensive part of a source
   build — 18 HIP fatbins at about 3m20s each, plus CUDA and OptiX — and it is
-  most of what the flag actually costs you. With the flag unset nothing is
+  most of what a source build actually costs you. Incremental passes only redo
+  the kernels whose sources changed. Otherwise nothing is
   compiled: the kernels arrive precompiled in the payload, as
   `big_libs/RhinoCycles/ccycles/win/<cfg>/lib/kernel_*.fatbin.zst` and
   `kernel_*.ptx.zst`. That is what RhinoBuilder's unticked checkbox gives you.
@@ -184,13 +209,12 @@ Deliberate, and worth knowing before touching the surrounding code.
    RhinoCycles branch. Otherwise document and park it.
 4. **Fix the smoketest**, or drop it in favour of `run_checks.ps1 -Render`, which
    does work.
-5. **Decide how a source build should be triggered.** Normal developers already
-   match 9.x exactly and need nothing; a Cycles developer currently has to know
-   a flag exists. Whether the build should detect that for itself is an open
-   decision, with the options and their costs in `tools/PORTING-GAPS.md`. Two
-   fixes there are independent of it and worth doing either way: a solution
-   dependency so deploying cannot be forgotten, and saying in the build output
-   which payload was used.
+5. ~~Decide how a source build should be triggered.~~ **Done.** The CMake build
+   tree is the switch, so the flag has to be found once and never again; the
+   reasoning and the rejected alternatives are in `tools/PORTING-GAPS.md`. The
+   two fixes that went with it are also in: `RhinoCyclesCore` now depends on
+   `ccycles`, so deploying cannot be forgotten, and the build says which payload
+   it used.
 
 ## Going deeper
 

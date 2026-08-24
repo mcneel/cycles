@@ -114,8 +114,10 @@ directly-viewed background is exact to within the noise floor.
 
 ## How a Cycles source build should be triggered
 
-Undecided. The current behaviour is safe and needs no action from anyone, but it
-asks a developer to declare something the build could work out for itself.
+**Decided: the CMake build tree is the switch.** `ccycles.vcxproj` builds from
+source when `RHINOCYCLESDEV` is set *or* when `cycles/build/CMakeCache.txt`
+exists. The options below are kept because the reasoning rules out the obvious
+alternatives, and someone will propose them again.
 
 ### What is true today
 
@@ -153,6 +155,17 @@ version or revision file anywhere in
 "what is in the tree" against "what the payload is".
 
 ### The options
+
+**Chosen: the build tree.** A fresh clone has no `cycles/build` - it is gitignored
+as `build*/` - and only CMake creates one, so its presence is a deliberate act and
+a reliable signal. No timestamps, no git queries, no stamp file, and nothing that
+a checkout can scramble. A normal developer is untouched and cannot trigger it by
+accident; a Cycles developer finds the flag once and then never thinks about it
+again, because the tree keeps source builds on. The costs are that `-Off` no
+longer suffices on its own, and that Clean had to stop deleting the tree - both
+recorded in `RHINO-CYCLES-5.md`.
+
+The rejected options follow.
 
 **A. Keep the flag.** No risk, no change. A Cycles developer must know
 `RHINOCYCLESDEV` exists, must know a running Visual Studio ignores it until
