@@ -14,7 +14,7 @@
         RhinoCyclesCore.csproj. Nobody needs CMake, CUDA or an OptiX SDK
         to build Rhino.
 
-    Debug+Cycles / Release+Cycles
+    Debug+Cycles / ReleaseDebuggable+Cycles
         Configures and builds Cycles from source and installs it into big_libs.
         GPU backends are auto-detected; a machine with no GPU SDKs installed
         still gets a working CPU-only build.
@@ -44,8 +44,8 @@
       <Configuration>Debug+Cycles</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Release+Cycles|x64">
-      <Configuration>Release+Cycles</Configuration>
+    <ProjectConfiguration Include="ReleaseDebuggable+Cycles|x64">
+      <Configuration>ReleaseDebuggable+Cycles</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
@@ -71,7 +71,7 @@
     <!-- build_cycles.ps1 understands Debug / Release / RelWithDebInfo. -->
     <CyclesConfiguration>Release</CyclesConfiguration>
     <CyclesConfiguration Condition="$(Configuration.StartsWith('Debug'))">Debug</CyclesConfiguration>
-    <CyclesConfiguration Condition="'$(Configuration)'=='ReleaseDebuggable'">RelWithDebInfo</CyclesConfiguration>
+    <CyclesConfiguration Condition="$(Configuration.StartsWith('ReleaseDebuggable'))">RelWithDebInfo</CyclesConfiguration>
 
     <CyclesScript>$(MSBuildThisFileDirectory)..\..\build_cycles.ps1</CyclesScript>
     <!-- RhinoBinDir comes from Rhino's property sheets, which a Makefile-style
@@ -102,7 +102,7 @@
                                              used and nobody needs CMake or a
                                              GPU SDK.
 
-        Debug+Cycles / Release+Cycles         build Cycles and its kernels from
+        Debug+Cycles / ReleaseDebuggable+Cycles         build Cycles and its kernels from
                                              source, install them into big_libs,
                                              and let RhinoCyclesCore deploy them.
 
@@ -119,7 +119,7 @@
     <CyclesBuildFromSource Condition="$(Configuration.Contains('Cycles'))">true</CyclesBuildFromSource>
 
     <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
-    <CyclesSkipMessage>echo ccycles: using the prebuilt Cycles from big_libs. Pick the Debug+Cycles or Release+Cycles configuration to build it from source.</CyclesSkipMessage>
+    <CyclesSkipMessage>echo ccycles: using the prebuilt Cycles from big_libs. Pick the Debug+Cycles or ReleaseDebuggable+Cycles configuration to build it from source.</CyclesSkipMessage>
 
     <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
     <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>

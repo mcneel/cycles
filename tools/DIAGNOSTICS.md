@@ -415,7 +415,7 @@ Build the **solution**, not single projects:
 
     MSBuild src4/BuildSolutions/Rhino.sln /p:Configuration=Debug /p:Platform=x64 /m:4
 
-Cycles itself is only built in the `Debug+Cycles` and `Release+Cycles`
+Cycles itself is only built in the `Debug+Cycles` and `ReleaseDebuggable+Cycles`
 configurations; the plain ones use the prebuilt payload, which is what almost
 everyone wants. For the rest of it, including why native debugging needs a local
 Debug build, see *Building* in `RHINO-CYCLES-5.md`. A full incremental pass is about seven minutes here and reports

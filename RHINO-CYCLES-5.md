@@ -42,7 +42,7 @@ Pick a different configuration. That is the whole mechanism.
 | Configuration | Cycles |
 | --- | --- |
 | `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload, as in Rhino 9.x |
-| `Debug+Cycles`, `Release+Cycles` | built from source, kernels included |
+| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source, kernels included |
 
 Visual Studio lists them in the configuration dropdown; RhinoBuilder lists them
 in Configurations. Same choice, both tools, nothing to set up and nothing to

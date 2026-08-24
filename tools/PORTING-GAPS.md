@@ -1,4 +1,4 @@
-# Known gaps in the 3.5 -> 5.2 port
+﻿# Known gaps in the 3.5 -> 5.2 port
 
 Things that work differently from shipping Rhino 9 WIP and are not bugs to be
 found - they are decisions waiting to be made. Each one says what was measured
@@ -114,7 +114,7 @@ directly-viewed background is exact to within the noise floor.
 
 ## How a Cycles source build should be triggered
 
-**Decided: a solution configuration.** `Debug+Cycles` and `Release+Cycles` build
+**Decided: a solution configuration.** `Debug+Cycles` and `ReleaseDebuggable+Cycles` build
 Cycles from source; the plain configurations use the prebuilt payload from
 `big_libs`, exactly as Rhino 9.x did. Visual Studio shows them in its
 configuration dropdown and RhinoBuilder in its Configurations list, so the same
