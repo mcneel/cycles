@@ -76,16 +76,40 @@ function Show-Status {
   $session = $env:RHINOCYCLESDEV
 
   # A vcxproj condition tests for non-empty, so anything at all counts as on.
-  $effective = if (![string]::IsNullOrEmpty($persisted)) { $persisted }
-               elseif (![string]::IsNullOrEmpty($machine)) { $machine }
-               else { '' }
+  #
+  # There are two answers, not one. A build started from this shell inherits the
+  # session value; a newly launched VS or shell gets the persisted one. Reporting
+  # only the persisted value would have called this OFF in a shell that was about
+  # to build Cycles.
+  $persistedEffective = if (![string]::IsNullOrEmpty($persisted)) { $persisted }
+                        elseif (![string]::IsNullOrEmpty($machine)) { $machine }
+                        else { '' }
+  $hereEffective = if (![string]::IsNullOrEmpty($session)) { $session } else { $persistedEffective }
+
+  function Format-State($value) {
+    if ([string]::IsNullOrEmpty($value)) { return 'OFF - prebuilt payload from big_libs' }
+    return "ON  - $varName=$value, so build_cycles.ps1 runs"
+  }
 
   Write-Host ''
   Write-Host 'Cycles source builds' -ForegroundColor Cyan
-  if ([string]::IsNullOrEmpty($effective)) {
-    Write-Host '  OFF  - builds use the prebuilt payload from big_libs.'
-  } else {
-    Write-Host "  ON   - $varName=$effective; ccycles.vcxproj will run build_cycles.ps1." -ForegroundColor Green
+  $hereColour = if ([string]::IsNullOrEmpty($hereEffective)) { 'Gray' } else { 'Green' }
+  $newColour = if ([string]::IsNullOrEmpty($persistedEffective)) { 'Gray' } else { 'Green' }
+  Write-Host ("  from this shell        : {0}" -f (Format-State $hereEffective)) -ForegroundColor $hereColour
+  Write-Host ("  from a new shell or VS : {0}" -f (Format-State $persistedEffective)) -ForegroundColor $newColour
+  if ($hereEffective -ne $persistedEffective) {
+    Write-Host '  These differ, so where you build from decides what happens.' -ForegroundColor Yellow
+  }
+
+  # The project tests for non-empty, not for truth, so these all mean ON - the
+  # opposite of what anyone setting them intends.
+  foreach ($v in @($hereEffective, $persistedEffective) | Select-Object -Unique) {
+    if ($v -match '^\s*(0|false|no|off)\s*$') {
+      Write-Host ''
+      Write-Host "  Careful: '$v' still counts as ON. The build tests whether the" -ForegroundColor Yellow
+      Write-Host '  variable is non-empty, not whether it looks true, so this builds' -ForegroundColor Yellow
+      Write-Host '  Cycles and its GPU kernels. Off means removed - use -Off.' -ForegroundColor Yellow
+    }
   }
 
   Write-Host ''

@@ -47,6 +47,17 @@ SDK still gets a working CPU build.
 argument it reports where the flag is set, whether a running Visual Studio is
 using a stale environment, and which payloads `big_libs` actually holds.
 
+**`RHINOCYCLESDEV=0` means on.** The project tests the variable for being
+non-empty, not for a truthy value, so `0`, `false` and `no` all enable a source
+build — an hour of GPU kernels for anyone who sets it that way expecting the
+opposite. Off means *removed*, which is what `-Off` does.
+
+RhinoBuilder's "Cycles Core" checkbox overrides the environment in both
+directions: ticked it passes `/p:RHINOCYCLESDEV=1`, unticked it passes the
+property as empty, and an explicit global property beats an inherited
+environment variable. So the box means what it says even on a machine set up for
+Visual Studio source builds.
+
 ### From Visual Studio
 
 **You never have to leave VS to build or debug Cycles.** RhinoBuilder's "Cycles
