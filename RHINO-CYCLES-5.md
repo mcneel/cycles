@@ -87,9 +87,22 @@ Two traps, both of which have cost real time:
   `ccycles.vcxproj` alone updates `big_libs` but not the plug-in output;
   `RhinoCyclesCore.csproj` alone copies `big_libs` without rebuilding Cycles. A
   Cycles edit needs both, in that order — or just the solution.
-- **GPU rendering needs `RhinoCyclesKernelCompiler.exe`**, which only a solution
-  build produces. Without it every render silently falls back to CPU or stalls,
-  and nothing says so.
+- **Two separate things compile GPU kernels. Do not confuse them.**
+
+  *At build time*, and only with `RHINOCYCLESDEV` set, `build_cycles.ps1`
+  compiles every architecture's kernel. This is the expensive part of a source
+  build — 18 HIP fatbins at about 3m20s each, plus CUDA and OptiX — and it is
+  most of what the flag actually costs you. With the flag unset nothing is
+  compiled: the kernels arrive precompiled in the payload, as
+  `big_libs/RhinoCycles/ccycles/win/<cfg>/lib/kernel_*.fatbin.zst` and
+  `kernel_*.ptx.zst`. That is what RhinoBuilder's unticked checkbox gives you.
+
+  *At runtime*, `RhinoCyclesKernelCompiler.exe` compiles for the device actually
+  present on the machine. Rhino launches it as a child process on a background
+  thread at plug-in load, under the `StartGpuKernelCompiler` setting (default
+  true). It ships with Rhino and has nothing to do with `RHINOCYCLESDEV` — but
+  only a solution build puts it in the plug-in output, and without it GPU
+  rendering silently falls back to CPU or stalls, and nothing says so.
 
 After any partial build, check the binary is newer than your edit before
 believing a render. A build that fails on a file lock leaves the old binary in
