@@ -92,6 +92,17 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
+		private static extern IntPtr cycles_version_string();
+		/// <summary>
+		/// Get the version of Cycles that ccycles.dll was built from, as "major.minor.patch".
+		/// </summary>
+		/// <returns>The Cycles version string.</returns>
+		public static string version_string()
+		{
+			return Marshal.PtrToStringAnsi(cycles_version_string());
+		}
+
+		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
 		private static extern IntPtr cycles_device_description(int i);
 		/// <summary>
 		/// Get the device description for specified device.
