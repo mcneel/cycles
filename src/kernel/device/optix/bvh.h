@@ -186,7 +186,7 @@ extern "C" __global__ void __anyhit__kernel_optix_shadow_all_hit()
    * block direct light (Product preset). ray is the world-space Cycles ray and
    * optixGetRayTmax() is in that ray's parameterization. */
   if (kernel_data.integrator.clip_all_rays &&
-      point_is_clipped(nullptr, ray->P + optixGetRayTmax() * ray->D)) {
+      point_is_clipped(nullptr, ray->P + optixGetRayTmax() * ray->D, object)) {
     return optixIgnoreIntersection();
   }
 

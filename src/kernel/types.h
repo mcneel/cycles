@@ -1305,6 +1305,11 @@ typedef struct KernelObject {
   bool use_planar_uvw;
   bool planar_uvw_capped;
   Transform planar_uvw_xform;
+
+  /* RH-98012: bit i is set when clipping plane i clips this object. Planes at
+   * index >= 32 always clip. */
+  uint clipping_plane_mask;
+  uint clipping_plane_pad[3];
   /* Rhino properties end */
 
 } KernelObject;

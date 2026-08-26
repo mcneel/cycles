@@ -303,6 +303,13 @@ CCL_CAPI void CDECL cycles_object_set_pass_id(ccl::Session* session_id, ccl::Obj
 CCL_CAPI void CDECL cycles_object_set_random_id(ccl::Session* session_id, ccl::Object*, unsigned int random_id);
 
 /**
+ * Set the clipping plane participation mask. Bit i is set when clipping plane
+ * i clips this object. Planes at index >= 32 always clip. (RH-98012)
+ * \ingroup ccycles_object
+ */
+CCL_CAPI void CDECL cycles_object_set_clipping_plane_mask(ccl::Session* session_id, ccl::Object*, unsigned int mask);
+
+/**
  * Clear clipping planes list.
  */
 CCL_CAPI void CDECL cycles_scene_clear_clipping_planes(ccl::Session* session_id);

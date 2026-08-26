@@ -81,6 +81,9 @@ class Object : public Node {
   NODE_SOCKET_API(Transform, planar_uvw_xform)
   NODE_SOCKET_API(bool, planar_uvw_capped)
 
+  /* RH-98012: bit i set when clipping plane i clips this object. */
+  NODE_SOCKET_API(uint, clipping_plane_mask)
+
   /* Set during device update. */
   bool intersects_volume;
 

@@ -216,7 +216,7 @@ ccl_device_inline
                * world-space hit point is the original world ray at isect.t,
                * which stays valid through instance transforms. */
               if (kernel_data.integrator.clip_all_rays &&
-                  point_is_clipped(kg, ray->P + isect.t * ray->D)) {
+                  point_is_clipped(kg, ray->P + isect.t * ray->D, isect.object)) {
                 continue;
               }
 

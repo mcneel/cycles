@@ -20,13 +20,31 @@ ccl_device_inline bool intersection_ray_valid(ccl_private const Ray *ray)
   return isfinite_safe(ray->P.x) && isfinite_safe(ray->D.x) && len_squared(ray->D) != 0.0f;
 }
 
-/* Rhino RH-95655: test whether a world-space point lies on the clipped-away
- * side (negative half-space) of any clipping plane. Used to make clipped
- * geometry invisible not only to camera rays (see path_clip_ray) but also to
- * indirect and shadow rays when the Product render preset enables clip_all_rays. */
-ccl_device_inline bool point_is_clipped(KernelGlobals kg, const float3 P)
+/* Rhino RH-98012: clipping plane participation mask of an object. Bit i is set
+ * when clipping plane i clips the object. Planes at index >= 32 always clip. */
+ccl_device_inline uint object_clipping_plane_mask(KernelGlobals kg, const int object)
 {
+  return (object == OBJECT_NONE) ? ~0u :
+                                   kernel_data_fetch(objects, object).clipping_plane_mask;
+}
+
+ccl_device_inline bool clipping_plane_clips_object(const uint mask, const int cpi)
+{
+  return cpi >= 32 || (mask & (1u << cpi)) != 0;
+}
+
+/* Rhino RH-95655: test whether a world-space point lies on the clipped-away
+ * side (negative half-space) of any clipping plane the object participates in.
+ * Used to make clipped geometry invisible not only to camera rays (see
+ * path_clip_ray) but also to indirect and shadow rays when the Product render
+ * preset enables clip_all_rays. */
+ccl_device_inline bool point_is_clipped(KernelGlobals kg, const float3 P, const int object)
+{
+  const uint mask = object_clipping_plane_mask(kg, object);
   for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+    if (!clipping_plane_clips_object(mask, cpi)) {
+      continue;
+    }
     const float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
     if (cpeq.x * P.x + cpeq.y * P.y + cpeq.z * P.z + cpeq.w < 0.0f) {
       return true;

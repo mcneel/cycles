@@ -262,7 +262,12 @@ ccl_device_forceinline bool path_clip_ray(
    * contributing to and occluding indirect lighting. */
   if (kernel_data.integrator.clip_all_rays ||
       (path_flag & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+    /* RH-98012: only planes this object participates in clip it. */
+    const uint clip_mask = object_clipping_plane_mask(kg, sd->object);
     for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+      if (!clipping_plane_clips_object(clip_mask, cpi)) {
+        continue;
+      }
       float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
       float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
       if (testdist < 0) {

@@ -273,6 +273,16 @@ void cycles_object_set_random_id(ccl::Session* session_id, ccl::Object* object, 
 	}
 }
 
+void cycles_object_set_clipping_plane_mask(ccl::Session* session_id, ccl::Object* object, unsigned int mask)
+{
+	ASSERT(object);
+
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		object->set_clipping_plane_mask(mask);
+	}
+}
+
 void cycles_scene_clear_clipping_planes(ccl::Session* session_id)
 {
 	ccl::Scene* sce = nullptr;

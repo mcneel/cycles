@@ -113,6 +113,8 @@ NODE_DEFINE(Object)
   SOCKET_TRANSFORM(planar_uvw_xform, "Planar UVW Transform", transform_identity());
   SOCKET_BOOLEAN(planar_uvw_capped, "Planar UVW Capped", false);
 
+  SOCKET_UINT(clipping_plane_mask, "Clipping Plane Mask", ~0u);
+
   return type;
 }
 
@@ -454,6 +456,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.planar_uvw_xform = ob->planar_uvw_xform;
   kobject.use_planar_uvw = ob->use_planar_uvw;
   kobject.planar_uvw_capped = ob->planar_uvw_capped;
+  kobject.clipping_plane_mask = ob->clipping_plane_mask;
   kobject.volume_density = object_volume_density(tfm, geom);
   kobject.color[0] = color.x;
   kobject.color[1] = color.y;
@@ -1129,23 +1132,25 @@ void ObjectManager::device_update_clipping_planes(Device*, DeviceScene* dscene,
 {
     float4* cps;
     need_clipping_plane_update = false;
-    /* Set the clipping planes. */
+    /* Set the clipping planes. RH-98012: keep the scene slot order so that the
+     * per-object participation masks (bit i == scene clipping plane i) stay
+     * valid. Discarded slots become a plane that clips nothing. */
     dscene->clipping_planes.free();
-    int num_cps = 0;
-    for (float4 cp : scene->clipping_planes) {
-        if (cp.x == FLT_MAX) continue;
-        num_cps++;
-    }
+    const int num_cps = (int)scene->clipping_planes.size();
     cps = dscene->clipping_planes.alloc(num_cps);
 
     int cp_idx = 0;
     for (float4 cp : scene->clipping_planes) {
         float4& dscene_cp = cps[cp_idx];
-        if (cp.x == FLT_MAX) continue;
-        dscene_cp.x = cp.x;
-        dscene_cp.y = cp.y;
-        dscene_cp.z = cp.z;
-        dscene_cp.w = cp.w;
+        if (cp.x == FLT_MAX) {
+            dscene_cp = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
+        }
+        else {
+            dscene_cp.x = cp.x;
+            dscene_cp.y = cp.y;
+            dscene_cp.z = cp.z;
+            dscene_cp.w = cp.w;
+        }
         cp_idx++;
     }
 

@@ -236,7 +236,12 @@ bool metalrt_shadow_all_hit(constant KernelParamsMetal &launch_params_metal,
    * Inlined (not point_is_clipped) because this free function has no
    * MetalKernelContext; kernel_data here resolves via launch_params_metal. */
   if (kernel_data.integrator.clip_all_rays) {
+    /* RH-98012: only planes this object participates in clip it. */
+    const uint clip_mask = kernel_data_fetch(objects, object).clipping_plane_mask;
     for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+      if (cpi < 32 && (clip_mask & (1u << cpi)) == 0) {
+        continue;
+      }
       const float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
       if (cpeq.x * hit_P.x + cpeq.y * hit_P.y + cpeq.z * hit_P.z + cpeq.w < 0.0f) {
         /* continue search */

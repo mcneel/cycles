@@ -243,7 +243,7 @@ ccl_device void kernel_embree_filter_occluded_func(const RTCFilterFunctionNArgum
       /* RH-95655: ignore hits on the clipped-away side so clipped geometry does
        * not block direct light (Product preset). cray is the world-space ray. */
       if (kernel_data.integrator.clip_all_rays &&
-          point_is_clipped(kg, cray->P + current_isect.t * cray->D)) {
+          point_is_clipped(kg, cray->P + current_isect.t * cray->D, current_isect.object)) {
         *args->valid = 0;
         return;
       }
