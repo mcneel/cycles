@@ -90,6 +90,14 @@ is enough to tell a real direction from all zeros.
 | `CCYCLES_BG_SKY_FROM_COLOR=1` | Force `sky_color_or_texture`'s Fac to 0, taking the environment image out of the skylight path. |
 | `CCYCLES_NO_CLAMP=1` | Set both sample clamps to 0, which Cycles reads as no limit at all. Takes the clamp's bias out of a comparison. |
 | `CCYCLES_FORCE_OPAQUE=1` | Cut the Alpha and Transmission Weight links on every principled node and set them opaque. Answers "is this material invisible because it is transparent?" in one run. |
+| `CCYCLES_FLAT_SHADERS=1` | Replace every surface shader with one grey diffuse, leaving the background and the lights alone. The geometry-vs-shading question asked properly. |
+| `CCYCLES_NAME_SC_PASSES=1` | Register `shadow_catcher`, `shadow_catcher_matte` and `background` under their own names so the probe can read them - Cycles auto-adds them with empty names and `get_pass_pixels` matches on name. |
+
+Use `CCYCLES_FLAT_SHADERS` rather than RhinoCycles' own `DebugSimpleShaders`
+setting for that question. `DebugSimpleShaders` drives the diffuse colour from
+the `uvmap1` attribute, so anything with UVs at or above 1 renders pure white -
+against a white background that is indistinguishable from missing geometry, and
+it cost a wrong conclusion on 2026-08-25.
 
 `CCYCLES_FORCE_OPAQUE` earned its keep by saying **no**. Material that renders as
 nothing is either transparent or transmissive, and Rhino builds both from long
@@ -331,6 +339,38 @@ directly-viewed background alone. Recorded so nobody pays for them twice.
 What is left is the Cycles version itself, which is the thing being changed. A
 version bisect through the 4.4 branches would name the upstream commit; nothing
 cheaper has worked.
+
+## The ground shadow that is really the same 2%
+
+On `tyreel_neon_testv9.3dm` the shadow catcher shows no shadow: Rhino's ground
+plane renders as flat background. Measured against shipping at the document
+camera, 640x480 - ground band mean 255.0 flat against shipping's 249.6 with a
+245-252 gradient, and 2,861 soft-grey pixels against 89,541.
+
+**It is not the shadow catcher, and it is not the background graph.** Both were
+run down, and the negative results are the useful part:
+
+| Suspect | Measurement that killed it |
+| --- | --- |
+| The matte redirect is not happening | `shadow_catcher_matte` reads identical to `combined` to six decimals, so `get_actual_display_pass` *is* redirecting and Rhino *is* reading the composited matte. |
+| The matte pass is missing | It exists. The session-start dump cannot see it - `Film::update_passes` adds it during device update - so list `scene->passes` from the `CCYCLES_PASS_PROBE` block instead, which runs mid-render. Ten passes, `PASS_SHADOW_CATCHER_MATTE` and `PASS_BACKGROUND` among them. |
+| The shadow arrives in alpha, not RGB | Alpha is exactly 1.0 everywhere, and `background_transparent=0` so the backdrop is multiplied in. |
+| The catcher captures no shadow | `shadow_catcher` under `CCYCLES_NO_CLAMP=1` reads min 0, max 1.481, **mean 0.970**. Under `CCYCLES_SIMPLE_BACKGROUND=1` the ground does darken - 201 under the car against 204 away from it, which is that same ratio. It is compositing. |
+| The background pass is 3x too bright | An artefact of reading `PASS_BACKGROUND` directly: it is scaled by its own sample count under approximate shadow catcher. The render disagrees - a 0.8 backdrop comes out at 204/255, exactly 0.8. Rhino writes linear straight to 8-bit on this path, which is worth knowing on its own. |
+| A node in the background graph inflates it | `CCYCLES_BG_TAP` along the camera branch: `bg_color_or_texture`, `factored_bg_color`, `gradient_or_other` and `bggamma` all read 0.998. No jump anywhere. (`sky_color_or_texture` reads 0.029 - that is the skylight branch, not the camera branch.) |
+
+So the backdrop is white *by design*, the catcher darkens it by about 3%, and
+the whole defect is that dev sits at 0.998 where shipping sits at 0.976. At 1.0
+the multiply clips and the entire gradient disappears - a 2% error with a
+100% symptom.
+
+**That is the same magnitude as the 4.2% scene above, in the same subsystem.**
+Treat them as one open item until something says otherwise; they differ in sign,
+which is the one argument against.
+
+Do not chase this with more taps. 2% at the top of an 8-bit range is below what
+PNG comparison can attribute - the next step is float EXR output and a
+per-channel ratio, or the version bisect that the 4.2% item already needs.
 
 ## The GPU never rendered, and why that poisoned everything
 

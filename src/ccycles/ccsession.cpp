@@ -320,6 +320,33 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 			static bool probed = false;
 			if (!probed) {
 				probed = true;
+				/* Film::update_passes adds the shadow-catcher passes during device
+				 * update, so the session-start dump runs too early to see them.
+				 * Reading "combined" is redirected to PASS_SHADOW_CATCHER_MATTE by
+				 * BufferParams::get_actual_display_pass, and falls back to the raw
+				 * combined pass *silently* when that matte is absent - which is a
+				 * catcher rendering as plain background with no shadow. List them
+				 * here, where the answer is final. */
+				if (ccsession_ != nullptr && ccsession_->session != nullptr) {
+					ccl::Scene *psce = ccsession_->session->scene.get();
+					if (psce != nullptr) {
+						/* These two decide whether the matte gets the backdrop
+						 * multiplied into RGB. With a transparent background,
+						 * use_approximate_shadow_catcher_background goes false and the
+						 * shadow arrives in *alpha* instead - which looks identical to
+						 * "no shadow" to anything that blits RGB over white. */
+						ccycles_diag("probe: approx_shadow_catcher=%d background_transparent=%d\n",
+						             (int)psce->film->get_use_approximate_shadow_catcher(),
+						             (int)psce->background->get_transparent());
+						ccycles_diag("probe: has_shadow_catcher=%d passes=%zu\n",
+						             (int)psce->has_shadow_catcher(), psce->passes.size());
+						for (const auto &p : psce->passes) {
+							ccycles_diag("probe:   pass type=%d mode=%d name='%s' written=%d\n",
+							             (int)p->get_type(), (int)p->get_mode(),
+							             p->get_name().c_str(), (int)p->is_written());
+						}
+					}
+				}
 				const char *names[] = {"combined", "shadow_catcher_matte",
 				                       "shadow_catcher", "background"};
 				const int w = tile.full_size.x, h = tile.full_size.y;
@@ -340,6 +367,23 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 					}
 					ccycles_diag("probe: '%s' %dx%d nonzero=%zu min=%f max=%f mean=%f\n",
 					             nm, w, h, nz, lo, hi, sum / double(probe.size()));
+					/* Per-channel, because a shadow that lives in alpha and a shadow
+					 * that lives in RGB are the same mean and completely different
+					 * bugs. */
+					for (int c = 0; c < 4; c++) {
+						float clo = probe[c], chi = probe[c];
+						double csum = 0.0;
+						size_t cn = 0;
+						for (size_t i = size_t(c); i < probe.size(); i += 4) {
+							const float v = probe[i];
+							if (v < clo) clo = v;
+							if (v > chi) chi = v;
+							csum += v;
+							cn++;
+						}
+						ccycles_diag("probe:   '%s' ch%d min=%f max=%f mean=%f\n",
+						             nm, c, clo, chi, csum / double(cn ? cn : 1));
+					}
 				}
 			}
 		}
@@ -910,6 +954,31 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 			}
 			ccycles_diag("flattened %d shader(s) to grey diffuse, skipped %d\n",
 			             flattened, skipped);
+		}
+
+		/* Cycles auto-adds the shadow-catcher passes with empty names, and
+		 * get_pass_pixels matches on name - so the passes that decide whether a
+		 * catcher shows its shadow are the ones that cannot be read back. Register
+		 * them under their own names so CCYCLES_PASS_PROBE can see the values.
+		 *
+		 * Film::update_passes calls remove_auto_passes and then re-adds what it
+		 * needs, so a named pass added here survives as the non-auto one. */
+		const char *name_sc = getenv("CCYCLES_NAME_SC_PASSES");
+		if (name_sc != nullptr && name_sc[0] == 0x31) {
+			ccl::Scene *nsce = session->scene.get();
+			if (nsce != nullptr) {
+				const ccl::PassType wanted[] = {ccl::PASS_SHADOW_CATCHER,
+				                                ccl::PASS_SHADOW_CATCHER_MATTE,
+				                                ccl::PASS_BACKGROUND};
+				int added = 0;
+				for (ccl::PassType pt : wanted) {
+					ccl::Pass *p = nsce->create_node<ccl::Pass>();
+					p->set_name(ccl::ustring(pass_type_as_string(pt)));
+					p->set_type(pt);
+					added++;
+				}
+				ccycles_diag("named %d shadow-catcher pass(es) for the probe\n", added);
+			}
 		}
 
 		cycles_debug_scene_stats(session_id);
