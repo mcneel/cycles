@@ -56,7 +56,7 @@ if (-not $RenderOnly) {
     Add-Result 'static audits' 2 'python not on PATH'
   }
   else {
-    foreach ($audit in 'audit_enums', 'audit_sockets', 'audit_svm_nodes') {
+    foreach ($audit in 'audit_enums', 'audit_sockets', 'audit_svm_nodes', 'audit_rhino_stock_sockets') {
       $script = Join-Path $toolsDir "$audit.py"
       if (-not (Test-Path $script)) { Add-Result $audit 2 'missing'; continue }
       Write-Host "--- $audit"

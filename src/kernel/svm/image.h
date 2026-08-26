@@ -433,16 +433,66 @@ ccl_device_inline auto svm_node_tex_image_mapping(const Float3Type co, const uin
   return make_float2(co);
 }
 
+/* Rhino: the plain value of a coordinate that may or may not carry
+ * derivatives. Upstream templated the image node on Float3Type; Rhino's decal
+ * test only wants the value. */
+ccl_device_inline float3 svm_texco_value(const float3 co)
+{
+  return co;
+}
+ccl_device_inline float3 svm_texco_value(const dual3 co)
+{
+  return co.val;
+}
+
+/* Rhino: fold x and y back on alternate tiles - see alternate_tile above. */
+ccl_device_inline float3 svm_alternate_tiles(const float3 co)
+{
+  return make_float3(alternate_tile(co.x), alternate_tile(co.y), co.z);
+}
+ccl_device_inline dual3 svm_alternate_tiles(const dual3 co)
+{
+  /* A folded tile runs backwards, so flip the differentials on the folded axes.
+   * Only the filter footprint depends on them, but getting the sign wrong there
+   * blurs across the fold. */
+  const float sx = (alternate_tile(co.val.x + 1e-4f) >= alternate_tile(co.val.x)) ? 1.0f : -1.0f;
+  const float sy = (alternate_tile(co.val.y + 1e-4f) >= alternate_tile(co.val.y)) ? 1.0f : -1.0f;
+  return dual3(svm_alternate_tiles(co.val),
+               make_float3(co.dx.x * sx, co.dx.y * sy, co.dx.z),
+               make_float3(co.dy.x * sx, co.dy.y * sy, co.dy.z));
+}
+
 template<class Float3Type>
 ccl_device_noinline void svm_node_tex_image(KernelGlobals kg,
                                             ccl_private ShaderData *sd,
                                             ccl_private float *ccl_restrict stack,
                                             const ccl_global SVMNodeTexImage &ccl_restrict node)
 {
-  const Float3Type co = stack_load<Float3Type>(stack, node.co);
+  Float3Type co = stack_load<Float3Type>(stack, node.co);
+
+  /* Rhino "Mirrored" repeat. Every other tile is folded back rather than
+   * wrapped, which upstream has no notion of. Fold the value; on a folded tile
+   * the coordinate runs backwards, so the derivatives change sign. */
+  if (node.alternate_tiles != 0) {
+    co = svm_alternate_tiles(co);
+  }
+
   const dual2 tex_co(svm_node_tex_image_mapping(co, node.projection));
 
-  const float4 f = svm_image_texture(kg, sd, node.id, tex_co, node.flags);
+  float4 f = svm_image_texture(kg, sd, node.id, tex_co, node.flags);
+
+  /* Rhino decals. rhino_texture_coordinate reports in the third component
+   * whether the shading point falls inside the decal footprint - negative means
+   * outside - and DecalUsage says this image is a decal at all. Without this the
+   * decal image is sampled over the whole surface and its alpha never reaches
+   * zero, so the decal art tiles across the material instead of sitting in its
+   * own patch. */
+  if (stack_valid(node.decal_usage_offset)) {
+    const float decalusage = stack_load_float(stack, node.decal_usage_offset);
+    if (decalusage > 0.0f && svm_texco_value(co).z < 0.0f) {
+      f.w = 0.0f;
+    }
+  }
 
   if (stack_valid(node.out_offset)) {
     stack_store_float3(stack, node.out_offset, make_float3(f));

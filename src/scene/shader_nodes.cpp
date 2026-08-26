@@ -465,15 +465,22 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
   }
 
   if (projection != NODE_IMAGE_PROJ_BOX) {
+    /* Rhino's two extras on this node. Before 5.2 they went out as a second
+     * packed SVM word; they are struct fields now. Dropping them is silent -
+     * mirrored textures repeat instead of folding, and decals are sampled over
+     * the whole surface instead of only inside their footprint. */
     compiler.add_node(this,
                       NODE_TEX_IMAGE,
                       SVMNodeTexImage{
                           .id = handle.kernel_id(),
                           .projection = uint(projection),
                           .flags = uint8_t(flags),
+                          .alternate_tiles = uint8_t(alternate_tiles ? 1 : 0),
                           .co = vector_offset,
                           .out_offset = compiler.output("Color"),
                           .alpha_offset = compiler.output("Alpha"),
+                          .decal_usage_offset = compiler.stack_assign_if_linked(
+                              input("DecalUsage")),
                       });
   }
   else {

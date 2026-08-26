@@ -830,7 +830,8 @@ CCL_CAPI void CDECL cycles_shadernode_set_member_bool(ccl::ShaderNode *shnode,
 			else if (mname == "is_linear") {
 				imgtex->set_colorspace(_get_colorspace(value ? 0 : 1));
 			}
-			// TODO: XXXX port over alternate_tiles support from old Cycles integration
+			/* Setting this socket was never the missing half - ImageTextureNode::compile
+			 * and svm_node_tex_image were, and they are back. */
 			else if (mname == "alternate_tiles") {
 				imgtex->set_alternate_tiles(value);
 			}
