@@ -27,9 +27,20 @@ the device: 1"` in a scene holding two is the sort of line that ends an
 investigation early.
 
 With `CCYCLES_DIAG_LOG` set, session start also dumps the scene: geometry,
-objects, per-mesh shader slots, lights with their strength and transform, the
-integrator's bounces and switches, the film state, and every shader graph with
-the value Cycles holds for each unlinked input.
+objects, per-mesh vertex bound and object transform, per-mesh shader slots,
+lights with their strength and transform, the integrator's bounces and switches,
+the film state, and every shader graph with the value Cycles holds for each
+unlinked input.
+
+The per-mesh **bound and transform** are what make a wrong-looking render
+tractable, because a render whose geometry appears collapsed is usually shaded
+wrong rather than built wrong. On `tyreel_neon_testv9.3dm` the dump said all 227
+meshes sat inside the document bounding box, every object transform was identity
+and nothing was NaN — which retired vertex stride, `packed_float3` overruns, UV
+buffer overflow and triangle index range in one run, and pointed the search at
+the shader graphs where the fault actually was. Note that RhinoCycles bakes world
+coordinates into the vertices and leaves the transforms identity, so a
+non-identity transform in this dump is itself news.
 
 ## Where are the pixels
 
@@ -78,6 +89,14 @@ is enough to tell a real direction from all zeros.
 | `CCYCLES_NO_LIGHT_TREE=1` | Force the old light distribution. Of little use for comparing against shipping - see below - and one run under it hung before the session started. |
 | `CCYCLES_BG_SKY_FROM_COLOR=1` | Force `sky_color_or_texture`'s Fac to 0, taking the environment image out of the skylight path. |
 | `CCYCLES_NO_CLAMP=1` | Set both sample clamps to 0, which Cycles reads as no limit at all. Takes the clamp's bias out of a comparison. |
+| `CCYCLES_FORCE_OPAQUE=1` | Cut the Alpha and Transmission Weight links on every principled node and set them opaque. Answers "is this material invisible because it is transparent?" in one run. |
+
+`CCYCLES_FORCE_OPAQUE` earned its keep by saying **no**. Material that renders as
+nothing is either transparent or transmissive, and Rhino builds both from long
+math chains, so forcing them opaque looked like the cheap first cut. It changed
+nothing on `tyreel_neon_testv9.3dm` — 15 principled nodes touched, 20 links cut,
+identical render — which took the whole alpha chain out of the search and left
+the texture path. Keep it for the next material that disappears.
 
 Use these to size a suspicion before changing code. `CCYCLES_WHITE_TINTS` moved
 the material preview scene from 11.27 against shipping Rhino 9 WIP to 9.96, and

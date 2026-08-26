@@ -1,4 +1,4 @@
-/**
+﻿/**
 Copyright 2014-2017 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -174,6 +174,28 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 	ccycles_diag("stats: geometry=%zu objects=%zu shaders=%zu\n",
 	       sce->geometry.size(), sce->objects.size(), sce->shaders.size());
 
+	/* A shadow catcher only shows its shadow if Film::update_passes saw
+	 * has_shadow_catcher() and added PASS_SHADOW_CATCHER_MATTE - reading
+	 * "combined" is then redirected to the matte by get_actual_display_pass. If
+	 * the matte is absent the redirect silently returns the raw combined pass and
+	 * the catcher renders as plain background with no shadow at all. Report both
+	 * halves so that failure is visible rather than inferred from the pixels. */
+	ccycles_diag("  has_shadow_catcher=%d  passes=%zu\n",
+	             (int)sce->has_shadow_catcher(), sce->passes.size());
+	for (const auto &pass : sce->passes) {
+		ccycles_diag("    pass type=%d mode=%d name='%s' written=%d\n",
+		             (int)pass->get_type(), (int)pass->get_mode(),
+		             pass->get_name().c_str(), (int)pass->is_written());
+	}
+	{
+		int catchers = 0, holdouts = 0;
+		for (ccl::Object *ob : sce->objects) {
+			if (ob->get_is_shadow_catcher()) catchers++;
+			if (ob->get_use_holdout()) holdouts++;
+		}
+		ccycles_diag("  shadow catcher objects=%d holdout objects=%d\n", catchers, holdouts);
+	}
+
 	for (size_t i = 0; i < sce->objects.size(); i++) {
 		ccl::Object *ob = sce->objects[i];
 		ccl::Geometry *geo = ob->get_geometry();
@@ -182,6 +204,36 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 			ccycles_diag("    mesh verts=%d tris=%d used_shaders=%zu\n",
 			       (int)mesh->num_verts(), (int)mesh->num_triangles(),
 			       mesh->get_used_shaders().size());
+			/* Counts alone do not say whether the positions are the ones Rhino
+			 * sent. Report the mesh bound and the object transform so a
+			 * collapsed or displaced object shows up in the dump rather than
+			 * only in the pixels. */
+			{
+				const ccl::Transform &t = ob->get_tfm();
+				const ccl::packed_float3 *P = mesh->get_position();
+				const int nv = (int)mesh->num_verts();
+				if (P != nullptr && nv > 0) {
+					float lox = P[0].x, loy = P[0].y, loz = P[0].z;
+					float hix = lox, hiy = loy, hiz = loz;
+					int nonfinite = 0;
+					for (int v = 0; v < nv; v++) {
+						float x = P[v].x, y = P[v].y, z = P[v].z;
+						if (!(x == x) || !(y == y) || !(z == z)) nonfinite++;
+						if (x < lox) lox = x; if (x > hix) hix = x;
+						if (y < loy) loy = y; if (y > hiy) hiy = y;
+						if (z < loz) loz = z; if (z > hiz) hiz = z;
+					}
+					ccycles_diag("      bound (%.3f %.3f %.3f)-(%.3f %.3f %.3f) nonfinite=%d\n",
+					             lox, loy, loz, hix, hiy, hiz, nonfinite);
+				}
+				else {
+					ccycles_diag("      NO POSITION DATA (P=%p nv=%d)\n", (const void *)P, nv);
+				}
+				ccycles_diag("      tfm r0=(%.4f %.4f %.4f %.4f) r1=(%.4f %.4f %.4f %.4f) r2=(%.4f %.4f %.4f %.4f)\n",
+				             t.x.x, t.x.y, t.x.z, t.x.w,
+				             t.y.x, t.y.y, t.y.z, t.y.w,
+				             t.z.x, t.z.y, t.z.z, t.z.w);
+			}
 			/* A per-triangle index pointing at the wrong slot - or a slot holding
 			 * an empty shader - renders black with everything else looking
 			 * correct, so name the shader each slot resolves to. */
@@ -199,6 +251,45 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 			}
 			ccycles_diag("      tri shader index count=%zu min=%d max=%d\n",
 			             tri_shader.size(), lo, hi);
+
+			/* UVs are corner-indexed, so the attribute has to hold exactly three
+			 * per triangle. A size mismatch means someone wrote past the end, and
+			 * a range far outside 0..1 means the values themselves are wrong -
+			 * both of which show up as a texture smeared across the surface
+			 * rather than as anything obviously broken. */
+			for (const ccl::Attribute &at : mesh->attributes.attributes) {
+				if (at.std != ccl::ATTR_STD_UV && at.std != ccl::ATTR_STD_GENERATED) {
+					continue;
+				}
+				const size_t expect = (at.std == ccl::ATTR_STD_UV)
+				                          ? (size_t)mesh->num_triangles() * 3
+				                          : (size_t)mesh->num_verts();
+				const size_t esz = at.data_sizeof();
+				const size_t have = (esz > 0) ? at.buffer_size(mesh, ccl::ATTR_PRIM_GEOMETRY) / esz : 0;
+				if (at.std == ccl::ATTR_STD_UV) {
+					const ccl::float2 *uv = at.data<ccl::float2>();
+					float ulo = 0.0f, uhi = 0.0f, vlo = 0.0f, vhi = 0.0f;
+					int nonfinite = 0;
+					if (uv != nullptr && have > 0) {
+						ulo = uhi = uv[0].x;
+						vlo = vhi = uv[0].y;
+						for (size_t k = 0; k < have; k++) {
+							const float u = uv[k].x, v = uv[k].y;
+							if (!(u == u) || !(v == v)) nonfinite++;
+							if (u < ulo) ulo = u; if (u > uhi) uhi = u;
+							if (v < vlo) vlo = v; if (v > vhi) vhi = v;
+						}
+					}
+					ccycles_diag("      uv '%s' have=%zu expect=%zu u=[%.3f %.3f] "
+					             "v=[%.3f %.3f] nonfinite=%d%s\n",
+					             at.name.c_str(), have, expect, ulo, uhi, vlo, vhi,
+					             nonfinite, (have == expect) ? "" : "  SIZE MISMATCH");
+				}
+				else {
+					ccycles_diag("      generated have=%zu expect=%zu%s\n", have, expect,
+					             (have == expect) ? "" : "  SIZE MISMATCH");
+				}
+			}
 		}
 		else if (ccl::Light *lt = dynamic_cast<ccl::Light *>(geo)) {
 			const ccl::Transform &t = ob->get_tfm();

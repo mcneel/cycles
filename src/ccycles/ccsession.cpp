@@ -1,4 +1,4 @@
-/**
+﻿/**
 Copyright 2014-2017 Robert McNeel and Associates
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -804,6 +804,41 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 			             touched);
 		}
 
+		/* Cut the alpha and transmission chains loose on every principled node.
+		 * A material that renders as nothing is either fully transparent or
+		 * fully transmissive, and Rhino builds both from long math chains, so
+		 * the cheapest way to find out which is to force them opaque and look. */
+		const char *force_opaque = getenv("CCYCLES_FORCE_OPAQUE");
+		if (force_opaque != nullptr && force_opaque[0] == 0x31) {
+			ccl::Scene *osce = session->scene.get();
+			int touched = 0, cut = 0;
+			if (osce != nullptr) {
+				const char *names[] = {"Alpha", "Transmission Weight"};
+				for (ccl::Shader *sh : osce->shaders) {
+					if (sh->graph == nullptr) continue;
+					for (ccl::ShaderNode *nd : sh->graph->nodes) {
+						ccl::PrincipledBsdfNode *pb =
+						    dynamic_cast<ccl::PrincipledBsdfNode *>(nd);
+						if (pb == nullptr) continue;
+						for (const char *nm : names) {
+							ccl::ShaderInput *in = nd->input(nm);
+							if (in == nullptr) continue;
+							if (in->link != nullptr) {
+								sh->graph->disconnect(in);
+								cut++;
+							}
+						}
+						pb->set_alpha(1.0f);
+						pb->set_transmission_weight(0.0f);
+						touched++;
+					}
+					sh->tag_update(osce);
+				}
+			}
+			ccycles_diag("forced opaque on %d principled node(s), %d link(s) cut\n",
+			             touched, cut);
+		}
+
 		const char *dump_bg = getenv("CCYCLES_DUMP_BG");
 		if (dump_bg != nullptr && dump_bg[0] != 0) {
 			ccl::Scene *dsce = session->scene.get();
@@ -836,6 +871,45 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 				ccycles_diag("replaced background shader '%s' with a plain white "
 				             "background_shader\n", bgshader->name.c_str());
 			}
+		}
+
+		/* Replace every surface shader with one flat diffuse, leaving the
+		 * background and the lights alone. This is the geometry-vs-shading
+		 * question asked properly: anything that still fails to appear is
+		 * genuinely absent from the render rather than shaded into invisibility.
+		 * RhinoCycles' own DebugSimpleShaders cannot answer it, because it drives
+		 * the diffuse colour from the uvmap1 attribute and so paints anything
+		 * with UVs at or above 1 pure white - against a white background that
+		 * looks exactly like missing geometry. */
+		const char *flat = getenv("CCYCLES_FLAT_SHADERS");
+		if (flat != nullptr && flat[0] == 0x31) {
+			ccl::Scene *fsce = session->scene.get();
+			int flattened = 0, skipped = 0;
+			if (fsce != nullptr) {
+				const ccl::Shader *bgsh =
+				    static_cast<const ccl::Shader *>(fsce->background->get_shader());
+				for (ccl::Shader *sh : fsce->shaders) {
+					/* Lights carry emissive shaders; flattening those would put the
+					 * scene in the dark and answer nothing. They are named by
+					 * RhinoCycles, so go by name. */
+					const std::string nm = sh->name.string();
+					if (sh == bgsh || nm == "light" || nm == "default_light" ||
+					    nm == "default_background") {
+						skipped++;
+						continue;
+					}
+					auto graph = ccl::make_unique<ccl::ShaderGraph>();
+					ccl::DiffuseBsdfNode *d = graph->create_node<ccl::DiffuseBsdfNode>();
+					d->set_color(ccl::make_float3(0.55f, 0.55f, 0.55f));
+					d->set_roughness(0.0f);
+					graph->connect(d->output("BSDF"), graph->output()->input("Surface"));
+					sh->set_graph(std::move(graph));
+					sh->tag_update(fsce);
+					flattened++;
+				}
+			}
+			ccycles_diag("flattened %d shader(s) to grey diffuse, skipped %d\n",
+			             flattened, skipped);
 		}
 
 		cycles_debug_scene_stats(session_id);
