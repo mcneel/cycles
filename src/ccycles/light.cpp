@@ -71,6 +71,26 @@ void CCyclesLight::flush()
 	light->set_use_mis(use_mis);
 	light->set_max_bounces(max_bounces);
 
+	/* Rhino's lights light the scene but are not themselves photographed. Before
+	 * 5.2 that was set_use_camera(false) on the light; the per-light flags are
+	 * gone, so it has to be the light Object's ray visibility now, which
+	 * defaults to PATH_RAY_VISIBILITY_ALL.
+	 *
+	 * Leaving it at the default puts the emitting quad in front of the lens: a
+	 * Rhino rectangular light at the studio default strength of 17.2 blows out
+	 * every pixel behind it, so the model reads as though whole panels were
+	 * missing rather than over-exposed.
+	 *
+	 * The background light is the exception - camera rays that escape the scene
+	 * have to reach it, or the environment goes black. */
+	if (object != nullptr) {
+		const bool is_background = (dynamic_cast<ccl::BackgroundLight *>(light) != nullptr);
+		object->set_visibility(is_background
+		                           ? ccl::PATH_RAY_VISIBILITY_ALL
+		                           : (ccl::PATH_RAY_VISIBILITY_ALL &
+		                              ~ccl::PATH_RAY_VISIBILITY_CAMERA));
+	}
+
 	/* Type specific properties. */
 	if (ccl::PointLight *point = dynamic_cast<ccl::PointLight *>(light)) {
 		point->set_radius(size);
