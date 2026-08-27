@@ -106,18 +106,29 @@ ccl_device_inline bool film_get_scale_and_scale_exposure(
     }
   }
 
-  if (kfilm_convert->pass_use_filter) {
+  /* Only the sample count pass can be dereferenced here. The early out above
+   * returns when all four sample count passes are unused, but the shadow catcher
+   * ones can exist while this one does not - with adaptive sampling off and an
+   * opaque background, Film::update_passes never adds PASS_SAMPLE_COUNT. Reading
+   * buffer + PASS_UNUSED is (~0) elements out of bounds; it read as zero and
+   * returned false, which made film_calculate_shadow_catcher_matte_with_shadow
+   * hand back zero_float4() for every pixel - an entirely black render. */
+  if (kfilm_convert->pass_use_filter && kfilm_convert->pass_sample_count != PASS_UNUSED) {
     const uint sample_count = *(
         (const ccl_global uint *)(buffer + kfilm_convert->pass_sample_count));
     if (!sample_count) {
       *scale = 0.0f;
       *scale_exposure = 0.0f;
+      *background_scale_exposure = 0.0f;
       return false;
     }
 
     *scale = kfilm_convert->scale / sample_count;
   }
   else {
+    /* kfilm_convert->scale already carries the uniform 1/num_samples division in
+     * this case (PassAccessor::init_kernel_film_convert), so no per-pixel count
+     * is needed. */
     *scale = kfilm_convert->scale;
   }
 
