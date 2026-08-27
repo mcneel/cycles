@@ -126,7 +126,16 @@ void CCyclesLight::flush()
 	 * sampled and the whole render came back black with a correct depth pass.
 	 * A light with no direction gets the identity basis. */
 	const bool have_dir = ccl::len_squared(dir) > 1e-12f;
-	const ccl::float3 z = have_dir ? ccl::normalize(dir) : ccl::make_float3(0.0f, 0.0f, 1.0f);
+	ccl::float3 z = have_dir ? ccl::normalize(dir) : ccl::make_float3(0.0f, 0.0f, 1.0f);
+
+	/* AreaLight::copy_to_kernel takes the emission normal as -column2. Putting +dir
+	 * in that column therefore aims the quad away from whatever Rhino pointed it at.
+	 * Measured on Brian25YearRhinoGlas.3dm: the file's Direction has dot +0.97 with
+	 * the direction from the light to the scene, and the kernel received exactly the
+	 * negation. The spot sign above was checked with spots, whose placement differs. */
+	if (type == ccl::LIGHT_AREA && have_dir) {
+		z = -z;
+	}
 	ccl::float3 x = axisu;
 	ccl::float3 y = axisv;
 
