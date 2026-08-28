@@ -761,24 +761,28 @@ void ShaderManager::device_update_common(Device * /*device*/,
   kfilm->is_rec709 = scene_linear_interop_id == "lin_rec709_scene";
 
   /* Rhino procedural noise tables */
-  if (rhino_perlin_noise_table_offset == TABLE_OFFSET_INVALID) {
+  if (rhino_perlin_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_perlin_noise_table.size() > 0) {
     rhino_perlin_noise_table_offset = scene->lookup_tables->add_table(dscene,
                                                                       rhino_perlin_noise_table);
   }
   dscene->data.tables.rhino_perlin_noise_offset = (int)rhino_perlin_noise_table_offset;
 
-  if (rhino_impulse_noise_table_offset == TABLE_OFFSET_INVALID) {
+  if (rhino_impulse_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_impulse_noise_table.size() > 0) {
     rhino_impulse_noise_table_offset = scene->lookup_tables->add_table(dscene,
                                                                        rhino_impulse_noise_table);
   }
   dscene->data.tables.rhino_impulse_noise_offset = (int)rhino_impulse_noise_table_offset;
 
-  if (rhino_vc_noise_table_offset == TABLE_OFFSET_INVALID) {
+  if (rhino_vc_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_vc_noise_table.size() > 0) {
     rhino_vc_noise_table_offset = scene->lookup_tables->add_table(dscene, rhino_vc_noise_table);
   }
   dscene->data.tables.rhino_vc_noise_offset = (int)rhino_vc_noise_table_offset;
 
-  if (rhino_aaltonen_noise_table_offset == TABLE_OFFSET_INVALID) {
+  if (rhino_aaltonen_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_aaltonen_noise_table.size() > 0) {
     rhino_aaltonen_noise_table_offset = scene->lookup_tables->add_table(
         dscene, rhino_aaltonen_noise_table);
   }
