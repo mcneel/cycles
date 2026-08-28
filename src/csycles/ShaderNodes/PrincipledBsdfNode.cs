@@ -149,17 +149,31 @@ namespace ccl.ShaderNodes
 	[ShaderNode("principled_bsdf")]
 	public class PrincipledBsdfNode : ShaderNode
 	{
+		/// <summary>
+		/// Raw ccl::ClosureType values - these sockets are SOCKET_ENUMs whose entries are
+		/// closure ids, so the number sent has to be one Cycles recognises. Check them
+		/// against ClosureType in kernel/svm/types.h whenever Cycles moves.
+		///
+		/// The distribution values look wrong and are not: for the principled BSDF the
+		/// kernel tests distribution == MULTI_GGX_GLASS (26) to select multiscatter GGX,
+		/// so 26 is a marker rather than a request for glass.
+		/// </summary>
 		public enum Distributions
 		{
 			GGX = 26,
 			Multiscatter_GGX = 24
 		}
 
+		/// <summary>
+		/// These were off by one against 5.2's ClosureType: BSSRDF_BURLEY is 31, not 32,
+		/// so asking for Burley selected random walk, random walk selected the legacy
+		/// variant, and fixed radius selected the skin variant.
+		/// </summary>
 		public enum ScatterMethod
 		{
-			Burley = 32,
-			RandomWalk = 33,
-			RandomWalkFixedRadius = 34,
+			Burley = 31,
+			RandomWalk = 32,
+			RandomWalkFixedRadius = 33,
 		}
 
 		public PrincipledBsdfInputs ins => (PrincipledBsdfInputs)inputs;

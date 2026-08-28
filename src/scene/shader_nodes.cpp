@@ -2795,6 +2795,10 @@ NODE_DEFINE(PrincipledBsdfNode)
 PrincipledBsdfNode::PrincipledBsdfNode() : BsdfBaseNode(get_node_type())
 {
   closure = CLOSURE_BSDF_PRINCIPLED_ID;
+  /* MULTI_GGX_GLASS looks wrong here but is not: the kernel tests
+   * distribution == CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID to decide whether the
+   * principled BSDF uses multiscatter GGX (see svm/closure.h). It is a marker, not a
+   * request for a glass closure. */
   distribution = CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID;
 }
 

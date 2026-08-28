@@ -356,6 +356,61 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 	             (int)sce->film->get_use_approximate_shadow_catcher(),
 	             (int)sce->film->get_display_pass());
 
+	/* Which shader each object actually renders with. Analysing a shader graph is
+	 * wasted effort if the surface in question is bound to a different shader, and
+	 * that binding was invisible here - every probe against the material named in
+	 * Rhino would come back with no change and no explanation. */
+	for (size_t oi = 0; oi < sce->objects.size(); oi++) {
+		ccl::Object *ob = sce->objects[oi];
+		ccl::Geometry *geo = ob->get_geometry();
+		if (geo == nullptr) {
+			ccycles_diag("  object %zu: no geometry\n", oi);
+			continue;
+		}
+		std::string names;
+		for (ccl::Node *sn : geo->get_used_shaders()) {
+			ccl::Shader *ush = static_cast<ccl::Shader *>(sn);
+			if (!names.empty()) {
+				names += ", ";
+			}
+			names += (ush != nullptr) ? ush->name.string() : std::string("<null>");
+		}
+		ccycles_diag("  object %zu: shaders [%s]\n", oi, names.c_str());
+
+		/* Which slot the triangles actually reference. A mesh can carry the right
+		 * material in used_shaders and still render with the wrong one if its
+		 * per-triangle indices point elsewhere. */
+		if (ccl::Mesh *mesh = dynamic_cast<ccl::Mesh *>(geo)) {
+			const ccl::array<int> &tri_shader = mesh->get_shader();
+			int counts[8] = {0};
+			int other = 0;
+			for (size_t t = 0; t < tri_shader.size(); t++) {
+				const int idx = tri_shader[t];
+				if (idx >= 0 && idx < 8) {
+					counts[idx]++;
+				}
+				else {
+					other++;
+				}
+			}
+			std::string hist;
+			for (int i = 0; i < 8; i++) {
+				if (counts[i] > 0) {
+					char buf[64];
+					snprintf(buf, sizeof(buf), "%sslot%d=%d", hist.empty() ? "" : " ", i, counts[i]);
+					hist += buf;
+				}
+			}
+			if (other > 0) {
+				char buf[64];
+				snprintf(buf, sizeof(buf), "%sout_of_range=%d", hist.empty() ? "" : " ", other);
+				hist += buf;
+			}
+			ccycles_diag("    tris=%zu shader slots: %s\n", tri_shader.size(),
+			             hist.empty() ? "(none)" : hist.c_str());
+		}
+	}
+
 	/* Correct geometry, correct lights, no failed connections and still a
 	 * black image leaves the socket values themselves. Print what Cycles
 	 * actually holds for every unlinked input, which is the thing the C# side
@@ -375,37 +430,60 @@ extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id
 		for (ccl::ShaderNode *nd : sh->graph->nodes) {
 			ccycles_diag("    node '%s' type=%s\n", nd->name.c_str(),
 			             nd->type->name.c_str());
-			for (ccl::ShaderInput *in : nd->inputs) {
-				if (in->link != nullptr) {
-					ccycles_diag("      %s <- linked\n", in->socket_type.name.c_str());
+			/* Walk the node type's sockets rather than only the linkable inputs.
+			 * Parameters - a math node's operation, a mix node's blend type, a colour
+			 * node's value - are not ShaderInputs, so they were invisible, and those
+			 * are exactly the values needed to tell an inverted subtract from a
+			 * multiply when a surface comes out black. */
+			for (const ccl::SocketType &sock : nd->type->inputs) {
+				/* Match by socket name against the node's own inputs. ShaderNode::input()
+				 * looks up by UI name, so passing the internal name silently returned
+				 * null and every linked socket was reported as its stale default - which
+				 * is worse than not printing it at all. */
+				ccl::ShaderInput *in = nullptr;
+				for (ccl::ShaderInput *cand : nd->inputs) {
+					if (cand->socket_type.name == sock.name) {
+						in = cand;
+						break;
+					}
+				}
+				if (in != nullptr && in->link != nullptr) {
+					/* Name the source. "linked" on its own cannot be followed, and
+					 * tracing which node feeds a black base colour is exactly what
+					 * this dump is for. */
+					const ccl::ShaderNode *from = in->link->parent;
+					ccycles_diag("      %s <- '%s'.%s\n", sock.name.c_str(),
+					             from != nullptr ? from->name.c_str() : "?",
+					             in->link->socket_type.name.c_str());
 					continue;
 				}
-				switch (in->socket_type.type) {
+				const ccl::SocketType &socket_type = sock;
+				switch (socket_type.type) {
 					case ccl::SocketType::FLOAT:
-						ccycles_diag("      %s = %f\n", in->socket_type.name.c_str(),
-						             nd->get_float(in->socket_type));
+						ccycles_diag("      %s = %f\n", socket_type.name.c_str(),
+						             nd->get_float(socket_type));
 						break;
 					case ccl::SocketType::COLOR:
 					case ccl::SocketType::VECTOR:
 					case ccl::SocketType::POINT:
 					case ccl::SocketType::NORMAL: {
-						ccl::float3 v = nd->get_float3(in->socket_type);
+						ccl::float3 v = nd->get_float3(socket_type);
 						ccycles_diag("      %s = (%f %f %f)\n",
-						             in->socket_type.name.c_str(), v.x, v.y, v.z);
+						             socket_type.name.c_str(), v.x, v.y, v.z);
 						break;
 					}
 					case ccl::SocketType::INT:
 					case ccl::SocketType::ENUM:
-						ccycles_diag("      %s = %d\n", in->socket_type.name.c_str(),
-						             nd->get_int(in->socket_type));
+						ccycles_diag("      %s = %d\n", socket_type.name.c_str(),
+						             nd->get_int(socket_type));
 						break;
 					case ccl::SocketType::BOOLEAN:
-						ccycles_diag("      %s = %d\n", in->socket_type.name.c_str(),
-						             (int)nd->get_bool(in->socket_type));
+						ccycles_diag("      %s = %d\n", socket_type.name.c_str(),
+						             (int)nd->get_bool(socket_type));
 						break;
 					default:
 						ccycles_diag("      %s = (type %d not printed)\n",
-						             in->socket_type.name.c_str(), (int)in->socket_type.type);
+						             socket_type.name.c_str(), (int)socket_type.type);
 						break;
 				}
 			}

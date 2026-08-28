@@ -93,6 +93,33 @@ internal static class Program
             CSycles.shadernode_set_member_float(bsdf, "strength", 4.0f);
         }
 
+        // SMOKE_IMAGE drives the surface colour from a file on disk through a stock
+        // image_texture node. Brian25YearRhinoGlas's tabletop renders black in Rhino
+        // even with a valid image handle, correct extension, a mix factor pinned to 1
+        // and the alpha gate bypassed - so this asks the same question with Rhino
+        // removed entirely: does the kernel's image lookup return anything at all?
+        string imagePath = Environment.GetEnvironmentVariable("SMOKE_IMAGE");
+        if (!string.IsNullOrEmpty(imagePath)) {
+            IntPtr imtex = CSycles.add_shader_node(diffuse, "image_texture", "imtex");
+            Console.WriteLine("image      : node created=" + (imtex != IntPtr.Zero));
+            if (imtex == IntPtr.Zero) { Console.WriteLine("RESULT     : NOT-CREATED"); return; }
+            CSycles.shadernode_set_member_string(imtex, "filename", imagePath);
+            Console.WriteLine("image      : '" + imagePath + "' exists=" + System.IO.File.Exists(imagePath));
+
+            // Without UVs the texture evaluates at one point and cannot show whether
+            // sampling works; Generated coordinates span the quad.
+            IntPtr texco2 = CSycles.add_shader_node(diffuse, "texture_coordinate", "imtexco");
+            foreach (string inName in new[] { "Vector", "UVW" }) {
+                if (CSycles.shader_connect_nodes(diffuse, texco2, "Generated", imtex, inName)) {
+                    Console.WriteLine("image      : uv via " + inName);
+                    break;
+                }
+            }
+            bool imwired = CSycles.shader_connect_nodes(diffuse, imtex, "Color", bsdf, "Color");
+            Console.WriteLine("image      : wired=" + imwired);
+            if (!imwired) { Console.WriteLine("RESULT     : NOT-WIRED"); return; }
+        }
+
         // SMOKE_NODE drives the surface colour from one Rhino shader node, which
         // is how the Rhino SVM nodes get exercised at all - nothing else in this
         // harness reaches them. One node per process so a crash in one does not
