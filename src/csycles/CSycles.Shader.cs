@@ -170,6 +170,19 @@ namespace ccl
 
 		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
 			CallingConvention = CallingConvention.Cdecl)]
+		private static extern void cycles_shadernode_set_image_mem(IntPtr shadernodeId, string name, IntPtr pixels, uint width, uint height, uint channels, [MarshalAs(UnmanagedType.U1)] bool isFloat);
+		/// <summary>
+		/// Give an image texture node pixels that Rhino already holds in memory, for
+		/// textures it generates itself or that are embedded in the .3dm and so have no
+		/// file on disk to load.
+		/// </summary>
+		public static void shadernode_set_image_mem(IntPtr shadernodeId, [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr pixels, uint width, uint height, uint channels, bool isFloat)
+		{
+			cycles_shadernode_set_image_mem(shadernodeId, name, pixels, width, height, channels, isFloat);
+		}
+
+		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
+			CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_shadernode_set_member_string(IntPtr shadernodeId, string name, string value);
 		public static void shadernode_set_member_string(IntPtr shadernodeId, [MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string value)
 		{

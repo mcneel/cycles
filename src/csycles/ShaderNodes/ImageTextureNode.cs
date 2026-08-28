@@ -160,6 +160,19 @@ namespace ccl.ShaderNodes
 		internal override void SetDirectMembers()
 		{
 			base.SetDirectMembers();
+
+			// Rhino supplies generated and .3dm-embedded textures as pixels in memory
+			// instead of a file path. Nothing consumed ByteImagePtr/FloatImagePtr before,
+			// so those textures reached the kernel as no image at all and the surfaces
+			// using them rendered black. Four channels: W*H*4 is the convention this
+			// codebase already uses for both buffer kinds (see apply_gamma_to_byte_buffer).
+			if (ByteImagePtr != IntPtr.Zero || FloatImagePtr != IntPtr.Zero)
+			{
+				bool isFloat = FloatImagePtr != IntPtr.Zero;
+				IntPtr pixels = isFloat ? FloatImagePtr : ByteImagePtr;
+				CSycles.shadernode_set_image_mem(Id, Filename ?? string.Empty, pixels, Width, Height, 4, isFloat);
+			}
+
 			CSycles.shadernode_set_member_float(Id, "projection_blend", ProjectionBlend);
 			CSycles.shadernode_set_member_int(Id, "extension", (int)Extension);
 			CSycles.shadernode_set_member_bool(Id, "use_alpha", UseAlpha);

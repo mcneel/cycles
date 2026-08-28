@@ -794,6 +794,36 @@ CCImage* get_ccimage(std::string imgname, T* img, unsigned int width, unsigned i
 extern "C" {
 #endif
 
+/* Hand an image that Rhino already holds in memory to an image texture node.
+ *
+ * This replaces the builtin image callbacks that Cycles 5.x removed, and which
+ * get_ccimage() below has been a stub for. Without it every generated or
+ * .3dm-embedded texture reached the kernel as no image at all, so the surfaces
+ * using them rendered black. Only the pointer is taken here; the copy happens in
+ * RhinoMemoryImageLoader when the node builds its image handle. */
+CCL_CAPI void CDECL cycles_shadernode_set_image_mem(ccl::ShaderNode *shnode,
+									   const char *name,
+									   void *pixels,
+									   unsigned int width,
+									   unsigned int height,
+									   unsigned int channels,
+									   bool is_float)
+{
+	if (shnode == nullptr) {
+		return;
+	}
+
+	ccl::ImageTextureNode *imgtex = dynamic_cast<ccl::ImageTextureNode *>(shnode);
+	if (imgtex == nullptr) {
+		ccycles_diag("cycles_shadernode_set_image_mem: node '%s' is not an image texture\n",
+					 shnode->type->name.string().c_str());
+		return;
+	}
+
+	imgtex->set_rhino_memory_image(
+		name, pixels, (int)width, (int)height, (int)channels, is_float);
+}
+
 CCL_CAPI void CDECL cycles_shadernode_set_member_bool(ccl::ShaderNode *shnode,
 									   const char *member_name,
 									   bool value)

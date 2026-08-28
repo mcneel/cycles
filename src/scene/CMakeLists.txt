@@ -28,6 +28,7 @@ set(SRC
   image_cache.cpp
   image_loader.cpp
   image_oiio.cpp
+  image_rhino.cpp
   image_sky.cpp
   image_vdb.cpp
   integrator.cpp
@@ -71,6 +72,7 @@ set(SRC_HEADERS
   image_cache.h
   image_loader.h
   image_oiio.h
+  image_rhino.h
   image_sky.h
   image_vdb.h
   integrator.h

@@ -137,6 +137,24 @@ class ImageTextureNode : public ImageSlotTextureNode {
   NODE_SOCKET_API_ARRAY(array<int>, tiles)
   NODE_SOCKET_API(bool, alternate_tiles)
   NODE_SOCKET_API(float, decalforward)
+
+  /* Rhino supplies generated and .3dm-embedded textures as pixels in memory
+   * instead of a file on disk. These are deliberately plain members rather than
+   * sockets: a raw host pointer must not be serialised or XML round-tripped. When
+   * set, update_images() builds the image from memory and the filename is unused. */
+  void set_rhino_memory_image(const char *name,
+                              const void *pixels,
+                              const int width,
+                              const int height,
+                              const int channels,
+                              const bool is_float);
+
+  string rhino_mem_name;
+  const void *rhino_mem_pixels = nullptr;
+  int rhino_mem_width = 0;
+  int rhino_mem_height = 0;
+  int rhino_mem_channels = 0;
+  bool rhino_mem_is_float = false;
   NODE_SOCKET_API(float, decalusage)
 
  protected:

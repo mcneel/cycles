@@ -11,6 +11,7 @@
 #include "scene/constant_fold.h"
 #include "scene/film.h"
 #include "scene/image.h"
+#include "scene/image_rhino.h"
 #include "scene/image_sky.h"
 #include "scene/integrator.h"
 #include "scene/light.h"
@@ -411,8 +412,35 @@ ShaderNodeType ImageTextureNode::shader_node_type() const
   return NODE_TEX_IMAGE_BOX;
 }
 
+void ImageTextureNode::set_rhino_memory_image(const char *name,
+                                              const void *pixels,
+                                              const int width,
+                                              const int height,
+                                              const int channels,
+                                              const bool is_float)
+{
+  rhino_mem_name = (name != nullptr) ? name : "";
+  rhino_mem_pixels = pixels;
+  rhino_mem_width = width;
+  rhino_mem_height = height;
+  rhino_mem_channels = channels;
+  rhino_mem_is_float = is_float;
+}
+
 void ImageTextureNode::update_images(const SVMCompiler &compiler)
 {
+  if (handle.empty() && rhino_mem_pixels != nullptr) {
+    /* Rhino gave us the pixels directly, so there is no file to load. */
+    ImageManager *image_manager = compiler.scene->image_manager.get();
+    handle = image_manager->add_image(make_unique<RhinoMemoryImageLoader>(rhino_mem_name,
+                                                                         rhino_mem_pixels,
+                                                                         rhino_mem_width,
+                                                                         rhino_mem_height,
+                                                                         rhino_mem_channels,
+                                                                         rhino_mem_is_float),
+                                      image_params());
+  }
+
   if (handle.empty()) {
     ImageManager *image_manager = compiler.scene->image_manager.get();
     const bool use_cache = image_manager->get_use_texture_cache();
