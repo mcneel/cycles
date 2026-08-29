@@ -7,10 +7,11 @@
   One entry point, because the checks are only useful if they are cheap to run
   and nobody remembers four commands. Two tiers:
 
-    Static audits    No build, no Rhino, about a second. These catch the three
+    Static audits    No build, no Rhino, about a second. These catch the four
                      ways the 3.5 -> 5.2 port has silently drifted: a renamed or
-                     retyped socket, a renumbered enum, and a stock SVM node
-                     emitted in Rhino's packed layout. Every one of those
+                     retyped socket, a renumbered enum, a stock SVM node
+                     emitted in Rhino's packed layout, and a parameter
+                     exposed as both a member and a socket. Every one of those
                      compiles, links, asserts nothing and renders the wrong
                      pixels, which is why they are worth a second.
 
@@ -56,7 +57,7 @@ if (-not $RenderOnly) {
     Add-Result 'static audits' 2 'python not on PATH'
   }
   else {
-    foreach ($audit in 'audit_enums', 'audit_sockets', 'audit_svm_nodes', 'audit_rhino_stock_sockets') {
+    foreach ($audit in 'audit_enums', 'audit_sockets', 'audit_svm_nodes', 'audit_rhino_stock_sockets', 'audit_member_socket_clash') {
       $script = Join-Path $toolsDir "$audit.py"
       if (-not (Test-Path $script)) { Add-Result $audit 2 'missing'; continue }
       Write-Host "--- $audit"

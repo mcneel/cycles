@@ -82,6 +82,31 @@ colour into the base-colour graph before it reaches `BaseColor`, and choosing a
 single roughness. Both are user-visible and neither is forced by 5.2, which is
 why they can wait.
 
+## A parameter exposed as both a member and a socket loses the member
+
+`Shader.WriteDataToNodes` calls `SetEnums()`, then `SetDirectMembers()`, then
+`SetSockets()`. `SetSockets` pushes every non-retired input socket, including ones
+nobody assigned, because a socket holds its C# default from construction. So where a
+node carries the same Cycles parameter both ways, the socket write lands last and
+silently overwrites the member. Nothing throws; the value simply does not arrive.
+
+Found 2026-08-29 on `BumpNode.invert`. RhinoCycles set the member
+(`RhinoFullNxt.cs`, base and clearcoat bump), and `BumpNode.ParseXml` set it too, so
+**negative bump amounts never inverted and XML-loaded bumps lost invert as well**.
+Nathan's 4.4 branch had already moved the RhinoCycles call sites to
+`ins.Invert.Value`; reverting that branch brought the member form back, which is how
+a fixed bug returned unnoticed.
+
+**Fixed** by making the property a view onto the socket, so both spellings and the XML
+path stay correct: `public bool Invert { get => ins.Invert.Value; set => ... }`.
+RhinoCycles `96f682a` also moved its two call sites to the socket.
+
+`tools/audit_member_socket_clash.py` now covers this as a fourth drift class in
+`run_checks.ps1`. It detects a delegating property and does not report it, so the fix
+above is recognised rather than needing an exception. The one remaining clash,
+`MusgraveTexture.dimension`, is listed as accepted for the same reason the three
+unregistered node types are: no reachable caller.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by

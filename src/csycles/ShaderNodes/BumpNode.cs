@@ -129,9 +129,19 @@ namespace ccl.ShaderNodes
 		}
 
 		/// <summary>
-		/// BumpNode set to true to invert result
+		/// BumpNode set to true to invert result.
+		///
+		/// A view onto the input socket rather than a value of its own. Cycles carries
+		/// invert as a socket, and WriteDataToNodes calls SetSockets after
+		/// SetDirectMembers - SetSockets pushes every socket including unassigned ones,
+		/// so an independent member here was silently overwritten by the socket default
+		/// and neither the C# API nor ParseXml below could invert a bump.
 		/// </summary>
-		public bool Invert { get; set; }
+		public bool Invert
+		{
+			get => ins.Invert.Value;
+			set => ins.Invert.Value = value;
+		}
 
 		internal override void SetDirectMembers()
 		{
