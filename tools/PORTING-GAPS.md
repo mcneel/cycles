@@ -107,6 +107,78 @@ above is recognised rather than needing an exception. The one remaining clash,
 `MusgraveTexture.dimension`, is listed as accepted for the same reason the three
 unregistered node types are: no reachable caller.
 
+## A bump texture blacks out the whole surface
+
+Open. `Brian25YearRhinoGlas.3dm` renders its tabletop black in dev and correctly in
+shipping: mean 7.2 against 62.2 at 1200x700, 250 samples.
+
+The cause is **the bump SVM node being compiled into the surface program but never
+executed**, so the slot it should write is never written and the principled BSDF shades
+with uninitialised stack. Skipping the single line
+`bump.outs.Normal.Connect(principled.ins.Normal)` in `RhinoFullNxt.cs` restores a
+correct render (58.9, against shipping's 55-62), because an unconnected `Normal` makes
+the closure fall back to `sd->N`.
+
+Compile-time logging in `BumpNode::compile` and `PrincipledBsdfNode::compile` shows the
+wiring is right, so this is not a slot mismatch:
+
+    BUMP       out=11 normal_in=6 center=3 dx=9 dy=10 bump_state=255 links_on_out=1
+    PRINCIPLED normal_in=11 linked=1 from='bump'
+
+What proves the node never runs: **five** different edits to `svm_node_set_bump` in
+`kernel/svm/displace.h` all produced byte-identical renders - zero strength, a NaN
+guard, changing the no-feature fallback, passing the input straight through, and storing
+a hardcoded `sd->N`. A function whose every output can be replaced by a constant without
+moving a pixel is not being called.
+
+**Where to look next.** Log the shader type in `BumpNode::compile`
+(`SHADER_TYPE_SURFACE` against `SHADER_TYPE_BUMP`). `svm.cpp` only runs
+`compile_type(..., SHADER_TYPE_BUMP)` when `has_bump_from_displacement`, which this
+material does not have, so if the node only compiles under that pass the surface program
+legitimately never writes the slot. Cross-check by dumping the emitted SVM node list for
+the `Paper` shader: "not emitted" and "emitted but jumped over" need different fixes.
+
+**Eliminated by measurement, so do not re-chase:** geometry and lighting (a
+`CCYCLES_FLAT_SHADERS` render shows the table lit with the correct shadow); the texture
+file (exists under `<model>_embedded_files\`, OIIO loads it 1003x1002, `kernel_id=0`);
+the in-memory image path (this texture is file based); base colour forced constant;
+alpha forced open; UV mapping bypassed; object-to-shader binding (`Paper`, 12 triangles
+on slot 1); a bare principled node (renders fine at 82.9); and
+`KERNEL_FEATURE_NODE_BUMP` (`MASK_SURFACE` includes it, and changing the no-feature
+branch changed nothing).
+
+**A trap worth keeping.** Do not add probes calling `compiler.output(...)` or
+`compiler.input_link(...)` inside a node's `compile()`. Those assign SVM stack slots on
+first use, so the probe changes the code it is measuring. Hoisting them to log is fine
+only if the original call order is preserved.
+
+## Light direction: two competing fixes, only one should exist
+
+Open, and the choice matters more than it looks.
+
+`ccycles/light.cpp` flips the light basis for area lights only:
+
+    if (type == ccl::LIGHT_AREA && have_dir) { z = -z; }
+
+The never-merged `origin/build/lars/UpdateToVersion44_RebaseOn9` line instead flips in
+C#, in `ShaderConverter.ConvertLight` right after `strength *= enabled`, for **every**
+light type:
+
+    dir *= -1.0f;
+
+Applying both double-negates area lights, so this is a choice, not two fixes.
+
+Evidence that the global form may be the right one: `smoketest/README.md` states
+`SMOKE_SPOTZ=1` lights the quad and `-1` does not. The measured sweep showed the
+reverse - only `-1` lit it. That inversion is unexplained under the area-only fix and is
+exactly what a missing global flip produces.
+
+**The experiment**, if picking this up: add the C# flip, remove the `LIGHT_AREA` guard,
+then check three things against shipping - the area-lit model above, the `SMOKE_SPOTZ`
+sweep (expect `+1` to light the quad, matching the README), and a point or directional
+light. If spots return to the documented behaviour, replace the ccycles flip rather than
+keeping it alongside.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by
