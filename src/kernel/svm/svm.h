@@ -307,6 +307,7 @@ ccl_device void svm_eval_nodes(KernelGlobals kg,
       SVM_CASE(NODE_SET_BUMP)
       svm_node_set_bump<node_feature_mask>(
           kg, sd, stack, svm_node_get<SVMNodeSetBump>(kg, &offset));
+      break;
       SVM_CASE(RHINO_NODE_TEX_COORD)
       {
         const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Run every check this port has: the static audits, and optionally the
   golden-image render regression.
@@ -7,11 +7,12 @@
   One entry point, because the checks are only useful if they are cheap to run
   and nobody remembers four commands. Two tiers:
 
-    Static audits    No build, no Rhino, about a second. These catch the four
+    Static audits    No build, no Rhino, about a second. These catch the five
                      ways the 3.5 -> 5.2 port has silently drifted: a renamed or
                      retyped socket, a renumbered enum, a stock SVM node
-                     emitted in Rhino's packed layout, and a parameter
-                     exposed as both a member and a socket. Every one of those
+                     emitted in Rhino's packed layout, a parameter exposed as
+                     both a member and a socket, and an interpreter case that
+                     falls through into the next one. Every one of those
                      compiles, links, asserts nothing and renders the wrong
                      pixels, which is why they are worth a second.
 
@@ -57,7 +58,7 @@ if (-not $RenderOnly) {
     Add-Result 'static audits' 2 'python not on PATH'
   }
   else {
-    foreach ($audit in 'audit_enums', 'audit_sockets', 'audit_svm_nodes', 'audit_rhino_stock_sockets', 'audit_member_socket_clash') {
+    foreach ($audit in 'audit_enums', 'audit_sockets', 'audit_svm_nodes', 'audit_rhino_stock_sockets', 'audit_member_socket_clash', 'audit_svm_dispatch') {
       $script = Join-Path $toolsDir "$audit.py"
       if (-not (Test-Path $script)) { Add-Result $audit 2 'missing'; continue }
       Write-Host "--- $audit"

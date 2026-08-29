@@ -107,50 +107,38 @@ above is recognised rather than needing an exception. The one remaining clash,
 `MusgraveTexture.dimension`, is listed as accepted for the same reason the three
 unregistered node types are: no reachable caller.
 
-## A bump texture blacks out the whole surface
+## A bump texture blacked out the whole surface
 
-Open. `Brian25YearRhinoGlas.3dm` renders its tabletop black in dev and correctly in
-shipping: mean 7.2 against 62.2 at 1200x700, 250 samples.
+**Fixed.** `NODE_SET_BUMP` had lost its `break` in the SVM interpreter
+(`kernel/svm/svm.h`) and fell through into `RHINO_NODE_TEX_COORD`, the case Rhino
+splices in beneath it.
 
-The cause is **the bump SVM node being compiled into the surface program but never
-executed**, so the slot it should write is never written and the principled BSDF shades
-with uninitialised stack. Skipping the single line
-`bump.outs.Normal.Connect(principled.ins.Normal)` in `RhinoFullNxt.cs` restores a
-correct render (58.9, against shipping's 55-62), because an unconnected `Normal` makes
-the closure fall back to `sd->N`.
+The fall-through runs the texture coordinate handler immediately after the bump node:
+it reads a packed node from the *current* instruction offset, so it misinterprets
+whatever node follows, writes into stack slots belonging to other nodes - including the
+one the bump had just written - and advances the offset wrongly. Every bump-mapped
+surface went black. `Brian25YearRhinoGlas.3dm` rendered its tabletop at mean 7.2 against
+shipping's 62.2; with the `break` restored it renders at 59.7.
 
-Compile-time logging in `BumpNode::compile` and `PrincipledBsdfNode::compile` shows the
-wiring is right, so this is not a slot mismatch:
+**Why it cost days.** The falling-through node looks innocent. It computes and stores
+its value correctly, and the damage happens a few instructions later, so every
+experiment aimed at the bump node came back identical: zero strength, a NaN guard,
+changing the no-feature fallback, passing the input straight through, and finally
+storing a hardcoded `sd->N` - five different edits, five byte-identical renders. That
+should have been read much sooner as "this code's output does not reach the image"
+rather than as five separate failed hypotheses about its internals.
 
-    BUMP       out=11 normal_in=6 center=3 dx=9 dy=10 bump_state=255 links_on_out=1
-    PRINCIPLED normal_in=11 linked=1 from='bump'
+Everything else measured true and pointed away from the bug: compile-time logging showed
+the bump writing stack slot 11 and the principled BSDF reading slot 11, both compiled
+into `SHADER_TYPE_SURFACE`, in the right order. The wiring was never wrong.
 
-What proves the node never runs: **five** different edits to `svm_node_set_bump` in
-`kernel/svm/displace.h` all produced byte-identical renders - zero strength, a NaN
-guard, changing the no-feature fallback, passing the input straight through, and storing
-a hardcoded `sd->N`. A function whose every output can be replaced by a constant without
-moving a pixel is not being called.
+`tools/audit_svm_dispatch.py` now checks every `SVM_CASE` terminates, as a fifth static
+drift class in `run_checks.ps1`. It was verified against the broken tree before being
+committed: it reports exactly this case and nothing else.
 
-**Where to look next.** Log the shader type in `BumpNode::compile`
-(`SHADER_TYPE_SURFACE` against `SHADER_TYPE_BUMP`). `svm.cpp` only runs
-`compile_type(..., SHADER_TYPE_BUMP)` when `has_bump_from_displacement`, which this
-material does not have, so if the node only compiles under that pass the surface program
-legitimately never writes the slot. Cross-check by dumping the emitted SVM node list for
-the `Paper` shader: "not emitted" and "emitted but jumped over" need different fixes.
-
-**Eliminated by measurement, so do not re-chase:** geometry and lighting (a
-`CCYCLES_FLAT_SHADERS` render shows the table lit with the correct shadow); the texture
-file (exists under `<model>_embedded_files\`, OIIO loads it 1003x1002, `kernel_id=0`);
-the in-memory image path (this texture is file based); base colour forced constant;
-alpha forced open; UV mapping bypassed; object-to-shader binding (`Paper`, 12 triangles
-on slot 1); a bare principled node (renders fine at 82.9); and
-`KERNEL_FEATURE_NODE_BUMP` (`MASK_SURFACE` includes it, and changing the no-feature
-branch changed nothing).
-
-**A trap worth keeping.** Do not add probes calling `compiler.output(...)` or
-`compiler.input_link(...)` inside a node's `compile()`. Those assign SVM stack slots on
-first use, so the probe changes the code it is measuring. Hoisting them to log is fine
-only if the original call order is preserved.
+**Relevant to the next version bump.** This is the failure mode of splicing Rhino's
+cases into upstream's `switch`: an upstream edit near an inserted case can silently
+remove the `break` that separates them. Run the audit after merging upstream.
 
 ## Light direction: two competing fixes, only one should exist
 
