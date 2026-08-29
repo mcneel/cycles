@@ -96,7 +96,12 @@ ccl_device_noinline void svm_node_set_bump(KernelGlobals kg,
     stack_store_float3(stack, node.out_offset, normal_out);
   }
   else {
-    stack_store_float3(stack, node.out_offset, zero_float3());
+    /* Without the bump feature there is no perturbed normal to compute, but this slot
+     * is read as a shading normal by whatever the bump node feeds - the principled BSDF
+     * in Rhino's PBR materials. Storing zero there gives that closure a zero normal,
+     * which renders black. Pass the surface normal through instead, so a disabled
+     * feature costs the bump and nothing else. */
+    stack_store_float3(stack, node.out_offset, sd->N);
   }
 #endif
 }
