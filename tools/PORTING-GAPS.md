@@ -211,11 +211,30 @@ with the diagnostics added was attempted and is blocked: `build_cycles_for_rhino
 requires VS2019 BuildTools, which is not installed here, and drives a CUDA build on an
 AMD machine.
 
-**If picking this up:** the cheap next step is to log `HasBgEnvTexture` and its two
-operands on both sides. `driver.py` in the harness can already dump the document side;
-the RhinoCycles side needs a temporary log, which cannot be added to the shipping
-binary - so this probably does need the shipping branch built, or a decision taken from
-the Rhino side about which colour a solid background should use.
+**Both builds build the same graph.** Shipping can dump its own background graph -
+`DumpEnvironmentShaderGraph` in the RhinoCycles settings makes both builds write
+`%USERPROFILE%/rhinobg_<id>.dot`, and it is present on `origin/rhino-9.x` as well as
+here. That is the only way to see inside the shipping build, which has none of the
+`CCYCLES_` switches.
+
+Comparing the two dumps with `dotdiff.py` (in the render harness, normalises the
+per-run pointers away): **55 nodes on both sides, same names, same values.**
+`bg_color_or_texture` is `Fac 0, Color1 (1,1,1), Color2 (0,0,0)` in *both*.
+`skylight_strength_factor` is identical in both. The only differences are socket UI
+labels that upstream renamed - `Image` to `Color`, `R/G/B` to `Red/Green/Blue` - which
+are cosmetic, since connections resolve on the internal name.
+
+So identical inputs, identical C#, identical graphs, different pixels. The difference
+is in how the graph is **evaluated**, not how it is built.
+
+**The ratio is exactly 3.00** (0.9974 against 0.3322), which looks like three channels
+being summed where one is wanted, or a strength applied once against three times -
+not a colour difference. That is the thread to pull: the background closure and the
+film/exposure path, not the shader graph.
+
+Note the earlier guess in this section - that dev ignores the environment because
+`BackgroundFill` is `SolidColor` - is **wrong**; shipping computes the same
+`BackgroundFill` from the same document and still renders differently.
 
 ## Three node types are not registered
 
