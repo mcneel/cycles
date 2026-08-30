@@ -167,6 +167,56 @@ sweep (expect `+1` to light the quad, matching the README), and a point or direc
 light. If spots return to the documented behaviour, replace the ccycles flip rather than
 keeping it alongside.
 
+## The background is the top colour where shipping uses the bottom
+
+Open. `SimpleVaseTest.3dm` renders a white background in dev and a grey one in
+shipping. Nothing else in that image differs - vase, table, light pool, shadow and
+caustics all match - but it is the darkest scene in the set, so a blown background
+dominates its mean and made it look like the worst regression of the six.
+
+Measured on the float output, not the 8-bit one (the 8-bit clips at 255 and hides all
+of this):
+
+| | background, linear |
+| --- | --- |
+| shipping | 0.332 |
+| dev | 0.997 |
+| dev, forced to use `Color2` | 0.358 |
+
+The document is `BackgroundStyle.SolidColor` with top white and bottom (160,160,160),
+and **both** builds report exactly that. Dev renders the top colour; shipping renders
+the bottom one. Forcing dev's `bg_color_or_texture.Color1` to `Color2AsFloat4`
+reproduces shipping to within 8%, so the bulk of the difference is simply which input
+that Mix node takes. The residual looks like a transfer-function difference: 0.6275
+raised to 2.2 is 0.358, the sRGB curve gives 0.347, shipping gives 0.332.
+
+**What this is not.** Verified, so it does not need redoing: the RhinoCycles background
+code is byte-identical to `origin/rhino-9.x` (the only diff in those four files is an
+unrelated shadow-catcher visibility line); both Rhinos report identical background
+settings and no RDK background environment; the environment texture resolves to a real
+file and is not a load failure; the `mix` node's sockets (`fac`, `color1`, `color2`)
+match between csycles and 5.2 exactly; and re-enabling
+`CurrentBackgroundShader?.Reset()` from the 4.4 branch changes nothing (it does run).
+
+So identical inputs and identical C# produce different backgrounds, which puts the
+difference inside Cycles' evaluation of that graph - `Fac` is 0 in dev, and a Mix with
+`Fac` 0 must return `Color1`. For shipping to show `Color2`, its `Fac` would have to be
+1, meaning `HasBgEnvTexture` is true there.
+
+**Why it is not resolved.** Confirming that needs shipping's internals, and there is no
+way to see them: `CCYCLES_BG_TAP` and the other switches are additions on this branch,
+so the shipping build has none of them, and csycles is not in this repository on
+`rhino9_cycles35` (it lives in the separate CCSycles repo). Building the shipping branch
+with the diagnostics added was attempted and is blocked: `build_cycles_for_rhino.ps1`
+requires VS2019 BuildTools, which is not installed here, and drives a CUDA build on an
+AMD machine.
+
+**If picking this up:** the cheap next step is to log `HasBgEnvTexture` and its two
+operands on both sides. `driver.py` in the harness can already dump the document side;
+the RhinoCycles side needs a temporary log, which cannot be added to the shipping
+binary - so this probably does need the shipping branch built, or a decision taken from
+the Rhino side about which colour a solid background should use.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by
