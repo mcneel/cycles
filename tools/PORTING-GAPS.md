@@ -236,6 +236,35 @@ Note the earlier guess in this section - that dev ignores the environment becaus
 `BackgroundFill` is `SolidColor` - is **wrong**; shipping computes the same
 `BackgroundFill` from the same document and still renders differently.
 
+### Measured inside shipping, with a tap
+
+The shipping branch **can be built here**: `origin/rhino9_cycles35` configures and
+builds with VS2022 (no VS2019 needed, despite what `build_cycles_for_rhino.ps1`
+hardcodes) given the 3.5-era libs at `<parent>/lib/win64_vc15`. Build
+`--target ccycles --config RelWithDebInfo`; a Debug build is the wrong CRT for the
+installed Rhino and makes it fail to render. `CCYCLES_BG_TAP` ports across with one
+change: `background->get_shader()` returns `Node*` there and needs the cast.
+
+With that DLL swapped into the installed Rhino (back the original up first), the same
+scene reproduces exactly, and tapping gives:
+
+| tapped node | shipping | dev |
+| --- | --- | --- |
+| `bg_color_or_texture` | 0.698 | 0.996 |
+| `gradient_or_other` | 0.698 | 0.996 |
+| final, untapped | 0.332 | 0.997 |
+
+Dev is flat from the first node to the output. Shipping is flat at 0.698 through the
+colour chain and then drops to 0.332 at the last stage, so **shipping applies a further
+factor of about 0.48 between `gradient_or_other` and `final_bg` that dev does not**.
+That is the thing to find; the colour chain itself is not where they diverge.
+
+Two cautions for whoever continues. The absolute numbers are read out of the saved
+`.hdr`, and shipping's `.hdr` and `.bmp` do not agree with each other under the same
+transform, so trust the ratios rather than the values. And the difference is not a
+global exposure change: the lit tabletop differs by 1.35 where the background differs
+by 3.00, which is what indirect light from a 3x brighter background would do.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by
