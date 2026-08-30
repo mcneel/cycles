@@ -259,6 +259,26 @@ colour chain and then drops to 0.332 at the last stage, so **shipping applies a 
 factor of about 0.48 between `gradient_or_other` and `final_bg` that dev does not**.
 That is the thing to find; the colour chain itself is not where they diverge.
 
+**Narrowed further, statically.** The last stage is
+`final_bg.Color = mix(Fac, refl_bg_or_custom_env, light_with_bg_or_sky)`, where `Fac`
+comes from `if_not_cam_nor_transm_nor_glossyrefl`. For a camera ray that chain has to
+collapse to zero - `Is Camera Ray` 1 gives `camera_and_transmission` 1, inverted to 0,
+multiplied to 0 - so the mix returns `Color1`, the background.
+
+Dev does exactly that: its output 0.997 equals its `Color1` 0.996. Shipping's 0.332 is
+about half its 0.698, which is what `Fac` near 0.5 blending toward black produces.
+
+Every node in that chain is identical in both dumps, including
+`refl_env_when_enabled = mul(1.0, 0.0)` and each math node's operation. So the
+divergence is in how the **light path gating evaluates**, not in the graph. The next
+probe is to tap `refl_bg_or_custom_env` and then `mix` in shipping and see which of the
+two stages introduces the half; that needs the instrumented shipping dll swapped in
+again.
+
+Worth noting which build is arithmetically right: dev computes what the graph says.
+Shipping is the one applying something the graph does not describe - but shipping is
+what users see today, so matching it is still the goal.
+
 Two cautions for whoever continues. The absolute numbers are read out of the saved
 `.hdr`, and shipping's `.hdr` and `.bmp` do not agree with each other under the same
 transform, so trust the ratios rather than the values. And the difference is not a
