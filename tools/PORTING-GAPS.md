@@ -389,13 +389,69 @@ Two separate effects, then, not one:
 That is the whole 3x: shipping 1/3 against dev 1.0. Dev puts all of its weight into a
 single camera contribution, which is why its gating never fires.
 
-`Ray Depth` is the remaining lead. It averages 0.7743 in shipping over a total weight of
-0.662, against 0.9967 over 0.996 in dev - so dev's single contribution sits at depth 1,
-and shipping's flagless contributions carry a non-integer mean depth, meaning they are
-bounces rather than one extra evaluation at a fixed depth. What they are is the next
-question, and answering it needs a counter in shipping's
-`integrator_eval_background_shader` rather than another tap: the device is CPU here, so a
-histogram of `path_flag` and depth per call is straightforward.
+### Where the extra contributions come from: the shadow catcher keeps tracing
+
+A tap cannot see who invoked the shader, so shipping's `shade_background.h` was
+instrumented directly. `CCYCLES_BG_EVAL_TALLY=<file>` counts every background shader
+evaluation by call site and path flag, with mean bounce, MIS weight and path throughput.
+Two sites were instrumented: `integrate_background` and `integrate_distant_lights`.
+
+Note for anyone reusing this: the guard has to be `#ifndef __KERNEL_GPU__`. There is no
+`__KERNEL_CPU__` in either tree, and using it compiles the whole thing out silently -
+the first run produced an empty tally and an otherwise perfect render.
+
+620,000 evaluations over a 400x240 five sample frame, and the shape is unmistakable:
+
+| flag | calls | bounce | mis | throughput |
+| --- | --- | --- | --- | --- |
+| `0xe0009001` | 77154 | 0.0000 | 1.0000 | 1.0000 |
+| `0x6400200a` | 77149 | 1.0000 | 1.0000 | 0.8684 |
+| `0x2400600a` | 76927 | 1.0003 | 1.0000 | 0.8688 |
+| `0x0400600a` | 374927 | 1.2487 | 1.0000 | 0.5052 |
+| (eight more, together under 2%) | | | | |
+
+**`integrate_distant_lights` never evaluates a background light at all** - not one
+`distantbg` call - so the earlier guess that the background-as-a-light path was the source
+is wrong too.
+
+The three near-identical counts are the answer. `0xe0009001` decodes as
+`CAMERA | MIS_SKIP | TRANSPARENT_BACKGROUND | SHADOW_CATCHER_HIT | SHADOW_CATCHER_PASS |
+SHADOW_CATCHER_BACKGROUND` at bounce 0, and `integrator_shade_background` ends with:
+
+    if (INTEGRATOR_STATE(state, path, flag) & PATH_RAY_SHADOW_CATCHER_BACKGROUND) {
+      /* Special case for shadow catcher where we want to fill the background pass
+       * behind the shadow catcher but also continue tracing the path. */
+      INTEGRATOR_STATE_WRITE(state, path, flag) &= ~PATH_RAY_SHADOW_CATCHER_BACKGROUND;
+      integrator_intersect_next_kernel_after_shadow_catcher_background<...>(kg, state);
+      return;
+    }
+
+So a background sample writes the background and **does not terminate**. The path carries
+on, escapes again, and shades the background again - which is why there are three groups
+of ~77,000 rather than one, all from the same samples, the later two now carrying
+`DIFFUSE | REFLECT` and `DIFFUSE_ANCESTOR` at bounce 1. Both builds' logs show
+`ApplyGroundPlaneChanges`, so Rhino's ground plane is the shadow catcher here.
+
+That also explains why the per-flag tap readings looked flagless: those later writes do
+carry ray type flags, but they land in shadow catcher passes rather than in the pixel the
+`.hdr` shows, which is why `Is Diffuse Ray` reads 0 over the background patch.
+
+**What is proven and what is not.** Proven: three background shader evaluations per
+background sample in shipping, the camera one at bounce 0 with MIS weight and throughput
+both exactly 1, the other two being shadow catcher continuations of the same sample; and
+`integrate_distant_lights` contributing nothing. Not yet shown: that the 5.2 branch does
+not do this. The camera write carrying weight 1 and throughput 1 while the visible pixel
+reads a third of the shader value means the factor is introduced in **pass compositing**,
+not in shader evaluation or in the weight applied to the write - so the next step is to
+tally inside `film_write_background`, recording which branch it takes
+(`film_write_transparent` against `film_write_combined_transparent_pass`, which
+`TRANSPARENT_BACKGROUND` selects between) and the value actually deposited, and to put the
+same tally in the 5.2 branch for comparison.
+
+Two earlier readings in this section are superseded and should not be trusted: that the
+three evaluations were camera, glossy+reflection and diffuse, and that they came from the
+background being sampled as a light. `tools/DIAGNOSTICS.md` also records the shadow
+catcher as exonerated - that was for a different symptom and does not clear it here.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
