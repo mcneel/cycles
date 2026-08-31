@@ -705,6 +705,20 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 		 * takes a handful of runs. */
 		const char *tap = getenv("CCYCLES_BG_TAP");
 		if (tap != nullptr && tap[0] != 0) {
+			/* "<node>" taps that node's first colour-ish output. "<node>:<Socket Name>" taps a
+			 * named one, which is what makes several outputs of the same node comparable:
+			 * every such tap compiles the identical tiny graph, so only the socket differs.
+			 * Taps of different nodes do not have that property and their numbers cannot be
+			 * combined. */
+			const std::string tapspec(tap);
+			const size_t tapcolon = tapspec.find(':');
+			const std::string tapnode = (tapcolon == std::string::npos)
+			                                ? tapspec
+			                                : tapspec.substr(0, tapcolon);
+			const std::string tapsock = (tapcolon == std::string::npos)
+			                                ? std::string()
+			                                : tapspec.substr(tapcolon + 1);
+
 			ccl::Scene *tsce = session->scene.get();
 			ccl::Shader *tsh = (tsce != nullptr)
 			                       ? static_cast<ccl::Shader *>(tsce->background->get_shader())
@@ -713,22 +727,31 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 				ccl::ShaderNode *srcnode = nullptr;
 				ccl::ShaderNode *bgnode = nullptr;
 				for (ccl::ShaderNode *nd : tsh->graph->nodes) {
-					if (nd->name == ccl::ustring(tap)) srcnode = nd;
+					if (nd->name == ccl::ustring(tapnode)) srcnode = nd;
 					if (nd->name == ccl::ustring("final_bg")) bgnode = nd;
 				}
 				if (srcnode == nullptr || bgnode == nullptr) {
-					ccycles_diag("tap: node '%s' or final_bg not found\n", tap);
+					ccycles_diag("tap: node '%s' or final_bg not found\n", tapnode.c_str());
 				}
 				else {
 					ccl::ShaderOutput *from = nullptr;
-					for (ccl::ShaderOutput *o : srcnode->outputs) {
-						if (o->type() == ccl::SocketType::COLOR ||
-						    o->type() == ccl::SocketType::FLOAT ||
-						    o->type() == ccl::SocketType::VECTOR ||
-						    o->type() == ccl::SocketType::POINT ||
-						    o->type() == ccl::SocketType::NORMAL) {
-							from = o;
-							break;
+					if (!tapsock.empty()) {
+						from = srcnode->output(tapsock.c_str());
+						if (from == nullptr) {
+							ccycles_diag("tap: '%s' has no output named '%s'\n", tapnode.c_str(),
+							             tapsock.c_str());
+						}
+					}
+					else {
+						for (ccl::ShaderOutput *o : srcnode->outputs) {
+							if (o->type() == ccl::SocketType::COLOR ||
+							    o->type() == ccl::SocketType::FLOAT ||
+							    o->type() == ccl::SocketType::VECTOR ||
+							    o->type() == ccl::SocketType::POINT ||
+							    o->type() == ccl::SocketType::NORMAL) {
+								from = o;
+								break;
+							}
 						}
 					}
 					ccl::ShaderInput *to = bgnode->input("Color");

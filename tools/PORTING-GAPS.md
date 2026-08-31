@@ -335,54 +335,68 @@ two structurally identical folded graphs (`Color1` literal white, `Color2` liter
 `Fac` from a light path chain) which render 2/3 and 1/3. For a camera ray both `Fac`
 values must be 0 and both must render white. So `Fac` is not 0.
 
-### Root cause: shipping evaluates the background three times, dev once
+### Root cause: shipping loses a third of the weight and mislabels half the rest
 
-Tapping the `light_path` node measures its first output, `Is Camera Ray`, directly. The
-folded graph of that run is four nodes -
-`light_path.Is Camera Ray -> convert_float_to_color -> final_bg.Color` - so there is no
-doubt what is being read:
+Tapping the `light_path` node measures its outputs directly. `CCYCLES_BG_TAP` accepts
+`<node>:<Socket Name>`, and this is the one tap family whose numbers may be compared with
+each other: every such render folds to the identical four node graph
+(`light_path.<socket> -> convert_float_to_color -> final_bg.Color`), so only the socket
+differs. Taps of *different* nodes each fold to a different graph, which is why the
+earlier bisect produced numbers that no single model could satisfy.
+
+Every light path output, background patch, 5 samples:
+
+| socket | shipping | dev |
+| --- | --- | --- |
+| `Is Camera Ray` | 0.3323 | 0.9967 |
+| `Ray Depth` | 0.7743 | 0.9967 |
+| `Is Shadow Ray` | 0 | 0 |
+| `Is Diffuse Ray` | 0 | 0 |
+| `Is Glossy Ray` | 0 | 0 |
+| `Is Singular Ray` | 0 | 0 |
+| `Is Reflection Ray` | 0 | 0 |
+| `Is Transmission Ray` | 0 | 0 |
+| `Is Volume Scatter Ray` | 0 | 0 |
+| `Transparent Depth`, `Diffuse Depth`, `Glossy Depth`, `Transmission Depth` | 0 | 0 |
+
+**This refutes the earlier reading in this section that shipping evaluates the background
+three times as camera, glossy+reflection and diffuse.** Glossy, diffuse, reflection and
+transmission are all exactly zero in both builds; there are no such contributions.
+
+The two other taps become interpretable once their folded graphs are read. Tapping
+`refl_bg_or_custom_env` folds to that node with `Color1` literal white, `Color2` literal
+black, and `Fac` still linked to `use_reflect_refract = IsGlossy * IsReflection`. Both of
+those are zero for every contribution, so `Fac` is zero for every contribution and the
+node yields white for all of them - that tap measures **total weight**, not a colour.
+Tapping `light_with_bg_or_sky` folds to `Fac <- non_camera_rays = 1 - IsCameraRay`, so it
+yields white only for camera contributions and measures **camera weight** - which is why
+it reads identically to the `Is Camera Ray` tap, as it must.
 
 | | shipping | dev |
 | --- | --- | --- |
-| `Is Camera Ray`, background pixels | **0.3323** | **0.9968** |
+| total weight reaching the pixel | 0.662 | 0.996 |
+| of it, camera-flagged | 0.332 | 0.997 |
+| of it, carrying no ray type flag at all | 0.330 | ~0 |
 
-0.3323 at 1, 4 and 5 samples alike, so it is a per-sample weighting and not a sampling
-artifact. Three equally weighted background evaluations per pixel - **camera,
-glossy+reflection, and diffuse** - predict every measurement taken:
+Two separate effects, then, not one:
 
-| tapped | predicted | shipping |
-| --- | --- | --- |
-| `light_path` (`Is Camera Ray`) | 1/3 | 0.3323 |
-| `refl_bg_or_custom_env` | 2/3 | 0.6622 |
-| `light_with_bg_or_sky` | 1/3 | 0.3323 |
-| untapped `mix` | 1/3 | 0.3331 |
+1. Shipping's background pixel receives only about **two thirds** of the weight dev's
+   does. A third of the energy is missing outright.
+2. Of what remains, **half carries no ray type flag** - not camera, not glossy, not
+   diffuse, nothing. Rhino's graph routes anything that is not a camera ray to black, so
+   those contributions render as black and the visible result is the camera third alone.
 
-Dev evaluates it once, as a camera ray, so its pixel is the pure background - white -
-and its light path gating has nothing left to gate, which is the entire purpose of this
-graph. That is why the render looks like "the top colour instead of the bottom": camera
-sees the background colour, glossy reflection sees the reflection environment, diffuse
-sees the sky, and shipping shows the average of all three where dev shows only the first.
+That is the whole 3x: shipping 1/3 against dev 1.0. Dev puts all of its weight into a
+single camera contribution, which is why its gating never fires.
 
-The kernels do read different things. Shipping's `svm_node_light_path`:
+`Ray Depth` is the remaining lead. It averages 0.7743 in shipping over a total weight of
+0.662, against 0.9967 over 0.996 in dev - so dev's single contribution sits at depth 1,
+and shipping's flagless contributions carry a non-integer mean depth, meaning they are
+bounces rather than one extra evaluation at a fixed depth. What they are is the next
+question, and answering it needs a counter in shipping's
+`integrator_eval_background_shader` rather than another tap: the device is CPU here, so a
+histogram of `path_flag` and depth per call is straightforward.
 
-    info = (path_flag & PATH_RAY_CAMERA) ? 1.0f : 0.0f;
-
-dev's:
-
-    info = (path_visibility & PATH_RAY_VISIBILITY_CAMERA) ? 1.0f : 0.0f;
-
-`path_visibility` is a separate 5.x bitmask, `INTEGRATOR_STATE(state, path, visibility)`,
-initialised to `PATH_RAY_VISIBILITY_CAMERA` in `path_state.h` and recomputed per bounce.
-Both call sites in `shade_background.h` pass their flags the same way and both evaluate
-with `path_flag | PATH_RAY_EMISSION`, so this rename alone does not account for a 3:1
-weight difference - it only means the two builds answer "is this a camera ray" from
-different state.
-
-**What is still open** is where shipping's other two evaluations come from and why dev
-has only one. That is now a narrow question about the background-as-light paths - whether
-the glossy and diffuse background evaluations land in the same film pixel - rather than
-anything to do with the shader graph, which has been ruled out at construction, after
-folding, and per node.
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
 `.hdr`, and shipping's `.hdr` and `.bmp` do not agree with each other under the same
