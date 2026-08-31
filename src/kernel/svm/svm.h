@@ -311,7 +311,7 @@ ccl_device void svm_eval_nodes(KernelGlobals kg,
       SVM_CASE(RHINO_NODE_TEX_COORD)
       {
         const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
-        offset = svm_rhino_node_tex_coord(kg, sd, path_flag, stack, node, offset);
+        offset = svm_rhino_node_tex_coord(kg, sd, path_visibility, stack, node, offset);
       }
       break;
       SVM_CASE(RHINO_NODE_MATRIX_MATH)

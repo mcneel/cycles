@@ -656,7 +656,7 @@ ccl_device_noinline int svm_node_tex_coord(KernelGlobals kg,
 
 ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
                                                  ccl_private ShaderData *sd,
-                                                 uint32_t path_flag,
+                                                 const PathRayVisibility path_visibility,
                                                  ccl_private float *stack,
                                                  uint4 node,
                                                  int offset)
@@ -711,7 +711,9 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
       break;
     }
     case NODE_TEXCO_WINDOW: {
-      if ((path_flag & PATH_RAY_VISIBILITY_CAMERA) && sd->object == OBJECT_NONE &&
+      /* Camera-ness lives in the visibility mask in 5.x; bit 0 of a path flag is
+       * PATH_RAY_REFLECT. Upstream's svm_node_tex_coord_eval reads it the same way. */
+      if ((path_visibility & PATH_RAY_VISIBILITY_CAMERA) && sd->object == OBJECT_NONE &&
           kernel_data.cam.type == CAMERA_ORTHOGRAPHIC)
         data = camera_world_to_ndc(kg, sd, sd->ray_P);
       else

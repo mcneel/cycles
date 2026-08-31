@@ -281,9 +281,13 @@ ccl_device_forceinline bool path_clip_ray(
     ccl_private ShaderData* sd,
     ccl_private Ray* ray)
 {
-  const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
+  /* 3.5 asked `path_flag & PATH_RAY_CAMERA` here. 5.x removed PATH_RAY_CAMERA from
+   * PathRayFlag and moved camera-ness to the separate path visibility mask, so testing a
+   * path flag against PATH_RAY_VISIBILITY_CAMERA reads bit 0 of the wrong word - which is
+   * now PATH_RAY_REFLECT. That clips reflection rays and leaves camera rays unclipped. */
+  const PathRayVisibility path_visibility = INTEGRATOR_STATE(state, path, visibility);
 
-  if ((path_flag & PATH_RAY_VISIBILITY_CAMERA) == PATH_RAY_VISIBILITY_CAMERA) {
+  if (path_visibility & PATH_RAY_VISIBILITY_CAMERA) {
     for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
       float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
       float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;

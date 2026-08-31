@@ -322,10 +322,67 @@ almost all of it folded to constants, and it confirms the reading above: both
 `(1,1,1)`, their `Color2` the literal `(0,0,0)`, and every gate resolves to 0 for a
 camera ray, so all three mixes return white.
 
-**The open probe is the same dump from shipping.** That needs the freshly built
-instrumented dll copied into the installed Rhino again, which needs an elevated copy.
-Whatever it shows is the answer, because the post-finalize graph is the one the SVM
-compiler sees.
+Shipping's post-finalize graph is **the same 12 nodes with the same 16 connections and
+the same folded constants**. `dotdiff` finds two differing entries and both are the
+`light_path` node's output list: dev has a fifteenth output, `Portal Depth`, appended
+after `Transmission Depth`. Appended last, so nothing shifts, and both trees'
+`LightPathNode::compile` maps outputs to `NODE_LP_*` by name.
+
+So the compiled graph is exonerated too, and that makes the tapped renders damning: the
+tap runs in `cycles_session_start`, before `session->start()`, so the tapped graph gets
+folded as well - and tapping `refl_bg_or_custom_env` and `light_with_bg_or_sky` compiles
+two structurally identical folded graphs (`Color1` literal white, `Color2` literal black,
+`Fac` from a light path chain) which render 2/3 and 1/3. For a camera ray both `Fac`
+values must be 0 and both must render white. So `Fac` is not 0.
+
+### Root cause: shipping evaluates the background three times, dev once
+
+Tapping the `light_path` node measures its first output, `Is Camera Ray`, directly. The
+folded graph of that run is four nodes -
+`light_path.Is Camera Ray -> convert_float_to_color -> final_bg.Color` - so there is no
+doubt what is being read:
+
+| | shipping | dev |
+| --- | --- | --- |
+| `Is Camera Ray`, background pixels | **0.3323** | **0.9968** |
+
+0.3323 at 1, 4 and 5 samples alike, so it is a per-sample weighting and not a sampling
+artifact. Three equally weighted background evaluations per pixel - **camera,
+glossy+reflection, and diffuse** - predict every measurement taken:
+
+| tapped | predicted | shipping |
+| --- | --- | --- |
+| `light_path` (`Is Camera Ray`) | 1/3 | 0.3323 |
+| `refl_bg_or_custom_env` | 2/3 | 0.6622 |
+| `light_with_bg_or_sky` | 1/3 | 0.3323 |
+| untapped `mix` | 1/3 | 0.3331 |
+
+Dev evaluates it once, as a camera ray, so its pixel is the pure background - white -
+and its light path gating has nothing left to gate, which is the entire purpose of this
+graph. That is why the render looks like "the top colour instead of the bottom": camera
+sees the background colour, glossy reflection sees the reflection environment, diffuse
+sees the sky, and shipping shows the average of all three where dev shows only the first.
+
+The kernels do read different things. Shipping's `svm_node_light_path`:
+
+    info = (path_flag & PATH_RAY_CAMERA) ? 1.0f : 0.0f;
+
+dev's:
+
+    info = (path_visibility & PATH_RAY_VISIBILITY_CAMERA) ? 1.0f : 0.0f;
+
+`path_visibility` is a separate 5.x bitmask, `INTEGRATOR_STATE(state, path, visibility)`,
+initialised to `PATH_RAY_VISIBILITY_CAMERA` in `path_state.h` and recomputed per bounce.
+Both call sites in `shade_background.h` pass their flags the same way and both evaluate
+with `path_flag | PATH_RAY_EMISSION`, so this rename alone does not account for a 3:1
+weight difference - it only means the two builds answer "is this a camera ray" from
+different state.
+
+**What is still open** is where shipping's other two evaluations come from and why dev
+has only one. That is now a narrow question about the background-as-light paths - whether
+the glossy and diffuse background evaluations land in the same film pixel - rather than
+anything to do with the shader graph, which has been ruled out at construction, after
+folding, and per node.
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
 `.hdr`, and shipping's `.hdr` and `.bmp` do not agree with each other under the same
@@ -353,6 +410,37 @@ are correct as written.
 
 Arrived with the 5.2 rebase, from upstream `e063549d4` "Detect volume attribute nodes
 that can use stochastic sampling" - not from the 4.4 port. Fixed by asking for `"Fac"`.
+
+## Two Rhino kernel functions asked a path flag whether it is a camera ray
+
+3.5 had `PATH_RAY_CAMERA = (1U << 0U)` in `PathRayFlag`. 5.x **removed it**: camera-ness
+moved to a separate `PathRayVisibility` mask, `INTEGRATOR_STATE(state, path, visibility)`,
+and bit 0 of a path flag is now `PATH_RAY_REFLECT`. Two Rhino functions were ported by
+substituting the new constant into the old test, which compiles and silently asks about
+reflection rays instead:
+
+`path_state.h`, `path_clip_ray` - Rhino's clipping planes:
+
+    const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
+    if ((path_flag & PATH_RAY_VISIBILITY_CAMERA) == PATH_RAY_VISIBILITY_CAMERA) {
+
+A camera ray never satisfies that, so **clipping planes stop clipping directly visible
+geometry** and start clipping reflection rays.
+
+`svm/tex_coord.h`, `svm_rhino_node_tex_coord` (the grafted `RHINO_NODE_TEX_COORD`),
+`NODE_TEXCO_WINDOW`:
+
+    if ((path_flag & PATH_RAY_VISIBILITY_CAMERA) && sd->object == OBJECT_NONE &&
+
+`texcoord.Window` is what feeds the background gradient's coordinates, so this one
+misplaces the gradient under an orthographic camera. Upstream's own
+`svm_node_tex_coord_eval` a hundred lines earlier reads `path_visibility` correctly,
+which is what makes the grafted copy stand out.
+
+Both fixed by reading the visibility mask. `svm_rhino_node_tex_coord` took `path_flag`
+only for this test, so it now takes `path_visibility`; the dispatch in `svm.h` already
+had it in scope. Worth a targeted check of clipping planes and of a gradient background
+under an orthographic camera - neither is covered by the current test models.
 
 ## Three node types are not registered
 
