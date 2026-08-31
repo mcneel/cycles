@@ -259,31 +259,100 @@ colour chain and then drops to 0.332 at the last stage, so **shipping applies a 
 factor of about 0.48 between `gradient_or_other` and `final_bg` that dev does not**.
 That is the thing to find; the colour chain itself is not where they diverge.
 
-**Narrowed further, statically.** The last stage is
-`final_bg.Color = mix(Fac, refl_bg_or_custom_env, light_with_bg_or_sky)`, where `Fac`
-comes from `if_not_cam_nor_transm_nor_glossyrefl`. For a camera ray that chain has to
-collapse to zero - `Is Camera Ray` 1 gives `camera_and_transmission` 1, inverted to 0,
-multiplied to 0 - so the mix returns `Color1`, the background.
+### The mix stage, measured
 
-Dev does exactly that: its output 0.997 equals its `Color1` 0.996. Shipping's 0.332 is
-about half its 0.698, which is what `Fac` near 0.5 blending toward black produces.
+Tapped in the instrumented shipping build, reading a background-only patch out of the
+`.hdr` per channel (patch 180,0 40x20 at 400x240, 5 samples - a background pixel is one
+shader evaluation with no path variance, so it converges at sample 1; the 5-sample
+untapped read 0.3331 matches the 250-sample sweep's 0.332):
 
-Every node in that chain is identical in both dumps, including
-`refl_env_when_enabled = mul(1.0, 0.0)` and each math node's operation. So the
-divergence is in how the **light path gating evaluates**, not in the graph. The next
-probe is to tap `refl_bg_or_custom_env` and then `mix` in shipping and see which of the
-two stages introduces the half; that needs the instrumented shipping dll swapped in
-again.
+| tapped node | shipping | dev |
+| --- | --- | --- |
+| `mix.Fac` (`if_not_cam_nor_transm_nor_glossyrefl`) | 0.0000 | 0.0000 |
+| `mix.Color1` (`refl_bg_or_custom_env`) | 0.6622 | 0.9961 |
+| `mix.Color2` (`light_with_bg_or_sky`) | 0.3323 | 0.9968 |
+| `mix.Color`, tapped | 0.3331 | - |
+| untapped | 0.3331 | 0.9965 |
 
-Worth noting which build is arithmetically right: dev computes what the graph says.
-Shipping is the one applying something the graph does not describe - but shipping is
-what users see today, so matching it is still the goal.
+Tapping `mix` reproduces the untapped value exactly, so the tap itself is neutral.
+Every channel is equal in every one of those reads - it is neutral grey, not a channel
+dropping out - and the three shipping numbers are 1/3, 2/3 and 3/3 of white.
+
+`Fac` is 0 in both, so the earlier guess that the socket default 0.5 was standing in is
+wrong. And with `Fac` 0 the mix must return `Color1`: `MixNode` packs `(fac, c1, c2)`
+and `svm_node_mix` unpacks the same order into `interp(c1, c2, t)`, in **both** trees.
+Shipping returns 0.3331 where its `Color1` is 0.6622.
+
+### The graphs really are equivalent
+
+The 24 apparent connection differences between the two dumps are all socket renames
+(`Image` to `Color`, `R/G/B` to `Red/Green/Blue`) from the separate/combine drift.
+Resolved pointer-accurately with the harness's `dotptr.py` - which keeps the two nodes
+both named `skylight_strength_factor`, and the three named `maximum`, distinct - the
+wiring is identical, including which of the two `skylight_strength_factor` nodes feeds
+the background multipliers (the `max`, value 1.0) and which feeds the reflection ones
+(the `mul`, value 0.0).
+
+Read literally for a camera ray the graph gives **white**: `mix.Fac` 0 selects
+`refl_bg_or_custom_env`, whose `Fac` (`refl_env_when_enabled = mul(1.0, 0)`) is 0 and so
+selects `gradient_or_other`, whose `Fac` is a literal 0 and so selects
+`factored_bg_color`, which is `bg_color_or_texture`'s literal white through a gamma of
+2.2 times 1.0. Dev renders 0.9965. **Dev is faithful to the graph; shipping applies a
+factor of 1/3 that the graph does not describe** - and when a tap makes the graph
+smaller that factor becomes 2/3 rather than staying put.
+
+Also visible in the literals, and worth keeping: `refl_color_or_texture.Color1` is
+0.358654, which is `(160/255)^2.2` - the document's background *bottom* colour at gamma
+2.2. `bg_color_or_texture.Color1` is white, the *top* colour. `bg_env_texture` is
+`(null)` in both; the style is SolidColor and no environment image is involved.
+
+### Why the dumps could not settle it
+
+`cycles_shader_dump_graph`, which is what the `DumpEnvironmentShaderGraph` setting
+calls, runs where RhinoCycles *builds* the graph - before `simplify()`, constant folding
+and `finalize()`. Identical dumps therefore only prove both builds construct the same
+graph, not that they compile the same one, and 3.5 and 5.2 do not have the same
+optimizer. 5.2's `finalize` has also dropped shipping's
+`else if (do_simplify) simplify_settings(scene)` branch.
+
+`CCYCLES_DUMP_FINAL=<prefix>` (added to `ShaderGraph::finalize` in both trees, temporary)
+dumps the background graph again afterwards. Dev's post-finalize graph is **12 nodes**,
+almost all of it folded to constants, and it confirms the reading above: both
+`refl_bg_or_custom_env.Color1` and `light_with_bg_or_sky.Color1` are the literal
+`(1,1,1)`, their `Color2` the literal `(0,0,0)`, and every gate resolves to 0 for a
+camera ray, so all three mixes return white.
+
+**The open probe is the same dump from shipping.** That needs the freshly built
+instrumented dll copied into the installed Rhino again, which needs an elevated copy.
+Whatever it shows is the answer, because the post-finalize graph is the one the SVM
+compiler sees.
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
 `.hdr`, and shipping's `.hdr` and `.bmp` do not agree with each other under the same
 transform, so trust the ratios rather than the values. And the difference is not a
 global exposure change: the lit tabletop differs by 1.35 where the background differs
 by 3.00, which is what indirect light from a 3x brighter background would do.
+
+## A mix node in a volume shader dereferences null
+
+`MixNode::is_linear_operation()` ended with
+
+    return use_clamp == false && input("Factor")->link == nullptr;
+
+but `MixNode` registers its factor socket as `"Fac"`. `"Factor"` is `MixColorNode`'s
+name for it, and `ShaderNode::input()` returns `nullptr` for a name the node does not
+have, so this dereferences null for every blend, add, multiply or subtract mix. Nor does
+the `use_clamp == false &&` short-circuit save it: `mix` defaults `use_clamp` to false.
+
+It is reachable from `ShaderGraph::optimize_volume_output`, which returns early unless
+the graph's `Volume` output is linked - so it is a latent crash on any volumetric
+material containing a mix node, not something the test models hit yet. The four sibling
+nodes on the same line (`MixColorNode`, `MixFloatNode`, `MixVectorNode`,
+`MixVectorNonUniformNode`) and `FloatCurveNode` all genuinely register `"Factor"` and
+are correct as written.
+
+Arrived with the 5.2 rebase, from upstream `e063549d4` "Detect volume attribute nodes
+that can use stochastic sampling" - not from the 4.4 port. Fixed by asking for `"Fac"`.
 
 ## Three node types are not registered
 

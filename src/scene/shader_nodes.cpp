@@ -5995,7 +5995,10 @@ bool MixNode::is_linear_operation()
     default:
       return false;
   }
-  return use_clamp == false && input("Factor")->link == nullptr;
+  /* This node's factor socket is "Fac". "Factor" is MixColorNode's name for it, and
+   * ShaderNode::input() returns nullptr for a name the node does not have, so asking for
+   * "Factor" here dereferences null on every blend, add, multiply or subtract mix. */
+  return use_clamp == false && input("Fac")->link == nullptr;
 }
 
 /* Mix Color */

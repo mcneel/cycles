@@ -400,6 +400,27 @@ void ShaderGraph::finalize(Scene *scene, bool do_bump, bool bump_in_object_space
 
     finalized = true;
   }
+
+  /* cycles_shader_dump_graph runs where RhinoCycles builds the graph, which is before
+   * simplify() and constant folding, so two builds can emit byte-identical dumps and still
+   * compile different graphs. With CCYCLES_DUMP_FINAL=<prefix> the background graph is
+   * dumped again here, after finalize, which is the graph the SVM compiler actually sees. */
+  const char *dumpfinal = getenv("CCYCLES_DUMP_FINAL");
+  if (dumpfinal != nullptr && dumpfinal[0] != 0) {
+    bool is_background = false;
+    for (ShaderNode *node : nodes) {
+      if (node->name == ustring("final_bg")) {
+        is_background = true;
+        break;
+      }
+    }
+    if (is_background) {
+      static int dumpfinal_counter = 0;
+      std::string path = std::string(dumpfinal) + "_final_" +
+                         std::to_string(dumpfinal_counter++) + ".dot";
+      dump_graph(path.c_str());
+    }
+  }
 }
 
 void ShaderGraph::find_dependencies(ShaderNodeSet &dependencies, ShaderInput *input)
