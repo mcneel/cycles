@@ -436,22 +436,58 @@ That also explains why the per-flag tap readings looked flagless: those later wr
 carry ray type flags, but they land in shadow catcher passes rather than in the pixel the
 `.hdr` shows, which is why `Is Diffuse Ray` reads 0 over the background patch.
 
-**What is proven and what is not.** Proven: three background shader evaluations per
-background sample in shipping, the camera one at bounce 0 with MIS weight and throughput
-both exactly 1, the other two being shadow catcher continuations of the same sample; and
-`integrate_distant_lights` contributing nothing. Not yet shown: that the 5.2 branch does
-not do this. The camera write carrying weight 1 and throughput 1 while the visible pixel
-reads a third of the shader value means the factor is introduced in **pass compositing**,
-not in shader evaluation or in the weight applied to the write - so the next step is to
-tally inside `film_write_background`, recording which branch it takes
-(`film_write_transparent` against `film_write_combined_transparent_pass`, which
-`TRANSPARENT_BACKGROUND` selects between) and the value actually deposited, and to put the
-same tally in the 5.2 branch for comparison.
+### The camera ray's background colour is discarded, by design
 
-Two earlier readings in this section are superseded and should not be trusted: that the
-three evaluations were camera, glossy+reflection and diffuse, and that they came from the
-background being sampled as a light. `tools/DIAGNOSTICS.md` also records the shadow
-catcher as exonerated - that was for a different symptom and does not clear it here.
+`film_write_background` was instrumented the same way, recording which of its two branches
+runs and the value each would deposit.
+
+**No `fw:transp` calls at all**, so `kernel_data.background.transparent` is false and the
+transparent-background branch never runs - every write goes to
+`film_write_combined_transparent_pass`. What that shows:
+
+| write | calls | bounce | throughput | value deposited |
+| --- | --- | --- | --- | --- |
+| `0xe0009001` | 80221 | 0.0000 | 1.0000 | **1.0000** |
+| `0x6400200a` | 80210 | 1.0000 | 0.8679 | 0.0000 |
+| `0x2400600a` | 79990 | 1.0003 | 0.8683 | 0.0000 |
+
+So the camera write carries the full white background, and both shadow catcher
+continuations carry nothing. And `film_write_combined_transparent_pass` opens with
+
+    if (film_write_shadow_catcher_transparent(kg, path_flag, contribution, transparent, buffer)) {
+      return;
+    }
+
+whose first act is
+
+    if (path_flag & PATH_RAY_SHADOW_CATCHER_BACKGROUND) {
+      return true;
+    }
+
+`0xe0009001` has bit 31 set, which is exactly `PATH_RAY_SHADOW_CATCHER_BACKGROUND`. **The
+camera ray's background colour is therefore discarded from the combined pass on purpose**,
+because the path is about to continue and shade the background again - and that later
+write, now flagged `DIFFUSE | REFLECT`, is the one Rhino's graph deliberately routes to the
+sky branch, which folds to black. Hence value 0.0000 on both continuations.
+
+That is the whole mechanism, and it explains why the light path gating matters so much in
+shipping and not at all here: in shipping the visible background does **not** come from the
+camera ray's evaluation, so the gating decides what is seen. In this branch the camera
+write survives, the gating never fires, and the background is simply the camera colour -
+white.
+
+**Proven**: one camera-flagged evaluation per background sample at bounce 0 with MIS weight,
+throughput and deposited value all exactly 1; two shadow catcher continuations of the same
+sample depositing 0; no distant-light evaluation; no transparent-background branch; and the
+camera write discarded by the `PATH_RAY_SHADOW_CATCHER_BACKGROUND` early return.
+
+**Inferred, not yet measured**: that the visible 1/3 arrives via the background pass -
+`film_write_emission_or_background_pass` runs unconditionally after the branch, so the
+camera write does reach `pass_background` with its full white - and that the factor of three
+is that pass being normalised by a count which includes all three writes. Confirming it
+means one more tally, in `film_write_emission_or_background_pass` and in the film
+normalisation. The same tally in this branch would also settle whether it sets up the
+shadow catcher continuation at all, which is still assumed rather than shown.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
