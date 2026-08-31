@@ -481,13 +481,57 @@ throughput and deposited value all exactly 1; two shadow catcher continuations o
 sample depositing 0; no distant-light evaluation; no transparent-background branch; and the
 camera write discarded by the `PATH_RAY_SHADOW_CATCHER_BACKGROUND` early return.
 
-**Inferred, not yet measured**: that the visible 1/3 arrives via the background pass -
-`film_write_emission_or_background_pass` runs unconditionally after the branch, so the
-camera write does reach `pass_background` with its full white - and that the factor of three
-is that pass being normalised by a count which includes all three writes. Confirming it
-means one more tally, in `film_write_emission_or_background_pass` and in the film
-normalisation. The same tally in this branch would also settle whether it sets up the
-shadow catcher continuation at all, which is still assumed rather than shown.
+**Inferred, not yet measured**: that the visible third arrives via the background pass.
+
+### Where the background is finally scaled, and a divergence that is ours
+
+`film_write_emission_or_background_pass` carries a Rhino patch:
+
+    // 2023-09-28 David E.
+    // The background pass needs its own sample counter in order to scale the pixels
+    // the appropriate amount and to correctly compose the background pass with the
+    // matte pass when doing shadow catching.
+    // Fixes RH-75422.
+    if (pass == kernel_data.film.pass_background) {
+      atomic_fetch_and_add_uint32(
+          (ccl_global uint *)(buffer) + kernel_data.film.pass_shadow_catcher_background_sample_count, 1);
+    }
+
+A second RH-75422 patch sits in `film_write_transparent`, counting transparent background
+samples because otherwise "every time we sample a transparent background it will darken the
+final pixel color". **Both patches are present in both trees**, 14 occurrences of each
+symbol either side, so nothing was dropped in the port.
+
+Tracing which writes reach that counter: the camera group `0xe0009001` has neither
+`SURFACE_PASS` nor `VOLUME_PASS`, so it takes the directly-visible branch, writes the full
+white to `pass_background` and increments the counter. Both continuations have
+`SURFACE_PASS` set together with `SHADOW_CATCHER_HIT`, so they hit the
+`is_shadowcatcher` early return and write no light pass at all. One background pass write
+and one counter increment per sample, then.
+
+The counters are consumed by `film_get_scale_and_scale_exposure` in `kernel/film/read.h`,
+and **that function differs between the two trees**:
+
+| | shipping | this branch |
+| --- | --- | --- |
+| filter path | `*scale = 1.0f / sample_count` | `*scale = kfilm_convert->scale / sample_count` |
+| otherwise | `*scale = 1.0f` | `*scale = kfilm_convert->scale` |
+
+This branch's version carries a long comment about `PASS_SAMPLE_COUNT` being absent with
+adaptive sampling off and an opaque background, and about an out-of-bounds read that made
+`film_calculate_shadow_catcher_matte_with_shadow` return zero for every pixel - so it was
+changed here deliberately, to fix an entirely black render. It is a local divergence, not
+upstream drift, and it sits exactly where the background's final scale is decided.
+
+Which of the two paths is live depends on `pass_use_filter` and on whether
+`pass_sample_count` exists. When it does not, both reduce to the same thing; when it does,
+they do not, and one of them divides by the sample count twice.
+
+**The next probe is runtime values, not more reading**: print `scale`,
+`scale_exposure`, `background_scale_exposure`, `sample_count`, and the three shadow catcher
+counters from `film_get_scale_and_scale_exposure`, in both trees, for one background pixel.
+That is a single instrumented build each and it either confirms this function as the source
+of the residual factor or rules it out.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
