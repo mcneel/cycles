@@ -651,10 +651,51 @@ this branch**, so nothing ever reaches `film_write_combined_pass` on a shadow ca
 back to one, `alpha_matte` becomes zero, and the background is composited at full
 brightness instead of a third.
 
-The next probe follows directly: tally which of the four `film_write_combined_pass` callers
-fires in each build - `film_write_direct_light`, `film_write_surface_emission` and the
-volume pair - and with what contribution and path flags. That says whether the ground plane
-is receiving no light at all or is being written through a different route here.
+### film_write_direct_light is never called here at all
+
+All four `film_write_combined_pass` call sites were instrumented in both trees. Shipping
+produces exactly **one** row - `cpB`, 81064 calls, every one on flag `0x60009001`
+(`SHADOW_CATCHER_HIT | SHADOW_CATCHER_PASS`), carrying 0.6114 - and that is the same count
+and the same contribution as the `scw1` write that fills `PASS_SHADOW_CATCHER`. This branch
+produces **no rows at all**.
+
+`cpB` sits immediately before an unconditional call, with no early return between it and
+the top of `film_write_direct_light`; the kernel objects are newer than the edit; and other
+probes in the same header (`scw2`, 81037 calls) fire in the same run. So the instrument is
+live and the function genuinely does not run.
+
+`film_write_direct_light` has exactly one caller in each tree, `integrator_shade_shadow` in
+`shade_shadow.h`, so **no shadow ray in this build ever writes its direct light
+contribution**. That is next-event estimation not landing, which is a much larger problem
+than the background it was found through - the background is merely the place where it
+became visible, because the shadow catcher pass has no other source.
+
+The structural difference is in the same function. Shipping:
+
+    const bool opaque = integrate_transparent_shadow(kg, state, num_hits);
+    if (opaque) { integrator_shadow_path_terminate(...); return; }
+
+This branch:
+
+    const TransparentShadowResult result = integrate_transparent_shadow(kg, state, packed_num_hits);
+    if (result == TRANSPARENT_SHADOW_EVAL_CACHE_MISS) {
+      integrator_shadow_path_cache_miss(state, DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW);
+      return;
+    }
+    if (result == TRANSPARENT_SHADOW_EVAL_OPAQUE) { integrator_shadow_path_terminate(...); return; }
+
+`TRANSPARENT_SHADOW_EVAL_CACHE_MISS` is a 5.x addition, part of the same shader-cache
+mechanism as the `SD_CACHE_MISS` check in `light_sample_shader_eval_forward`. If that path
+always reports a miss - because nothing in Rhino's integration ever services the cache and
+re-queues the work - every shadow ray returns there and direct lighting silently
+disappears.
+
+**That is a hypothesis, not a measurement.** What is measured is only that
+`film_write_direct_light` never runs. The probe that settles it counts entries to
+`integrator_shade_shadow` and which of its three exits each takes, in both trees. Given how
+many strong-looking readings in this section have been wrong, it should be measured before
+being believed or acted on.
+
 
 One difference found while looking, not yet shown to matter: `Scene::has_shadow_catcher`
 here skips objects whose geometry `is_light()`, which shipping does not do. It is an

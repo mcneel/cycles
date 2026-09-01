@@ -181,4 +181,20 @@ inline void record_scw(int site, bool guard, uint32_t flag, float contribution)
   snprintf(key, sizeof(key), "scw%d %s", site, guard ? "write" : "skip ");
   record(key, flag, 0, 0, contribution, 0.0f, 0.0f, 0.0f);
 }
+
+/* The four film_write_combined_pass call sites.
+ *
+ * A and B are in film_write_direct_light (the ambient occlusion branch and the main one),
+ * C is film_write_volume_emission, D is film_write_surface_emission. Only that route
+ * reaches film_write_shadow_catcher, and its write never fires in the 5.2 branch, so the
+ * question is which of these four the shadow catcher path takes in each build.
+ *
+ * Slots: mis -> contribution.
+ */
+inline void record_cp(char site, uint32_t flag, float contribution)
+{
+  char key[64];
+  snprintf(key, sizeof(key), "cp%c", site);
+  record(key, flag, 0, 0, contribution, 0.0f, 0.0f, 0.0f);
+}
 }  // namespace rhino_bg_tally
