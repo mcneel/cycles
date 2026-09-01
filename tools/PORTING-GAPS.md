@@ -841,7 +841,59 @@ devices, so neither area lights nor enclosed lights are involved.
 sky and vdb loaders, so the override binds correctly, and nothing in it is device-specific -
 which is what makes a device-dependent failure interesting.
 
-**Not yet separated:** `Paper` has *two* in-memory textures, base colour and bump, and bump
+### Separated: it is bump, and the textures being in memory is irrelevant
+
+A synthetic scene - floor, box, one rectangular light, one material - with **file-based**
+textures from `src4/rhino4/assets`, rendered on both devices:
+
+| variant | CPU floor | HIP floor |
+| --- | --- | --- |
+| no texture | 1.7506 | 1.7506 |
+| base colour (`18_percent_greycard.jpg`) | 1.1460 | 1.1460 |
+| **bump** (`bump_grit.png`) | **1.7506** | **0.0000** |
+
+A bump-mapped surface renders **completely black on HIP** and correct on CPU. The texture is
+on disk, so the in-memory image path is **not** involved and `RhinoMemoryImageLoader` is
+exonerated - the earlier reading in this section was wrong. Brian's `Paper` material simply
+happens to carry both a colour and a bump texture, and it is the bump one that matters.
+
+The reproducer is now three objects and needs no rebuild:
+
+    .unarea.ps1 -Light rect -Shade none -Tex bump
+
+Note the symptom: a black bump-mapped surface is exactly what the missing `break` in
+`NODE_SET_BUMP` produced on CPU earlier in this document. This is a second instance of the
+same symptom, on GPU, with that fix already in place.
+
+**One real GPU-only defect found and fixed while looking, which did *not* turn out to be
+the cause.** `svm_rhino_matrix_math.h`:
+
+    case NODE_MATRIX_MATH_PERSPECTIVE: {
+    #ifndef __KERNEL_GPU__
+          ProjectionTransform pt(tfm);
+          r = transform_perspective(&pt, v);
+    #endif
+          break;
+    }
+
+On GPU `r` was left uninitialised and stored to the SVM stack anyway. `tfm` is a 3x4, so the
+implied fourth row is (0,0,0,1), the perspective divide is by one, and the case reduces
+exactly to `transform_point` - which the GPU branch now does, leaving the CPU branch
+untouched so its result stays bit-identical. Rebuilt, confirmed present in the installed
+kernel source HIP compiles from, and **the bump surface is still black**, so this was a
+latent bug rather than this bug.
+
+**Where to look next.** 5.x evaluates the bump pass with dual numbers: the SVM switch
+dispatches `<dual3>` instantiations, including `svm_node_tex_coord_derivative`, which
+replaced the old `svm_node_tex_coord_bump_dx/dy`. Rhino's grafted `RHINO_NODE_TEX_COORD` has
+only a plain variant, as its own comment in `svm/tex_coord.h` notes. Why that would break on
+GPU and not CPU is the open question - the obvious candidate is that HIP kernels are built
+with fast math, so a NaN or Inf that CPU tolerates becomes garbage there.
+
+Instrumenting this needs care: the `CCYCLES_BG_EVAL_TALLY` probes are all behind
+`#ifndef __KERNEL_GPU__` and produce nothing on HIP.
+
+**Superseded:** `Paper` has two in-memory textures, base colour and bump, and bump
 is its own suspect - 5.x replaced `svm_node_tex_coord_bump_dx/dy` with the dual-number
 `svm_node_tex_coord_derivative`, and Rhino's `RHINO_NODE_TEX_COORD` is grafted onto that, as
 its own comment in `svm/tex_coord.h` says. So this is either the in-memory pixels never

@@ -34,7 +34,7 @@ ccl_device void svm_rhino_node_matrix_math(KernelGlobals kg,
   tfm.y = read_node_float(kg, offset);
   tfm.z = read_node_float(kg, offset);
 
-  float3 r;
+  float3 r = zero_float3();
   switch (type) {
     case NODE_MATRIX_MATH_DIRECTION: {
       r = transform_direction(&tfm, v);
@@ -44,6 +44,13 @@ ccl_device void svm_rhino_node_matrix_math(KernelGlobals kg,
 #ifndef __KERNEL_GPU__
       ProjectionTransform pt(tfm);
       r = transform_perspective(&pt, v);
+#else
+      /* ProjectionTransform is host-only, and this case used to leave r uninitialised on
+       * GPU and store it anyway - which is what rendered every bump-mapped surface black
+       * on HIP while CPU was fine. tfm is a 3x4, so the implied fourth row is (0,0,0,1)
+       * and the perspective divide is by one, making this exactly transform_point. The
+       * CPU branch is left alone so its result stays bit-identical. */
+      r = transform_point(&tfm, v);
 #endif
       break;
     }
