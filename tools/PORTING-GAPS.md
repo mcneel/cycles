@@ -932,7 +932,23 @@ while 5.x pairs every differentiable node with one. Rhino's nodes therefore do n
 participate in automatic differentiation at all, which is a real porting gap whether or not
 it is this bug.
 
-The next bisect is to no-op Rhino's procedural nodes on GPU one at a time - starting with
+**Controlled for the file, which was a flaw in the first version of this test.** The colour
+variant used a `.jpg` and the bump variant a `.png`, so "colour works, bump fails" could
+have been the image rather than bump. Using the *same* `bump_grit.png` as a base colour
+renders identically on CPU and HIP (0.5376 both), so the file and its format are exonerated
+and the result stands: it is bump.
+
+Also excluded since: neutralising `RHINO_NODE_TEX_COORD` on GPU, with its node-stream
+decoding left intact so `offset` still advances, leaves the surface black. So that node is
+not the one corrupting things.
+
+Full list of what has been ruled out for this bug, each by a build and a measurement: the
+in-memory image path, area lights, the light tree, the `matrix_math` uninitialised value
+(a real bug, fixed, unrelated), `-ffast-math`, an uninitialised SVM stack, the bump normal
+computation in `svm_node_set_bump`, the bump-enabled GPU kernel variant, the texture file
+and format, and `RHINO_NODE_TEX_COORD`.
+
+The next bisect is to no-op the remaining Rhino procedural nodes on GPU one at a time - starting with
 `RHINO_NODE_TEX_COORD` and `RHINO_NODE_MATRIX_MATH`, both of which a bitmap texture goes
 through - and see which one clears the black.
 
