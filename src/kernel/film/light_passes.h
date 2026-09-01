@@ -254,6 +254,12 @@ ccl_device bool film_write_shadow_catcher(KernelGlobals kg,
   }
 
   /* Shadow catcher pass. */
+#ifndef __KERNEL_GPU__
+  rhino_bg_tally::record_scw(1,
+                             kernel_shadow_catcher_is_object_pass(path_flag),
+                             path_flag,
+                             average(contribution));
+#endif
   if (kernel_shadow_catcher_is_object_pass(path_flag)) {
     film_write_pass_spectrum(buffer + kernel_data.film.pass_shadow_catcher, contribution);
     return true;
@@ -291,6 +297,12 @@ ccl_device bool film_write_shadow_catcher_transparent(KernelGlobals kg,
   }
 
   /* Shadow catcher pass. */
+#ifndef __KERNEL_GPU__
+  rhino_bg_tally::record_scw(2,
+                             kernel_shadow_catcher_is_object_pass(path_flag),
+                             path_flag,
+                             average(contribution));
+#endif
   if (kernel_shadow_catcher_is_object_pass(path_flag)) {
     /* NOTE: The transparency of the shadow catcher pass is ignored. It is not needed for the
      * calculation and the alpha channel of the pass contains numbers of samples contributed to a

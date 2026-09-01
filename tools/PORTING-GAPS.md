@@ -618,24 +618,48 @@ output returns, keyed by output type and path flag. `IsReflectionRay` matches ro
 `IsDiffuseRay` matches too. So the shadow catcher shader's `Fac` is the same in both builds
 and this lead is closed.
 
-### What is actually left
+### The missing write: the shadow catcher gets no direct light here
 
-Everything on the path has now been measured identical: the kernel functions, the scene
-flags, the allocated passes, the path flags, and the light path outputs the shadow catcher
-shader gates on. The one measured difference remains `PASS_SHADOW_CATCHER` being written in
-shipping and staying zero here.
+Both `film_write_pass_spectrum(pass_shadow_catcher, contribution)` sites were instrumented
+in both trees, recording the guard's result next to the contribution:
 
-The write is `film_write_pass_spectrum(buffer + kernel_data.film.pass_shadow_catcher,
-contribution)` inside `film_write_shadow_catcher_transparent`, guarded by
-`kernel_shadow_catcher_is_object_pass(path_flag)`, and there are two such sites in each
-tree. The next probe is a tally at those two sites recording whether the guard fires at all
-here and, if it does, what `contribution` is - which separates "the write never happens"
-from "the write happens with zero", and those point at very different causes.
+| site | shipping | this branch |
+| --- | --- | --- |
+| `scw1 write` | 81064 calls, contribution **0.6114** | **never fires** |
+| `scw2 write` | 81064 calls, contribution 0.0000 | 81040 calls, contribution 0.0000 |
 
-A caution for whoever continues: four successive hypotheses in this section were disproved
-by the next measurement - glossy/diffuse evaluations, the background sampled as a light,
-`film_get_scale_and_scale_exposure`, and now the light path gating. Each looked strong from
-reading code. Measure before believing.
+So it is not "the write happens with zero" - site 2 does that in both. It is that **site 1
+never happens here at all**, and site 1 is the one carrying light.
+
+The two sites sit in different functions reached by different routes:
+
+  * `scw1` is in `film_write_shadow_catcher`, called from `film_write_combined_pass` -
+    the direct light and surface emission route.
+  * `scw2` is in `film_write_shadow_catcher_transparent`, called from
+    `film_write_combined_transparent_pass`.
+
+`film_write_combined_pass` has the same four callers in both trees, and
+`Scene::device_update` runs the managers in the same order either side (objects, geometry,
+object flags, lights, integrator), so the integrator snapshots `has_shadow_catcher` after
+objects are loaded in both. The probe also reports `has_shadow_catcher=1` here and the
+shadow catcher passes are allocated, so `film_write_shadow_catcher` would not be returning
+at its `!kernel_data.integrator.has_shadow_catcher` early out.
+
+What that leaves, measured: **the ground plane receives no direct light contribution in
+this branch**, so nothing ever reaches `film_write_combined_pass` on a shadow catcher path,
+`PASS_SHADOW_CATCHER` stays zero, `film_calculate_shadow_catcher` divides by zero and falls
+back to one, `alpha_matte` becomes zero, and the background is composited at full
+brightness instead of a third.
+
+The next probe follows directly: tally which of the four `film_write_combined_pass` callers
+fires in each build - `film_write_direct_light`, `film_write_surface_emission` and the
+volume pair - and with what contribution and path flags. That says whether the ground plane
+is receiving no light at all or is being written through a different route here.
+
+One difference found while looking, not yet shown to matter: `Scene::has_shadow_catcher`
+here skips objects whose geometry `is_light()`, which shipping does not do. It is an
+upstream 5.x change, and since the probe still reports 1 it is not the cause, but it is
+worth remembering if the object set ever changes.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved

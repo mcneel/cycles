@@ -165,4 +165,20 @@ inline void record_lp(int path_type, uint32_t flag, uint32_t visibility, float i
   snprintf(key, sizeof(key), "lp t=%02d vis=0x%04x", path_type, visibility);
   record(key, flag, 0, 0, info, 0.0f, 0.0f, 0.0f);
 }
+
+/* The two film_write_pass_spectrum(pass_shadow_catcher, ...) sites.
+ *
+ * PASS_SHADOW_CATCHER is written in shipping and stays zero in the 5.2 branch, while every
+ * function, flag and light path output on the way there measures identical. Recording the
+ * guard's result alongside the contribution separates the two remaining possibilities: the
+ * guard never firing, or firing with a zero contribution.
+ *
+ * Slots: mis -> contribution.
+ */
+inline void record_scw(int site, bool guard, uint32_t flag, float contribution)
+{
+  char key[64];
+  snprintf(key, sizeof(key), "scw%d %s", site, guard ? "write" : "skip ");
+  record(key, flag, 0, 0, contribution, 0.0f, 0.0f, 0.0f);
+}
 }  // namespace rhino_bg_tally
