@@ -128,4 +128,22 @@ inline void record_matte(const char *site,
   snprintf(key, sizeof(key), "%s res=%.3f a=%.3f am=%.3f", site, result, alpha, alpha_matte);
   record(key, 0u, 0, 0, scale, scale_exposure, background_scale_exposure, color_background);
 }
+
+/* The shadow catcher term is combined_no_matte / color_catcher, and that ratio is what
+ * differs between the trees - a third against one. Reading it here rather than through
+ * CCYCLES_PASS_PROBE is deliberate: that probe looks passes up by name via
+ * get_pass_pixels, and every pass except combined and depth has an empty name, so it
+ * reports the shadow catcher passes "unavailable" when they are in fact allocated. Here
+ * the kernel has already resolved them by type through kfilm_convert->pass_*.
+ *
+ * Slots: mis -> color_catcher, throughput -> color_combined, value -> color_matte,
+ * alpha -> num_samples.
+ */
+inline void record_sc(
+    float result, float num_samples, float catcher, float combined, float matte)
+{
+  char key[64];
+  snprintf(key, sizeof(key), "sc res=%.3f n=%.0f", result, num_samples);
+  record(key, 0u, 0, 0, catcher, combined, matte, num_samples);
+}
 }  // namespace rhino_bg_tally

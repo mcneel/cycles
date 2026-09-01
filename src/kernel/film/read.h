@@ -615,6 +615,13 @@ film_calculate_shadow_catcher(const ccl_global KernelFilmConvert *ccl_restrict k
    * Note that we treat shadow catcher as straight alpha here because alpha got canceled out
    * during the division. */
   const float3 pixel = (1.0f - alpha) * one_float3() + alpha * shadow_catcher;
+#ifndef __KERNEL_GPU__
+  rhino_bg_tally::record_sc(average(pixel),
+                            num_samples,
+                            average(color_catcher),
+                            average(color_combined),
+                            average(color_matte));
+#endif
 
   return pixel;
 }

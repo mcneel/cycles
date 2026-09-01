@@ -559,19 +559,56 @@ well:
 `PATH_RAY_ALL_VISIBILITY`, this branch asserts the equivalent instead, which is an upstream
 5.x change and not a behaviour difference.
 
-### What is left
+### Root cause: PASS_SHADOW_CATCHER is never written here
 
-Kernel functions identical, scene flags identical, passes identical, path flags identical -
-and yet `film_calculate_shadow_catcher` returns 0.333 against 1.000. The only thing left is
-the **contents** of the three shadow catcher passes at a background pixel:
-`combined_no_matte / color_catcher` is a third in shipping and one here.
+`film_calculate_shadow_catcher` was instrumented in both trees to log the three pass values
+its ratio is built from, read at the offsets the kernel has already resolved by pass type.
+(`CCYCLES_PASS_PROBE` cannot do this: it looks passes up by name via `get_pass_pixels`, and
+every pass but `combined` and `depth` has an empty name, so it calls them unavailable when
+they are allocated.)
 
-The probe that answers it reads `PASS_SHADOW_CATCHER`, `PASS_SHADOW_CATCHER_MATTE`,
-`PASS_SHADOW_CATCHER_SAMPLE_COUNT` and `PASS_COMBINED` at one sky pixel in both builds.
-Note the existing `CCYCLES_PASS_PROBE` cannot do it as written: it looks passes up by name
-with `tile.get_pass_pixels`, and every pass except `combined` and `depth` has an empty
-name, so it reports them "unavailable" when they are in fact allocated. It needs to address
-them by type.
+`color_catcher`, by shadow catcher sample count:
+
+| n | shipping | this branch |
+| --- | --- | --- |
+| 1 | 0.6165 | **0.0000** |
+| 2 | 1.6288 | **0.0000** |
+| 3 | 1.8337 | **0.0000** |
+| 4 | 3.2338 | **0.0000** |
+| 5 | 3.0237 | **0.0000** |
+
+**`PASS_SHADOW_CATCHER` is populated in shipping and entirely empty here.** The pass is
+allocated - it is type 53 in the probe's list - it simply never receives a non-zero
+contribution. With `color_catcher` zero, `safe_divide_shadow_catcher` falls back to one, so
+`shadow_catcher` is 1, `alpha_matte` is 0, and the composite passes the background through
+at full brightness. Shipping's non-zero value gives 0.333. That is the whole difference.
+
+Both write sites and the `kernel_shadow_catcher_is_object_pass` predicate guarding them are
+identical between the trees, so the code is not what differs - the contributions arriving
+there are zero, meaning the shadow catcher object path carries no light here.
+
+### The lead: the shadow catcher shader's light path gating
+
+`RhinoFullNxt.cs` builds the shadow catcher network itself:
+
+    lightpath.outs.IsReflectionRay.Connect(pathadder.ins.Value1);
+    lightpath.outs.IsDiffuseRay.Connect(pathadder.ins.Value2);
+    pathadder.outs.Value.Connect(refl_flipper.ins.Fac);
+    lastclosure.Connect(refl_flipper.ins.Closure1);
+    noshow.outs.BSDF.Connect(refl_flipper.ins.Closure2);
+
+`pathadder` is a clamped add, and `Closure2` is a **transparent** BSDF. So `Fac` of 1 makes
+the ground plane invisible and contributing nothing; `Fac` of 0 keeps the real shader.
+
+In 5.x those `LightPath` outputs answer from `path_visibility`, not `path_flag` - the same
+change that produced the clipping plane and `NODE_TEXCO_WINDOW` bugs fixed earlier in this
+document. If `IsReflectionRay` or `IsDiffuseRay` now read 1 where 3.5 read 0 on the shadow
+catcher object pass path, the plane turns transparent exactly where it should be
+accumulating into `PASS_SHADOW_CATCHER`, which is precisely the measurement above.
+
+Testing it is direct: tap those two outputs on the shadow catcher's own shader, or force
+`refl_flipper.Fac` to zero and see whether `color_catcher` becomes non-zero and the
+background drops to a third.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
