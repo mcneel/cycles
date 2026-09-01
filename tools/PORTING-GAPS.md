@@ -525,15 +525,53 @@ And that is where the kernel stops being the answer. `film_calculate_shadow_catc
 `integrator/shadow_catcher.h` differs only in includes and parameter types - no logic
 change anywhere in the split.
 
-**So the remaining difference is in scene and pass setup, not in Cycles.** The things to
-compare next are `kernel_data.integrator.has_shadow_catcher`, whether Rhino's ground plane
-object carries the shadow catcher flag in each build, and which passes `Film::update_passes`
-actually allocates. That is a RhinoCycles and `scene/` question, and it is where this should
-be picked up.
+**So the remaining difference is not in the Cycles kernel.** But it is not in the scene
+setup either, which the next round checked and cleared.
 
-Worth keeping in mind while doing so: `use_approximate_shadow_catcher_background` selects
-the composite branch that these numbers came from, and the ground plane is what makes the
-scene have a shadow catcher at all - both builds log `ApplyGroundPlaneChanges`.
+### The scene setup matches too
+
+`CCYCLES_PASS_PROBE` (with `CCYCLES_DIAG_LOG`) reports the scene-side state at the last
+sample. For this branch:
+
+    probe: approx_shadow_catcher=1 background_transparent=0
+    probe: has_shadow_catcher=1 passes=10
+
+and all ten passes are allocated, including the complete shadow catcher set -
+`PASS_SHADOW_CATCHER` (53), `PASS_SHADOW_CATCHER_SAMPLE_COUNT` (54),
+`PASS_SHADOW_CATCHER_MATTE` (55), `PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT` (47),
+`PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT` (46), alongside `PASS_COMBINED`,
+`PASS_BACKGROUND`, `PASS_DEPTH`, `PASS_ADAPTIVE_AUX_BUFFER` and `PASS_SAMPLE_COUNT`.
+
+So the scene does have a shadow catcher here, it is the ground plane, the approximate
+background composite is on, the background is not transparent, and every pass the
+composite needs exists. None of those is the difference.
+
+Decoding the recorded path flags with each tree's own enum confirms the paths match as
+well:
+
+| | shipping | this branch |
+| --- | --- | --- |
+| camera eval | `CAMERA, MIS_SKIP, SHADOW_CATCHER_BACKGROUND, SHADOW_CATCHER_HIT, SHADOW_CATCHER_PASS, TRANSPARENT_BACKGROUND` | identical apart from `CAMERA`, which 5.x deleted from `PathRayFlag` |
+| continuation 1 | `DIFFUSE, DIFFUSE_ANCESTOR, REFLECT, SHADOW_CATCHER_HIT, SHADOW_CATCHER_PASS, SURFACE_PASS` | identical apart from `DIFFUSE`, which moved to the visibility mask |
+| continuation 2 | `DIFFUSE, DIFFUSE_ANCESTOR, REFLECT, SHADOW_CATCHER_HIT, SINGLE_PASS_DONE, SURFACE_PASS` | same |
+
+`Object::visibility_for_tracing` also matches: shipping masks with
+`PATH_RAY_ALL_VISIBILITY`, this branch asserts the equivalent instead, which is an upstream
+5.x change and not a behaviour difference.
+
+### What is left
+
+Kernel functions identical, scene flags identical, passes identical, path flags identical -
+and yet `film_calculate_shadow_catcher` returns 0.333 against 1.000. The only thing left is
+the **contents** of the three shadow catcher passes at a background pixel:
+`combined_no_matte / color_catcher` is a third in shipping and one here.
+
+The probe that answers it reads `PASS_SHADOW_CATCHER`, `PASS_SHADOW_CATCHER_MATTE`,
+`PASS_SHADOW_CATCHER_SAMPLE_COUNT` and `PASS_COMBINED` at one sky pixel in both builds.
+Note the existing `CCYCLES_PASS_PROBE` cannot do it as written: it looks passes up by name
+with `tile.get_pass_pixels`, and every pass except `combined` and `depth` has an empty
+name, so it reports them "unavailable" when they are in fact allocated. It needs to address
+them by type.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved
