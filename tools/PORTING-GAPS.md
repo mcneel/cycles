@@ -883,6 +883,22 @@ untouched so its result stays bit-identical. Rebuilt, confirmed present in the i
 kernel source HIP compiles from, and **the bump surface is still black**, so this was a
 latent bug rather than this bug.
 
+**Fast math is not the cause.** HIP kernels really are built with `-ffast-math`
+(`src/device/hip/device_impl.cpp`) while the CPU kernel is not, so it was the obvious
+asymmetry. `CCYCLES_HIP_NO_FAST_MATH=1` now drops it, and the bump surface is still exactly
+0.0000 on HIP:
+
+| | near patch | far patch |
+| --- | --- | --- |
+| CPU | 1.7506 | 1.4666 |
+| HIP, fast math | 0.0000 | 0.0000 |
+| HIP, `-fno-fast-math` | 0.0000 | 0.0000 |
+
+Worth knowing if you reuse that switch: the fatbin cache key is
+`md5(source + common_cflags)` and does **not** cover the `options` string, so changing the
+flag alone reuses a cached fatbin and the switch appears to do nothing. It is folded into
+the key here for that reason.
+
 **Where to look next.** 5.x evaluates the bump pass with dual numbers: the SVM switch
 dispatches `<dual3>` instantiations, including `svm_node_tex_coord_derivative`, which
 replaced the old `svm_node_tex_coord_bump_dx/dy`. Rhino's grafted `RHINO_NODE_TEX_COORD` has

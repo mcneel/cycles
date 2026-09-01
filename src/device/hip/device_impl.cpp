@@ -260,10 +260,23 @@ string HIPDevice::compile_kernel(const uint kernel_features, const char *name, c
    * compiler command line arguments makes sure fatbin gets re-built.
    */
   string common_cflags = compile_kernel_get_common_cflags(kernel_features);
-  const string kernel_md5 = util_md5_string(source_md5 + common_cflags);
+
+  /* TEMPORARY diagnostic. HIP kernels are built with -ffast-math and the CPU kernel is
+   * not, which is the obvious asymmetry behind bump-mapped surfaces rendering black on HIP
+   * while CPU is correct. CCYCLES_HIP_NO_FAST_MATH=1 drops the flag.
+   *
+   * It has to go into the fatbin cache key too: that key is md5(source + common_cflags)
+   * and does not cover `options`, so without this a previously compiled fatbin is reused
+   * and the switch silently does nothing. */
+  const char *hip_no_fast = getenv("CCYCLES_HIP_NO_FAST_MATH");
+  const bool drop_fast_math = (hip_no_fast != nullptr && hip_no_fast[0] == '1');
+  const string fast_math_flag = drop_fast_math ? string(" -fno-fast-math")
+                                               : string(" -ffast-math");
+  const string kernel_md5 = util_md5_string(source_md5 + common_cflags + fast_math_flag);
 
   const char *const kernel_ext = "genco";
-  std::string options = "-Wno-parentheses-equality -Wno-unused-value -ffast-math -std=c++17";
+  std::string options = "-Wno-parentheses-equality -Wno-unused-value -std=c++17";
+  options.append(fast_math_flag);
 
 #  ifndef NDEBUG
   options.append(" -save-temps");
