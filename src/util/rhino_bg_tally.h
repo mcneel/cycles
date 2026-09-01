@@ -197,4 +197,19 @@ inline void record_cp(char site, uint32_t flag, float contribution)
   snprintf(key, sizeof(key), "cp%c", site);
   record(key, flag, 0, 0, contribution, 0.0f, 0.0f, 0.0f);
 }
+
+/* integrator_shade_shadow: entry and which exit each shadow ray takes.
+ *
+ * film_write_direct_light never runs in the 5.2 branch, and this is its only caller, so
+ * every shadow ray must be leaving by one of the earlier exits. 5.x adds a fourth,
+ * TRANSPARENT_SHADOW_EVAL_CACHE_MISS, which shipping does not have.
+ *
+ *   E entry   M cache miss   O opaque   N more intersections   W wrote direct light
+ */
+inline void record_ss(char exit_code)
+{
+  char key[32];
+  snprintf(key, sizeof(key), "ss_%c", exit_code);
+  record(key, 0u, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f);
+}
 }  // namespace rhino_bg_tally

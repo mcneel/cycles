@@ -4,6 +4,10 @@
 
 #pragma once
 
+#ifndef __KERNEL_GPU__
+#  include "util/rhino_bg_tally.h"
+#endif
+
 #include "kernel/integrator/guiding.h"
 #include "kernel/integrator/shade_volume.h"
 #include "kernel/integrator/surface_shader.h"
@@ -266,6 +270,9 @@ ccl_device void integrator_shade_shadow(KernelGlobals kg,
                                         IntegratorShadowState state,
                                         ccl_global float *ccl_restrict render_buffer)
 {
+#ifndef __KERNEL_GPU__
+  rhino_bg_tally::record_ss('E');
+#endif
   PROFILING_INIT(kg, PROFILING_SHADE_SHADOW_SETUP);
   const uint packed_num_hits = INTEGRATOR_STATE(state, shadow_path, packed_num_hits);
 
@@ -274,10 +281,16 @@ ccl_device void integrator_shade_shadow(KernelGlobals kg,
   const TransparentShadowEvalResult result = integrate_transparent_shadow(
       kg, state, packed_num_hits);
   if (result == TRANSPARENT_SHADOW_EVAL_CACHE_MISS) {
+#ifndef __KERNEL_GPU__
+    rhino_bg_tally::record_ss('M');
+#endif
     integrator_shadow_path_cache_miss(state, DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW);
     return;
   }
   if (result == TRANSPARENT_SHADOW_EVAL_OPAQUE) {
+#ifndef __KERNEL_GPU__
+    rhino_bg_tally::record_ss('O');
+#endif
     integrator_shadow_path_terminate(state, DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW);
     return;
   }
@@ -285,12 +298,18 @@ ccl_device void integrator_shade_shadow(KernelGlobals kg,
 
   if (shadow_intersections_has_remaining(packed_num_hits)) {
     /* More intersections to find, continue shadow ray. */
+#ifndef __KERNEL_GPU__
+    rhino_bg_tally::record_ss('N');
+#endif
     integrator_shadow_path_next(
         state, DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW, DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW);
     return;
   }
 
   guiding_record_direct_light(kg, state);
+#ifndef __KERNEL_GPU__
+  rhino_bg_tally::record_ss('W');
+#endif
   film_write_direct_light(kg, state, render_buffer);
   integrator_shadow_path_terminate(state, DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW);
 }

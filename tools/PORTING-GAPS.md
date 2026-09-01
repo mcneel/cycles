@@ -690,7 +690,23 @@ always reports a miss - because nothing in Rhino's integration ever services the
 re-queues the work - every shadow ray returns there and direct lighting silently
 disappears.
 
-**That is a hypothesis, not a measurement.** What is measured is only that
+**Measured since:** `integrator_shade_shadow` was instrumented at entry and at every exit
+in both trees. This branch produces **no rows at all - not even the entry marker** - in a
+run where the same tally emitted 226 `approx`, 62 `lp` and 10 `scw2` rows, so the
+instrument was live. The shadow kernel therefore never runs here at all. It is not the
+write failing, and not the cache-miss exit being taken: no shadow ray is ever shaded.
+
+Together with the 376k background evaluations at bounce 1 carrying `DIFFUSE | REFLECT`,
+that means this branch lights the scene purely by BSDF-sampled environment hits, with no
+next-event estimation whatsoever. That is consistent with renders being brighter in places
+(no MIS split of the energy) and noisier, and it fully accounts for `PASS_SHADOW_CATCHER`
+being empty.
+
+Still to measure: the shipping side of the same counters, to confirm the contrast rather
+than infer it, and then why the kernel is never scheduled - whether the shadow paths are
+never queued or the device never dispatches that kernel.
+
+**The cache-miss reading below was a hypothesis, not a measurement, and is now superseded.** What is measured is only that
 `film_write_direct_light` never runs. The probe that settles it counts entries to
 `integrator_shade_shadow` and which of its three exits each takes, in both trees. Given how
 many strong-looking readings in this section have been wrong, it should be measured before
