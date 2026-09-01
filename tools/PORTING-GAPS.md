@@ -483,55 +483,57 @@ camera write discarded by the `PATH_RAY_SHADOW_CATCHER_BACKGROUND` early return.
 
 **Inferred, not yet measured**: that the visible third arrives via the background pass.
 
-### Where the background is finally scaled, and a divergence that is ours
+### It is alpha_matte, and every kernel function in the chain is identical
 
-`film_write_emission_or_background_pass` carries a Rhino patch:
-
-    // 2023-09-28 David E.
-    // The background pass needs its own sample counter in order to scale the pixels
-    // the appropriate amount and to correctly compose the background pass with the
-    // matte pass when doing shadow catching.
-    // Fixes RH-75422.
-    if (pass == kernel_data.film.pass_background) {
-      atomic_fetch_and_add_uint32(
-          (ccl_global uint *)(buffer) + kernel_data.film.pass_shadow_catcher_background_sample_count, 1);
-    }
-
-A second RH-75422 patch sits in `film_write_transparent`, counting transparent background
-samples because otherwise "every time we sample a transparent background it will darken the
-final pixel color". **Both patches are present in both trees**, 14 occurrences of each
-symbol either side, so nothing was dropped in the port.
-
-Tracing which writes reach that counter: the camera group `0xe0009001` has neither
-`SURFACE_PASS` nor `VOLUME_PASS`, so it takes the directly-visible branch, writes the full
-white to `pass_background` and increments the counter. Both continuations have
-`SURFACE_PASS` set together with `SHADOW_CATCHER_HIT`, so they hit the
-`is_shadowcatcher` early return and write no light pass at all. One background pass write
-and one counter increment per sample, then.
-
-The counters are consumed by `film_get_scale_and_scale_exposure` in `kernel/film/read.h`,
-and **that function differs between the two trees**:
+`film_calculate_shadow_catcher_matte_with_shadow` was instrumented in **both** trees,
+recording the composite's terms keyed by the result so pixels with the same outcome
+aggregate. The background cluster in each:
 
 | | shipping | this branch |
 | --- | --- | --- |
-| filter path | `*scale = 1.0f / sample_count` | `*scale = kfilm_convert->scale / sample_count` |
-| otherwise | `*scale = 1.0f` | `*scale = kfilm_convert->scale` |
+| result | 0.333 | 1.000 |
+| `alpha` | 0.000 | 0.000 |
+| `alpha_matte` | **0.667** | **0.000** |
+| `scale` | 0.4399 | 0.4355 |
+| `scale_exposure` | 1.0000 | 1.0000 |
+| `background_scale_exposure` | 0.4399 | 0.4355 |
+| `color_background` | 1.0000 | 1.0000 |
 
-This branch's version carries a long comment about `PASS_SAMPLE_COUNT` being absent with
-adaptive sampling off and an opaque background, and about an out-of-bounds read that made
-`film_calculate_shadow_catcher_matte_with_shadow` return zero for every pixel - so it was
-changed here deliberately, to fix an entirely black render. It is a local divergence, not
-upstream drift, and it sits exactly where the background's final scale is decided.
+`alpha_over = color_matte * alpha + color_background * (1 - alpha_matte)` gives
+`1.0 * (1 - 0.667) = 0.333` and `1.0 * (1 - 0) = 1.0`. So the scales agree to within noise
+and the background colour is 1.0 in both - **the entire difference is `alpha_matte`**. The
+divergence in `film_get_scale_and_scale_exposure` recorded above is real but is *not* the
+cause; that lead is dead.
 
-Which of the two paths is live depends on `pass_use_filter` and on whether
-`pass_sample_count` exists. When it does not, both reduce to the same thing; when it does,
-they do not, and one of them divides by the sample count twice.
+Since `alpha` is 0 in both, `alpha_matte = 1 - saturate(average(shadow_catcher))`, so
+`film_calculate_shadow_catcher` returns 0.333 in shipping and 1.000 here. It returns
+exactly one from
 
-**The next probe is runtime values, not more reading**: print `scale`,
-`scale_exposure`, `background_scale_exposure`, `sample_count`, and the three shadow catcher
-counters from `film_get_scale_and_scale_exposure`, in both trees, for one background pixel.
-That is a single instrumented build each and it either confirms this function as the source
-of the residual factor or rules it out.
+    /* If there is no shadow catcher object in this pixel, there is no modification of the
+     * light needed, so return one. */
+    if (num_samples == 0.0f) {
+      return one_float3();
+    }
+
+so `pass_shadow_catcher_sample_count` is **zero on sky pixels here and non-zero in
+shipping**. Shipping performs the shadow catcher split on background pixels; this branch
+does not.
+
+And that is where the kernel stops being the answer. `film_calculate_shadow_catcher`,
+`film_calculate_shadow_catcher_matte_with_shadow` and
+`film_write_shadow_catcher_bounce_data` are byte-identical between the trees, and
+`integrator/shadow_catcher.h` differs only in includes and parameter types - no logic
+change anywhere in the split.
+
+**So the remaining difference is in scene and pass setup, not in Cycles.** The things to
+compare next are `kernel_data.integrator.has_shadow_catcher`, whether Rhino's ground plane
+object carries the shadow catcher flag in each build, and which passes `Film::update_passes`
+actually allocates. That is a RhinoCycles and `scene/` question, and it is where this should
+be picked up.
+
+Worth keeping in mind while doing so: `use_approximate_shadow_catcher_background` selects
+the composite branch that these numbers came from, and the ground plane is what makes the
+scene have a shadow catcher at all - both builds log `ApplyGroundPlaneChanges`.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved

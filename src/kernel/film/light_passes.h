@@ -4,6 +4,10 @@
 
 #pragma once
 
+#ifndef __KERNEL_GPU__
+#  include "util/rhino_bg_tally.h"
+#endif
+
 #include "kernel/film/write.h"
 
 #include "kernel/integrator/shadow_catcher.h"
@@ -674,6 +678,16 @@ ccl_device_inline void film_write_background(KernelGlobals kg,
     film_write_combined_transparent_pass(
         kg, path_visibility, path_flag, sample, contribution, transparent, buffer);
   }
+#ifndef __KERNEL_GPU__
+  rhino_bg_tally::record(is_transparent_background_ray ? "fw:transp" : "fw:combined",
+                         path_flag,
+                         INTEGRATOR_STATE(state, path, bounce),
+                         INTEGRATOR_STATE(state, path, transparent_bounce),
+                         0.0f,
+                         average(INTEGRATOR_STATE(state, path, throughput)),
+                         average(contribution),
+                         transparent);
+#endif
   film_write_emission_or_background_pass(kg,
                                          state,
                                          contribution,
