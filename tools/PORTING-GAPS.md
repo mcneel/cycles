@@ -587,9 +587,9 @@ Both write sites and the `kernel_shadow_catcher_is_object_pass` predicate guardi
 identical between the trees, so the code is not what differs - the contributions arriving
 there are zero, meaning the shadow catcher object path carries no light here.
 
-### The lead: the shadow catcher shader's light path gating
+### The light path gating is NOT the cause
 
-`RhinoFullNxt.cs` builds the shadow catcher network itself:
+The obvious suspect was Rhino's shadow catcher network in `RhinoFullNxt.cs`:
 
     lightpath.outs.IsReflectionRay.Connect(pathadder.ins.Value1);
     lightpath.outs.IsDiffuseRay.Connect(pathadder.ins.Value2);
@@ -597,18 +597,45 @@ there are zero, meaning the shadow catcher object path carries no light here.
     lastclosure.Connect(refl_flipper.ins.Closure1);
     noshow.outs.BSDF.Connect(refl_flipper.ins.Closure2);
 
-`pathadder` is a clamped add, and `Closure2` is a **transparent** BSDF. So `Fac` of 1 makes
-the ground plane invisible and contributing nothing; `Fac` of 0 keeps the real shader.
+`pathadder` is a clamped add and `Closure2` is a transparent BSDF, so a `Fac` of one makes
+the ground plane contribute nothing. Since 5.x answers these outputs from the visibility
+mask rather than the path flag - the change behind the clipping plane and
+`NODE_TEXCO_WINDOW` bugs above - it looked likely that they now read one where 3.5 read
+zero.
 
-In 5.x those `LightPath` outputs answer from `path_visibility`, not `path_flag` - the same
-change that produced the clipping plane and `NODE_TEXCO_WINDOW` bugs fixed earlier in this
-document. If `IsReflectionRay` or `IsDiffuseRay` now read 1 where 3.5 read 0 on the shadow
-catcher object pass path, the plane turns transparent exactly where it should be
-accumulating into `PASS_SHADOW_CATCHER`, which is precisely the measurement above.
+**They do not.** `svm_node_light_path` was instrumented in both trees to log what each
+output returns, keyed by output type and path flag. `IsReflectionRay` matches row for row:
 
-Testing it is direct: tap those two outputs on the shadow catcher's own shader, or force
-`refl_flipper.Fac` to zero and see whether `color_catcher` becomes non-zero and the
-background drops to a third.
+| path | shipping | this branch |
+| --- | --- | --- |
+| `SHADOW_CATCHER_HIT` | 0.0 | 0.0 |
+| `SHADOW_CATCHER_HIT, PASS` | 0.0 | 0.0 |
+| `SHADOW_CATCHER_BACKGROUND, HIT, PASS` | 0.0 | 0.0 |
+| `REFLECT, SURFACE_PASS` (376k calls) | 1.0 | 1.0 |
+| `REFLECT, HIT, SURFACE_PASS` | 1.0 | 1.0 |
+| `REFLECT, HIT, PASS, SURFACE_PASS` | 1.0 | 1.0 |
+
+`IsDiffuseRay` matches too. So the shadow catcher shader's `Fac` is the same in both builds
+and this lead is closed.
+
+### What is actually left
+
+Everything on the path has now been measured identical: the kernel functions, the scene
+flags, the allocated passes, the path flags, and the light path outputs the shadow catcher
+shader gates on. The one measured difference remains `PASS_SHADOW_CATCHER` being written in
+shipping and staying zero here.
+
+The write is `film_write_pass_spectrum(buffer + kernel_data.film.pass_shadow_catcher,
+contribution)` inside `film_write_shadow_catcher_transparent`, guarded by
+`kernel_shadow_catcher_is_object_pass(path_flag)`, and there are two such sites in each
+tree. The next probe is a tally at those two sites recording whether the guard fires at all
+here and, if it does, what `contribution` is - which separates "the write never happens"
+from "the write happens with zero", and those point at very different causes.
+
+A caution for whoever continues: four successive hypotheses in this section were disproved
+by the next measurement - glossy/diffuse evaluations, the background sampled as a light,
+`film_get_scale_and_scale_exposure`, and now the light path gating. Each looked strong from
+reading code. Measure before believing.
 
 
 Two cautions for whoever continues. The absolute numbers are read out of the saved

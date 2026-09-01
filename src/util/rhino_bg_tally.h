@@ -146,4 +146,23 @@ inline void record_sc(
   snprintf(key, sizeof(key), "sc res=%.3f n=%.0f", result, num_samples);
   record(key, 0u, 0, 0, catcher, combined, matte, num_samples);
 }
+
+/* What svm_node_light_path actually returns, per output and per path.
+ *
+ * Rhino's shadow catcher shader adds IsReflectionRay and IsDiffuseRay into a clamped add
+ * feeding a MixClosure whose second closure is a transparent BSDF, so a one there makes
+ * the ground plane contribute nothing - and PASS_SHADOW_CATCHER stays empty. 5.x answers
+ * these outputs from the visibility mask rather than the path flag, so the question is
+ * whether they now read one where 3.5 read zero.
+ *
+ * Keyed by output type and visibility, with the path flag in the flag column; the
+ * returned value is the mean in the "mis" slot. Pass 0 for visibility on 3.5, which has
+ * no such mask.
+ */
+inline void record_lp(int path_type, uint32_t flag, uint32_t visibility, float info)
+{
+  char key[64];
+  snprintf(key, sizeof(key), "lp t=%02d vis=0x%04x", path_type, visibility);
+  record(key, flag, 0, 0, info, 0.0f, 0.0f, 0.0f);
+}
 }  // namespace rhino_bg_tally

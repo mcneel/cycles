@@ -4,6 +4,11 @@
 
 #pragma once
 
+#ifndef __KERNEL_GPU__
+/* TEMPORARY, mirror of the shipping instrumentation. */
+#  include "util/rhino_bg_tally.h"
+#endif
+
 #include "kernel/svm/node_types.h"
 #include "kernel/svm/util.h"
 
@@ -102,6 +107,9 @@ ccl_device_noinline void svm_node_light_path(KernelGlobals kg,
       break;
   }
 
+#ifndef __KERNEL_GPU__
+  rhino_bg_tally::record_lp((int)node.path_type, path_flag, (uint32_t)path_visibility, info);
+#endif
   stack_store_float(stack, node.out_offset, info);
 }
 
