@@ -797,6 +797,52 @@ only for this test, so it now takes `path_visibility`; the dispatch in `svm.h` a
 had it in scope. Worth a targeted check of clipping planes and of a gradient background
 under an orthographic camera - neither is covered by the current test models.
 
+## HIP renders an emissive-lit scene far darker than CPU
+
+Same build, same model, same everything but the device. `Brian25YearRhinoGlas` on HIP loses
+the neutral illumination entirely: the emissive panel is still there and the glass still
+shows blue specular, but the ground plane is black, with no diffuse light and no shadow. On
+CPU the floor is lit and gridded and casts a shadow.
+
+Reproduced in the harness at 5 samples, 400x240, via `scprobe.ps1 -Device 0` against
+`-Device 1`, reading the combined pass host-side:
+
+| | CPU | HIP | ratio |
+| --- | --- | --- | --- |
+| nonzero pixels | 205072 | 105410 | 1.95 |
+| mean | 0.4207 | 0.3119 | |
+| R | 0.1294 | 0.0272 | 4.75 |
+| G | 0.1841 | 0.0549 | 3.35 |
+| B | 0.3694 | 0.1654 | 2.23 |
+
+Not a uniform darkening: blue survives best and red and green collapse, and half the lit
+pixels go to zero. The blue is the emitter seen directly and in specular; what is lost is
+everything that should arrive as neutral illumination.
+
+**It is scene-dependent, not universal.** `SimpleVaseTest` renders the same on both devices
+- background patch 0.9965 either way, matching every CPU measurement in this file. The
+difference between the two scenes is the light: SimpleVaseTest is lit by the environment,
+Brian's model by an emissive area panel in an otherwise dark scene. So the suspicion is
+area/emissive light sampling on GPU, which is also where the unresolved light direction
+question in this document sits.
+
+Ruled out already:
+
+  * Stale GPU kernels. HIP has no prebuilt binaries here; it compiles at runtime from the
+    kernel source copy installed at `big_libs/RhinoCycles/ccycles/win/debug/source/kernel`,
+    and that copy's timestamps match the working tree exactly and contain the
+    `NODE_SET_BUMP` `break` fix. The kernel cache directory is empty but kernels load.
+  * Kernel build failures. The run logs no error, warning or fallback, and reports
+    `Loading render kernels` normally.
+
+Note for whoever picks this up: **the `CCYCLES_BG_EVAL_TALLY` instrumentation cannot see
+HIP.** Every kernel-side probe in it is guarded by `#ifndef __KERNEL_GPU__`, so on GPU it
+compiles out and produces an empty file - which looks exactly like a diagnostic that found
+nothing. `CCYCLES_PASS_PROBE` does work on both devices, because it reads the tile passes
+host-side in the output driver. Enabling the per-component light passes and comparing them
+across devices is the obvious next probe: it would say directly whether the diffuse direct
+component is what goes missing.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by
