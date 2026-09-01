@@ -486,6 +486,20 @@ $cmakeArgs = @(
     '-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF'
 )
 
+# Cycles builds the CPU kernel once per SIMD variant (SSE4.2, AVX2 and so on) even though
+# a machine only ever runs one of them, and that is most of the cost of touching a kernel
+# header - about twenty minutes here. CYCLES_NATIVE_ONLY=1 builds only this machine's
+# architecture, which is what you want while iterating on kernel code. The result is not
+# portable to other CPUs, so it is opt-in and off by default. Flipping it re-configures and
+# forces one full rebuild; every build after that is far quicker.
+if ($env:CYCLES_NATIVE_ONLY -eq '1') {
+    Write-Host 'CYCLES_NATIVE_ONLY=1: building only this machine CPU architecture'
+    $cmakeArgs += '-DWITH_CYCLES_NATIVE_ONLY=ON'
+}
+else {
+    $cmakeArgs += '-DWITH_CYCLES_NATIVE_ONLY=OFF'
+}
+
 if ($Generator -eq 'ninja') {
     # Ninja takes the architecture from the compiler it is handed, not from -A,
     # which it rejects. The developer shell was entered as x64 above, so cl.exe
