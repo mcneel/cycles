@@ -797,6 +797,65 @@ only for this test, so it now takes `path_visibility`; the dispatch in `svm.h` a
 had it in scope. Worth a targeted check of clipping planes and of a gradient background
 under an orthographic camera - neither is covered by the current test models.
 
+## HIP against CPU: it is one material, and its textures are in memory
+
+Narrowed from "HIP renders Brian's model wrong" to a single material, without a rebuild.
+All on the dev build, only the device changing:
+
+| test | CPU | HIP | agree |
+| --- | --- | --- | --- |
+| plain, whole frame | R 0.0806 G 0.1227 B 0.2481 | R **0.0000** G 0.0229 B 0.1047 | no |
+| `CCYCLES_NO_LIGHT_TREE=1` | 0.1504 | 0.0424 | no |
+| `CCYCLES_FLAT_SHADERS=1` | 0.2209 | 0.2209 | **yes** |
+| `RHDIFF_REPLACEMAT=Glass_Crystal` | 0.1564 | 0.0549 | no |
+| `RHDIFF_REPLACEMAT=lamp-shade` | 0.1048 | 0.0113 | no |
+| `RHDIFF_REPLACEMAT=Paper` | 0.0968 | 0.0968 | **yes** |
+
+The red channel is **exactly zero** over the whole frame on HIP in the plain case, which is
+why the image reads as uniformly blue rather than merely dark - a channel gone, not
+attenuation.
+
+Flat shaders agreeing puts this in shader evaluation rather than lighting or the film, and
+the light tree makes no difference either way. Replacing just `Paper` with an untextured
+grey PBR makes the devices agree exactly, red included.
+
+`RHDIFF_MATDUMP` says what `Paper` is:
+
+    MAT 'Paper' type='Physically Based'
+      CHILD slot='pbr-base-color' type='Bitmap Texture' file='C:\Users\GEBRUI~1\...\V7\TextureCache\E6AD.jpg' exists=False
+      CHILD slot='pbr-bump'       type='Bitmap Texture' file='C:\Users\GEBRUI~1\...\V7\TextureCache\E6EC.jpg' exists=False
+
+Both files point at another machine's temp texture cache and **do not exist**, so the pixels
+are embedded in the .3dm and reach Cycles through the in-memory image path - the one stubbed
+out in 5.2 behind an undefined `LEGACY_IMAGES` and implemented here by
+`RhinoMemoryImageLoader` in `scene/image_rhino.cpp`. That code was added earlier in this
+port, and the note elsewhere in this file that it "has no test that exercises it" was
+wrong: Brian's model exercises it, and is the only model in the set that does.
+
+Scope: `SimpleVaseTest` and `GjisGlasTalerSimplified2` render identically on CPU and HIP, so
+this is not a general GPU problem. Synthetic scenes built for this - a rectangular light
+over a floor and box, with and without a lamp shade cone - also agree exactly on both
+devices, so neither area lights nor enclosed lights are involved.
+
+`RhinoMemoryImageLoader::load_pixels` has the same signature as the base and as the oiio,
+sky and vdb loaders, so the override binds correctly, and nothing in it is device-specific -
+which is what makes a device-dependent failure interesting.
+
+**Not yet separated:** `Paper` has *two* in-memory textures, base colour and bump, and bump
+is its own suspect - 5.x replaced `svm_node_tex_coord_bump_dx/dy` with the dual-number
+`svm_node_tex_coord_derivative`, and Rhino's `RHINO_NODE_TEX_COORD` is grafted onto that, as
+its own comment in `svm/tex_coord.h` says. So this is either the in-memory pixels never
+reaching the device, or the bump derivative graft differing on GPU.
+
+The experiment that separates them: a synthetic material with a **file-based** texture on
+both devices, in base-colour-only and bump-only variants. File-based agreeing while embedded
+diverges pins it on the in-memory path; both diverging pins it on textures or bump generally.
+
+Reproducer, no rebuild needed:
+
+    .\devcmp.ps1                                        # diverges
+    .\devcmp.ps1 -Switch RHDIFF_REPLACEMAT -Value Paper  # agrees
+
 ## HIP renders an emissive-lit scene far darker than CPU
 
 Same build, same model, same everything but the device. `Brian25YearRhinoGlas` on HIP loses
