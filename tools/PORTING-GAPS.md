@@ -690,7 +690,27 @@ always reports a miss - because nothing in Rhino's integration ever services the
 re-queues the work - every shadow ray returns there and direct lighting silently
 disappears.
 
-**Measured since:** `integrator_shade_shadow` was instrumented at entry and at every exit
+**RETRACTED - the conclusion below is wrong.** 5.x restructured next-event estimation out
+of `shade_shadow` entirely. It has kernels 3.5 does not:
+`DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT_NEE`,
+`DEVICE_KERNEL_INTEGRATOR_SHADE_DEDICATED_LIGHT`, with `shade_dedicated_light.h` and
+`shade_light.h` alongside `shade_shadow.h`. Direct light now lands through
+`film_write_surface_emission` (`shade_light.h:73`), not `film_write_direct_light`. So
+`integrator_shade_shadow` never running is **normal for 5.x**, not a defect, and this
+branch is not missing next-event estimation. Lars rendering Brian's glass model on CPU and
+finding it good is what prompted the recheck; a renderer with no NEE would not look good.
+
+What remains true and measured: `PASS_SHADOW_CATCHER` is empty here and populated in
+shipping, and none of the four `film_write_combined_pass` call sites fires here. Since 5.x
+reaches the shadow catcher write by a different route, the question is now whether the new
+NEE kernels carry the shadow catcher write at all - upstream restructured this code and
+Rhino's shadow catcher handling may simply not have been carried across to the new path.
+That is where to resume.
+
+The superseded reading follows, kept because the measurements in it are sound even though
+the conclusion drawn from them was not.
+
+**Measured:** `integrator_shade_shadow` was instrumented at entry and at every exit
 in both trees. This branch produces **no rows at all - not even the entry marker** - in a
 run where the same tally emitted 226 `approx`, 62 `lp` and 10 `scw2` rows, so the
 instrument was live. The shadow kernel therefore never runs here at all. It is not the
