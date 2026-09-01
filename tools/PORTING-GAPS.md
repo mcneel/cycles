@@ -899,6 +899,43 @@ Worth knowing if you reuse that switch: the fatbin cache key is
 flag alone reuses a cached fatbin and the switch appears to do nothing. It is folded into
 the key here for that reason.
 
+### Bisected: it is the texture chain running in the bump context
+
+Four more hypotheses tested and excluded, each with a build and a measurement:
+
+| tried | result |
+| --- | --- |
+| `-fno-fast-math` for the HIP kernels | still black |
+| zero the SVM stack at the top of `svm_eval_nodes` | still black |
+| bypass the perturbation: `normal_out = normal_in` on GPU | **still black** |
+| force `KERNEL_FEATURE_NODE_BUMP` on for every shader, render a scene with no texture | **CPU and HIP identical**, 1.7506 both |
+
+The last two together are the informative pair. Bypassing the computed normal leaves the
+surface black, so the fault is not in `svm_node_set_bump`'s arithmetic and not in the
+perturbed normal it produces - and the existing NaN guard and disabled-feature fallback in
+that function, both added during the earlier CPU black-bump work, are not being relied on
+here. Forcing the bump feature bit on renders a bump-free scene identically on both devices,
+so the specialised bump-enabled GPU kernel is not broken either.
+
+What is left is that **evaluating Rhino's texture chain in the bump context corrupts
+something on GPU**. In the bypass build the chain still ran to produce the bump heights; only
+its result was discarded, and the surface was still black. So the damage is done by the
+evaluation, not by what it returns - which points at Rhino's procedural nodes writing
+somewhere they should not, out of stack bounds or similar, and taking the closure with them.
+
+That is the same fragility class as Nathan's `e3c7cefa9`, "Do not inline procedural node
+related code on HIP", which is already in this branch and was about RDNA3 hangs rather than
+black output.
+
+Also relevant, and still true: Rhino has **23 SVM nodes and not one `_DERIVATIVE` variant**,
+while 5.x pairs every differentiable node with one. Rhino's nodes therefore do not
+participate in automatic differentiation at all, which is a real porting gap whether or not
+it is this bug.
+
+The next bisect is to no-op Rhino's procedural nodes on GPU one at a time - starting with
+`RHINO_NODE_TEX_COORD` and `RHINO_NODE_MATRIX_MATH`, both of which a bitmap texture goes
+through - and see which one clears the black.
+
 **Where to look next.** 5.x evaluates the bump pass with dual numbers: the SVM switch
 dispatches `<dual3>` instantiations, including `svm_node_tex_coord_derivative`, which
 replaced the old `svm_node_tex_coord_bump_dx/dy`. Rhino's grafted `RHINO_NODE_TEX_COORD` has
