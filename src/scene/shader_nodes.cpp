@@ -4518,9 +4518,26 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
   ShaderNodeType attr_node = NODE_ATTR;
   ShaderNodeType geom_node = NODE_GEOMETRY;
 
-  /* 5.2 removed the NODE_*_BUMP_DX/DY node variants in favour of the
-   * dual-number derivative path (svm_node_tex_coord_derivative), so there is
-   * no bump-specific node to switch to here. */
+  /* 3.5 switched all three of these to the upstream NODE_*_BUMP_DX/DY variants, which were
+   * Rhino-extended copies that evaluated the coordinate at a shifted position - that offset
+   * between the centre, DX and DY copies of a bump chain is what produces the height
+   * gradient. 5.2 removed those variants in favour of dual numbers and the port dropped the
+   * switch entirely, so all three copies produced the identical coordinate, the gradient was
+   * zero and bump silently did nothing.
+   *
+   * RHINO_NODE_TEX_COORD_BUMP_DX/DY restore it for this node. The upstream nodes this one
+   * also emits take the offset as a field instead, so they get the real bump_offset rather
+   * than a hardcoded centre. */
+  const NodeBumpOffset bump_offset = shader_bump_to_node_bump_offset(bump);
+  const bool use_derivative = need_derivatives() || (bump != SHADER_BUMP_NONE);
+  const uint8_t store_derivatives = need_derivatives();
+
+  if (bump == SHADER_BUMP_DX) {
+    texco_node = RHINO_NODE_TEX_COORD_BUMP_DX;
+  }
+  else if (bump == SHADER_BUMP_DY) {
+    texco_node = RHINO_NODE_TEX_COORD_BUMP_DY;
+  }
 
   out = output("Generated");
   if (!out->links.empty()) {
@@ -4529,11 +4546,12 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
                         geom_node,
                         SVMNodeGeometry{
                             .geom_type = NODE_GEOM_P,
-                            .bump_offset = NODE_BUMP_OFFSET_CENTER,
-                            .store_derivatives = false,
+                            .bump_offset = bump_offset,
+                            .store_derivatives = store_derivatives,
                             .out_offset = compiler.output(out),
-                            .bump_filter_width = 0.0f,
-                        });
+                            .bump_filter_width = bump_filter_width,
+                        },
+                        use_derivative);
     }
     else {
       if (from_dupli) {
@@ -4550,10 +4568,11 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
                               .attr = attr,
                               .out_offset = compiler.output(out),
                               .output_type = NODE_ATTR_OUTPUT_FLOAT3,
-                              .bump_offset = NODE_BUMP_OFFSET_CENTER,
-                              .store_derivatives = false,
-                              .bump_filter_width = 0.0f,
-                          });
+                              .bump_offset = bump_offset,
+                              .store_derivatives = store_derivatives,
+                              .bump_filter_width = bump_filter_width,
+                          },
+                          use_derivative);
       }
     }
   }
@@ -4601,11 +4620,12 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
                         geom_node,
                         SVMNodeGeometry{
                             .geom_type = NODE_GEOM_I,
-                            .bump_offset = NODE_BUMP_OFFSET_CENTER,
-                            .store_derivatives = false,
+                            .bump_offset = bump_offset,
+                            .store_derivatives = store_derivatives,
                             .out_offset = compiler.output(out),
-                            .bump_filter_width = 0.0f,
-                        });
+                            .bump_filter_width = bump_filter_width,
+                        },
+                        use_derivative);
     }
     else {
       compiler.add_node_packed(texco_node, NODE_TEXCO_REFLECTION, compiler.output(out));
@@ -4678,10 +4698,11 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
                           .attr = attr,
                           .out_offset = compiler.output(out),
                           .output_type = NODE_ATTR_OUTPUT_FLOAT3,
-                          .bump_offset = NODE_BUMP_OFFSET_CENTER,
-                          .store_derivatives = false,
-                          .bump_filter_width = 0.0f,
-                      });
+                          .bump_offset = bump_offset,
+                          .store_derivatives = store_derivatives,
+                          .bump_filter_width = bump_filter_width,
+                      },
+                      use_derivative);
     decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_UV, compiler);
   }
 

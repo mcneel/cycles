@@ -20,8 +20,10 @@ CCL_NAMESPACE_BEGIN
 
 /* ---- Rhino texture coordinate support -------------------------------- */
 /* Grafted on top of upstream 5.2. Upstream replaced svm_node_tex_coord_bump_dx/dy
- * with the dual-number svm_node_tex_coord_derivative; Rhino's RHINO_NODE_TEX_COORD
- * is a separate SVM node and is unaffected by that change. */
+ * with the dual-number svm_node_tex_coord_derivative. Rhino's RHINO_NODE_TEX_COORD is a
+ * separate SVM node, so it needs its own bump handling: RHINO_NODE_TEX_COORD_BUMP_DX and
+ * _BUMP_DY select the shifted evaluation, mirroring what 3.5 got from the upstream
+ * NODE_TEX_COORD_BUMP_DX/DY it used to switch to. */
 
 ccl_device_inline void wcs_box_coord(KernelGlobals kg, ccl_private ShaderData *sd, ccl_private float3 *data)
 {
@@ -654,16 +656,34 @@ ccl_device_noinline int svm_node_tex_coord(KernelGlobals kg,
 
 /* Rhino: RHINO_NODE_TEX_COORD, dispatched from svm.h. */
 
-ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
-                                                 ccl_private ShaderData *sd,
-                                                 const PathRayVisibility path_visibility,
-                                                 ccl_private float *stack,
-                                                 uint4 node,
-                                                 int offset)
+ccl_device_noinline int svm_rhino_node_tex_coord(
+    KernelGlobals kg,
+    ccl_private ShaderData *sd,
+    const PathRayVisibility path_visibility,
+    ccl_private float *stack,
+    uint4 node,
+    int offset,
+    const NodeBumpOffset bump_offset = NODE_BUMP_OFFSET_CENTER)
 {
   float3 data = zero_float3();
   uint type = node.y;
   uint out_offset = node.z;
+
+  /* The DX and DY copies of a bump chain have to evaluate the coordinate at a shifted
+   * position; that offset between the three copies is what produces the height gradient.
+   * 3.5 did this by switching this node to NODE_TEX_COORD_BUMP_DX/DY, which were
+   * Rhino-extended copies of the upstream node. 5.2 removed those in favour of dual
+   * numbers, and the port dropped the switch without replacing it - so every copy produced
+   * the same coordinate and bump silently did nothing.
+   *
+   * Shifting sd->P covers every coordinate type derived from position. The UV attribute
+   * path does not read P and is shifted separately below. Like 3.5, the derivative is added
+   * whole rather than scaled by a filter width. */
+  const float3 saved_P = sd->P;
+  if (bump_offset != NODE_BUMP_OFFSET_CENTER) {
+    const differential3 dP = differential_from_compact(sd->Ng, sd->dP);
+    sd->P += (bump_offset == NODE_BUMP_OFFSET_DX) ? dP.dx : dP.dy;
+  }
 
   switch (type) {
     case NODE_TEXCO_OBJECT: {
@@ -864,11 +884,25 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
           data = zero_float3();
         }
         else if (desc.type == NODE_ATTR_FLOAT2) {
-          float2 f = primitive_surface_attribute<float2>(kg, sd, desc);
-          data = make_float3(f.x, f.y, 0.0f);
+          const dual2 f = primitive_surface_attribute<dual2>(kg, sd, desc);
+          float2 uv = f.val;
+          if (bump_offset == NODE_BUMP_OFFSET_DX) {
+            uv += f.dx;
+          }
+          else if (bump_offset == NODE_BUMP_OFFSET_DY) {
+            uv += f.dy;
+          }
+          data = make_float3(uv.x, uv.y, 0.0f);
         }
         else {
-          data = primitive_surface_attribute<float3>(kg, sd, desc);
+          const dual3 f = primitive_surface_attribute<dual3>(kg, sd, desc);
+          data = f.val;
+          if (bump_offset == NODE_BUMP_OFFSET_DX) {
+            data += f.dx;
+          }
+          else if (bump_offset == NODE_BUMP_OFFSET_DY) {
+            data += f.dy;
+          }
         }
       }
       else {
@@ -877,6 +911,8 @@ ccl_device_noinline int svm_rhino_node_tex_coord(KernelGlobals kg,
       break;
     }
   }
+
+  sd->P = saved_P;
 
   stack_store_float3(stack, out_offset, data);
   return offset;

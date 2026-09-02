@@ -314,6 +314,23 @@ ccl_device void svm_eval_nodes(KernelGlobals kg,
         offset = svm_rhino_node_tex_coord(kg, sd, path_visibility, stack, node, offset);
       }
       break;
+      /* The DX and DY copies of a bump chain, which evaluate the coordinate at a shifted
+       * position. Kept adjacent to the base case because the enum order in
+       * node_types_template.h has to match this switch. */
+      SVM_CASE(RHINO_NODE_TEX_COORD_BUMP_DX)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        offset = svm_rhino_node_tex_coord(
+            kg, sd, path_visibility, stack, node, offset, NODE_BUMP_OFFSET_DX);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_TEX_COORD_BUMP_DY)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        offset = svm_rhino_node_tex_coord(
+            kg, sd, path_visibility, stack, node, offset, NODE_BUMP_OFFSET_DY);
+      }
+      break;
       SVM_CASE(RHINO_NODE_MATRIX_MATH)
       {
         const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
