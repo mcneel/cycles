@@ -1632,3 +1632,47 @@ Before anyone spends another day on `SimpleVaseTest`, `Brian25YearRhinoGlas` or
 for those scenes first (`grep -i 'Updating Images' renders/*/<model>.cycles.log`). On
 present evidence a large part of the table is this difference, and comparing a build
 that lights with a studio HDR against one that does not is not a renderer comparison.
+
+## Three of the four gaps are intended RhinoCycles changes. One is left.
+
+Area lights are the biggest piece. A synthetic rectangular light - `runarea.ps1 -Light
+rect`, one quad, one box, one light - puts dev at **1.1213 overall, median 1.1404**,
+background 1.0000, lit surfaces 1.13-1.25. That matches
+`GjisGlasTalerSimplified2` (median 1.1744) and `Brian25YearRhinoGlas` (median 1.1538) in
+both size and shape, so those two models are this one effect.
+
+`ShaderConverter` states the cause outright:
+
+    // Shadow intensity no longer scales the emitter (RH-96957); the legacy
+    // size behavior is now baked into the geometry on file read (RH-96952).
+    size = 1.0f;
+
+Shipping still scales the emitter by the shadow-intensity term; dev does not. **A
+deliberate change, not a port regression.** It also explains why pinning `Light.Radius`
+to 0 left Gjis at 1.0703 - for a rectangular light the emitter comes from Width and
+Length, and `Radius` never enters. (Brian renders black in *both* builds with radius 0,
+so that model cannot be tested that way at all.)
+
+Two hypotheses died on the way, recorded so they are not retried: the light-object
+**handedness** (flipping z alone leaves a left-handed basis, so swapping u and v with it
+looked promising - measured a no-op to four decimals, and reverted), and the rect light's
+**centring** (dev already does it: `rectLoc = Location + Width*0.5 + Length*0.5`).
+
+### The table, as now understood
+
+| model | ratio | explanation |
+|---|---|---|
+| Brian25YearRhinoGlas | 1.1986 | area-light emitter size, RH-96957/RH-96952 - intended |
+| GjisGlasTalerSimplified2 | 1.0704 | same |
+| EsaSetOfDiamonds | 0.9406 | dev loads `StudioC.hdr` for skylighting, shipping loads no image |
+| SimpleVaseTest | 2.5256 | **still unexplained** - the shadow-catcher background |
+
+Skylight-state and image-loading were checked per model and per build: all four agree on
+`sky`/`skystrength`, and only Esa shows the image-loading asymmetry (dev 2, shipping 0).
+The synthetic skylight scene shows the same asymmetry with a locally present file, so it
+is about whether a build *uses* the studio environment for lighting, not about missing
+files.
+
+So the port is in better shape than the table suggested: the three largest numbers are
+either intended behaviour or a content difference, and `SimpleVaseTest` is the only gap
+left that looks like a renderer question.
