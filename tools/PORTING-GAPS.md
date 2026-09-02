@@ -1701,3 +1701,20 @@ the frame at all. The next step is `background->get_transparent()` on the dev si
 `ccycles/background.cpp` exposes `set_transparent`, and if Rhino never turns it on, no
 matte compositing happens and the background is composited opaque, which is the shape of
 a 2.5x background difference.
+
+Two more eliminations on the same model, both measured on the dev side:
+
+- **The opaque background is correct.** The document reports
+  `TransparentBackground=False`, so `Background.Transparent = false` and the frame's
+  alpha being uniformly 1.0 is the right answer, not a missing matte.
+- **The film flag is right.** `film_set_use_approximate_shadow_catcher` is called
+  exactly once, with `1`. Worth noting how fragile that is: RhinoCycles calls it per
+  object with that object's `IsShadowCatcher`, so a single global film flag is decided by
+  whichever object happens to be processed last. It lands correctly here, but it would
+  not survive a second catcher or a different iteration order.
+
+So on the dev side the whole chain is present and correct: the flag reaches Cycles,
+survives to pass creation, the passes are added and written, the background is opaque as
+the document asks, and `use_approximate_shadow_catcher` is true. The 2.5x is in the
+values that chain computes, and the instrument needed to see them is a pass read **by
+`PassType`** - every existing probe goes by name, and auto-added passes have none.
