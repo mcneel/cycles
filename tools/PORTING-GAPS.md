@@ -1676,3 +1676,28 @@ files.
 So the port is in better shape than the table suggested: the three largest numbers are
 either intended behaviour or a content difference, and `SimpleVaseTest` is the only gap
 left that looks like a renderer question.
+
+### SimpleVaseTest: three more things ruled out, and one live thread
+
+The old account has dev's `PASS_SHADOW_CATCHER` reading exactly 0.0000. Re-measured,
+and the picture is different:
+
+- **The flag reaches Cycles.** A probe on `cycles_scene_object_set_is_shadowcatcher`
+  catches `set_is_shadowcatcher(1)` on one of the six objects.
+- **It survives to pass creation.** In `Film::update_passes`,
+  `has_shadow_catcher=1 flagged=1 of 6 objects`, so the shadow-catcher branch runs and
+  the passes are added.
+- **The passes are written.** `written=1` for both of them.
+
+The 0.0000 was a **probe artefact**: `CCYCLES_PASS_PROBE` resolves passes by name, and
+auto-added passes carry an empty name in *both* trees - `Film::add_auto_pass` is
+identical, `set_name(ustring((name) ? name : ""))`. That is what the removed
+`CCYCLES_NAME_SC_PASSES` switch was working around. Reading these passes needs a lookup
+by `PassType`, not by name.
+
+What the probe did show is worth keeping: dev's combined pass has **alpha uniformly
+1.0** (`ch3 min=1.0 max=1.0 mean=1.0`), so no matte or transparency is being applied to
+the frame at all. The next step is `background->get_transparent()` on the dev side -
+`ccycles/background.cpp` exposes `set_transparent`, and if Rhino never turns it on, no
+matte compositing happens and the background is composited opaque, which is the shape of
+a 2.5x background difference.
