@@ -1303,3 +1303,110 @@ Two fixes stand on their own and do not depend on which option wins:
   built from source. Both states are currently invisible and both have produced
   wrong conclusions in this port. Two one-line messages retire most of the
   "check the binary is newer than your edit" ritual.
+
+## Two runs of one build did not agree
+
+Every dev-against-shipping number in this document is a difference between two
+images. That only means something if a build agrees with *itself*, and it did not:
+two runs of `SimpleVaseTest` at 20 samples disagreed by mean 4.4e-5, max 0.078,
+with 27% of pixels moving. A suite cannot fail honestly against a baseline it
+cannot reproduce, so this was worth more than another brightness hunt.
+
+Two causes, found by narrowing rather than guessing. Rendering **one** sample
+still differed, which rules out the order samples are summed in - a single sample
+is written once - and points at the scene or the shaders differing between
+processes. Hashing the compiled SVM confirmed it: same scene, same 396 words, same
+11 shaders, two different hashes. Dumping the words narrowed it to six, at indices
+48-50 and 54-56: two float3 colour constants, a different colour every run.
+
+They came from `ccycles`. `prep_session` built `default_surface` and
+`default_background` with a colour drawn from `std::random_device`, so both
+shaders were a different colour in every process. Shipping does exactly the same
+thing - this is inherited, not a port regression - but a default shader whose
+colour is random cannot be correct in either tree, and it made every render
+irreproducible. Both are now a fixed magenta, which says "nothing was assigned
+here" just as loudly and says it the same way every time.
+
+That fix takes the compiled SVM to a single hash across runs and collapses the
+single-sample difference from max 0.541 to max 0.0078 - exactly 1/128, one RGBE
+quantisation step in the `.hdr` writer, i.e. the images now agree to within the
+file format. At 20 samples the residue is mean 2.7e-5, max 0.0195, down from
+4.4e-5 and 0.078.
+
+A second source remains and scales with sample count, so it is most likely the
+order in which per-sample contributions accumulate. It is two quantisation steps
+on the worst scene, which is far below every difference this document records, so
+the suite can proceed with a tolerance rather than waiting for exactness.
+
+### The setting that made it worse was unusable, and no longer is
+
+Adaptive sampling gives each pixel its own sample count, chosen by a convergence
+test whose timing varies between runs. Turning it off is the obvious way to
+equalise an A/B, and it used to render black in this branch - documented as a
+single-setting repro. **It no longer does**: with `UseAdaptiveSampling` pinned
+false, `SimpleVaseTest` renders at mean 68.3, and a probe in
+`PassAccessor::init_kernel_film_convert` shows the mechanism was never reached -
+`num_samples_` runs 1..20 and is never 0, so `scale` is never 0. One of this
+branch's fixes closed it; the note saying otherwise was stale.
+
+`parity.ps1` and `render_one.ps1` now pin `UseAdaptiveSampling,Seed`, so both
+builds render exactly `Samples` samples at every pixel. Re-running the four
+models that way changed the four ratios in the fourth decimal place (2.5258,
+1.2004, 1.0704, 0.9408), so those gaps are real renderer differences and never
+were sampling artefacts.
+
+## The audit that found nothing, so it need not be repeated
+
+Six mechanical checks of the port surface, all clean. Recorded because a negative
+result bounds where a bug can still be, and because re-deriving them costs a day:
+
+- **All 22 Rhino nodes in `rhino_shader_nodes.cpp` emit byte-identical SVM
+  payloads to 3.5.** The file's 378 changed lines are the mechanical rename of
+  `add_node`/`stack_assign` to `add_node_packed`/`input_link`. The
+  `input_link(ShaderInput *)` overload is a plain alias for `stack_assign`, so an
+  unlinked socket still has its constant written to the stack; `compiler.output()`
+  does differ - it returns `SVM_STACK_INVALID` for an unlinked output where 3.5
+  always allocated a slot - but all 40 stores in `svm_rhino_procedurals.h` are
+  guarded by `stack_valid`, so nothing writes past the stack.
+- **Every `ccycles` entry point lands on the same `ccl::` setters as 3.5**, with
+  the differences all accounted for: the light setters now fill a `CCyclesLight`
+  struct, `cycles_mesh_*` gained the `tag_*_modified` calls the append fix needs,
+  and `cycles_camera_set_size` also sets `full_width`/`full_height`.
+- **`CCyclesLight::flush` applies every field it stores** - all fifteen. `size`
+  reaches spot lights too, since 5.2 has `SpotLight : public PointLight`.
+- **The new 5.2 light knobs match 3.5's behaviour**: `normalize`, `spread`,
+  `ellipse`, `is_portal` and `is_enabled` all already existed in 3.5 at the same
+  defaults, so no scene changes brightness by inheriting a new one.
+  `BackgroundLight::average_radiance` is new but computed internally by
+  `device_update_background`, not something `ccycles` must set.
+- **`SkyTextureNode` lost no Rhino extension.** 3.5's "Dust" socket is 5.2's
+  "Aerosol" (`dust_density` -> `aerosol_density`), an upstream rename, and no
+  tree wires the sky densities through the C API at all.
+- **The `IntegratorHash` difference between builds is not a settings difference.**
+  All 23 fields the hash covers are identical in both builds; the hash also
+  changes *within* a single dev render, so it cannot be used to compare builds.
+
+### Left alone deliberately
+
+`cycles_light_set_samples` writes `max_bounces`. Both trees do it, identically,
+so it is a faithful port of a 3.5 bug. Fixing it would change renders away from
+shipping, which is the opposite of the goal here; it is recorded rather than
+corrected.
+
+## The rest of the instrumentation is gone
+
+The kernel-side tally was removed earlier. The host side was larger and worse:
+`cycles_session_start` had grown to ~330 lines of experiment switches - nine env
+vars that rewired the background graph, replaced shaders, forced colour spaces and
+added passes - on the shipping session-start path, where a stray environment
+variable could silently change a customer's render. It is now the six lines 3.5
+has. Also removed: `CCYCLES_NO_CLAMP`, `CCYCLES_NO_LIGHT_TREE` and
+`CCYCLES_NO_SHADOW_CATCHER`, which changed integrator and object state, and a
+full min/max/mean scan of the pass buffer that ran on every
+`cycles_session_retain_float_buffer` call.
+
+`ccycles_diag` itself was never gated - it wrote to stderr and
+`OutputDebugString` on every call, including one line per object per session
+start. It now returns immediately unless `CCYCLES_DIAG_LOG` is set, which silences
+every remaining caller at once. What is left in `ccycles` is read-only:
+`CCYCLES_DIAG_LOG`, `CCYCLES_LOG_LEVEL` and `CCYCLES_PASS_PROBE`.

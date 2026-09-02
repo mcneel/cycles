@@ -85,6 +85,13 @@ extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(const char *l
  * test executables that do have a console. */
 static inline void ccycles_diag(const char *fmt, ...)
 {
+	/* Silent unless asked for. Read once: this is called per object and per pass.
+	 * getenv on every call would cost more than the message it decides against. */
+	static const bool want_diag = getenv("CCYCLES_DIAG_LOG") != nullptr;
+	if (!want_diag) {
+		return;
+	}
+
 	/* The prefix goes in the same buffer as the message. Two separate
 	 * OutputDebugStringA calls are two separate records to any listener, and a
 	 * listener that misses the second one shows a bare "ccycles:" with nothing

@@ -215,30 +215,11 @@ CCL_CAPI void CDECL cycles_integrator_set_sampling_pattern(ccl::Session* session
 	}
 }
 
-/* Experiment switch: clamping is biased by design - it discards the part of a
- * sample's radiance above the limit - so any change in the per-sample radiance
- * distribution shows up as a brightness-graded difference even when the clamp
- * value itself is untouched. CCYCLES_NO_CLAMP=1 sets both limits to 0, which
- * Cycles reads as FLT_MAX, so a render can be compared with the bias removed.
- *
- * Note that Integrator multiplies whatever it is given by 3 before handing it
- * to the kernel, so a scene value of 3 is a kernel limit of 9. That scaling is
- * the same in 3.5 and 5.2. */
-static float ccycles_clamp_override(float value, const char *which)
-{
-	const char *no_clamp = getenv("CCYCLES_NO_CLAMP");
-	if (no_clamp != nullptr && no_clamp[0] == 0x31 && value != 0.0f) {
-		ccycles_diag("disabling %s clamp (was %f)\n", which, value);
-		return 0.0f;
-	}
-	return value;
-}
-
 CCL_CAPI void CDECL cycles_integrator_set_sample_clamp_direct(ccl::Session* session_id, float sample_clamp_direct)
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_sample_clamp_direct(ccycles_clamp_override(sample_clamp_direct, "direct"));
+		sce->integrator->set_sample_clamp_direct(sample_clamp_direct);
 	}
 }
 
@@ -246,7 +227,7 @@ CCL_CAPI void CDECL cycles_integrator_set_sample_clamp_indirect(ccl::Session* se
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_sample_clamp_indirect(ccycles_clamp_override(sample_clamp_indirect, "indirect"));
+		sce->integrator->set_sample_clamp_indirect(sample_clamp_indirect);
 	}
 }
 
@@ -262,14 +243,6 @@ CCL_CAPI void CDECL cycles_integrators_set_use_light_tree(ccl::Session* session_
 {
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		/* Experiment switch: the light tree is how 5.x picks an emitter, and a
-		 * background emitter goes through it differently than a local light.
-		 * CCYCLES_NO_LIGHT_TREE forces the older distribution instead. */
-		const char *no_tree = getenv("CCYCLES_NO_LIGHT_TREE");
-		if (no_tree != nullptr && no_tree[0] == 0x31) {
-			ccycles_diag("forcing use_light_tree off (was %d)\n", (int)use_light_tree);
-			use_light_tree = false;
-		}
 		sce->integrator->set_use_light_tree(use_light_tree);
 	}
 }

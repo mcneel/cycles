@@ -164,17 +164,6 @@ void cycles_scene_object_set_is_shadowcatcher(ccl::Session* session_id, ccl::Obj
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		/* TEMPORARY experiment switch: a shadow catcher makes Cycles split the
-		 * image across combined/matte/background, so it is worth being able to
-		 * take them out of the picture without touching the document. */
-		const char *no_sc = getenv("CCYCLES_NO_SHADOW_CATCHER");
-		if (no_sc != nullptr && no_sc[0] == 0x31) {
-			if (is_shadowcatcher) {
-				ccycles_diag("ignoring shadow catcher flag on object %p\n",
-				             (void *)object);
-			}
-			is_shadowcatcher = false;
-		}
 		object->set_is_shadow_catcher(is_shadowcatcher);
 		object->tag_update(sce);
 		sce->light_manager->tag_update(sce, ccl::LightManager::UPDATE_ALL);
