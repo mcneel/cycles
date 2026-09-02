@@ -57,6 +57,8 @@ NODE_DEFINE(Shader)
 
   SOCKET_BOOLEAN(use_transparent_shadow, "Use Transparent Shadow", true);
   SOCKET_BOOLEAN(use_bump_map_correction, "Bump Map Correction", true);
+  /* Rhino extension, restored: see the note in shader.h. Default matches 3.5. */
+  SOCKET_BOOLEAN(heterogeneous_volume, "Heterogeneous Volume", true);
 
   static NodeEnum volume_sampling_method_enum;
   volume_sampling_method_enum.insert("distance", VOLUME_SAMPLING_DISTANCE);
@@ -669,7 +671,9 @@ void ShaderManager::device_update_common(Device * /*device*/,
     if (shader->has_volume_connected && !shader->has_surface) {
       flag |= SD_HAS_ONLY_VOLUME;
     }
-    if (shader->has_volume && shader->has_volume_spatial_varying) {
+    if (shader->has_volume && shader->has_volume_spatial_varying &&
+        shader->get_heterogeneous_volume())
+    {
       flag |= SD_HETEROGENEOUS_VOLUME;
     }
     if (shader->has_volume_attribute_dependency) {

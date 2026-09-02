@@ -347,11 +347,13 @@ CCL_CAPI void CDECL cycles_shader_set_heterogeneous_volume(ccl::Session *session
 											unsigned int heterogeneous_volume)
 {
 	if (shader_id)
-		/* 5.2 dropped Shader::heterogeneous_volume; homogeneous volumes are
-		 * expressed through the volume interpolation method instead. */
-		shader_id->set_volume_interpolation_method(
-			heterogeneous_volume == 1 ? (int)ccl::INTERPOLATION_LINEAR :
-										(int)ccl::INTERPOLATION_CLOSEST);
+		/* 5.2 dropped Shader::heterogeneous_volume and derives heterogeneity from the graph
+		 * alone. This used to be mapped onto set_volume_interpolation_method, which is an
+		 * unrelated setting - homogeneity is whether density varies along the ray, while the
+		 * interpolation method is how voxel data is filtered - so asking for a homogeneous
+		 * volume silently switched voxel filtering to nearest instead. The socket is
+		 * restored as a Rhino extension in scene/shader.{h,cpp}. */
+		shader_id->set_heterogeneous_volume(heterogeneous_volume == 1);
 }
 
 CCL_CAPI ccl::ShaderNode* CDECL cycles_add_shader_node(ccl::Shader *shader_id,

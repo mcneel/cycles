@@ -83,6 +83,10 @@ class Shader : public Node {
   NODE_SOCKET_API(bool, use_bump_map_correction)
   NODE_SOCKET_API(VolumeSampling, volume_sampling_method)
   NODE_SOCKET_API(int, volume_interpolation_method)
+  /* Rhino: 5.2 dropped this socket and derives heterogeneity from the graph alone.
+   * RhinoCycles sets it to false, so the override has to stay or Rhino's volumes would
+   * start ray-marching where 3.5 treated them as homogeneous. */
+  NODE_SOCKET_API(bool, heterogeneous_volume)
   NODE_SOCKET_API(float, volume_step_rate)
 
   /* displacement */
