@@ -1718,3 +1718,46 @@ survives to pass creation, the passes are added and written, the background is o
 the document asks, and `use_approximate_shadow_catcher` is true. The 2.5x is in the
 values that chain computes, and the instrument needed to see them is a pass read **by
 `PassType`** - every existing probe goes by name, and auto-added passes have none.
+
+### SimpleVaseTest localised: the shadow-catcher composite, and a constant factor of 3
+
+Two measurements narrow this a long way.
+
+**It is the shadow catcher.** The catcher is the ground plane, and neither build can be
+instrumented on the shipping side, so take the catcher out of the document for both:
+`RHDIFF_GP=opaque` (ground plane kept, shadow-only cleared). The ratio falls from
+**2.5256 to 1.0505**, median 1.0470 - i.e. down to the same ~5% seen everywhere else.
+
+**The residue is a constant 3, independent of sample count.** At 5, 20 and 80 samples:
+
+| samples | overall | median | p90 |
+|---|---|---|---|
+| 5 | 2.6307 | 2.9882 | **3.0118** |
+| 20 | 2.5256 | 1.2000 | **3.0118** |
+| 80 | 2.4847 | 1.0876 | **3.0118** |
+
+The median converges to 1.0 as samples rise - most of the frame agrees - while a subset
+of pixels sits at exactly 3.0118 at every sample count. A sample-count-independent factor
+of 3 is not noise and not a scale error; it is a divisor that is 1 where it should be 3.
+
+`film_get_scale_and_scale_exposure` has exactly one such divisor:
+
+    local_background_scale_exposure = 1.0f / max(shadow_catcher_background_sample_count, 1u);
+
+If `pass_shadow_catcher_background_sample_count` reads 0 in dev, `max(0, 1)` makes that
+scale 1.0 where shipping's counter of 3 makes it 1/3 - dev exactly 3x brighter, at any
+sample count. That counter is Rhino's own (RH-75422), incremented in
+`film_write_pass_spectrum`'s caller when `pass == kernel_data.film.pass_background`.
+
+**The whole chain around it is a faithful port** - checked function by function, so none
+of this needs redoing: the composite (`film_calculate_shadow_catcher_matte_with_shadow`,
+cosmetic differences only), the pass set and its conditions (`Film::update_passes`,
+byte-identical region), both counter writes and their guards, the front-face
+`CORE_PATCH` in `kernel_shadow_catcher_is_path_split_bounce`,
+`is_transparent_background_ray` in `shade_background.h`, and the `pass_offset` branch
+structure in `light_passes.h`.
+
+So the next step is to read that counter, not to read more code: instrument
+`pass_shadow_catcher_background_sample_count` on the dev side and see whether it is 0.
+If it is, the question becomes why the background pass write that increments it is not
+reached - and that is a much smaller question than the one this model started with.
