@@ -1147,6 +1147,59 @@ The remaining sites are mechanical ports with no behaviour lost: the
 `kernel/util/color.h` became `kernel/util/colorspace.h`, and the two halves of the
 in-memory image loader (`scene/image_rhino.h`, `ccycles/shader.cpp:799`).
 
+## Sweep: diffing the Rhino-specific surface against 3.5
+
+Extending the audit method from a grep for apologetic comments to a systematic comparison of
+the sets of things each tree defines. No builds; the whole sweep is diffing.
+
+**Complete, nothing lost:** the 23 Rhino SVM node dispatches in `svm.h` and every
+`svm_rhino_node_*` kernel function match between trees (the only difference is the two bump
+cases added here). `rhino_shader_nodes.cpp` mentions `bump` in neither tree, so the texture
+coordinate node was the only Rhino node that lost bump switching.
+
+**ccycles setters, checked one file at a time** - this is where the heterogeneous volume bug
+was, and it is the class of bug that matters because RhinoCycles calls these:
+
+  * `integrator.cpp` - clean apart from the dropped clipping functions below and the
+    env-gated `CCYCLES_NO_CLAMP` / `CCYCLES_NO_LIGHT_TREE` diagnostics added here.
+  * `light.cpp` - looks alarming and is fine. Shipping's `cycles_create_light` sets
+    `use_camera(false)`, `use_glossy(false)`, `use_transmission(true)`, and 5.2 removed all
+    three sockets. But shipping's `cycles_light_set_type`, which the Rhino API always calls
+    straight after creation, sets `use_glossy(true)` back again - its comment reads "too many
+    cmomplaints about lights not working". So shipping's effective state is the Cycles
+    defaults with camera visibility off, and this branch reproduces exactly that by clearing
+    `PATH_RAY_VISIBILITY_CAMERA` on the light's Object, with the background light exempt.
+  * `object.cpp`, `scene.cpp` - `session->scene` to `session->scene.get()` and similar
+    renames only.
+  * `camera.cpp` - this branch *adds* `set_full_width` / `set_full_height` alongside
+    `set_screen_size`; an addition, not a loss.
+  * `film.cpp` - identical.
+
+**Dropped, and currently unreachable: per-object clipping-plane participation and
+clip-all-rays.** Shipping has two C API functions this branch does not:
+`cycles_integrator_set_clip_all_rays` and `cycles_object_set_clipping_plane_mask`, backing
+`Integrator::clip_all_rays`, `Object::clipping_plane_mask`,
+`KernelObject::clipping_plane_mask` and the `object_clipping_plane_mask` /
+`clipping_plane_clips_object` helpers in `kernel/bvh/util.h`. Shipping's `path_clip_ray`
+uses both:
+
+    if (kernel_data.integrator.clip_all_rays || (path_flag & PATH_RAY_CAMERA) == PATH_RAY_CAMERA) {
+      /* RH-98012: only planes this object participates in clip it. */
+      const uint clip_mask = object_clipping_plane_mask(kg, sd->object);
+      ...
+        if (!clipping_plane_clips_object(clip_mask, cpi)) { continue; }
+
+So two shipped fixes are absent here: **RH-95655**, which clips indirect bounces as well as
+camera rays under the Product preset so clipped geometry stops contributing to and occluding
+indirect lighting, and **RH-98012**, per-object clipping-plane participation.
+
+They are inert as things stand - `clipping_plane_mask` defaults to `~0u` and
+`clip_all_rays` to `false`, which is exactly this branch's unconditional behaviour, and
+neither csycles nor RhinoCycles binds either function. So restoring the plumbing today would
+be dead code. It is written down because the moment Rhino wants either feature back, this is
+the list: an `Object` socket, a `KernelObject` field, the two `bvh/util.h` helpers, an
+`Integrator` socket, the `path_clip_ray` conditions, and the two C API functions.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by

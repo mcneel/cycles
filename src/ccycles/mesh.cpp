@@ -302,21 +302,27 @@ void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry,
 
 		if (mesh)
 		{
-			/* 5.2 dropped Mesh::add_triangle; the triangle indices, per-face
-			 * shader and smooth flags are plain node sockets now. */
-			ccl::array<int> tris = mesh->get_triangles();
+			/* 5.2 dropped Mesh::add_triangle; the triangle indices, per-face shader and
+			 * smooth flags are plain node sockets now.
+			 *
+			 * NODE_SOCKET_API_ARRAY's getter returns a non-const reference, so append in
+			 * place and flag the socket modified. Binding the getters to values instead
+			 * copied all three arrays on every call, which made adding n triangles O(n^2) -
+			 * unnoticed because RhinoCycles uploads meshes through the bulk
+			 * cycles_mesh_set_verts / set_tris path and never calls this. */
+			ccl::array<int> &tris = mesh->get_triangles();
 			tris.push_back_slow((int)v0);
 			tris.push_back_slow((int)v1);
 			tris.push_back_slow((int)v2);
-			mesh->set_triangles(tris);
+			mesh->tag_triangles_modified();
 
-			ccl::array<int> shaders = mesh->get_shader();
+			ccl::array<int> &shaders = mesh->get_shader();
 			shaders.push_back_slow(shader_id->id);
-			mesh->set_shader(shaders);
+			mesh->tag_shader_modified();
 
-			ccl::array<bool> smooths = mesh->get_smooth();
+			ccl::array<bool> &smooths = mesh->get_smooth();
 			smooths.push_back_slow(smooth == 1);
-			mesh->set_smooth(smooths);
+			mesh->tag_smooth_modified();
 		}
 	}
 }
