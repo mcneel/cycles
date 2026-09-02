@@ -1564,3 +1564,71 @@ sampled at against the radiance the background emits, and the PDF and MIS weight
 for it. `RHDIFF_SET="Key=Value"` sweeps any single integrator field, and
 `runenv.ps1 -Sky <n>` builds the scene at another level, which separates a conversion
 error from a scale error. That is the next thing to try.
+
+### Sweep for the rest of the Light-is-Geometry hazard: clean
+
+The prune bug was code that was correct only because 3.5 had `Light : public Node`, so
+the obvious question is where else that assumption is made. Swept every
+`static_cast<Mesh *>` and C-style `(Mesh *)` in `src/scene`, `src/ccycles` and
+`src/bvh`, and every loop over `scene->objects` / `scene->geometry`.
+
+**Clean.** The upstream 5.2 code was written with the new hierarchy and guards itself;
+the only Rhino-side casts over those lists were the two prunes, now fixed. The one
+other Rhino cast, in `cycles_scene_object_set_shader`, already sits behind
+`if (geometry->is_mesh())`.
+
+## The 5% is not Cycles. It is two RhinoCycles differences, one of them deliberate
+
+Two corrections to what is written above, both from measurement.
+
+**Repairing the texture paths changes nothing.** With `RHDIFF_FIXTEX=1` applied to all
+four models - `SimpleVaseTest` and `GjisGlasTalerSimplified2` repaired completely,
+"still missing 0" - the ratios are identical: 2.5256, 1.0704, 1.1986, 0.9406 against
+2.5258, 1.0704, 1.2004, 0.9410. The models really do carry foreign texture paths, and
+repairing them is still the right thing to do, but **it explains none of the four
+gaps.** The earlier claim that the table was measuring missing-texture fallbacks was
+wrong.
+
+**The skylit 5% is an environment-loading difference.** Cut the test scene down to one
+2-triangle quad, no box, ground plane off (a new document has it on, and it meshes as a
+101x101 grid coplanar with the floor - worth knowing, though removing it changed
+nothing), background a solid grey, lit only by the skylight. Same document, both builds
+reporting `skystrength 1`, and:
+
+- dev logs `Updating Images: Loading RhinoStudio8.exr`
+- **shipping loads no image at all**
+
+So dev lights the scene with the studio HDR environment and shipping uses another
+fallback. That is why both floors carry a gradient a uniform sky cannot produce
+(shipping 0.41 -> 0.85 across the floor, dev 0.45 -> 0.89), why dev is ~5% brighter, and
+why the camera background still matches to 1.0000 - both display the solid grey. It also
+explains the *sign* of Esa, where dev loaded `StudioC.hdr`: a darker studio environment
+makes dev darker there, and a brighter one makes it brighter here.
+
+**What is left is ~1.7% from one point light, and it is intended.** With the skylight
+off, one point light, no ground plane and no image loaded on either side, dev is 1.0327
+overall, median 1.0172, p90 1.0699 - and the excess falls off with distance from the
+light, which is the signature of a different emitter radius. `ShaderConverter` says so
+outright:
+
+    // Emitter size/softness come from the light's geometry now, not the hidden
+    // shadow-intensity term (RH-96957/RH-96839): point/spot use Radius, rect
+    // uses Width/Length, directional uses Radius as angular size (below).
+    size = (float)lg.Radius;
+
+Shipping still derives emitter size from the shadow-intensity term. **That is a
+deliberate behaviour change, not a port regression.**
+
+### What this means for the four gaps
+
+Neither effect is in Cycles, and both live in RhinoCycles, whose dev branch also
+reverted "Move to Cycles 4.4" and "Make lights work" - the latter carrying the global
+`dir *= -1.0f` that the open area-light direction question is about. Shipping's
+RhinoCycles is `9.0.26237.15343` (2026-08-25), only a week older than this build, so
+these are branch differences rather than a stale comparison.
+
+Before anyone spends another day on `SimpleVaseTest`, `Brian25YearRhinoGlas` or
+`GjisGlasTalerSimplified2`: **check whether the two builds load the same environment**
+for those scenes first (`grep -i 'Updating Images' renders/*/<model>.cycles.log`). On
+present evidence a large part of the table is this difference, and comparing a build
+that lights with a studio HDR against one that does not is not a renderer comparison.
