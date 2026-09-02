@@ -4,11 +4,6 @@
 
 #pragma once
 
-#ifndef __KERNEL_GPU__
-/* TEMPORARY, mirror of the shipping instrumentation for the background chase. */
-#  include "util/rhino_bg_tally.h"
-#endif
-
 #include "kernel/film/data_passes.h"
 #include "kernel/film/denoising_passes.h"
 #include "kernel/film/light_passes.h"
@@ -156,14 +151,6 @@ ccl_device_inline ShaderEvalResult integrate_background(
     const float mis_weight = light_sample_mis_weight_forward_background(
         kg, state, path_visibility, path_flag);
 
-#ifndef __KERNEL_GPU__
-    rhino_bg_tally::record("bg",
-                           INTEGRATOR_STATE(state, path, flag),
-                           INTEGRATOR_STATE(state, path, bounce),
-                           INTEGRATOR_STATE(state, path, transparent_bounce),
-                           mis_weight,
-                           average(INTEGRATOR_STATE(state, path, throughput)));
-#endif
     guiding_record_background(kg, state, L, mis_weight);
     L *= mis_weight;
   }
@@ -251,14 +238,6 @@ ccl_device_inline ShaderEvalResult integrate_sun_lights(
         kg, state, path_visibility, path_flag, klight->object_id, light_eval.pdf);
 
     /* Write to render buffer. */
-#ifndef __KERNEL_GPU__
-    rhino_bg_tally::record("distant",
-                           INTEGRATOR_STATE(state, path, flag),
-                           INTEGRATOR_STATE(state, path, bounce),
-                           INTEGRATOR_STATE(state, path, transparent_bounce),
-                           mis_weight,
-                           average(INTEGRATOR_STATE(state, path, throughput)));
-#endif
     guiding_record_background(kg, state, eval, mis_weight);
     film_write_surface_emission(
         kg, state, eval, mis_weight, render_buffer, object_lightgroup(kg, klight->object_id));

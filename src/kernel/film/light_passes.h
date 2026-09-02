@@ -4,10 +4,6 @@
 
 #pragma once
 
-#ifndef __KERNEL_GPU__
-#  include "util/rhino_bg_tally.h"
-#endif
-
 #include "kernel/film/write.h"
 
 #include "kernel/integrator/shadow_catcher.h"
@@ -254,12 +250,6 @@ ccl_device bool film_write_shadow_catcher(KernelGlobals kg,
   }
 
   /* Shadow catcher pass. */
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record_scw(1,
-                             kernel_shadow_catcher_is_object_pass(path_flag),
-                             path_flag,
-                             average(contribution));
-#endif
   if (kernel_shadow_catcher_is_object_pass(path_flag)) {
     film_write_pass_spectrum(buffer + kernel_data.film.pass_shadow_catcher, contribution);
     return true;
@@ -297,12 +287,6 @@ ccl_device bool film_write_shadow_catcher_transparent(KernelGlobals kg,
   }
 
   /* Shadow catcher pass. */
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record_scw(2,
-                             kernel_shadow_catcher_is_object_pass(path_flag),
-                             path_flag,
-                             average(contribution));
-#endif
   if (kernel_shadow_catcher_is_object_pass(path_flag)) {
     /* NOTE: The transparency of the shadow catcher pass is ignored. It is not needed for the
      * calculation and the alpha channel of the pass contains numbers of samples contributed to a
@@ -535,9 +519,6 @@ ccl_device_inline void film_write_direct_light(KernelGlobals kg,
     }
     if (kernel_data.kernel_features & KERNEL_FEATURE_AO_ADDITIVE) {
       const Spectrum ao_weight = INTEGRATOR_STATE(state, shadow_path, unshadowed_throughput);
-#ifndef __KERNEL_GPU__
-      rhino_bg_tally::record_cp('A', path_flag, average(contribution));
-#endif
       film_write_combined_pass(
           kg, path_visibility, path_flag, sample, contribution * ao_weight, buffer);
     }
@@ -545,9 +526,6 @@ ccl_device_inline void film_write_direct_light(KernelGlobals kg,
   }
 
   /* Direct light shadow. */
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record_cp('B', path_flag, average(contribution));
-#endif
   film_write_combined_pass(kg, path_visibility, path_flag, sample, contribution, buffer);
 
 #ifdef __PASSES__
@@ -696,16 +674,6 @@ ccl_device_inline void film_write_background(KernelGlobals kg,
     film_write_combined_transparent_pass(
         kg, path_visibility, path_flag, sample, contribution, transparent, buffer);
   }
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record(is_transparent_background_ray ? "fw:transp" : "fw:combined",
-                         path_flag,
-                         INTEGRATOR_STATE(state, path, bounce),
-                         INTEGRATOR_STATE(state, path, transparent_bounce),
-                         0.0f,
-                         average(INTEGRATOR_STATE(state, path, throughput)),
-                         average(contribution),
-                         transparent);
-#endif
   film_write_emission_or_background_pass(kg,
                                          state,
                                          contribution,
@@ -729,9 +697,6 @@ ccl_device_inline void film_write_volume_emission(KernelGlobals kg,
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
   const int sample = INTEGRATOR_STATE(state, path, sample);
 
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record_cp('C', path_flag, average(contribution));
-#endif
   film_write_combined_pass(kg, path_visibility, path_flag, sample, contribution, buffer);
   film_write_emission_or_background_pass(
       kg, state, contribution, buffer, kernel_data.film.pass_emission, lightgroup);
@@ -752,9 +717,6 @@ ccl_device_inline void film_write_surface_emission(KernelGlobals kg,
   const uint32_t path_flag = INTEGRATOR_STATE(state, path, flag);
   const int sample = INTEGRATOR_STATE(state, path, sample);
 
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record_cp('D', path_flag, average(contribution));
-#endif
   film_write_combined_pass(kg, path_visibility, path_flag, sample, contribution, buffer);
   film_write_emission_or_background_pass(
       kg, state, contribution, buffer, kernel_data.film.pass_emission, lightgroup);

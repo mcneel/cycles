@@ -1023,6 +1023,60 @@ host-side in the output driver. Enabling the per-component light passes and comp
 across devices is the obvious next probe: it would say directly whether the diffuse direct
 component is what goes missing.
 
+## Rhino's SVM nodes do not participate in automatic differentiation
+
+Upstream 5.2 replaced the old bump_dx/bump_dy scheme with automatic differentiation: a node
+that may be evaluated in a bump chain emits a `_DERIVATIVE` variant of itself, and the
+kernel runs a dual-number instantiation that carries value, dx and dy.
+
+Three pieces of the machinery matter:
+
+  * `SVMCompiler::node_type` maps a type to its derivative variant when derivatives are
+    wanted, and `svm_node_type_with_derivatives` **falls through to the plain type** for any
+    node without one. No warning, no assert.
+  * `SVMCompiler::stack_size(const ShaderIO *io)` returns `stack_size(type) * 3` when
+    derivatives are in play, so a dual socket occupies three times the slots.
+  * Whether derivatives are wanted is decided **per node, inside its own `compile()`** -
+    e.g. `const bool use_derivative = need_derivatives() || (bump != SHADER_BUMP_NONE);` in
+    `TextureCoordinateNode` and the image texture nodes.
+
+**None of Rhino's 23 SVM nodes does any of this.** `rhino_shader_nodes.cpp` contains no
+reference to `use_derivatives`, `need_derivatives` or `SHADER_BUMP_NONE`. So in a bump
+chain a Rhino node emits its plain form and writes only the value part, while a downstream
+upstream-Cycles node in the same chain emits its `_DERIVATIVE` form and reads a dual from
+that offset. Producer writes one third of what the consumer reads; the rest is whatever
+those slots currently hold - other nodes' live values, not merely uninitialised memory.
+
+That is a structural gap independent of any one bug: **bump and displacement cannot work
+correctly through any Rhino procedural node.** It also predicts device-dependent damage,
+since what sits in the neighbouring slots depends on stack layout, and it is a candidate
+root cause for the parked HIP black-bump issue above - which would explain why bypassing
+the perturbation in `svm_node_set_bump` did not help, the damage being the mis-sized access
+rather than the value computed from it.
+
+It also means one earlier exclusion in this document is weaker than stated: zeroing the SVM
+stack at the top of `svm_eval_nodes` does not test this, because the slots being misread are
+live and get written during evaluation, not left at their initial value.
+
+### Options for closing it
+
+1. **Real derivative variants for all 23 nodes.** Correct and faithful, and large - the
+   procedural texture nodes (noise, waves, perturbing) would need dual-number forms of
+   their maths.
+2. **Zero-derivative variants** - a `_DERIVATIVE` variant per Rhino node that performs the
+   existing plain evaluation and writes explicit zeros for dx and dy. Mechanical, safe, and
+   makes the stack layout agree. Cost: a bump driven through a Rhino procedural produces no
+   bump detail from that node, which is wrong but quiet and correct-by-construction rather
+   than corrupt.
+3. **Refuse derivatives downstream of an unsupported node** - propagate "no derivative
+   support" so the consumer emits its plain variant too. Cleanest semantically, but it
+   means touching upstream node compile logic and the propagation is not currently there.
+
+Recommendation: **2 first**, because it converts undefined behaviour into a known,
+documented loss of fidelity and is testable immediately with the three-object reproducer
+(`.unarea.ps1 -Light rect -Shade none -Tex bump`), then 1 for the nodes that actually
+matter for bump - the bitmap texture path before the procedural noise ones.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by

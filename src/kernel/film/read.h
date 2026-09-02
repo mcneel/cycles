@@ -8,11 +8,6 @@
 
 #pragma once
 
-#ifndef __KERNEL_GPU__
-/* TEMPORARY, part of the SimpleVaseTest background chase. */
-#  include "util/rhino_bg_tally.h"
-#endif
-
 #include "kernel/types.h"
 
 #include "util/color.h"
@@ -615,13 +610,6 @@ film_calculate_shadow_catcher(const ccl_global KernelFilmConvert *ccl_restrict k
    * Note that we treat shadow catcher as straight alpha here because alpha got canceled out
    * during the division. */
   const float3 pixel = (1.0f - alpha) * one_float3() + alpha * shadow_catcher;
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record_sc(average(pixel),
-                            num_samples,
-                            average(color_catcher),
-                            average(color_combined),
-                            average(color_matte));
-#endif
 
   return pixel;
 }
@@ -670,29 +658,9 @@ ccl_device_inline float4 film_calculate_shadow_catcher_matte_with_shadow(
                                     background_scale_exposure;
 
     const float3 alpha_over = color_matte * alpha + color_background * (1.0f - alpha_matte);
-#ifndef __KERNEL_GPU__
-    rhino_bg_tally::record_matte("approx",
-                                 average(alpha_over),
-                                 alpha,
-                                 alpha_matte,
-                                 scale,
-                                 scale_exposure,
-                                 background_scale_exposure,
-                                 average(color_background));
-#endif
     return make_float4(alpha_over.x, alpha_over.y, alpha_over.z, 1.0f);
   }
 
-#ifndef __KERNEL_GPU__
-  rhino_bg_tally::record_matte("plain",
-                               average(color_matte),
-                               alpha,
-                               alpha_matte,
-                               scale,
-                               scale_exposure,
-                               background_scale_exposure,
-                               0.0f);
-#endif
   return make_float4(color_matte, alpha_matte);
 }
 
