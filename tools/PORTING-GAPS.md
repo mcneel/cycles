@@ -1522,3 +1522,45 @@ It is also not a general point-light strength error - a synthetic single-point-l
 scene makes dev 4% **brighter**, the opposite sign. The remaining question is the
 background level itself, and the next step is a locally authored environment-lit scene,
 with no borrowed texture paths, that reproduces the 10%.
+
+## A minimal reproducer: skylit surfaces are ~5% brighter
+
+Esa is closed as a renderer question. Its dimmer background was the missing studio
+environment, and the proof is a scene built here with no borrowed content: with a
+**solid-colour** background and no texture anywhere, the two builds' backgrounds agree
+to **1.0000**. The environment path is not at fault; Esa's own textures were.
+
+Building that scene turned up a better lead, though - a real difference with a
+three-object reproducer. `makeenv.py` / `runenv.ps1` build `envlit-<grey>-box<0|1>.3dm`:
+a grey floor (`230,230,230`), optionally a box, **no lights at all**, background a solid
+grey, illumination entirely from the skylight. On that scene:
+
+| region | dev against shipping |
+|---|---|
+| background | **1.0000** - identical |
+| the lit floor | median **1.046**, p90 1.10 |
+
+So the emitted background radiance matches exactly while everything it illuminates is
+about 5% brighter in dev. The same sign and the same 1.10 spread show up in the
+synthetic single-point-light scene (1.0438), so this is not specific to the sky: **dev's
+direct lighting is a few percent brighter.**
+
+Excluded, each by measurement:
+
+- **Integrator settings.** All 23 fields pinned on both sides, `mismatched=[]` in both
+  logs, ratio unchanged at 1.0616. (This also retires the old warning that pinning made
+  Beta 4x brighter - with the current harness it is neutral.)
+- **Indirect light.** Persists with `MaxBounce=MaxDiffuseBounce=1` (1.0604) and with
+  `UseIndirectLight=false` (1.0590), so it is direct lighting.
+- **The light tree.** 5.x samples emitters through one and 3.5 has none at all; forcing
+  it off changes nothing (1.0615 against 1.0616).
+- **Occlusion.** Removing the box entirely leaves it at 1.0618, median 1.0461 - the
+  excess is not about shadowing.
+- **Materials and textures.** There are none: one flat diffuse colour.
+- **Scene content.** Authored locally by script, so no foreign texture paths.
+
+What is left is the direct-lighting estimator itself - the strength the skylight is
+sampled at against the radiance the background emits, and the PDF and MIS weight used
+for it. `RHDIFF_SET="Key=Value"` sweeps any single integrator field, and
+`runenv.ps1 -Sky <n>` builds the scene at another level, which separates a conversion
+error from a scale error. That is the next thing to try.
