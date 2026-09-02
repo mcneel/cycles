@@ -1829,3 +1829,28 @@ whatever the last object processed happened to be. It lands correctly on
 by a non-catcher would clear it. That is RhinoCycles rather than Cycles, so it is
 recorded here rather than changed - the fix is to set it from whether the scene has any
 catcher at all, not per object.
+
+### The "unexercised fixes" item, resolved by checking reachability instead
+
+Three fixes were listed as needing a purpose-built test scene. Grepping RhinoCycles for
+what it actually emits answers it more cheaply:
+
+- **`NODE_TEXCO_WINDOW` is already under test.** `RhinoBackground.cs` connects
+  `texco.outs.Window` to the gradient texture (line 334, and again at 67), and
+  `RenderEngine.Utils.cs:293` does the same for image textures. Every scene with a
+  gradient background exercises it - `SimpleVaseTest` and
+  `GjisGlasTalerSimplified2` both have one (`top=white bottom=160`). So the
+  `path_flag` -> `path_visibility` fix there has been exercised by every render in this
+  document, not waiting for a scene.
+- **`heterogeneous_volume` is wired.** RhinoCycles sets `HeterogeneousVolume = false`
+  explicitly (`RenderEngine.Shaders.cs:91`, `RhinoShader.cs:45`). That is what makes the
+  fix matter: before it, the C API wrote `set_volume_interpolation_method` instead, so
+  the flag kept its default of **true** and Rhino's request for a homogeneous volume was
+  ignored. It still needs a volume closure to show up in pixels, but it is not dead code.
+- **`matrix_math` PERSPECTIVE is hardening.** Every `MatrixMathNode` RhinoCycles builds
+  is constructed with a `Transform` and no operation, so it takes csycles' default;
+  nothing seen here asks for `NODE_MATRIX_MATH_PERSPECTIVE`. The GPU fix removes an
+  uninitialised value on a path Rhino may never take - worth keeping, not worth a scene.
+
+That leaves the `MixNode` null-deref fix as the only one genuinely waiting on a volume
+scene, and it is a null dereference: reachable or not, the fix is unambiguous.
