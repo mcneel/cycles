@@ -1761,3 +1761,43 @@ So the next step is to read that counter, not to read more code: instrument
 `pass_shadow_catcher_background_sample_count` on the dev side and see whether it is 0.
 If it is, the question becomes why the background pass write that increments it is not
 reached - and that is a much smaller question than the one this model started with.
+
+### SimpleVaseTest: dev is right and shipping is wrong
+
+The factor of 3 has a direction, and it is not the one this document has assumed
+throughout. `SimpleVaseTest`'s background is `style=SolidColor top=(255,255,255)` -
+pure white, which is 1.0 in linear terms. Measured over the background region at 80
+samples:
+
+| build | background | |
+|---|---|---|
+| dev | **0.9841** | white, as the document asks |
+| shipping | **0.3284** | exactly one third (x3 = 0.985) |
+
+**So shipping renders a white background at a third of its brightness whenever a shadow
+catcher is in the scene, and the 5.2 path does not.** The largest number in the parity
+table is dev being correct.
+
+That fits the mechanism already identified: the background region is scaled by
+`1.0f / max(shadow_catcher_background_sample_count, 1u)`, and a divisor three times too
+large makes a white background render at 1/3 regardless of sample count - which is
+exactly what the 5-, 20- and 80-sample runs show (p90 pinned at 3.0118 while the median
+converges to 1.0).
+
+**Consequence for this whole document: shipping is not the oracle.** Every gap here has
+been written up as "dev differs from shipping", with the implicit assumption that
+shipping is right. For this model that assumption would have had us reintroduce a bug.
+Before treating any remaining difference as a regression, check what the scene actually
+asks for - a white background is a case where the correct answer is known without either
+renderer.
+
+With that, the table reads:
+
+| model | ratio | verdict |
+|---|---|---|
+| SimpleVaseTest | 2.5256 | **dev correct, shipping renders white at 1/3** |
+| Brian25YearRhinoGlas | 1.1986 | intended emitter-size change (RH-96957/RH-96952) |
+| GjisGlasTalerSimplified2 | 1.0704 | same |
+| EsaSetOfDiamonds | 0.9406 | environment loading, not shading |
+
+Nothing in the four is an unexplained port regression.
