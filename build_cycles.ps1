@@ -415,6 +415,17 @@ $levelZeroRoot = @($libModern, $libLegacy) |
 if ($levelZeroRoot) { $detected.Add('oneapi'); Write-Found 'oneAPI' $levelZeroRoot }
 else { Write-Missing 'oneAPI' 'level-zero not present in the library bundle' }
 
+# CYCLES_DEVICES restricts the device set the same way CYCLES_NATIVE_ONLY restricts CPU
+# architectures, and for the same reason: it can be set through the environment, which is
+# the only route that works when ccycles.vcxproj calls this script through pwsh -File. On a
+# machine whose GPU is AMD, the CUDA cubins and OptiX PTX are pure cost on every kernel
+# touch - CYCLES_DEVICES=cpu,hip drops them. Changing it re-configures and forces one full
+# rebuild; builds after that are much quicker.
+if (-not $Devices -and $env:CYCLES_DEVICES) {
+    $Devices = @($env:CYCLES_DEVICES -split '[,;\s]+' | Where-Object { $_ })
+    Write-Host "CYCLES_DEVICES=$($env:CYCLES_DEVICES): restricting the device set"
+}
+
 if (-not $Devices) {
     $Devices = if ($detected.Count) { $detected.ToArray() } else { @('cpu') }
     Write-Host "   -> enabling: $($Devices -join ', ')" -ForegroundColor Cyan
