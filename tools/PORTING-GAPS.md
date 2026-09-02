@@ -9,6 +9,47 @@ See `DIAGNOSTICS.md` for the switches and tooling used to establish any of this.
 See `PORT-HISTORY.md` for where the earlier 4.x attempts live and what they
 already decided.
 
+---
+
+## Read this first: state as of 2026-09-02
+
+**This document is chronological, and the early sections reach conclusions that later
+measurements overturned.** Several root causes stated confidently below were retracted.
+Where a section disagrees with this summary, this summary is the later measurement.
+
+**The four A/B parity gaps are all accounted for, and none is an unexplained port
+regression:**
+
+| model | ratio | verdict |
+|---|---|---|
+| SimpleVaseTest | 2.5256 | **shipping is wrong** - it renders a white background at 1/3 when a shadow catcher is present; dev is correct |
+| Brian25YearRhinoGlas | 1.1986 | intended RhinoCycles change - emitter size no longer scaled by shadow intensity (RH-96957/RH-96952) |
+| GjisGlasTalerSimplified2 | 1.0704 | same |
+| EsaSetOfDiamonds | 0.9406 | environment loading - dev resolves the studio HDR for skylighting, shipping loads no image |
+
+**Three standing rules, each learned the hard way:**
+
+1. **Shipping is not the oracle.** Everything here is framed as "dev differs from
+   shipping"; on `SimpleVaseTest` acting on that would have reintroduced a bug. Ask what
+   the scene asks for first - a white background is knowable without either renderer.
+2. **Check both builds load the same environment** before calling a difference shading:
+   `grep -i 'Updating Images' renders/*/<model>.cycles.log`. A build lighting with a
+   studio HDR against one that is not is not a renderer comparison.
+3. **Compare with a tolerance, not for equality.** Two runs of one build agree to
+   mean ~3e-5 / max ~0.02 at 20 samples; shipping is no better (12.8% of pixels move
+   against dev's 23%). Pin `-PinKeys 'UseAdaptiveSampling,Seed'`.
+
+**Fixed on this branch and verified:** the bump regression, `MixNode`'s null deref,
+`path_clip_ray`'s camera test, `NODE_TEXCO_WINDOW`, `matrix_math` on GPU,
+`heterogeneous_volume`, `cycles_mesh_add_triangle`'s O(n^2), the two random default
+shader colours, `prune()` never running, both `prune()` loops' unchecked `Mesh` casts,
+and the host-side instrumentation strip.
+
+**Still open:** the HIP bump black render (parked), a dev-only preview-render deadlock
+(never investigated), and the `Test lights ceilings 2` sweep (818 MB, never run).
+
+---
+
 ## Two principled inputs are silently dropped
 
 Blender 4.0 removed `Subsurface Color` and `Transmission Roughness` from the
