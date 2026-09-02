@@ -1023,59 +1023,52 @@ host-side in the output driver. Enabling the per-component light passes and comp
 across devices is the obvious next probe: it would say directly whether the diffuse direct
 component is what goes missing.
 
-## Rhino's SVM nodes do not participate in automatic differentiation
+## Rhino's SVM nodes ignore the bump offset, so bump through them does nothing
 
-Upstream 5.2 replaced the old bump_dx/bump_dy scheme with automatic differentiation: a node
-that may be evaluated in a bump chain emits a `_DERIVATIVE` variant of itself, and the
-kernel runs a dual-number instantiation that carries value, dx and dy.
+**This section previously claimed a stack-size mismatch and undefined behaviour. That was
+wrong** - written from reading the compiler half of the mechanism without checking what the
+kernel half actually does. The corrected account follows; the retraction is kept because the
+wrong version was committed and may have been read.
 
-Three pieces of the machinery matter:
+How bump actually works in this tree - still the chain-duplication scheme, not pure
+automatic differentiation:
 
-  * `SVMCompiler::node_type` maps a type to its derivative variant when derivatives are
-    wanted, and `svm_node_type_with_derivatives` **falls through to the plain type** for any
-    node without one. No warning, no assert.
-  * `SVMCompiler::stack_size(const ShaderIO *io)` returns `stack_size(type) * 3` when
-    derivatives are in play, so a dual socket occupies three times the slots.
-  * Whether derivatives are wanted is decided **per node, inside its own `compile()`** -
-    e.g. `const bool use_derivative = need_derivatives() || (bump != SHADER_BUMP_NONE);` in
-    `TextureCoordinateNode` and the image texture nodes.
+  * `ShaderGraph::bump_from_displacement` finds the subgraph feeding a `BumpNode`'s Height
+    input and **makes two extra copies** of it, marking the originals `SHADER_BUMP_CENTER`
+    and the copies `SHADER_BUMP_DX` and `SHADER_BUMP_DY`, then wires them to the bump node's
+    `SampleX` and `SampleY`.
+  * A derivative-aware node compiled into one of those copies **shifts its own value**:
+    `svm_node_tex_coord_derivative` computes a `dual3` internally and does
+    `data.val += data.dx * node.bump_filter_width` for the DX copy, `data.dy` for DY. That
+    offset between the three copies is what produces the height gradient.
+  * Storing a dual on the stack is a *separate* matter, governed by `store_derivatives` /
+    `need_derivatives()`, which is only set for tiled-and-mipmapped textures through the
+    texture cache. That same flag drives `stack_size(io)`'s factor of three, so producer and
+    consumer agree. There is no mismatch and no out-of-bounds access.
 
-**None of Rhino's 23 SVM nodes does any of this.** `rhino_shader_nodes.cpp` contains no
-reference to `use_derivatives`, `need_derivatives` or `SHADER_BUMP_NONE`. So in a bump
-chain a Rhino node emits its plain form and writes only the value part, while a downstream
-upstream-Cycles node in the same chain emits its `_DERIVATIVE` form and reads a dual from
-that offset. Producer writes one third of what the consumer reads; the rest is whatever
-those slots currently hold - other nodes' live values, not merely uninitialised memory.
+**The real gap:** none of Rhino's 23 SVM nodes looks at `bump_offset` at all -
+`rhino_shader_nodes.cpp` never mentions `bump`, `SHADER_BUMP_NONE` or `use_derivatives`. So
+in a duplicated bump chain the centre, DX and DY copies of a Rhino node all emit the
+*identical* coordinate. The three sampled heights come out equal, the surface gradient is
+zero, and the bump has no effect.
 
-That is a structural gap independent of any one bug: **bump and displacement cannot work
-correctly through any Rhino procedural node.** It also predicts device-dependent damage,
-since what sits in the neighbouring slots depends on stack layout, and it is a candidate
-root cause for the parked HIP black-bump issue above - which would explain why bypassing
-the perturbation in `svm_node_set_bump` did not help, the damage being the mis-sized access
-rather than the value computed from it.
+That is a fidelity loss - bump silently doing nothing when driven through a Rhino
+procedural - rather than corruption. It also means it does **not** explain the parked HIP
+black-bump issue, since a zero gradient renders an unbumped surface, not a black one.
 
-It also means one earlier exclusion in this document is weaker than stated: zeroing the SVM
-stack at the top of `svm_eval_nodes` does not test this, because the slots being misread are
-live and get written during evaluation, not left at their initial value.
+**The fix is not "zero-derivative variants".** Zeroing derivatives is effectively what
+already happens. What is needed is for the Rhino nodes in a bump chain - starting with
+`RHINO_NODE_TEX_COORD`, which is the coordinate source for the bitmap texture path
+(`RhinoTextureCoordinate` -> `MatrixMath` -> `ImageTexture`, per
+`ShaderConverter.CreateAndConnectProceduralNode`) - to honour `bump_offset` and shift their
+coordinate by the appropriate derivative, the way
+`svm_node_tex_coord_derivative` does. That requires real derivatives of the Rhino
+coordinate types, not a stub.
 
-### Options for closing it
-
-1. **Real derivative variants for all 23 nodes.** Correct and faithful, and large - the
-   procedural texture nodes (noise, waves, perturbing) would need dual-number forms of
-   their maths.
-2. **Zero-derivative variants** - a `_DERIVATIVE` variant per Rhino node that performs the
-   existing plain evaluation and writes explicit zeros for dx and dy. Mechanical, safe, and
-   makes the stack layout agree. Cost: a bump driven through a Rhino procedural produces no
-   bump detail from that node, which is wrong but quiet and correct-by-construction rather
-   than corrupt.
-3. **Refuse derivatives downstream of an unsupported node** - propagate "no derivative
-   support" so the consumer emits its plain variant too. Cleanest semantically, but it
-   means touching upstream node compile logic and the propagation is not currently there.
-
-Recommendation: **2 first**, because it converts undefined behaviour into a known,
-documented loss of fidelity and is testable immediately with the three-object reproducer
-(`.unarea.ps1 -Light rect -Shade none -Tex bump`), then 1 for the nodes that actually
-matter for bump - the bitmap texture path before the procedural noise ones.
+Unverified: whether bump currently has *any* effect on Rhino materials on CPU. The
+reasoning above says it should not, which is worth measuring before acting - the reproducer
+`.unarea.ps1 -Light rect -Shade none -Tex bump` renders a bump-textured floor on CPU and
+the bump detail in it can be compared against the untextured variant.
 
 ## Three node types are not registered
 
