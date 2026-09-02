@@ -45,9 +45,21 @@ Ensure both the **Mac** and the **Windows** sections are completed.
 
 3. Go to `RDK/cycles/cycles` and run `make clean && make release`.
 
-4. Execute `cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/`.
+4. Make the built `libccycles.dylib` portable (strips the machine-specific absolute rpaths `make release` bakes in and adds portable `@loader_path` rpaths so the RhinoCycles kernel compiler can find the Cycles dependency dylibs — see RH-96549):
 
-5. Go to `big_libs`, create a branch if needed and execute:
+ ```
+./fix-cycles-rpaths.sh
+ ```
+
+5. Execute `cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/`.
+
+   Steps 3-5 as one command, from `RDK/cycles/cycles`:
+
+ ```
+make clean && make release && ./fix-cycles-rpaths.sh && cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/
+ ```
+
+6. Go to `big_libs`, create a branch if needed and execute:
 
  ```
 git add -f RhinoCycles/ccycles/osx/release/libccycles.dylib
