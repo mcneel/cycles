@@ -273,9 +273,14 @@ void GeometryManager::update_interactive_motion(Scene *scene)
 
 void GeometryManager::prune(Scene* scene)
 {
+	/* Same type check as ObjectManager::prune, and for the same reason: 5.2 made Light
+	 * a Geometry, so scene->geometry holds the lights themselves. Casting one to Mesh
+	 * and reading triangles.size() is undefined, and deletes the light when it reads
+	 * zero. Only a mesh can be empty in the sense meant here. */
 	vector<Geometry *> geom_to_prune;
 	for(Geometry* geom: scene->geometry) {
-		if(static_cast<Mesh *>(geom)->triangles.size() == 0) {
+		if(geom != nullptr && geom->is_mesh() &&
+		   static_cast<const Mesh *>(geom)->triangles.size() == 0) {
 			geom_to_prune.push_back(geom);
 		}
 	}

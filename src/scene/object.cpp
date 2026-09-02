@@ -553,9 +553,22 @@ void ObjectManager::update_interactive_motion(Scene *scene)
 
 void ObjectManager::prune(Scene* scene)
 {
+	/* Drop objects whose mesh has no triangles. Rhino hands those over for surfaces
+	 * that produced no render mesh, and they cost a BVH entry each.
+	 *
+	 * The type check is not optional in 5.2. Light was `public Node` in 3.5, so
+	 * scene->objects held nothing but mesh objects and casting every one to Mesh was
+	 * safe by construction. 5.2 made Light a Geometry and CCyclesLight::flush gives
+	 * each light an Object, so an unchecked cast now reads whatever lies at
+	 * Mesh::triangles inside a Light - and deletes the light if that happens to read
+	 * zero. Hair and point clouds have no triangles at all and would go the same way. */
 	vector<Object*> obs_to_prune;
 	for(Object* ob: scene->objects) {
-		if(static_cast<Mesh *>(ob->geometry)->triangles.size() == 0) {
+		const Geometry *geom = ob->geometry;
+		if(geom == nullptr) {
+			continue;
+		}
+		if(geom->is_mesh() && static_cast<const Mesh *>(geom)->triangles.size() == 0) {
 			obs_to_prune.push_back(ob);
 		}
 	}

@@ -1456,3 +1456,25 @@ So a regression suite wants a tolerance, not bit-exactness: mean 5e-5 / max 0.1 
 every difference this document records. Both fixed sources were worth finding
 anyway - one made the shader program itself differ per run, the other disabled
 pruning entirely.
+
+### What prune was not removing, and the hazard restoring it armed
+
+Rhino's `prune` deletes objects whose mesh has no triangles - surfaces that produced
+no render mesh. Instrumented on `SimpleVaseTest` and `EsaSetOfDiamonds`, it removes
+**nothing**: 0 of 6 and 0 of 11 objects, same for geometry. So the time it spent
+disabled cost these scenes nothing, and it only matters for documents that do carry
+empty meshes.
+
+Restoring it did arm a real hazard, though, and it is worth stating why the original
+code was fine and the same code is not. Both prunes did an unchecked
+`static_cast<Mesh *>` over every entry in `scene->objects` / `scene->geometry` and
+read `triangles.size()`. In 3.5 that was safe by construction: `class Light : public
+Node`, so lights were never in those lists and every entry really was a mesh. **5.2
+made `Light` a `Geometry`**, and `CCyclesLight::flush` gives every light an `Object`,
+so both lists now contain lights. The cast then reads whatever lies at
+`Mesh::triangles` inside a `Light` - undefined, and it deletes the light whenever that
+reads zero. Hair and point clouds have no triangles at all and would go the same way.
+Both loops now check `is_mesh()` first.
+
+This is the shape of port bug worth looking for elsewhere: code that is correct only
+because of a class hierarchy that 5.2 changed underneath it.
