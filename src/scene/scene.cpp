@@ -191,27 +191,24 @@ void Scene::device_update(Device *device_, Progress &progress)
     const scoped_callback_timer timer([this, print_stats](double time) {
       if (update_stats) {
         update_stats->scene.times.add_entry({"device_update", time});
-  object_manager->prune(this);
-  geometry_manager->prune(this);
-
-  /* The order of updates is important, because there's dependencies between
-   * the different managers, using data computed by previous managers.
-   *
-   * - Image manager uploads images used by shaders.
-   * - Camera may be used for adaptive subdivision.
-   * - Displacement shader must have all shader data available.
-   * - Light manager needs lookup tables and final mesh data to compute emission CDF.
-   * - Lookup tables are done a second time to handle film tables
-   */
-
         if (print_stats) {
           printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
         }
       }
     });
 
+    object_manager->prune(this);
+    geometry_manager->prune(this);
+
     /* The order of updates is important, because there's dependencies between
-     * the different managers, using data computed by previous managers. */
+     * the different managers, using data computed by previous managers.
+     *
+     * - Image manager uploads images used by shaders.
+     * - Camera may be used for adaptive subdivision.
+     * - Displacement shader must have all shader data available.
+     * - Light manager needs lookup tables and final mesh data to compute emission CDF.
+     * - Lookup tables are done a second time to handle film tables
+     */
 
     if (film->update_lightgroups(this)) {
       light_manager->tag_update(this, ccl::LightManager::LIGHT_MODIFIED);

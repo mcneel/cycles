@@ -1410,3 +1410,49 @@ full min/max/mean scan of the pass buffer that ran on every
 start. It now returns immediately unless `CCYCLES_DIAG_LOG` is set, which silences
 every remaining caller at once. What is left in `ccycles` is read-only:
 `CCYCLES_DIAG_LOG`, `CCYCLES_LOG_LEVEL` and `CCYCLES_PASS_PROBE`.
+
+### The second source: prune() was never running
+
+After the default-shader fix a **one-sample** render still differed on 1215 pixels,
+max 0.46. One sample is written once, so accumulation order cannot explain it, and
+the compiled SVM was now identical - so the scene itself had to differ between
+processes. The decisive measurement was cheap: **shipping renders the same scene
+twice at one sample and differs on a single pixel by 4e-6.** Whatever this was, it
+was ours, not upstream's, which also killed the Embree theory - both trees use
+Embree on CPU.
+
+`Scene::device_update` had `object_manager->prune(this)` and
+`geometry_manager->prune(this)` spliced *inside* the `scoped_callback_timer`
+lambda, together with the comment block that belongs after it. 3.5 has both calls
+after the timer, before the updates. The splice compiles, which is why it survived,
+and it has two effects: the calls sit behind `if (update_stats)`, so in normal
+rendering they **never run at all**, and when statistics are enabled they run from
+the timer's callback at scope exit - after every update they were meant to precede.
+Unused objects and geometry were therefore never pruned, and stale geometry took
+part in intersection.
+
+Moving them back takes a one-sample render from 1215 differing pixels to **3**,
+against shipping's 1. It did not move the four parity ratios, so it is not behind
+those.
+
+### What is left is shared with shipping
+
+Two residues remain, and neither is a port regression - shipping has both:
+
+- **Accumulation order.** At 20 samples shipping differs from itself on 12.8% of
+  pixels (mean 2.0e-5, max 0.030) and dev on 23.1% (mean 3.9e-5, max 0.078). Dev is
+  about twice shipping but the same order of magnitude, and the effect is absent at
+  one sample, so it is the order per-sample contributions are summed in.
+- **Rhino's own scene data.** The uploaded `objects` array differs between runs even
+  under an order-independent hash, in exactly two objects and exactly three fields:
+  a translation of order 1e-5 (mirrored in the inverse transform, so it is one
+  input), and `random_number`, which is `random_id / 0xFFFFFFFF` where `random_id`
+  is Rhino's runtime mesh `InstanceId`. `tri_verts` differs too. That is Rhino
+  generating render meshes and instance ids slightly differently per session, above
+  Cycles entirely.
+
+So a regression suite wants a tolerance, not bit-exactness: mean 5e-5 / max 0.1 at
+20 samples clears both residues on the worst scene here while sitting far below
+every difference this document records. Both fixed sources were worth finding
+anyway - one made the shader program itself differ per run, the other disabled
+pruning entirely.
