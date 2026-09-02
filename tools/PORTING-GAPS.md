@@ -1200,6 +1200,34 @@ be dead code. It is written down because the moment Rhino wants either feature b
 the list: an `Object` socket, a `KernelObject` field, the two `bvh/util.h` helpers, an
 `Integrator` socket, the `path_clip_ray` conditions, and the two C API functions.
 
+## Baseline: how far this branch is from shipping, per model
+
+Measured rather than impressionistic, so a change can be checked for regressions and the
+remaining gaps ranked. CPU, 20 samples, 400x240, same driver pinning the seed on both sides,
+whole-image comparison with `hdrdiff.py`. `parity.ps1` runs it.
+
+**Noise floor first**, because without it none of the numbers mean anything: the same build
+rendered twice differs by a mean of **0.000034**. driver.py pins the seed, so the renderer is
+essentially deterministic run to run. Anything above that is real.
+
+| model | mean abs diff vs shipping | times the noise floor |
+| --- | --- | --- |
+| `SimpleVaseTest` | 0.1154 | ~3400 |
+| `Brian25YearRhinoGlas` | 0.0317 | ~930 |
+| `GjisGlasTalerSimplified2` | 0.0283 | ~830 |
+| `EsaSetOfDiamonds` | 0.0137 | ~400 |
+
+So **every model differs substantially**, not only the one chased through this document.
+`SimpleVaseTest` is the outlier by a factor of four, which fits the shadow catcher background
+gap recorded above, but the other three sit 400 to 900 times the floor and none of them has
+an explanation yet.
+
+Ignore the "percent of pixels differing" figure these tools also print - at 1e-6 it reads
+70 to 99% for every model and says nothing, because the two builds' sampling differs. The
+mean is the signal. That distinction matters: comparing patch *means* is what hid the bump
+regression for a whole session, since a bump map redistributes shading without moving a
+patch average, while comparing every pixel finds it immediately.
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by
