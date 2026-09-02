@@ -1847,10 +1847,12 @@ what it actually emits answers it more cheaply:
   fix matter: before it, the C API wrote `set_volume_interpolation_method` instead, so
   the flag kept its default of **true** and Rhino's request for a homogeneous volume was
   ignored. It still needs a volume closure to show up in pixels, but it is not dead code.
-- **`matrix_math` PERSPECTIVE is hardening.** Every `MatrixMathNode` RhinoCycles builds
-  is constructed with a `Transform` and no operation, so it takes csycles' default;
-  nothing seen here asks for `NODE_MATRIX_MATH_PERSPECTIVE`. The GPU fix removes an
-  uninitialised value on a path Rhino may never take - worth keeping, not worth a scene.
+- **`matrix_math` PERSPECTIVE is unreachable from Rhino - confirmed.** Every
+  `MatrixMathNode` RhinoCycles builds is constructed with a `Transform` and no
+  operation, and csycles' constructor sets `Operation = Operations.Point`
+  (`src/csycles/ShaderNodes/MatrixMathNode.cs:116`), which nothing overrides. So the
+  GPU fix removes an uninitialised value on a path Rhino never takes: keep it as
+  hardening, and no test scene is possible, let alone needed.
 
 That leaves the `MixNode` null-deref fix as the only one genuinely waiting on a volume
 scene, and it is a null dereference: reachable or not, the fix is unambiguous.
