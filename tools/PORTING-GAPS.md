@@ -1100,6 +1100,53 @@ reasoning above says it should not, which is worth measuring before acting - the
 `.unarea.ps1 -Light rect -Shade none -Tex bump` renders a bump-textured floor on CPU and
 the bump detail in it can be compared against the untextured variant.
 
+## Audit: every place the port worked around something 5.2 removed
+
+Two of the bugs in this document were found the same way - not by bisecting, but by finding
+the equivalent code in the 3.5 tree and diffing that one function. Both had the same
+signature: a comment in our tree explaining that upstream removed a mechanism, followed by
+the behaviour being quietly simplified away. That signature is greppable, so the set is
+finite rather than an open-ended hunt:
+
+    grep -rniE '(5\.2|5\.x|upstream) (removed|dropped|replaced|no longer)|no .*-specific node|in favour of the dual|temporarily disable|stubbed' src/
+
+Eleven sites, all reviewed. Two were already the subjects of this document
+(`path_state.h:284`, the clipping planes; `tex_coord.h` with `shader_nodes.cpp:4524`, the
+bump gradient). Of the rest:
+
+**`ccycles/shader.cpp:350` - a real semantic mistranslation.**
+`cycles_shader_set_heterogeneous_volume` maps its flag onto
+`set_volume_interpolation_method(INTERPOLATION_LINEAR or INTERPOLATION_CLOSEST)`. Those are
+unrelated concepts: heterogeneous against homogeneous is whether density varies along the
+ray, a sampling optimisation, while the interpolation method is how voxel data is filtered.
+So asking for a homogeneous volume now silently switches voxel filtering to nearest, and
+asking for a heterogeneous one switches it to linear, neither of which is what was asked.
+5.2's `Shader` has `volume_sampling_method` and a derived `has_volume_spatial_varying`, so
+the right mapping is probably that upstream now infers homogeneity from the graph and this
+setter should either be a no-op or touch `volume_sampling_method` - but that is a decision
+about intended behaviour, not something to guess at.
+
+**`ccycles/mesh.cpp:305` - quadratic, but latent.** `cycles_mesh_add_triangle` reads back
+`get_triangles()`, `get_shader()` and `get_smooth()`, appends one element to each and sets
+all three again - three whole-array copies per triangle, so O(n^2) in triangle count.
+RhinoCycles does not go through it (`ChangeDatabase` uses the bulk `SetVerts` /
+`SetVertTris` path), so this is a defect in the API rather than a cause of slow big-model
+renders. Worth fixing, not urgent.
+
+**`scene/svm.h:100` - by design, and the systemic reason for the bump bug.** The packed
+`add_node_packed` / `encode_uchar4` layer is a deliberate compatibility choice so Rhino's 23
+SVM nodes and their kernel-side readers keep the old wire format. The consequence is that
+those nodes bypass `SVMCompiler::node_type()` entirely, so **any 5.2 feature keyed on the
+typed-struct path skips all 23 of them silently** - which is exactly how the bump gradient
+was lost. Any future upstream mechanism that arrives through typed structs will need
+checking against this list rather than assumed to apply.
+
+The remaining sites are mechanical ports with no behaviour lost: the
+`graphics_interop_get_device` and `DisplayDriver::zero` renames
+(`ccycles/internal_types.h`), Rhino's own luminance weights re-homed when
+`kernel/util/color.h` became `kernel/util/colorspace.h`, and the two halves of the
+in-memory image loader (`scene/image_rhino.h`, `ccycles/shader.cpp:799`).
+
 ## Three node types are not registered
 
 `velvet_bsdf`, `anisotropic_bsdf` and `musgrave_texture` are referenced by
