@@ -1478,3 +1478,47 @@ Both loops now check `is_mesh()` first.
 
 This is the shape of port bug worth looking for elsewhere: code that is correct only
 because of a class hierarchy that 5.2 changed underneath it.
+
+## The four parity models are not clean references
+
+**Every one of them stores textures as absolute paths from the machine that authored
+it**, and those files do not exist here:
+
+| model | missing |
+|---|---|
+| SimpleVaseTest | `C:\Users\Teufel\...\RhinoStudio8.exr` |
+| GjisGlasTalerSimplified2 | `C:\Users\LBP-LARS-PC\...\RhinoStudio8.exr` |
+| EsaSetOfDiamonds | `C:\Users\esa\...\RhinoStudio8.exr`, `StudioC.hdr` |
+| Brian25YearRhinoGlas | two V7 `TextureCache` jpgs |
+
+Three of the four are missing the same studio environment, which **does** exist locally
+under this user's own profile - the path is simply the author's. Worse, the two builds
+do not miss it in the same way: dev's log shows Cycles loading `StudioC.hdr` and
+`18_percent_greycard.jpg`, while shipping's log contains no image loading at all,
+though it does carry other `UpdateCallback` lines. **So the two builds are not
+rendering the same scene**, and the difference lands on the environment - which is
+exactly where the ratio deficits sit.
+
+`driver.py` now takes `RHDIFF_FIXTEX=1`, which repoints any missing texture at a local
+copy of the same basename and logs what it could not resolve. Use it, or expect to
+attribute a content difference to the renderer. `RhinoStudio8.exr` resolves that way;
+`StudioC.hdr` has no local copy and is presumably read from the file's embedded
+content, which is why dev finds it and shipping does not.
+
+This reframes the four gaps. They are still real differences in output, but they are
+not all shading differences, and the failure to explain `SimpleVaseTest` across six
+attempts is a good deal less surprising now.
+
+### Where EsaSetOfDiamonds actually stands
+
+Narrowed, not closed. Its 0.9408 is **not** the `Gem` material - replacing `Gem` with a
+plain grey PBR leaves the ratio at 0.9383 and the median at 0.9187, unchanged to four
+decimals. A per-cell ratio map puts the deficit in the background and edges (0.89-0.91)
+rather than on the objects (0.95-0.99), and the backgrounds are flat in both builds
+(relative stddev 2.4% shipping, 1.8% dev), so neither is displaying the studio image:
+dev simply renders a flat background 9.6% dimmer, 0.1161 against 0.1285.
+
+It is also not a general point-light strength error - a synthetic single-point-light
+scene makes dev 4% **brighter**, the opposite sign. The remaining question is the
+background level itself, and the next step is a locally authored environment-lit scene,
+with no borrowed texture paths, that reproduces the 10%.
