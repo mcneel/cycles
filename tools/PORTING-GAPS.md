@@ -1801,3 +1801,31 @@ With that, the table reads:
 | EsaSetOfDiamonds | 0.9406 | environment loading, not shading |
 
 Nothing in the four is an unexplained port regression.
+
+### The light-direction question, decided
+
+This has been open as "area-only negation in `CCyclesLight::flush`, or the global
+`dir *= -1.0f`, but never both". The evidence is now in:
+
+- Shipping's RhinoCycles has the **global** negation - it arrives with "Make lights
+  work", which this branch reverted.
+- Dev has the **area-only** negation in `flush`, and it is measured: Brian's file has
+  Direction with dot +0.97 toward the scene and the kernel received exactly the negation,
+  while the spot sign was checked separately with the smoke test's `SMOKE_SPOTZ` sweep.
+- The two agree for area lights, which is why the rect-light reproducer renders correctly
+  in both. Making the basis right-handed as well (`z = -z` plus swapping u and v)
+  measured a **no-op to four decimals**, so handedness is not part of this.
+
+**Decision: keep the area-only negation, do not add the global one.** Adding it would
+double-negate area lights, and the per-type behaviour dev needs is already verified by
+measurement for the two types where direction matters.
+
+### One latent bug found in passing, not fixed here
+
+`ChangeDatabase` calls `film_set_use_approximate_shadow_catcher(session,
+ob.IsShadowCatcher)` **once per object**, so a single global film flag ends up holding
+whatever the last object processed happened to be. It lands correctly on
+`SimpleVaseTest` (one catcher, called once with 1), but a scene with a catcher followed
+by a non-catcher would clear it. That is RhinoCycles rather than Cycles, so it is
+recorded here rather than changed - the fix is to set it from whether the scene has any
+catcher at all, not per object.
