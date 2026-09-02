@@ -1023,7 +1023,37 @@ host-side in the output driver. Enabling the per-component light passes and comp
 across devices is the obvious next probe: it would say directly whether the diffuse direct
 component is what goes missing.
 
-## Rhino's SVM nodes ignore the bump offset, so bump through them does nothing
+## Bump maps are silently ignored - measured, CPU, against shipping
+
+Not a fidelity nuance: **bump does nothing at all in this branch.** Same three-object scene,
+same CPU device, 20 samples, comparing the bump-textured material against the identical
+material with no texture:
+
+| build | pixels differing | mean abs diff | max abs diff |
+| --- | --- | --- | --- |
+| **shipping** | 59110 of 96000 (**61.6%**) | 0.008546 | 0.164 |
+| **this branch** | 408 of 96000 (0.43%) | 0.000013 | 0.023 |
+
+Shipping applies the bump map across most of the frame. This branch differs from its own
+no-texture render only at noise level. Both dev figures come from one build (the
+instrumentation-stripped one) so they are directly comparable, and shipping renders the
+same two models as the control, which removes the obvious objection - the scene's floor is
+overexposed and lit by a large overhead area light, where a small normal perturbation
+barely changes N dot L, so "no visible difference" alone would not have been evidence.
+Shipping showing 61.6% in that same scene settles it.
+
+Reproduce with `hdrdiff.py`, which compares every pixel rather than patch means - a patch
+mean can hide a bump that moves shading around without changing its average:
+
+    .unarea.ps1 -Light rect -Shade none -Tex none
+    .unarea.ps1 -Light rect -Shade none -Tex bump
+    python hdrdiff.py renders\dev\arealight-rect-none-none.CPU.hdr renders\dev\arealight-rect-none-bump.CPU.hdr
+
+This is almost certainly the cause of image differences across the whole test-model sweep,
+not just the two scenes chased in this document, and it is user-visible on CPU - the
+platform most people render on.
+
+### Mechanism, and why the earlier reading of it was wrong
 
 **This section previously claimed a stack-size mismatch and undefined behaviour. That was
 wrong** - written from reading the compiler half of the mechanism without checking what the
