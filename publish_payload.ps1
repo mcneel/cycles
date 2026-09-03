@@ -314,6 +314,11 @@ Write-Ok 'kernel source hash' $manifest.kernelSourceHash.Substring(0, 16)
 # Rhino.Inside in Revit 2020 loads Revit's own OpenImageIO and TBB into the process,
 # and resolution by bare filename picked the host's instead of ours.
 #
+# Note that ccycles.dll was built from source in 3.5 too - it is our code either way -
+# so post-processing it was a choice rather than a necessity: the resource had simply
+# never been wired into the CMake. openvdb.dll and the oneAPI JIT DLL are the only ones
+# that genuinely have no link step of ours.
+#
 # None of that applies to 5.x:
 #
 #   * ccycles.dll gets both at link time now. src/ccycles/CMakeLists.txt generates
