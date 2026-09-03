@@ -2248,3 +2248,51 @@ So the preview hang stands where it did: the RDK quick path is healthy in dev, t
 scripted routes cannot discriminate the builds, and the MCP route cannot either until
 dev's script host answers. An interactive reproduction with a debugger remains the way
 in.
+
+### Driving a dev build over MCP: why inline scripts fail, and the workaround
+
+Worth writing down, because it wasted a lot of time and silently invalidated a
+comparison.
+
+`run_python` over the MCP listener **fails against a dev build for every script**,
+including `print(42)`. It is not a hang: the dev build's `ScriptEditor` command expects a
+**file path** (`Path of script to run ( Browse ):`), the MCP host sends **inline script
+text**, and the mismatch produces `SyntaxError` plus a modal
+
+    RHINO ERROR
+    The ScriptEditor command did not return 'success', 'cancel', or 'nothing'.
+    (Use "TestErrorCheck" to disable this message box.)
+
+which blocks the call until the client times out at 300 seconds. Shipping accepts inline
+text, so the same call works there - and that asymmetry is exactly what produced the
+retracted "dev blocks, shipping returns" table.
+
+**The workaround is to bypass the script host**: write the script to a file and run it by
+path through `run_command`:
+
+    -RunPythonScript "C:\path	o\probe.py"
+
+Have the script write its findings to a text file rather than stdout, since command
+output is not returned reliably. With that route, Python runs in a dev build over MCP
+normally. Launch with `-TestErrorCheck _ModalDlgOnError=off` chained before `_MCPStart`
+to suppress the developer error boxes as well.
+
+### What that channel then showed about previews
+
+With a valid channel on both sides, running the identical script by path:
+
+| build | `GenerateRenderContentPreview` | poll afterwards |
+|---|---|---|
+| dev | returns 0.0s, `state=Rendering` | still `Rendering` at 28 s |
+| shipping | returns 0.0s, `state=Rendering` | still `Rendering` at 21 s |
+
+**Identical.** So there is no dev-only anomaly at this entry point, and the earlier
+claim of one was an artefact of the broken channel. The job does not complete under
+automation in *either* build, so this API cannot demonstrate the reported hang however it
+is driven.
+
+That is a useful negative: suspicion moves off `GenerateRenderContentPreview` and onto
+whatever services the queue in an interactive session. The remaining step is genuinely
+interactive - open the material editor in a dev build, watch a thumbnail fail to appear,
+and read the stacks - and `_Materials` does open over `run_command` (it returns `Done.`),
+so a live session is easy to set up; what is missing is eyes on the panel.
