@@ -302,14 +302,25 @@ Write-Ok 'kernel source hash' $manifest.kernelSourceHash.Substring(0, 16)
 
 # ------------------------------------------------------------------- version resources
 
-# openvdb.dll and cycles_kernel_oneapi_jit.dll come out of the precompiled Blender
-# library bundle, so we ship them without building them and the only way to attach
-# version resources is after the fact. ccycles.dll does not need this - its VERSIONINFO
-# and SxS manifest are compiled in at link time.
+# Not just cosmetic, despite the name. ccycles.dll genuinely no longer needs any of
+# this - its VERSIONINFO and SxS manifest are compiled in at link time - but two of the
+# three things versioninfo_changer.ps1 does still matter, because we ship openvdb.dll
+# and cycles_kernel_oneapi_jit.dll out of the precompiled Blender bundle without
+# building them, so resources can only be attached afterwards:
 #
-# This step had no caller at all after make_rhino_all.ps1 stopped being used, so those
-# two DLLs were shipping unstamped. It needs ResourceHacker, which is not part of any
-# other requirement here, so a missing one is a warning rather than a failure.
+#   * openvdb.dll gets a side-by-side assembly manifest so it resolves tbb.dll within
+#     the Cycles assembly instead of picking up Rhino's copy. This is functional. The
+#     versions really do differ - the payload ships TBB 2022.3.0 while src4/bin/Debug
+#     holds 2021.11 - and Windows resolves a DLL's dependencies from the application
+#     directory first, not from the DLL's own. Whether it currently misbinds depends on
+#     the flags Rhino loads plug-ins with, which is worth establishing rather than
+#     assuming; oneTBB keeping ABI within tbb12 is why this has not obviously broken.
+#   * the oneAPI JIT DLL gets a version stamp, which is diagnostic only.
+#   * leftover *_d.dll, *.so and *gyd* files are stripped from the install tree.
+#
+# The step had no caller at all after make_rhino_all.ps1 stopped being used. It needs
+# ResourceHacker, which nothing else here requires, so a missing one warns - but for a
+# payload that is actually shipping, the openvdb manifest should not be skipped.
 Write-Step "Stamping version resources"
 
 $versionScript = Join-Path $cyclesRoot 'versioninfo_changer.ps1'
@@ -318,7 +329,9 @@ if (-not (Test-Path $versionScript)) {
 }
 elseif (-not (Get-Command 'ResourceHacker' -ErrorAction SilentlyContinue) -and
         -not (Get-Command 'ResourceHacker.exe' -ErrorAction SilentlyContinue)) {
-    Write-Warn 'skipped' 'ResourceHacker is not on PATH; openvdb.dll and the oneAPI JIT DLL will ship unstamped'
+    Write-Warn 'skipped' 'ResourceHacker is not on PATH'
+    Write-Warn '' 'openvdb.dll will ship with no SxS manifest, so it resolves tbb.dll'
+    Write-Warn '' 'from the application directory rather than from this payload'
 }
 else {
     & $versionScript -InstallDir $payloadDir
