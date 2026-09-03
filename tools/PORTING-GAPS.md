@@ -1986,3 +1986,41 @@ kernels built from current source, which is the only state that matters.
 The dev build was checked afterwards for collateral damage from rebuilding
 `RhinoCyclesCore` outside the solution: `SimpleVaseTest` still renders to mean 0.1880,
 the same value as before, so the build behaves as it did.
+
+## The preview hang: what is established, and why it is still open
+
+Not reproduced, but narrowed on both sides.
+
+**The code has a plausible mechanism.** `PreviewRenderEngine.Renderer` runs its entire
+body inside `lock (RcCore.It.PreviewRendererLock)` - one global lock for all previews -
+and drives the render with a `Thread.Sleep(50)` poll on `Finished`. A single preview that
+never reports finished therefore holds that lock forever, and every later preview blocks
+behind it, which presents as the whole application deadlocking rather than one thumbnail
+failing. It also sets `Session.Scene.Integrator.UseAdaptiveSampling = false`, which is
+the setting that used to render black in this branch, so a preview that produced nothing
+was once a plausible way in.
+
+**Recorded for anyone attempting it: it is dev-only, and dev is Debug while shipping is
+Release.** That is exactly how a blocked CRT assertion dialog presents, and this project
+has lost hours to one before. Check `MainWindowTitle` on the live process before
+believing in a deadlock - `runpreview.ps1` does this automatically.
+
+**Why it is not reproduced yet.** Driving a content preview from script needs real RDK
+scaffolding. `RenderMaterial` has no `CreatePreview` in this RhinoCommon. What exists is
+
+    GenerateRenderContentPreview(lwf: LinearWorkflow, c: RenderContent, width, height,
+                                 bSuppressLocalMapping, pjs: PreviewJobSignature,
+                                 pa: PreviewAppearance, result: PreviewRenderResult)
+    GenerateQuickContentPreview(c: RenderContent, width, height, psc: PreviewSceneServer,
+                               bSuppressLocalMapping, reason: int, result: Result)
+
+A null `PreviewSceneServer` is accepted, but the trailing `result` is a ref parameter the
+script host will not synthesise, and `Rhino.Render.RenderContent` exposes no `Result`
+type to pass (only `MatchDataResult`). `NewPreviewSceneServer(ssd: SceneServerData)` with
+`SceneServerData(geo, back, light, usage)` or `SceneServerData(appearance, usage)` is the
+way in, and building those is the next step - four Rhino launches went into establishing
+this much, so the signatures above are worth keeping.
+
+`previewtest.py` and `runpreview.ps1` in the harness carry all of it: they open a model,
+walk `doc.RenderMaterials`, log before and after each attempt with timings, and watch the
+window title from outside.
