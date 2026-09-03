@@ -2151,3 +2151,42 @@ server, or an interactive reproduction with a debugger attached to read the stac
 the code hypothesis to confirm is one preview holding
 `RcCore.It.PreviewRendererLock` while its `Thread.Sleep(50)` loop waits on a `Finished`
 flag that never arrives.
+
+### Preview hang: the API is now fully mapped, and a scripted repro is not possible
+
+Everything needed to call the preview pipeline from script is established, so nobody has
+to rediscover it:
+
+    appearance = Rhino.Render.PreviewAppearance(material.CppPointer)
+    ssd        = Rhino.Render.SceneServerData(appearance,
+                     Rhino.Render.SceneServerDataUsage.Synchronous)
+    psc        = material.NewPreviewSceneServer(ssd)
+    sig        = Rhino.Render.PreviewJobSignature(w, h, material.RenderHash)
+    result     = Rhino.Render.Utilities.PreviewRenderResult.Rendering   # nested in Utilities
+
+    # RDK's own fast path - works:
+    RenderContent.GenerateQuickContentPreview(m, w, h, psc, False, 0,
+                                              ref Rhino.Commands.Result)
+    # the Cycles path - asynchronous:
+    RenderContent.GenerateRenderContentPreview(None, m, w, h, False, sig, appearance,
+                                               ref Utilities.PreviewRenderResult)
+
+**The quick path works in dev**: a real `Bitmap` with `Result.Success`, 2.1 s for the
+first material and 0.0 s cached for the second. So the RDK preview plumbing is healthy.
+
+**The Cycles path never completes from a script** - it returns `(None, Rendering)`
+immediately and stays `Rendering`. Polling for two minutes does not finish it, **and
+shipping behaves exactly the same**, so this does not discriminate the two builds.
+Replacing the sleep with a `Rhino.RhinoApp.Wait()` pump - on the theory that sleeping on
+the script thread starved the job - changed nothing.
+
+So three routes are exhausted: the RDK API with a null scene server (declines), the
+Materials panel via a scripted command (never returns in either build), and the
+asynchronous rendered preview (stays `Rendering` in either build, pumped or not). Ten
+Rhino launches went into this. **A scripted reproduction is not the way in.**
+
+What would settle it in minutes: reproduce it interactively - open the material editor in
+a dev build and watch a thumbnail hang - then attach a debugger and read the stacks. The
+hypothesis to confirm is a preview holding `RcCore.It.PreviewRendererLock` while its
+`Thread.Sleep(50)` loop waits on a `Finished` flag that never arrives, which would block
+every later preview behind the same lock.
