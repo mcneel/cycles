@@ -32,10 +32,12 @@
       * MSVC redist and
         Windows Kits     - dropped entirely; CMake locates these itself.
 
-    The CUDA architecture list is deliberately NOT pinned here any more. Upstream
-    Cycles keeps CYCLES_CUDA_BINARIES_ARCH current with what the toolkit and the
-    renderer actually support; the old hardcoded list still named sm_37, which
-    has not been supported since Cycles 4.2.
+    The shipping architecture lists for CUDA and HIP are pinned here, in
+    $cudaShippingArches and $hipShippingArches, and passed with -D so upstream's
+    CMakeLists keeps taking merges cleanly. They are a statement about which
+    GPU generations Rhino supports, so they belong somewhere a person can read
+    them - and upstream's defaults are wrong for us in both directions: its HIP
+    list has no RDNA4, and its CUDA list still names Kepler.
 
 .PARAMETER Configuration
     Debug, Release or RelWithDebInfo. Release maps to RelWithDebInfo in the
@@ -50,9 +52,10 @@
     Plug-ins output directory for the chosen configuration.
 
 .PARAMETER CudaBinaries
-    Build the full set of CUDA cubins instead of PTX only. Slow; used for
-    release builds. Only meaningful together with -AllArches, since otherwise
-    the architecture list comes from the cards in this machine.
+    Fall back to upstream's CYCLES_CUDA_BINARIES_ARCH rather than PTX only.
+    Rarely wanted: -AllArches already builds Rhino's shipping list, and a local
+    build takes its architectures from the cards in this machine. This is the
+    escape hatch for comparing against what upstream would have produced.
 
 .PARAMETER AllArches
     Build kernels for every architecture Cycles ships, rather than only for the
@@ -592,10 +595,39 @@ $hipShippingArches = @(
     'gfx1200', 'gfx1201'
 )
 
+# The shipping CUDA architecture list, owned by Rhino for the same reason as the HIP one
+# - except here the question is which NVIDIA generations Rhino supports, which is a
+# product decision and should be written down somewhere a person can read it.
+#
+# Two things this fixes. Upstream's list still names sm_30, sm_35 and sm_37 - Kepler,
+# 2012, dropped by CUDA 12 - and because the CMake routes architectures the primary
+# toolkit rejects to the optional CUDA 11 one, a machine with CUDA 11.8 installed would
+# actually build and ship them. And the payload before this shipped *no* cubins at all,
+# only kernel_compute_52.ptx.zst, so every NVIDIA card JIT-compiled Maxwell-era PTX on
+# first render and none of the per-architecture tuning upstream added ever applied -
+# --jump-table-density for sm_120 among it.
+#
+# Maxwell through Blackwell, plus compute_75 as the PTX fallback for anything newer or
+# not listed. Adding a generation is one line here.
+$cudaShippingArches = @(
+    'sm_52'                       # Maxwell   - GTX 900
+    'sm_60', 'sm_61'              # Pascal    - GTX 10xx, Quadro P
+    'sm_70'                       # Volta     - Titan V, V100
+    'sm_75'                       # Turing    - GTX 16xx, RTX 20xx
+    'sm_86'                       # Ampere    - RTX 30xx
+    'sm_89'                       # Ada       - RTX 40xx
+    'sm_120'                      # Blackwell - RTX 50xx
+    'compute_75'                  # PTX fallback for everything else
+)
+
 if ($AllArches) {
     if ($kernelHip) {
         $hipArches = $hipShippingArches
         Write-Found 'HIP arch' "$($hipArches.Count) shipping targets"
+    }
+    if ($kernelCuda) {
+        $cudaArches = $cudaShippingArches
+        Write-Found 'CUDA arch' "$($cudaArches.Count) shipping targets"
     }
 }
 else {
