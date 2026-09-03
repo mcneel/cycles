@@ -38,22 +38,32 @@ $CyclesHipShippingArches = @(
     'gfx1200', 'gfx1201'                                                    # RDNA4
 )
 
-# NVIDIA, CUDA. 8 cubins plus one PTX fallback.
+# NVIDIA, CUDA. 9 cubins plus one PTX fallback.
 #
-# compute_75 is a virtual architecture, so it produces PTX that the driver JITs for
-# anything unlisted - newer cards included. It is a fallback, not a substitute: the
-# payload once contained only kernel_compute_52.ptx.zst and nothing else, which meant
-# every NVIDIA card ran code generated for a Maxwell virtual architecture, with none of
-# upstream's per-architecture tuning applied.
+# The floor is compute capability 5.0 because that is Cycles' own floor - device_impl.cpp
+# refuses anything below it - so this list covers every card upstream supports and no
+# more.
+#
+# Do not thin it out without understanding how a card finds its kernel. CUDADevice walks
+# cubins within one major version, minor counting down, and then walks PTX *downwards*
+# from the card's own capability. So compute_75 is only ever found by a card at 7.5 or
+# above: dropping the sm_5x, sm_6x and sm_70 cubins does not make those cards fall back
+# to PTX, it leaves them with no CUDA kernel at all and sends them to the CPU. sm_50 was
+# missing here for one payload for exactly that reason - a GTX 750 Ti found no cubin,
+# walked PTX 5.0 down to 5.0, and got nothing.
+#
+# If these ever do need to go, the cheap way is to add a low virtual architecture -
+# compute_52 - so old cards JIT rather than lose the GPU. One file instead of four
+# cubins, at the cost of first-render latency and no per-architecture tuning.
 $CyclesCudaShippingArches = @(
-    'sm_52'                       # Maxwell   - GTX 900
+    'sm_50', 'sm_52'              # Maxwell   - GTX 750 Ti, GTX 900, 940M
     'sm_60', 'sm_61'              # Pascal    - GTX 10xx, Quadro P
     'sm_70'                       # Volta     - Titan V, V100
     'sm_75'                       # Turing    - GTX 16xx, RTX 20xx
     'sm_86'                       # Ampere    - RTX 30xx
     'sm_89'                       # Ada       - RTX 40xx
     'sm_120'                      # Blackwell - RTX 50xx
-    'compute_75'                  # PTX fallback for everything else
+    'compute_75'                  # PTX fallback for Turing and newer
 )
 
 # The OptiX modules. Architecture-independent PTX compiled by the OptiX runtime at
