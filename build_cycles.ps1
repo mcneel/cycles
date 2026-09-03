@@ -17,10 +17,18 @@
                            with the VS2019 ABI.
       * CUDA / OptiX /
         HIP / oneAPI     - probed from the usual environment variables and
-                           install locations. Anything not found is switched
-                           off rather than failing the build, so a developer
-                           with no GPU SDKs installed still gets a working
-                           CPU-only Cycles.
+                           install locations. A missing SDK switches off that
+                           backend's *kernels*, not the backend: CUDA and HIP
+                           device support is compiled in either way, so the
+                           kernels already in the payload keep serving the GPU.
+                           OptiX is the exception - it needs its SDK headers
+                           and nvcc, with no dynamic-loading path around either.
+
+    Kernels are built for the GPUs in this machine, not for every architecture
+    Cycles supports. Rebuilding kernels is how you test a kernel change, and a
+    kernel for a card you do not own cannot be tested - so an AMD-only machine
+    should not spend an hour on 18 HIP fatbins plus the CUDA and OptiX kernels
+    every time a kernel header changes. Pass -AllArches for the shipping set.
       * MSVC redist and
         Windows Kits     - dropped entirely; CMake locates these itself.
 
@@ -43,7 +51,13 @@
 
 .PARAMETER CudaBinaries
     Build the full set of CUDA cubins instead of PTX only. Slow; used for
-    release builds.
+    release builds. Only meaningful together with -AllArches, since otherwise
+    the architecture list comes from the cards in this machine.
+
+.PARAMETER AllArches
+    Build kernels for every architecture Cycles ships, rather than only for the
+    GPUs in this machine. This is what publishing a payload wants; a developer
+    testing a kernel change does not.
 
 .PARAMETER ConfigureOnly
     Run the CMake configure step and stop, leaving a solution to open in VS.
@@ -93,6 +107,8 @@ param(
 
     [switch]$CudaBinaries,
 
+    [switch]$AllArches,
+
     [switch]$ConfigureOnly,
 
     [ValidateSet('ninja', 'vs')]
@@ -120,12 +136,16 @@ function ConvertTo-CMakePath([string]$p) { return $p.Replace('\', '/') }
 
 Write-Step "Checking prerequisites"
 
-foreach ($tool in 'cmake', 'git', 'python') {
-    $cmd = Get-Command $tool -ErrorAction SilentlyContinue
-    if (-not $cmd) { throw "'$tool' is not on PATH. Install it and re-run." }
-    Write-Found $tool $cmd.Source
-}
-
+# Visual Studio is the anchor for everything else. CMake and Ninja both ship inside it,
+# in the "C++ CMake tools for Windows" component that Rhino's own .vsconfig already
+# installs - so a machine that has run bootstrap.exe holds the entire toolchain even
+# with an empty PATH.
+#
+# This used to demand cmake, git and python on PATH up front and throw otherwise, which
+# failed a check a correctly set up machine passes: VS's cmake.exe is not on PATH by
+# default. git and python are not needed to build at all. They are needed only to fetch
+# the precompiled library bundle, so they are checked in that step instead, and only
+# when the bundle is actually missing.
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found. Install Visual Studio 2022 or newer." }
 
@@ -146,6 +166,22 @@ $vsMajor = & $vswhere -latest -products * `
     -version '[17.0,)' -property installationVersion
 $vsMajor = [int](($vsMajor -split '\.')[0])
 
+# CMake: prefer whatever is on PATH, then fall back to the copy inside Visual Studio.
+# PATH wins here - unlike Ninja below - because this tree deliberately pins an older
+# CMake than the newest release, and a developer who installed one on PATH meant it.
+# The fallback is what lets a bootstrapped machine build with nothing else installed.
+$cmakeExe = @(
+    (Get-Command cmake -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)
+    (Join-Path $vsPath 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe')
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+
+if (-not $cmakeExe) {
+    throw ("cmake was not found on PATH or inside '$vsPath'. Add the 'C++ CMake tools " +
+           "for Windows' component in the Visual Studio installer, or run bootstrap.exe " +
+           "from the root of the Rhino repo, which installs it from Rhino's .vsconfig.")
+}
+Write-Found 'cmake' $cmakeExe
+
 # The generator is chosen from what CMake actually offers, not derived from the
 # Visual Studio version. Deriving it looked obvious and was wrong: on a machine
 # with VS 18 it produced "Visual Studio 18 2026", which CMake 3.31 has never
@@ -156,7 +192,7 @@ $vsMajor = [int](($vsMajor -split '\.')[0])
 # Ask CMake, keep the Visual Studio entries, and take the newest whose major
 # version is one we actually have installed.
 $cmakeGenerators = @(
-    & cmake --help 2>$null |
+    & $cmakeExe --help 2>$null |
         Select-String -Pattern '^\s*\*?\s*(Visual Studio (\d+) \d+)' |
         ForEach-Object {
             [pscustomobject]@{
@@ -173,7 +209,7 @@ $vsGenerator = $cmakeGenerators |
 
 if (-not $vsGenerator) {
     throw ("CMake offers no Visual Studio generator at or below version $vsMajor. " +
-           "Installed CMake is $((& cmake --version | Select-Object -First 1)); " +
+           "Installed CMake is $((& $cmakeExe --version | Select-Object -First 1)); " +
            "either install a newer CMake or a Visual Studio it supports.")
 }
 
@@ -280,6 +316,19 @@ else {
     Write-Host "   Libraries missing - running 'make update'" -ForegroundColor Yellow
     $makeBat = Join-Path $cyclesRoot 'make.bat'
     if (-not (Test-Path $makeBat)) { throw "make.bat not found at '$makeBat'." }
+
+    # git and python are needed here and nowhere else - 'make update' drives
+    # make_update.py, which fetches the library submodule. Checking them at this point
+    # rather than up front means a developer whose bundle is already checked out (the
+    # normal case after bootstrap.exe, which inits submodules) never has to have them.
+    foreach ($tool in 'git', 'python') {
+        if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
+            throw ("'$tool' is needed to fetch the precompiled Cycles libraries and was " +
+                   "not found on PATH. Run bootstrap.exe from the root of the Rhino repo, " +
+                   "or fetch the bundle yourself with 'git submodule update --init " +
+                   "--recursive' in $cyclesRoot.")
+        }
+    }
     # Launch with an explicit working directory: Set-Location/Push-Location does
     # not change the working directory a child process inherits.
     $proc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "`"$makeBat`"", 'update' `
@@ -428,7 +477,7 @@ if (-not $Devices -and $env:CYCLES_DEVICES) {
 
 if (-not $Devices) {
     $Devices = if ($detected.Count) { $detected.ToArray() } else { @('cpu') }
-    Write-Host "   -> enabling: $($Devices -join ', ')" -ForegroundColor Cyan
+    Write-Host "   -> kernels for: $($Devices -join ', ')" -ForegroundColor Cyan
 }
 else {
     Write-Host "   -> requested: $($Devices -join ', ')" -ForegroundColor Cyan
@@ -438,6 +487,141 @@ else {
         }
         if ($d -ne 'cpu' -and $detected -notcontains $d) {
             throw "'$d' was requested but its toolkit was not detected. Install it, set the matching environment variable, or drop it from -Devices."
+        }
+    }
+}
+
+# -------------------------------------------------------- device support vs kernels
+#
+# These are two different questions and the script used to answer only one.
+#
+#   Device support is host code. Cycles loads the CUDA and HIP driver APIs
+#   dynamically - WITH_CUDA_DYNLOAD defaults ON and external_libs.cmake forces
+#   WITH_HIP_DYNLOAD ON - so device/cuda and device/hip compile and link against the
+#   bundled cuew and hipew headers, with no toolkit installed at all.
+#
+#   Kernel binaries are the cubins, PTX and fatbins. Those need nvcc and hipcc.
+#
+# Conflating them was the worst trap in the old behaviour: no CUDA toolkit meant
+# WITH_CYCLES_DEVICE_CUDA=OFF, so a developer with an NVIDIA card and no SDK built a
+# ccycles.dll that could not use their own GPU - and, because the install overwrites
+# the payload in big_libs, lost the working kernels that were already there. Now the
+# device stays compiled in and the existing kernels in the payload keep serving it.
+#
+# OptiX is the exception. Its host code includes the SDK headers (OPTIX_INCLUDE_DIR)
+# and its kernels are PTX built by nvcc, so it needs the OptiX SDK *and* a CUDA
+# toolkit. There is no dynamic-loading path that avoids either.
+#
+# oneAPI cannot be split at all: its device support and its kernel DLL are one
+# artifact - cycles_kernel_oneapi_jit.dll, built by the SYCL clang++ in the library
+# bundle - so there is no switch that keeps Intel support while skipping the build.
+# It needs nothing installed, but it is the long serial job in a full build. Splitting
+# it would mean editing upstream's kernel/device/oneapi/CMakeLists.txt.
+$deviceCuda  = $true
+$deviceHip   = $true
+$deviceOneApi = [bool]$levelZeroRoot
+$deviceOptix = [bool]($optixPath -and $cudaPath)
+
+if (-not $optixPath) {
+    Write-Missing 'OptiX device' 'no SDK headers; OptiX support is compiled out of this build'
+}
+elseif (-not $cudaPath) {
+    Write-Missing 'OptiX device' 'OptiX kernels are built by nvcc and no CUDA toolkit was found'
+}
+
+$kernelCuda  = ($Devices -contains 'cuda') -and [bool]$cudaPath
+$kernelHip   = ($Devices -contains 'hip') -and [bool]$hipPath
+$kernelOptix = ($Devices -contains 'optix') -and $deviceOptix
+
+# ------------------------------------------------------- which architectures to build
+#
+# By default build only what this machine can actually run, which is the whole point
+# of a local build: you rebuild kernels to test a change, and a kernel for a card you
+# do not own cannot be tested. An AMD-only machine paying for 18 HIP fatbins plus the
+# CUDA and OptiX kernels on every kernel touch is roughly an hour for nothing.
+#
+# -AllArches builds the full shipping set. That is what publishing wants, and nothing
+# else should use it.
+#
+# Detection uses the vendors' own tools rather than adapter enumeration:
+# amdgpu-arch (ships with ROCm) prints the gfx target of each installed AMD GPU, and
+# nvidia-smi (ships with the driver) reports each NVIDIA card's compute capability.
+# Win32_VideoController is not usable for this - it also lists things like the
+# "Microsoft Remote Display Adapter", and it does not name a kernel architecture.
+function Get-LocalHipArches {
+    if (-not $hipPath) { return @() }
+    $exe = Join-Path $hipPath 'bin\amdgpu-arch.exe'
+    if (-not (Test-Path $exe)) { return @() }
+    $out = & $exe 2>$null
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return @($out | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^gfx[0-9a-f]+$' } | Select-Object -Unique)
+}
+
+function Get-LocalCudaArches {
+    $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+    if (-not $smi) { return @() }
+    $out = & $smi.Source --query-gpu=compute_cap --format=csv,noheader 2>$null
+    if ($LASTEXITCODE -ne 0) { return @() }
+    return @($out |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -match '^(\d+)\.(\d+)$' } |
+        ForEach-Object { "sm_$($Matches[1])$($Matches[2])" } |
+        Select-Object -Unique)
+}
+
+$hipArches = @()
+$cudaArches = @()
+
+# The shipping HIP architecture list, owned by Rhino rather than taken from upstream.
+#
+# Upstream's CYCLES_CUDA_BINARIES_ARCH is kept current, but CYCLES_HIP_BINARIES_ARCH was
+# last touched in June 2024 and names 18 targets with no RDNA4 among them - so a payload
+# built from the upstream default leaves an RX 9070 falling back to CPU. These four
+# additions were already known in this tree; they were sitting in make_hip.sh, which the
+# Windows build never called.
+#
+# Kept here, and passed with -D, so upstream's CMakeLists stays untouched and takes
+# merges cleanly. hipcc cross-compiles for absent hardware, so no AMD card of any
+# generation is needed to build these - verified by compiling gfx1201 on a gfx1150
+# machine.
+$hipShippingArches = @(
+    'gfx900', 'gfx902', 'gfx906', 'gfx90c'
+    'gfx1010', 'gfx1011', 'gfx1012'
+    'gfx1030', 'gfx1031', 'gfx1032', 'gfx1034', 'gfx1035', 'gfx1036'
+    'gfx1100', 'gfx1101', 'gfx1102', 'gfx1103', 'gfx1150', 'gfx1151', 'gfx1152'
+    'gfx1200', 'gfx1201'
+)
+
+if ($AllArches) {
+    if ($kernelHip) {
+        $hipArches = $hipShippingArches
+        Write-Found 'HIP arch' "$($hipArches.Count) shipping targets"
+    }
+}
+else {
+    if ($kernelHip) {
+        $hipArches = Get-LocalHipArches
+        if ($hipArches.Count) { Write-Found 'HIP arch' ($hipArches -join ', ') }
+        else {
+            Write-Missing 'HIP arch' 'no AMD GPU found by amdgpu-arch; skipping HIP kernels'
+            $kernelHip = $false
+        }
+    }
+    if ($kernelCuda) {
+        $cudaArches = Get-LocalCudaArches
+        if ($cudaArches.Count) { Write-Found 'CUDA arch' ($cudaArches -join ', ') }
+        else {
+            Write-Missing 'CUDA arch' 'no NVIDIA GPU found by nvidia-smi; skipping CUDA kernels'
+            $kernelCuda = $false
+            # The OptiX kernels are architecture-independent PTX rather than per-arch
+            # cubins, so nothing about them needs narrowing - but with no NVIDIA card
+            # present there is nothing to test them on either, and they are nine nvcc
+            # invocations. Skip them for the same reason as the cubins. Device support
+            # stays compiled in, so the payload's OptiX kernels keep working.
+            if ($kernelOptix) {
+                Write-Missing 'OptiX kernels' 'no NVIDIA GPU present; using the ones in the payload'
+                $kernelOptix = $false
+            }
         }
     }
 }
@@ -521,20 +705,30 @@ else {
     $cmakeArgs += '-A', 'x64'
 }
 
-if ($Devices -contains 'optix') {
+# Every device switch below is set explicitly, ON or OFF, on every configure. Only ever
+# adding =ON meant the CMake cache remembered whatever a previous run enabled, so
+# -Devices cpu still built HIP in an existing build directory - the flags described the
+# difference from last time rather than what was asked for.
+
+if ($deviceOptix) {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=ON', "-DOPTIX_ROOT_DIR=$(ConvertTo-CMakePath $optixPath)"
 } else {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_OPTIX=OFF'
 }
 
-if ($Devices -contains 'cuda') {
-    # WITH_CYCLES_DEVICE_CUDA is marked advanced and defaults to ON, so it was
-    # easy to leave alone - but the cache remembers an OFF from any earlier
-    # -Devices run that excluded CUDA, and with the device off find_package(CUDA)
-    # never runs. CUDA_NVCC_EXECUTABLE then stays empty, and the OptiX kernels
-    # call cuda_add_common_flags with an empty version argument, which CMake
-    # reports only as "invoked with incorrect arguments".
-    $cmakeArgs += '-DWITH_CYCLES_DEVICE_CUDA=ON'
+# CUDA device support is unconditional: cuew loads the driver API at runtime, so this
+# links with no toolkit present. It also keeps find_package(CUDA) running, which the
+# OptiX kernels depend on - with the device off, CUDA_NVCC_EXECUTABLE stays empty and
+# cuda_add_common_flags is called with an empty version argument, which CMake reports
+# only as "invoked with incorrect arguments".
+$cmakeArgs += '-DWITH_CYCLES_DEVICE_CUDA=ON'
+
+# The OptiX kernels ride on WITH_CYCLES_CUDA_BINARIES upstream: kernel/device/optix
+# guards its PTX rules with "if(WITH_CYCLES_CUDA_BINARIES AND WITH_CYCLES_DEVICE_OPTIX)".
+# So asking for OptiX kernels without CUDA binaries builds nothing, silently. Turn the
+# switch on for either, and let the architecture list stay cheap when only OptiX is
+# wanted - the OptiX modules are architecture-independent PTX and do not need cubins.
+if ($kernelCuda -or $kernelOptix) {
     $cmakeArgs += '-DWITH_CYCLES_CUDA_BINARIES=ON'
     # Pass the toolkit explicitly. CMake's FindCUDA otherwise relies on
     # CUDA_PATH/PATH, which silently fails when a stale CUDA_PATH points at an
@@ -545,33 +739,44 @@ if ($Devices -contains 'cuda') {
         $cmakeArgs += "-DCUDA11_TOOLKIT_ROOT_DIR=$(ConvertTo-CMakePath $cuda11Path)"
         $cmakeArgs += "-DCUDA11_NVCC_EXECUTABLE=$(ConvertTo-CMakePath (Join-Path $cuda11Path 'bin/nvcc.exe'))"
     }
-    # Leave CYCLES_CUDA_BINARIES_ARCH at the upstream default unless a full
-    # cubin build was asked for; PTX-only keeps iteration times sane.
-    if (-not $CudaBinaries) { $cmakeArgs += '-DCYCLES_CUDA_BINARIES_ARCH=compute_52' }
+    if ($kernelCuda -and $cudaArches.Count) {
+        # This machine's cards only.
+        $cmakeArgs += "-DCYCLES_CUDA_BINARIES_ARCH=$($cudaArches -join ';')"
+    }
+    elseif (-not $CudaBinaries) {
+        # One PTX kernel, which the driver JITs for whatever card shows up: cheap and
+        # portable. This is also the OptiX-only case - nvcc still has to be handed an
+        # architecture, but no cubins are wanted.
+        $cmakeArgs += '-DCYCLES_CUDA_BINARIES_ARCH=compute_52'
+    }
+    # else: -CudaBinaries with no narrowing leaves the upstream default list.
 } else {
-    $cmakeArgs += '-DWITH_CYCLES_DEVICE_CUDA=OFF'
     $cmakeArgs += '-DWITH_CYCLES_CUDA_BINARIES=OFF'
+    if ($cudaPath) { $cmakeArgs += "-DCUDA_TOOLKIT_ROOT_DIR=$(ConvertTo-CMakePath $cudaPath)" }
 }
 
-if ($Devices -contains 'hip') {
-    $cmakeArgs += '-DWITH_CYCLES_DEVICE_HIP=ON'
+# HIP device support is unconditional for the same reason: external_libs.cmake forces
+# WITH_HIP_DYNLOAD ON, so device/hip links against the bundled hipew and needs no ROCm.
+$cmakeArgs += '-DWITH_CYCLES_DEVICE_HIP=ON'
+
+if ($kernelHip) {
     $cmakeArgs += "-DHIP_ROOT_DIR=$(ConvertTo-CMakePath $hipPath)"
-    # Device support and kernel binaries are separate switches, exactly as they
-    # are for CUDA, and WITH_CYCLES_HIP_BINARIES defaults to OFF. Enabling only
-    # the device gave a build with HIP compiled in and no HIP kernels, so Cycles
-    # found no usable AMD device at all - which is what crashed Rhino on a
-    # machine whose GPU the 3.5 build renders with quite happily.
+    # Device support and kernel binaries are separate switches, and
+    # WITH_CYCLES_HIP_BINARIES defaults to OFF. Enabling only the device once gave a
+    # build with HIP compiled in and no HIP kernels anywhere, so Cycles found no usable
+    # AMD device at all - which crashed Rhino on a machine whose GPU the 3.5 build
+    # renders with quite happily. That case is now covered by the payload's kernels
+    # instead, but the two switches still have to be set deliberately.
     $cmakeArgs += '-DWITH_CYCLES_HIP_BINARIES=ON'
+    if ($hipArches.Count) {
+        $cmakeArgs += "-DCYCLES_HIP_BINARIES_ARCH=$($hipArches -join ';')"
+    }
 } else {
-    # Every device switch is set explicitly, ON or OFF, on every configure.
-    # Only ever adding =ON meant the CMake cache remembered whatever a previous
-    # run enabled, so -Devices cpu still built HIP in an existing build
-    # directory - the flags described the difference from last time rather than
-    # what was asked for.
-    $cmakeArgs += '-DWITH_CYCLES_DEVICE_HIP=OFF'
     $cmakeArgs += '-DWITH_CYCLES_HIP_BINARIES=OFF'
+    if ($hipPath) { $cmakeArgs += "-DHIP_ROOT_DIR=$(ConvertTo-CMakePath $hipPath)" }
 }
-if ($Devices -contains 'oneapi') {
+
+if ($deviceOneApi) {
     $cmakeArgs += '-DWITH_CYCLES_DEVICE_ONEAPI=ON'
     $cmakeArgs += "-D_LEVEL_ZERO_INCLUDE_DIR=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'include'))"
     $cmakeArgs += "-D_LEVEL_ZERO_LIBRARY=$(ConvertTo-CMakePath (Join-Path $levelZeroRoot 'lib'))"
@@ -581,7 +786,7 @@ if ($Devices -contains 'oneapi') {
 
 Write-Host "   cmake $($cmakeArgs -join ' ')" -ForegroundColor DarkGray
 
-& cmake @cmakeArgs
+& $cmakeExe @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE." }
 
 if ($ConfigureOnly) {
@@ -606,7 +811,7 @@ if (-not $Jobs) {
 }
 
 Write-Step "Building ($cmakeConfig, $Jobs jobs)"
-& cmake --build $BuildDir --config $cmakeConfig --target install --parallel $Jobs
+& $cmakeExe --build $BuildDir --config $cmakeConfig --target install --parallel $Jobs
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 
 # CMake install rules do not carry the HIP fatbins, so whatever kernels were in the
@@ -614,9 +819,16 @@ if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 # render ran kernels that did not contain the fixes being tested - a black bump-mapped
 # surface on HIP survived nine hypotheses for exactly that reason. Copy the freshly
 # built ones in alongside the rest of the payload.
+#
+# Deploy the *compressed* fatbins, not the uncompressed intermediates. The build tree
+# holds both - kernel_gfx1100.fatbin and kernel_gfx1100.fatbin.zst - but the runtime
+# only ever looks for the compressed name: HIPDevice::compile_kernel probes
+# "lib/<name>_<arch>.fatbin.zst" and nothing else. Copying "*.fatbin" therefore
+# deployed 18 files Cycles never opens and left the stale .zst in place, which is the
+# same stale-kernel symptom this step was added to fix.
 $hipBuilt = Join-Path $BuildDir "src/kernel/device/hip"
 if (Test-Path $hipBuilt) {
-    $fatbins = @(Get-ChildItem $hipBuilt -Filter "*.fatbin" -ErrorAction SilentlyContinue)
+    $fatbins = @(Get-ChildItem $hipBuilt -Filter "*.fatbin.zst" -ErrorAction SilentlyContinue)
     if ($fatbins.Count -gt 0) {
         $libDir = Join-Path $InstallDir "lib"
         $null = New-Item -ItemType Directory -Force -Path $libDir
