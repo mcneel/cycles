@@ -44,8 +44,13 @@
     CMake build so we keep usable symbols, matching the old behaviour.
 
 .PARAMETER Devices
-    Which GPU backends to enable. Defaults to whatever is detected on the
-    machine. Pass 'cpu' to force a CPU-only build.
+    Which backends to build *kernels* for. Defaults to whatever toolkits are
+    detected. Pass 'cpu' to build no GPU kernels at all.
+
+    Note this no longer decides which devices Cycles supports: CUDA and HIP
+    device support is compiled in either way, and -Devices cpu produces a
+    ccycles.dll that still drives both, using the kernels in the payload. What
+    it controls is what this build compiles.
 
 .PARAMETER InstallDir
     Where to place ccycles.dll and its dependencies. Defaults to the Rhino
@@ -580,6 +585,27 @@ function Get-LocalCudaArches {
         Where-Object { $_ -match '^(\d+)\.(\d+)$' } |
         ForEach-Object { "sm_$($Matches[1])$($Matches[2])" } |
         Select-Object -Unique)
+}
+
+# The MSVC toolset check, deferred to here because it only matters once we know whether
+# any kernels are being built. Both kernel compilers reject the newest MSVC: nvcc says
+# "Only the versions between 2017 and 2022 (inclusive) are supported", and ROCm 6.4's
+# clang fails inside __clang_cuda_math_forward_declares.h against MSVC 14.51's cmath.
+# VS 18 installs 14.51 by default, so a machine that never applied Rhino's .vsconfig has
+# no 14.4x at all - and the failure surfaces as a wall of errors inside compiler headers
+# with nothing pointing at the cause.
+#
+# A warning was not enough for that. It is an error, but only for a build that will
+# actually invoke a kernel compiler: someone building CPU-only Cycles on a machine
+# without the toolset is not doing anything wrong.
+if (-not $msvcVer -and ($kernelCuda -or $kernelHip -or $kernelOptix)) {
+    throw ("MSVC 14.4x is not installed, and this build compiles GPU kernels, which will " +
+           "fail inside the compilers' own headers rather than anywhere useful. nvcc " +
+           "rejects MSVC newer than 2022, and ROCm 6.4's clang cannot parse 14.51's " +
+           "cmath. Install 'MSVC v143 - VS 2022 C++ x64/x86 build tools' in the Visual " +
+           "Studio installer, or run bootstrap.exe from the root of the Rhino repo, " +
+           "which applies Rhino's .vsconfig and includes it. To build without kernels " +
+           "instead, pass -Devices cpu.")
 }
 
 $hipArches = @()
