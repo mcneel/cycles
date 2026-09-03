@@ -126,6 +126,32 @@ if (-not $RenderOnly) {
   }
 }
 
+if (-not $RenderOnly) {
+  # Does the installer ship the kernels we build?
+  #
+  # Worth a second because it was wrong in the worst way: Cycles.wxs listed 32 kernel
+  # files, every one an uncompressed name from before Cycles compressed them, while all
+  # 41 the payload ships were absent. The runtime only opens the .zst form, so a shipped
+  # Rhino had no precompiled kernels at all - and nothing noticed, because working trees
+  # still hold leftover uncompressed files and the MSI kept building.
+  #
+  # Skipped rather than failed when the installer is not there: this repository is also
+  # used standalone, without the Rhino tree around it.
+  $installerCheck = Join-Path $repo '..\..\..\..\..\installer\msi\Features\Plug-ins\update_cycles_kernels.ps1'
+  if (-not (Test-Path $installerCheck)) {
+    Write-Host '--- installer kernel list'
+    Write-Host '  no Rhino installer tree here - skipped'
+    Add-Result 'installer kernel list' 0 'no installer tree'
+  }
+  else {
+    Write-Host '--- installer kernel list'
+    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $installerCheck -Check 2>&1
+    $code = $LASTEXITCODE
+    $out | ForEach-Object { "  $_" }
+    Add-Result 'installer kernel list' $code $(if ($code -ne 0) { 'regenerate needed' } else { '' })
+  }
+}
+
 if ($Render -or $RenderOnly) {
   $script = Join-Path $toolsDir 'render_regression.ps1'
   if (-not (Test-Path $script)) { Add-Result 'render regression' 2 'missing' }
