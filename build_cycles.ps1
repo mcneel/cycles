@@ -609,4 +609,23 @@ Write-Step "Building ($cmakeConfig, $Jobs jobs)"
 & cmake --build $BuildDir --config $cmakeConfig --target install --parallel $Jobs
 if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE." }
 
+# CMake install rules do not carry the HIP fatbins, so whatever kernels were in the
+# payload stay there. In this tree they were three weeks old, which meant every HIP
+# render ran kernels that did not contain the fixes being tested - a black bump-mapped
+# surface on HIP survived nine hypotheses for exactly that reason. Copy the freshly
+# built ones in alongside the rest of the payload.
+$hipBuilt = Join-Path $BuildDir "src/kernel/device/hip"
+if (Test-Path $hipBuilt) {
+    $fatbins = @(Get-ChildItem $hipBuilt -Filter "*.fatbin" -ErrorAction SilentlyContinue)
+    if ($fatbins.Count -gt 0) {
+        $libDir = Join-Path $InstallDir "lib"
+        $null = New-Item -ItemType Directory -Force -Path $libDir
+        $fatbins | Copy-Item -Destination $libDir -Force
+        Write-Step "Deployed $($fatbins.Count) HIP fatbin(s) to $(ConvertTo-CMakePath $libDir)"
+    }
+    else {
+        Write-Step "No HIP fatbins in the build tree - HIP will use whatever is already deployed"
+    }
+}
+
 Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
