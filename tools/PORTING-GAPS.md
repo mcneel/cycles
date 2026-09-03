@@ -2049,3 +2049,33 @@ stalled device reporting the other device's numbers; a failed scene generation r
 an empty document that both devices matched perfectly) and this one produced **no output
 at all**. The quiet one cost the most time, which is the opposite of what one would
 expect: a wrong number invites scrutiny, an absent number invites patience.
+
+## Why a developer build cannot open some models unattended
+
+The 818 MB `Test lights ceilings 2.3dm` looked like it hung the dev build: shipping
+opened and rendered it in about 26 minutes, while dev sat with **flat CPU (30 to 36
+seconds over five minutes), flat memory (0.72 GB), a normal window title, and a driver
+log containing only `OPENING`**. An 818 MB load would show memory climbing, so this was
+blocked rather than slow.
+
+Enumerating the process's windows named it immediately:
+
+    VISIBLE  Rhino WIP  Developer CRhinoDoc::AddObject() Warning
+
+A modal developer warning, waiting to be dismissed. Posting `WM_CLOSE` to it revealed
+**seven** in sequence; after the seventh the open resumed at once - CPU 38 to 147
+seconds, memory 0.72 to 2.56 GB. Developer warnings are not compiled into shipping,
+which is the entire reason this looked like a dev-only defect. **It is not a renderer
+problem, and not a Cycles problem.**
+
+`render_one.ps1` now watches for any window whose title contains `Warning`, `Assert` or
+`Runtime Library` while it waits, closes it, and reports the count. That matters for the
+regression suite: on a developer build, any model that raises internal warnings will
+otherwise stall an unattended sweep forever, and the symptom - flat CPU, ordinary title,
+no log - looks nothing like a dialog.
+
+Worth pairing with the existing note that a Debug render which never starts is usually a
+blocked CRT assertion dialog. Same failure mode, different dialog: **when a developer
+build goes quiet, enumerate its windows before theorising.** `MainWindowTitle` alone is
+not enough - the blocking window here was a separate top-level WPF dialog, and the main
+window's title stayed `Rhino WIP` throughout.
