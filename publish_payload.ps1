@@ -209,35 +209,6 @@ else { Write-Ok 'nothing stale' 'every kernel in lib/ is one we ship' }
 
 Write-Step "Writing the manifest"
 
-# The kernel source hash covers src/kernel *and* src/util. Cycles' own dependency
-# tracking does not: the fatbin and cubin rules depend on cycles_kernel's interface
-# sources, which is src/kernel only - but kernel/types.h includes util/projection.h and
-# util/static_assert.h, so an edit under src/util changes the kernels without
-# invalidating them. An incremental build will happily hand you stale kernels for it.
-# Hashing both means the manifest notices what the build does not.
-function Get-KernelSourceHash {
-    $roots = @(
-        (Join-Path $cyclesRoot 'src\kernel')
-        (Join-Path $cyclesRoot 'src\util')
-    )
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try {
-        $buffer = [System.Text.StringBuilder]::new()
-        foreach ($root in $roots) {
-            Get-ChildItem $root -Recurse -File |
-                Sort-Object FullName |
-                ForEach-Object {
-                    $rel = $_.FullName.Substring($cyclesRoot.Length).Replace('\', '/')
-                    $fileHash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($_.FullName))).Replace('-', '')
-                    [void]$buffer.AppendLine("$rel $fileHash")
-                }
-        }
-        $bytes = [Text.Encoding]::UTF8.GetBytes($buffer.ToString())
-        return [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
-    }
-    finally { $sha.Dispose() }
-}
-
 # CYCLES_VERSION_STRING is composed from the numeric macros rather than being a literal,
 # so read those. Note this reports 5.3.0 on a 5.2 tree and that is correct: upstream
 # bumps the version straight after tagging, so src/util/version.h already reads 5.3.0 at
@@ -288,11 +259,11 @@ $manifest = [ordered]@{
         optix = $CyclesOptixModules
     }
 
-    # Compare this against a fresh Get-KernelSourceHash to know whether the kernels in
+    # Compare this against a fresh Get-CyclesKernelSourceHash to know whether the kernels in
     # a payload were built from the kernel sources currently in the tree. That is the
     # check that stops a kernel change merging without a republish, and the one that
     # tells a developer their local HIP kernels are now stale.
-    kernelSourceHash = Get-KernelSourceHash
+    kernelSourceHash = Get-CyclesKernelSourceHash -CyclesRoot $cyclesRoot
 }
 
 $manifestPath = Join-Path $payloadDir 'ccycles_payload.json'

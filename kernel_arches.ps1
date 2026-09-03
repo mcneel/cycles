@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    The GPU architectures Rhino ships Cycles kernels for.
+    Shared facts about Cycles kernels: which architectures Rhino ships, and how to
+    identify the sources a set of kernels was built from.
 
 .DESCRIPTION
     Dot-sourced by build_cycles.ps1, which passes these to CMake with -D, and by
@@ -69,3 +70,36 @@ $CyclesOptixModules = @(
     'kernel_optix_osl_shader_raytrace'
     'kernel_optix_osl_volume'
 )
+
+# Identifies the kernel sources a payload was built from. publish_payload.ps1 records it
+# in ccycles_payload.json; build_cycles.ps1 compares it against the tree to notice when
+# the committed payload predates local kernel changes.
+#
+# It deliberately covers src/util as well as src/kernel. Cycles' own dependency tracking
+# does not: the fatbin and cubin rules depend on cycles_kernel's interface sources, which
+# is src/kernel only - yet kernel/types.h includes util/projection.h and
+# util/static_assert.h, so an edit under src/util changes the kernels without
+# invalidating them and an incremental build hands back stale ones. Hashing both means
+# the manifest notices what the build does not.
+function Get-CyclesKernelSourceHash {
+    param([Parameter(Mandatory)][string]$CyclesRoot)
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $buffer = [System.Text.StringBuilder]::new()
+        foreach ($sub in 'src\kernel', 'src\util') {
+            $root = Join-Path $CyclesRoot $sub
+            if (-not (Test-Path $root)) { continue }
+            Get-ChildItem $root -Recurse -File |
+                Sort-Object FullName |
+                ForEach-Object {
+                    $rel = $_.FullName.Substring($CyclesRoot.Length).Replace('\', '/')
+                    $fileHash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($_.FullName))).Replace('-', '')
+                    [void]$buffer.AppendLine("$rel $fileHash")
+                }
+        }
+        $bytes = [Text.Encoding]::UTF8.GetBytes($buffer.ToString())
+        return [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+    }
+    finally { $sha.Dispose() }
+}

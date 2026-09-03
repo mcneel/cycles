@@ -1067,11 +1067,42 @@ if ($inherited) {
 
 Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
 
-# Say where the full build lives. Nothing else announces publish_payload.ps1, and a
-# developer who has just changed kernel code has no way to know it exists - the payload
-# guard mentions it, but only when it fires, which a Debug+Cycles build never sees.
+# Say where the full build lives, and whether it is needed.
+#
+# Nothing else announces publish_payload.ps1, and a developer who has just changed
+# kernel code has no way to know it exists - the payload guard mentions it, but only
+# when it fires, which a Debug+Cycles build never sees.
+#
+# The interesting half is the hash. The committed payload records the kernel sources it
+# was built from, so comparing that against this tree answers the question the developer
+# cannot answer by looking: does the payload everyone else uses still match the kernels
+# in this branch? When it does not, a republish is part of merging the change, in the
+# same way a checked-in generated file is - otherwise everyone on a plain build gets a
+# new ccycles.dll with the old kernels, which for something like an SVM renumbering is
+# not slow but wrong.
+#
+# Informational, not a failure: this fires on every build while iterating, and blocking
+# would be intolerable. The hard stop belongs on the pull request, where the same
+# comparison can be made once and cannot be scrolled past.
 if (-not $AllArches) {
     Write-Host "   This built kernels for this machine only. To produce a payload for" -ForegroundColor DarkGray
     Write-Host "   everyone - every backend, every shipping architecture, checked and" -ForegroundColor DarkGray
     Write-Host "   staged in big_libs - run publish_payload.ps1." -ForegroundColor DarkGray
+
+    $committedManifest = Join-Path (Join-Path (Split-Path -Parent $InstallDir) 'release') 'ccycles_payload.json'
+    if (Test-Path $committedManifest) {
+        $recorded = (Get-Content -LiteralPath $committedManifest -Raw | ConvertFrom-Json).kernelSourceHash
+        if ($recorded) {
+            $current = Get-CyclesKernelSourceHash -CyclesRoot $cyclesRoot
+            if ($current -ne $recorded) {
+                Write-Host ""
+                Write-Host "   The committed payload's kernels were built from different kernel" -ForegroundColor Yellow
+                Write-Host "   sources than this tree has. If that is your change, the payload needs" -ForegroundColor Yellow
+                Write-Host "   republishing before it merges - otherwise everyone on a plain build" -ForegroundColor Yellow
+                Write-Host "   gets your ccycles.dll with the old kernels." -ForegroundColor Yellow
+                Write-Host "     payload: $($recorded.Substring(0, 16))" -ForegroundColor DarkGray
+                Write-Host "     tree:    $($current.Substring(0, 16))" -ForegroundColor DarkGray
+            }
+        }
+    }
 }
