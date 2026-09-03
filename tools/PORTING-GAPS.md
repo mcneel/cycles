@@ -1962,3 +1962,27 @@ line at all. It now refuses to render a scene it did not just write.
 Both traps share a shape worth remembering: **a broken measurement that agrees with
 itself looks like a passing test.** Any comparison here should assert that each side
 produced fresh output from the intended input before it compares anything.
+
+### HIP bump: closed
+
+With the freshly built fatbins deployed, the reproducer
+(`runarea.ps1 -Light rect -Shade none -Tex bump`) gives:
+
+| | image mean | patch A | patch B |
+|---|---|---|---|
+| CPU | 1.3357 | 1.6884 | 1.4220 |
+| HIP | 1.3357 | 1.6885 | 1.4219 |
+
+Whole-image ratio **1.0000**, with median, p10 and p90 all 1.0000 - every pixel above the
+floor agrees. Against the old evidence (HIP mean 0.4255 against CPU's 1.3357, the
+bump-mapped floor black), **the symptom is gone**, and the two files are genuinely
+different renders rather than one file read twice.
+
+The nine hypotheses excluded earlier were all excluded against kernels from 15 August.
+Whether the bump fix alone accounts for it or something else in the intervening month
+contributed cannot be untangled now, and does not need to be: the reproducer passes on
+kernels built from current source, which is the only state that matters.
+
+The dev build was checked afterwards for collateral damage from rebuilding
+`RhinoCyclesCore` outside the solution: `SimpleVaseTest` still renders to mean 0.1880,
+the same value as before, so the build behaves as it did.
