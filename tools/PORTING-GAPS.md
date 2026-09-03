@@ -2115,3 +2115,39 @@ the `ON_ErrorEx` call on the same path.
 `Runtime Library` while it waits and counts them. Note for anyone extending this:
 `PostMessage` of a Return keystroke does **not** reach these WPF dialogs, so answering
 "Yes" properly needs UI Automation; `WM_CLOSE` in a loop is what works today.
+
+### Preview hang: two reproduction routes tried, both dead ends
+
+**Route 1 - the RDK preview API.** `RenderMaterial` has no `CreatePreview` here. The
+real entry point is
+
+    RenderContent.GenerateQuickContentPreview(c, w, h, psc: PreviewSceneServer,
+                                              bSuppressLocalMapping, reason, ref Rhino.Commands.Result)
+
+which now *runs* - the trailing parameter is `ref Rhino.Commands.Result`, an enum in
+`Rhino.Commands` and not on `RenderContent`, which is what earlier attempts were missing.
+With a null scene server it returns `(None, Result.Nothing)` immediately: the RDK
+declines rather than rendering. Building a real one needs
+`SceneServerData(geo: PreviewGeometry, back: PreviewBackground, light: PreviewLighting,
+usage: SceneServerDataUsage)`, and the first three are **wrapper classes, not enums**
+(`CppPointer`, `ElementKind`, `SetUpPreview`), so they cannot be constructed from script
+as values. Only `SceneServerDataUsage` is an enum (`Asynchronous`, `Synchronous`). The
+other constructor takes a `PreviewAppearance`, which is the next thing to try.
+
+**Route 2 - the Materials panel.** Opening it with `rs.Command("_-Materials")` renders a
+thumbnail per material through the real pipeline, and in dev the script never returned:
+log stopped at that line, four-minute timeout, ordinary window title, no modal dialog,
+main window enabled, CPU idle at 43 seconds, memory flat at 2.13 GB. That looked like the
+hang.
+
+**It is not.** Shipping does exactly the same - same stop, same timeout, CPU 41 seconds.
+A scripted panel command simply does not return under `-RunPythonScript`, in either
+build, so this route cannot discriminate between them and the apparent reproduction was
+an artefact of the method. Recorded because it is a convincing-looking dead end that
+would otherwise be walked into again.
+
+**What would actually settle it:** the `PreviewAppearance` constructor for the scene
+server, or an interactive reproduction with a debugger attached to read the stacks -
+the code hypothesis to confirm is one preview holding
+`RcCore.It.PreviewRendererLock` while its `Thread.Sleep(50)` loop waits on a `Finished`
+flag that never arrives.
