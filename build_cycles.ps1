@@ -62,6 +62,14 @@
     GPUs in this machine. This is what publishing a payload wants; a developer
     testing a kernel change does not.
 
+.PARAMETER Force
+    Install into the requested payload even when this build makes fewer kernels
+    than the payload already holds. Without it, such a build is redirected to a
+    sibling "local" payload, which RhinoCyclesCore prefers and git ignores, so
+    the committed payload is never replaced by kernels for one machine's GPU.
+    With it, the payload's manifest is deleted, because it would no longer
+    describe what is there.
+
 .PARAMETER ConfigureOnly
     Run the CMake configure step and stop, leaving a solution to open in VS.
 
@@ -111,6 +119,8 @@ param(
     [switch]$CudaBinaries,
 
     [switch]$AllArches,
+
+    [switch]$Force,
 
     [switch]$ConfigureOnly,
 
@@ -642,6 +652,64 @@ elseif ($InstallDir -notmatch '^([A-Za-z]:[\\/]|\\\\)') {
     # lost its separators installs somewhere surprising and still reports
     # success. Require a drive plus separator, or a UNC path.
     throw "-InstallDir must be an absolute path, got '$InstallDir'. If this came from a build script, check that backslashes survived quoting - forward slashes are safest."
+}
+
+# ---------------------------------------------------------------- payload guard
+#
+# A local build is narrow on purpose - kernels for this machine's GPUs and nothing
+# else - and ccycles.vcxproj installs into the payload in big_libs, because that is
+# how a Cycles build reaches the plug-in output for everyone. Those two together are
+# a trap: building ReleaseDebuggable+Cycles to test one kernel edit would replace the
+# shared payload with a ccycles.dll built from a dirty tree and kernels for one card,
+# and nothing but git status would say so.
+#
+# So a narrow build does not write a payload that describes itself as complete. It
+# writes to a sibling "local" payload instead, which is gitignored and which
+# RhinoCyclesCore prefers over release and debug when it exists. The developer's Rhino
+# picks up exactly what they built; the committed payload is untouched.
+#
+# The debug payload is exempt: it is already gitignored and only a Debug build uses
+# it, so it is local by definition.
+#
+# -Force writes the requested payload anyway, and then deletes its manifest, because a
+# payload that has been partly overwritten no longer contains what the manifest says.
+# publish_payload.ps1 writes a fresh one.
+if (-not $AllArches) {
+    $targetManifest = Join-Path $InstallDir 'ccycles_payload.json'
+    $targetIsLocal = (Split-Path -Leaf $InstallDir) -eq 'debug'
+
+    if ((Test-Path $targetManifest) -and -not $targetIsLocal) {
+        $existing = Get-Content -LiteralPath $targetManifest -Raw | ConvertFrom-Json
+
+        # Narrower means the payload names a kernel this build will not produce.
+        $builtHip = if ($kernelHip) { @($hipArches) } else { @() }
+        $builtCuda = if ($kernelCuda) { @($cudaArches) } else { @() }
+        $builtOptix = if ($kernelOptix) { @($existing.arches.optix) } else { @() }
+
+        $shortfall = @()
+        $shortfall += @($existing.arches.hip | Where-Object { $builtHip -notcontains $_ })
+        $shortfall += @($existing.arches.cuda | Where-Object { $builtCuda -notcontains $_ })
+        $shortfall += @($existing.arches.optix | Where-Object { $builtOptix -notcontains $_ })
+
+        if ($shortfall.Count) {
+            if ($Force) {
+                Write-Step "Overwriting the committed payload (-Force)"
+                Write-Host ("   {0,-12} {1}" -f 'manifest', 'removed; this payload no longer holds what it described') -ForegroundColor DarkYellow
+                Remove-Item -LiteralPath $targetManifest -Force
+            }
+            else {
+                $localDir = Join-Path (Split-Path -Parent $InstallDir) 'local'
+                Write-Step "Installing to the local payload instead"
+                Write-Host ("   this build makes {0} fewer kernel(s) than the payload in" -f $shortfall.Count) -ForegroundColor DarkYellow
+                Write-Host  "   big_libs holds, so it would leave a payload that no longer" -ForegroundColor DarkYellow
+                Write-Host  "   matches its manifest. Writing a local one, which your Rhino" -ForegroundColor DarkYellow
+                Write-Host  "   prefers and git ignores." -ForegroundColor DarkYellow
+                Write-Host ""
+                Write-Host  "   publish_payload.ps1 builds the full set; -Force overwrites." -ForegroundColor DarkGray
+                $InstallDir = $localDir
+            }
+        }
+    }
 }
 
 Write-Step "Configuring ($cmakeConfig)"
