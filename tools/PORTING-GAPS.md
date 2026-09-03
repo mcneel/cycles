@@ -2024,3 +2024,28 @@ this much, so the signatures above are worth keeping.
 `previewtest.py` and `runpreview.ps1` in the harness carry all of it: they open a model,
 walk `doc.RenderMaterials`, log before and after each attempt with timings, and watch the
 window title from outside.
+
+### A third harness trap: a model name with spaces silently renders nothing
+
+`render_one.ps1` built its command file from the model stem and passed it as
+
+    /runscript="_-ReadCommandFile <path>"
+
+`_-ReadCommandFile` takes an unquoted path only as far as the first space, so for
+`Test lights ceilings 2.3dm` Rhino launched, failed to find the command file, and sat on
+an Untitled document indefinitely. **Forty minutes went by with no driver log at all**
+before that was noticed - the tell, and it is a loud one in hindsight, is that
+`driver.py` writes its log as its first action, so *no log* means the script never ran,
+which is a different failure from a render that went wrong.
+
+Every model tested until now happened to have a space-free name. The fix keeps the
+command file name space-free (`$stem -replace '[^A-Za-z0-9._-]', '_'`); the model path
+itself is quoted inside the file and was never the problem. This matters beyond one
+model - the test folder is full of names with spaces (`Copy of sanmiguel.3dm`), and the
+regression suite being built in parallel would have hit the same wall.
+
+That makes three harness traps in one day. Two manufactured **false agreement** (a
+stalled device reporting the other device's numbers; a failed scene generation rendering
+an empty document that both devices matched perfectly) and this one produced **no output
+at all**. The quiet one cost the most time, which is the opposite of what one would
+expect: a wrong number invites scrutiny, an absent number invites patience.
