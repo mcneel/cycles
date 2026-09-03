@@ -566,6 +566,26 @@ $kernelOptix = ($Devices -contains 'optix') -and $deviceOptix
 # nvidia-smi (ships with the driver) reports each NVIDIA card's compute capability.
 # Win32_VideoController is not usable for this - it also lists things like the
 # "Microsoft Remote Display Adapter", and it does not name a kernel architecture.
+# Which GPU vendors are physically in this machine, which is a different question from
+# which architectures to build for. Adapter enumeration cannot answer the second - it
+# never names a kernel architecture, and it lists things like the Microsoft Remote
+# Display Adapter - but it answers this one, and unlike amdgpu-arch and nvidia-smi it
+# works with no SDK and no vendor driver tooling installed. That matters, because the
+# case worth warning about is precisely a machine with a GPU whose SDK is missing.
+function Get-LocalGpuVendors {
+    $vendors = [System.Collections.Generic.HashSet[string]]::new()
+    $adapters = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)
+
+    foreach ($a in $adapters) {
+        $text = "$($a.AdapterCompatibility) $($a.Name)"
+        if ($text -match 'NVIDIA') { [void]$vendors.Add('nvidia') }
+        if ($text -match 'Advanced Micro Devices|\bAMD\b|Radeon') { [void]$vendors.Add('amd') }
+        if ($text -match '\bIntel\b') { [void]$vendors.Add('intel') }
+    }
+
+    return $vendors
+}
+
 function Get-LocalHipArches {
     if (-not $hipPath) { return @() }
     $exe = Join-Path $hipPath 'bin\amdgpu-arch.exe'
@@ -993,10 +1013,32 @@ function Copy-InheritedKernels {
 $inherited = Copy-InheritedKernels -TargetPayload $InstallDir -Hip $deviceHip -Cuda $deviceCuda -Optix $deviceOptix
 if ($inherited) {
     Write-Step "Filled $inherited kernel(s) from the committed payload"
-    Write-Host "   These are for devices this build supports but did not compile kernels" -ForegroundColor DarkYellow
-    Write-Host "   for - usually a GPU vendor whose SDK is not installed here. They are as" -ForegroundColor DarkYellow
-    Write-Host "   old as the last publish, so if you changed kernel code, they do not" -ForegroundColor DarkYellow
-    Write-Host "   contain it. Your own GPU's kernels were built from your tree." -ForegroundColor DarkYellow
+    Write-Host "   For devices this build supports but compiled no kernels for. They are as" -ForegroundColor DarkYellow
+    Write-Host "   old as the last publish, so they do not contain local kernel changes." -ForegroundColor DarkYellow
+
+    # The case that actually costs someone an afternoon: a GPU is in this machine and
+    # the kernels it will run were inherited rather than built, so a kernel edit renders
+    # identically and nothing obvious says why. Say it loudly, and name the SDK.
+    #
+    # Not an error. It is a perfectly reasonable state - a developer working on the host
+    # side has no reason to install a kernel compiler - and it is what makes a missing
+    # SDK survivable at all. It is only a trap for someone who just edited a kernel.
+    $vendors = Get-LocalGpuVendors
+    $blind = @()
+    if ($vendors.Contains('amd') -and -not $kernelHip) {
+        $blind += 'AMD (install the ROCm HIP SDK to build HIP kernels)'
+    }
+    if ($vendors.Contains('nvidia') -and -not $kernelCuda) {
+        $blind += 'NVIDIA (install the CUDA toolkit to build CUDA and OptiX kernels)'
+    }
+
+    if ($blind.Count) {
+        Write-Host ""
+        Write-Host "   Note that a GPU in this machine will run inherited kernels:" -ForegroundColor Yellow
+        foreach ($b in $blind) { Write-Host "     - $b" -ForegroundColor Yellow }
+        Write-Host "   So a change to kernel code will NOT show up in renders on that GPU," -ForegroundColor Yellow
+        Write-Host "   however many times you rebuild. bootstrap.exe /cycles installs these." -ForegroundColor Yellow
+    }
 }
 
 Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
