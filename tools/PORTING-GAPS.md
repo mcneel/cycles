@@ -1950,3 +1950,15 @@ read a second time** - identical to four decimals, which reads as "the two devic
 and would have been reported as the bug being fixed. It now compares the file's write
 time against the start of the pass and refuses to report anything it did not just
 produce.
+
+A second one of the same kind, found immediately afterwards: `runarea.ps1` deleted the
+scene, regenerated it, and then rendered **without checking the scene existed**. When the
+generation step failed, `render_one` rendered whatever document Rhino had open - an empty
+one. No lights, white sky, a blown-out frame at mean 255.0 with a single colour bucket -
+and *both* devices agreed on it perfectly, which reads as a clean comparison. The tell was
+the cycles log: only the disabled Distant light was converted, with no `ConvertLight Area`
+line at all. It now refuses to render a scene it did not just write.
+
+Both traps share a shape worth remembering: **a broken measurement that agrees with
+itself looks like a passing test.** Any comparison here should assert that each side
+produced fresh output from the intended input before it compares anything.
