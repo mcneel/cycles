@@ -302,48 +302,43 @@ Write-Ok 'kernel source hash' $manifest.kernelSourceHash.Substring(0, 16)
 
 # ------------------------------------------------------------------- version resources
 
-# Not just cosmetic, despite the name. ccycles.dll genuinely no longer needs any of
-# this - its VERSIONINFO and SxS manifest are compiled in at link time - but two of the
-# three things versioninfo_changer.ps1 does still matter, because we ship openvdb.dll
-# and cycles_kernel_oneapi_jit.dll out of the precompiled Blender bundle without
-# building them, so resources can only be attached afterwards:
+# -------------------------------------------------------- no ResourceHacker step
 #
-#   * openvdb.dll gets a side-by-side assembly manifest so it resolves tbb.dll within
-#     the Cycles assembly instead of picking up Rhino's copy. This is the functional
-#     one, and the mismatch it addresses is real: the payload ships TBB 2022.3.0 while
-#     src4/bin/Debug holds 2021.11, and Windows resolves a DLL's dependencies from the
-#     application directory first, not from the DLL's own.
+# There deliberately is not one, and this is why - it took an investigation to
+# establish, so it is written down rather than left to be rediscovered.
 #
-#     But it is not a regression to skip it, because it is not currently applied
-#     either. The openvdb.dll in the committed payload carries only Visual Studio's
-#     default trustInfo manifest - no assemblyIdentity, no dependent assembly - and
-#     Rhino works. So this step would *add* pinning we do not have rather than restore
-#     something lost. Worth doing deliberately, when someone wants to establish which
-#     TBB openvdb actually binds to; oneTBB keeping ABI within the tbb12 major is the
-#     likely reason nobody has noticed.
-#   * the oneAPI JIT DLL gets a version stamp, which is diagnostic only.
-#   * leftover *_d.dll, *.so and *gyd* files are stripped from the install tree.
+# Cycles 3.5 ran versioninfo_changer.ps1, which used ResourceHacker to bolt resources
+# onto DLLs we ship but do not build. Two separate purposes: VERSIONINFO stamps
+# (86dbc0e6e, "Add tool to set DLL version info") and then side-by-side private
+# assembly manifests on ccycles.dll and openvdb.dll (ccf571272) - the latter because
+# Rhino.Inside in Revit 2020 loads Revit's own OpenImageIO and TBB into the process,
+# and resolution by bare filename picked the host's instead of ours.
 #
-# The step had no caller at all after make_rhino_all.ps1 stopped being used. It needs
-# ResourceHacker, which nothing else here requires, so a missing one warns - but for a
-# payload that is actually shipping, the openvdb manifest should not be skipped.
-Write-Step "Stamping version resources"
-
-$versionScript = Join-Path $cyclesRoot 'versioninfo_changer.ps1'
-if (-not (Test-Path $versionScript)) {
-    Write-Warn 'skipped' 'versioninfo_changer.ps1 not found'
-}
-elseif (-not (Get-Command 'ResourceHacker' -ErrorAction SilentlyContinue) -and
-        -not (Get-Command 'ResourceHacker.exe' -ErrorAction SilentlyContinue)) {
-    Write-Warn 'skipped' 'ResourceHacker is not on PATH'
-    Write-Warn '' 'openvdb.dll will ship with no SxS manifest, so it resolves tbb.dll'
-    Write-Warn '' 'from the application directory rather than from this payload'
-}
-else {
-    & $versionScript -InstallDir $payloadDir
-    if ($LASTEXITCODE -ne 0) { Write-Warn 'failed' "versioninfo_changer.ps1 exited $LASTEXITCODE" }
-    else { Write-Ok 'stamped' 'openvdb.dll, cycles_kernel_oneapi_jit.dll' }
-}
+# None of that applies to 5.x:
+#
+#   * ccycles.dll gets both at link time now. src/ccycles/CMakeLists.txt generates
+#     ccycles.manifest from ccycles_manifest.xml.in and compiles it in as resource
+#     "2 24" - RT_MANIFEST under ISOLATIONAWARE_MANIFEST_RESOURCE_ID - alongside
+#     ccycles_version.rc.
+#   * that manifest is a superset of the old openvdb one. It declares openvdb.dll,
+#     tbb12.dll, tbbmalloc.dll, tbbmalloc_proxy.dll, the OpenImageIO pair,
+#     OpenColorIO and, with oneAPI, cycles_kernel_oneapi_jit.dll and sycl8.dll, so
+#     they all resolve inside the ccycles assembly context.
+#   * the old openvdb manifest is now actively wrong. openvdb_manifest.txt declares
+#     assembly "openvdb" version 10.0.0.0 listing <file name="tbb.dll"/>, but the
+#     bundle ships OpenVDB 13.0.0.0 whose only TBB import is tbb12.dll, and there is
+#     no plain tbb.dll in the payload at all. openvdb_manifest_replace.template also
+#     hardcodes FILEVERSION 10,0,0,0, so running it would stamp a 13.0 DLL as 10.0.
+#   * the collision it guarded got structurally safer. The shared name used to be the
+#     unversioned tbb.dll - two arbitrary TBB builds, no compatibility guarantee. It
+#     is tbb12.dll now, oneTBB's ABI-stable interface library, so the payload's
+#     2022.3.0 and Rhino's 2021.11 interoperate by design.
+#
+# What is left of that script is a cosmetic VERSIONINFO stamp on the oneAPI JIT DLL,
+# which has been shipping blank, and stripping *_d.dll / *.so / *gyd* leftovers, none
+# of which the current bundle produces. So versioninfo_changer.ps1 and its two openvdb
+# templates are dead code; they are left in the tree only until someone confirms the
+# Rhino.Inside/Revit case against a 5.x payload.
 
 # --------------------------------------------------------------------------- staging
 
