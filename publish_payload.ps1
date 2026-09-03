@@ -309,12 +309,18 @@ Write-Ok 'kernel source hash' $manifest.kernelSourceHash.Substring(0, 16)
 # building them, so resources can only be attached afterwards:
 #
 #   * openvdb.dll gets a side-by-side assembly manifest so it resolves tbb.dll within
-#     the Cycles assembly instead of picking up Rhino's copy. This is functional. The
-#     versions really do differ - the payload ships TBB 2022.3.0 while src4/bin/Debug
-#     holds 2021.11 - and Windows resolves a DLL's dependencies from the application
-#     directory first, not from the DLL's own. Whether it currently misbinds depends on
-#     the flags Rhino loads plug-ins with, which is worth establishing rather than
-#     assuming; oneTBB keeping ABI within tbb12 is why this has not obviously broken.
+#     the Cycles assembly instead of picking up Rhino's copy. This is the functional
+#     one, and the mismatch it addresses is real: the payload ships TBB 2022.3.0 while
+#     src4/bin/Debug holds 2021.11, and Windows resolves a DLL's dependencies from the
+#     application directory first, not from the DLL's own.
+#
+#     But it is not a regression to skip it, because it is not currently applied
+#     either. The openvdb.dll in the committed payload carries only Visual Studio's
+#     default trustInfo manifest - no assemblyIdentity, no dependent assembly - and
+#     Rhino works. So this step would *add* pinning we do not have rather than restore
+#     something lost. Worth doing deliberately, when someone wants to establish which
+#     TBB openvdb actually binds to; oneTBB keeping ABI within the tbb12 major is the
+#     likely reason nobody has noticed.
 #   * the oneAPI JIT DLL gets a version stamp, which is diagnostic only.
 #   * leftover *_d.dll, *.so and *gyd* files are stripped from the install tree.
 #
