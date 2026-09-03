@@ -1066,3 +1066,12 @@ if ($inherited) {
 }
 
 Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
+
+# Say where the full build lives. Nothing else announces publish_payload.ps1, and a
+# developer who has just changed kernel code has no way to know it exists - the payload
+# guard mentions it, but only when it fires, which a Debug+Cycles build never sees.
+if (-not $AllArches) {
+    Write-Host "   This built kernels for this machine only. To produce a payload for" -ForegroundColor DarkGray
+    Write-Host "   everyone - every backend, every shipping architecture, checked and" -ForegroundColor DarkGray
+    Write-Host "   staged in big_libs - run publish_payload.ps1." -ForegroundColor DarkGray
+}

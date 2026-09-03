@@ -52,6 +52,21 @@ Build the **solution**, not single projects:
 That is all most people need. Cycles comes prebuilt from `big_libs`, so no
 CMake, CUDA or OptiX SDK is required.
 
+### Setting up to build Cycles
+
+    bootstrap.exe /cycles
+
+Once. It installs the GPU SDKs on top of what a normal bootstrap already does:
+the CUDA toolkit via winget, and the OptiX headers from NVIDIA's public
+repository - which is all the build needs, so no developer login is involved.
+ROCm is the exception and stays manual, because AMD publishes a download page
+rather than a stable file URL and its installer cannot install the SDK without
+the driver; bootstrap offers to open the page. You only need ROCm to build AMD
+kernels, which means publishing a payload, or testing on an AMD card.
+
+Nothing here is needed for a normal Rhino build, and `/cycles` is opt-in, so
+nobody who is not working on Cycles is affected.
+
 ### Building Cycles itself
 
 Pick a different configuration. That is the whole mechanism.
@@ -59,24 +74,53 @@ Pick a different configuration. That is the whole mechanism.
 | Configuration | Cycles |
 | --- | --- |
 | `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload, as in Rhino 9.x |
-| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source, kernels included |
+| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source, kernels for the GPUs in your machine |
 
 Visual Studio lists them in the configuration dropdown; RhinoBuilder lists them
 in Configurations. Same choice, both tools, nothing to set up and nothing to
 remember. The plain configurations are untouched, so a developer who never edits
 Cycles cannot trip it.
 
-Picking a `+Cycles` configuration builds Cycles, installs it into `big_libs`, and
-deploys it through `RhinoCyclesCore` - all in that one build, because the solution
-depends on it. The first pass configures CMake and compiles every architecture's
-kernels, so it is slow; later passes are incremental.
+**Kernels are built for your own GPUs, not for every architecture Cycles
+supports.** Rebuilding kernels is how a kernel change gets tested, and a kernel
+for a card you do not own cannot be tested - so a machine with one AMD GPU
+builds one fatbin rather than twenty-two. Everything else is filled in from the
+committed payload, and the build says so. Two consequences worth knowing:
 
-To share what you built, commit the payload in `big_libs`.
+- Those inherited kernels are as old as the last publish, so they do not contain
+  your change. If a GPU in your machine is one whose SDK you have not installed,
+  the build warns loudly, because then a kernel edit will not show up in your
+  own renders however often you rebuild.
+- A narrow build does not overwrite the committed payload. It writes
+  `big_libs/RhinoCycles/ccycles/win/local`, which is gitignored and which
+  `RhinoCyclesCore` prefers while it is newer than the committed one - so your
+  Rhino runs what you built, a pull that republishes the payload takes over
+  again by itself, and nothing has to be remembered or deleted.
 
-Why this is a choice rather than automatic: `ccycles.vcxproj` drives CMake and so
-declares no source files, leaving MSBuild nothing to compare - and git rewrites
-mtimes on checkout, so timestamps would make a fresh clone a coin flip. An
-explicit configuration is the honest way to say it.
+### Publishing a payload
+
+    powershell -File publish_payload.ps1
+
+This is what everyone else runs, so it is the step that matters when a kernel
+change is going out. It builds every backend for every shipping architecture,
+checks the result file by file against the lists in `kernel_arches.ps1`, prunes
+kernels we no longer ship, writes `ccycles_payload.json`, and stages the payload
+in `big_libs` - it does not commit, because the message should name the kernel
+change that made a republish necessary.
+
+It refuses to stage an incomplete payload, and it requires all four SDKs: a
+machine missing one stops with a message naming what to install rather than
+quietly shipping a payload without that backend.
+
+Kernel code changed means a republish is needed. `ccycles_payload.json` records
+a hash of the kernel sources - `src/kernel` and `src/util`, because Cycles' own
+dependency tracking covers only the first - so a payload can be compared against
+the tree it should have been built from.
+
+Why the configuration choice is explicit rather than automatic: `ccycles.vcxproj`
+drives CMake and so declares no source files, leaving MSBuild nothing to compare
+- and git rewrites mtimes on checkout, so timestamps would make a fresh clone a
+coin flip. An explicit configuration is the honest way to say it.
 
 ### From Visual Studio
 
