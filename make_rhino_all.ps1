@@ -594,18 +594,6 @@ try {
         Promote-CcyclesPdbToInstall -ConfigCandidates $pdbCandidates
     }
 
-    Invoke-TimedStage -Name "Update Version Info" -Action {
-        Push-Location $scriptRoot
-        try {
-            & powershell -NoProfile -ExecutionPolicy Bypass -File ".\versioninfo_changer.ps1" -RhinoBranchName $rhinoBranchName | Out-Host
-            if ($LASTEXITCODE -ne 0) {
-                Write-Log "WARNING: versioninfo_changer.ps1 failed with code $LASTEXITCODE."
-            }
-        }
-        finally {
-            Pop-Location
-        }
-    }
 
     Invoke-TimedStage -Name "Copy Build Outputs" -Action {
         Copy-AllOutputs
