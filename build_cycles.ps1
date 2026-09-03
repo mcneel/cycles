@@ -500,11 +500,35 @@ if (-not $Devices) {
 else {
     Write-Host "   -> requested: $($Devices -join ', ')" -ForegroundColor Cyan
     foreach ($d in $Devices) {
+        # These throw rather than quietly dropping the backend, which is the whole point
+        # of naming devices explicitly: publish_payload.ps1 does it so that a machine
+        # which cannot produce a complete payload stops instead of shipping a partial
+        # one. Say what to install, though - "set HIP_PATH" is no use to someone who
+        # does not have ROCm at all, which is the common case for this message.
         if ($d -eq 'hip' -and -not $hipAvailable) {
-            throw "'hip' was requested but no ROCm install was found. Set HIP_PATH."
+            throw ("'hip' was requested but no ROCm install was found. Install the HIP SDK " +
+                   "for Windows - no AMD hardware is needed, hipcc cross-compiles - from " +
+                   "https://www.amd.com/en/developer/resources/rocm-hub/hip-sdk.html, or " +
+                   "point HIP_PATH at an existing one. Cycles builds against ROCm 6.x. " +
+                   "Drop 'hip' from -Devices to build without AMD kernels, but note that a " +
+                   "payload without them is not publishable.")
+        }
+        # OptiX needs both its headers and a CUDA toolkit: the host code includes
+        # optix.h and the kernels are PTX built by nvcc. Checked here against the
+        # detected paths, since the device decisions below have not been made yet.
+        if ($d -eq 'optix' -and -not ($optixPath -and $cudaPath)) {
+            throw ("'optix' was requested but " + $(if (-not $optixPath) {
+                       "the OptiX SDK headers were not found. bootstrap.exe /cycles fetches " +
+                       "them from NVIDIA, or set OPTIX_ROOT_DIR"
+                   } else {
+                       "no CUDA toolkit was found, and the OptiX kernels are PTX built by " +
+                       "nvcc. bootstrap.exe /cycles installs it"
+                   }) + ".")
         }
         if ($d -ne 'cpu' -and $detected -notcontains $d) {
-            throw "'$d' was requested but its toolkit was not detected. Install it, set the matching environment variable, or drop it from -Devices."
+            throw ("'$d' was requested but its toolkit was not detected. bootstrap.exe " +
+                   "/cycles installs the GPU SDKs, or set the matching environment " +
+                   "variable, or drop it from -Devices.")
         }
     }
 }
