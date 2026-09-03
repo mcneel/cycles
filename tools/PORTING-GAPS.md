@@ -2296,3 +2296,27 @@ whatever services the queue in an interactive session. The remaining step is gen
 interactive - open the material editor in a dev build, watch a thumbnail fail to appear,
 and read the stacks - and `_Materials` does open over `run_command` (it returns `Done.`),
 so a live session is easy to set up; what is missing is eyes on the panel.
+
+### Preview hang: DOES NOT REPRODUCE
+
+Settled interactively, which is what it needed all along.
+
+A dev build launched with `-TestErrorCheck _ModalDlgOnError=off` chained before
+`_MCPStart`, with `SimpleVaseTest` open and `_Materials` opened over `run_command`,
+**shows both thumbnails rendered** - Glass and Plaster, real preview spheres, neither
+blank nor spinning.
+
+Because the RDK caches previews by render hash, that alone could have been a cache hit,
+so the cache was invalidated: setting Glass's colour changed its hash from 3823452469 to
+911147150. The panel then had to produce a new thumbnail, and it did - CPU jumped from
+543 to 664 seconds within eight seconds, roughly fifteen cores of work, and settled
+again. A fresh preview rendered on demand.
+
+So the preview pipeline works in the dev build: cached previews display, and an
+invalidated one re-renders. **The reported deadlock is stale.**
+
+That is the fourth parked conclusion in this document to evaporate on re-test, after
+adaptive-sampling-off rendering black, in-memory images being unimplemented, and the
+`0.0000` shadow-catcher pass. The pattern is consistent enough to state as a rule:
+**before investigating a parked symptom, spend ten minutes reproducing it.** Every one of
+those four cost hours of theory built on a premise that no longer held.
