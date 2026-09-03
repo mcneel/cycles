@@ -2191,7 +2191,7 @@ hypothesis to confirm is a preview holding `RcCore.It.PreviewRendererLock` while
 `Thread.Sleep(50)` loop waits on a `Finished` flag that never arrives, which would block
 every later preview behind the same lock.
 
-### Preview hang: REPRODUCED, dev-only, with a one-line trigger
+### Preview hang: a reproduction that was NOT one - retracted
 
 The scripted routes above all failed because `-RunPythonScript` returns immediately and
 starves the job. **Driving Rhino over its MCP listener - a live session with a real
@@ -2222,3 +2222,29 @@ never entered rather than that it spun.
 Note the RDK's own quick path is healthy in dev (`GenerateQuickContentPreview` returns a
 real bitmap with `Result.Success` in 2.1 s), so this is specific to the **Cycles**
 preview path, not to RDK preview plumbing.
+
+**Retraction.** The comparison above is invalid and the preview hang is still
+unreproduced.
+
+The dev side never ran the preview code at all. A file-logging probe placed *before* the
+first call wrote nothing, which prompted the obvious control:
+
+    run_python("print('hello')")   shipping -> returns immediately
+                                   dev      -> times out at 300 seconds
+
+**Every `run_python` against the dev build times out regardless of content.** The 300
+second block was the MCP scripting host, not `GenerateRenderContentPreview`, and the
+"dev blocks, shipping returns 0.0s" table measured that difference rather than anything
+about previews. Two runs of it reproduced the same artefact, which is exactly why
+repetition is not evidence.
+
+Note the distinction, because it is a real dev-only finding in its own right and it
+matters for tooling: `_-RunPythonScript` works perfectly in dev - `driver.py` has driven
+every render in this document through it - while the **MCP script host** does not answer
+within 300 seconds. Whether that is a hang or merely a very slow first-time runtime
+initialisation in a Debug build is not established.
+
+So the preview hang stands where it did: the RDK quick path is healthy in dev, three
+scripted routes cannot discriminate the builds, and the MCP route cannot either until
+dev's script host answers. An interactive reproduction with a debugger remains the way
+in.
