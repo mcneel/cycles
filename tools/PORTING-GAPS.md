@@ -2079,3 +2079,39 @@ blocked CRT assertion dialog. Same failure mode, different dialog: **when a deve
 build goes quiet, enumerate its windows before theorising.** `MainWindowTitle` alone is
 not enough - the blocking window here was a separate top-level WPF dialog, and the main
 window's title stayed `Rhino WIP` throughout.
+
+### The 818 MB sweep: no new problems
+
+`Test lights ceilings 2.3dm` renders in both builds once the dialogs are dealt with, and
+the two agree:
+
+| | value |
+|---|---|
+| image means | 0.9149 shipping, 0.9253 dev |
+| overall ratio | **1.0114** |
+| median | 1.0039, p10 0.9961, p90 1.0492 |
+
+Per-cell, almost the whole frame sits at 0.999-1.000. The only deviation is a localised
+patch reaching 1.06-1.17 in the middle - and in a model named for its ceiling lights,
+that is where the lights are. It matches the emitter-size change already identified as
+intended (RH-96957/RH-96952) on `Brian25YearRhinoGlas` and
+`GjisGlasTalerSimplified2`, so it is the same known behaviour rather than a new finding.
+
+**What the sweep did turn up is about the model, not the renderer.** Opening it raises
+seven `CRhinoDoc::AddObject()` developer warnings, and the source
+(`BadObjectDialogs.cpp:409`) says what they mean:
+
+    "CRhinoObject.m_geometry.IsValid() returned false."
+    "Disable this message box for the rest of this modeling session?"
+
+So **seven objects in that file have geometry that fails `IsValid()`**. The box is
+`MB_YESNO` with the default on Yes, and answering Yes sets `bIsDeveloper = false` for the
+session - which is what the comment above it means by "easy to turn off by pressing
+Enter". Posting `WM_CLOSE` acts as No, so each object raises it again; that is why seven
+appeared one after another. A second dialog, `Rhino Error Detected`, follows them from
+the `ON_ErrorEx` call on the same path.
+
+`render_one.ps1` now closes windows titled `Warning`, `Assert`, `Error` or
+`Runtime Library` while it waits and counts them. Note for anyone extending this:
+`PostMessage` of a Return keystroke does **not** reach these WPF dialogs, so answering
+"Yes" properly needs UI Automation; `WM_CLOSE` in a loop is what works today.
