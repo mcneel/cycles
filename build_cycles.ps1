@@ -32,12 +32,12 @@
       * MSVC redist and
         Windows Kits     - dropped entirely; CMake locates these itself.
 
-    The shipping architecture lists for CUDA and HIP are pinned here, in
-    $cudaShippingArches and $hipShippingArches, and passed with -D so upstream's
-    CMakeLists keeps taking merges cleanly. They are a statement about which
-    GPU generations Rhino supports, so they belong somewhere a person can read
-    them - and upstream's defaults are wrong for us in both directions: its HIP
-    list has no RDNA4, and its CUDA list still names Kepler.
+    The shipping architecture lists for CUDA and HIP live in kernel_arches.ps1
+    and are passed with -D, so upstream's CMakeLists keeps taking merges
+    cleanly. They are a statement about which GPU generations Rhino supports, so
+    they belong somewhere a person can read them - and upstream's defaults are
+    wrong for us in both directions: its HIP list has no RDNA4, and its CUDA
+    list still names Kepler.
 
 .PARAMETER Configuration
     Debug, Release or RelWithDebInfo. Release maps to RelWithDebInfo in the
@@ -575,58 +575,19 @@ function Get-LocalCudaArches {
 $hipArches = @()
 $cudaArches = @()
 
-# The shipping HIP architecture list, owned by Rhino rather than taken from upstream.
-#
-# Upstream's CYCLES_CUDA_BINARIES_ARCH is kept current, but CYCLES_HIP_BINARIES_ARCH was
-# last touched in June 2024 and names 18 targets with no RDNA4 among them - so a payload
-# built from the upstream default leaves an RX 9070 falling back to CPU. These four
-# additions were already known in this tree; they were sitting in make_hip.sh, which the
-# Windows build never called.
-#
-# Kept here, and passed with -D, so upstream's CMakeLists stays untouched and takes
-# merges cleanly. hipcc cross-compiles for absent hardware, so no AMD card of any
-# generation is needed to build these - verified by compiling gfx1201 on a gfx1150
-# machine.
-$hipShippingArches = @(
-    'gfx900', 'gfx902', 'gfx906', 'gfx90c'
-    'gfx1010', 'gfx1011', 'gfx1012'
-    'gfx1030', 'gfx1031', 'gfx1032', 'gfx1034', 'gfx1035', 'gfx1036'
-    'gfx1100', 'gfx1101', 'gfx1102', 'gfx1103', 'gfx1150', 'gfx1151', 'gfx1152'
-    'gfx1200', 'gfx1201'
-)
-
-# The shipping CUDA architecture list, owned by Rhino for the same reason as the HIP one
-# - except here the question is which NVIDIA generations Rhino supports, which is a
-# product decision and should be written down somewhere a person can read it.
-#
-# Two things this fixes. Upstream's list still names sm_30, sm_35 and sm_37 - Kepler,
-# 2012, dropped by CUDA 12 - and because the CMake routes architectures the primary
-# toolkit rejects to the optional CUDA 11 one, a machine with CUDA 11.8 installed would
-# actually build and ship them. And the payload before this shipped *no* cubins at all,
-# only kernel_compute_52.ptx.zst, so every NVIDIA card JIT-compiled Maxwell-era PTX on
-# first render and none of the per-architecture tuning upstream added ever applied -
-# --jump-table-density for sm_120 among it.
-#
-# Maxwell through Blackwell, plus compute_75 as the PTX fallback for anything newer or
-# not listed. Adding a generation is one line here.
-$cudaShippingArches = @(
-    'sm_52'                       # Maxwell   - GTX 900
-    'sm_60', 'sm_61'              # Pascal    - GTX 10xx, Quadro P
-    'sm_70'                       # Volta     - Titan V, V100
-    'sm_75'                       # Turing    - GTX 16xx, RTX 20xx
-    'sm_86'                       # Ampere    - RTX 30xx
-    'sm_89'                       # Ada       - RTX 40xx
-    'sm_120'                      # Blackwell - RTX 50xx
-    'compute_75'                  # PTX fallback for everything else
-)
+# The shipping architecture lists live in kernel_arches.ps1, dot-sourced here and by
+# publish_payload.ps1. One file so the build and the payload check cannot drift: a
+# publish that verified against its own copy of the list would pass while shipping
+# something else.
+. (Join-Path $cyclesRoot 'kernel_arches.ps1')
 
 if ($AllArches) {
     if ($kernelHip) {
-        $hipArches = $hipShippingArches
+        $hipArches = $CyclesHipShippingArches
         Write-Found 'HIP arch' "$($hipArches.Count) shipping targets"
     }
     if ($kernelCuda) {
-        $cudaArches = $cudaShippingArches
+        $cudaArches = $CyclesCudaShippingArches
         Write-Found 'CUDA arch' "$($cudaArches.Count) shipping targets"
     }
 }
