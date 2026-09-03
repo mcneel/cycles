@@ -2190,3 +2190,35 @@ a dev build and watch a thumbnail hang - then attach a debugger and read the sta
 hypothesis to confirm is a preview holding `RcCore.It.PreviewRendererLock` while its
 `Thread.Sleep(50)` loop waits on a `Finished` flag that never arrives, which would block
 every later preview behind the same lock.
+
+### Preview hang: REPRODUCED, dev-only, with a one-line trigger
+
+The scripted routes above all failed because `-RunPythonScript` returns immediately and
+starves the job. **Driving Rhino over its MCP listener - a live session with a real
+message loop - discriminates the builds at once.**
+
+Launch either build with `/runscript="_MCPStart <port> _Enter"` and a model, then run:
+
+    appearance = Rhino.Render.PreviewAppearance(m.CppPointer)
+    sig        = Rhino.Render.PreviewJobSignature(128, 128, m.RenderHash)
+    rr         = Rhino.Render.Utilities.PreviewRenderResult.Rendering
+    Rhino.Render.RenderContent.GenerateRenderContentPreview(
+        None, m, 128, 128, False, sig, appearance, rr)
+
+| build | result |
+|---|---|
+| shipping | **returns in 0.0s**, `bmp=False`, `state=Rendering` - the job is queued and the caller continues |
+| dev | **never returns** - blocked past a 300 second client timeout, twice in a row |
+
+While dev is blocked: `Responding=True`, the window title is normal, memory flat at 2.21
+GB, and **CPU flat** (76 to 77 seconds across twenty seconds). So it is not rendering
+slowly - nothing is running at all. The caller is waiting for work that never starts.
+
+That fits the standing hypothesis: `PreviewRenderEngine.Renderer` takes
+`RcCore.It.PreviewRendererLock` for its whole body, so a job that never completes - or a
+lock already held - blocks every later preview, and a flat CPU says the render loop was
+never entered rather than that it spun.
+
+Note the RDK's own quick path is healthy in dev (`GenerateQuickContentPreview` returns a
+real bitmap with `Result.Success` in 2.1 s), so this is specific to the **Cycles**
+preview path, not to RDK preview plumbing.
