@@ -901,4 +901,76 @@ if (Test-Path $hipBuilt) {
     }
 }
 
+# --------------------------------------------------- inherit the kernels we did not build
+#
+# This is what makes "a missing SDK costs you kernels, not the backend" actually true.
+#
+# Device support for CUDA and HIP is compiled in whether or not their toolkits are
+# installed, on the grounds that the kernels already in the payload keep serving those
+# GPUs. That holds for the committed release payload - but a debug or local payload is
+# created from scratch and starts empty, so on a fresh clone the assumption fails: a
+# developer with an NVIDIA card and no CUDA toolkit would get a Rhino whose ccycles.dll
+# has the CUDA device compiled in and no CUDA kernels anywhere. That is worse than the
+# old behaviour, which compiled the device out and fell back to the CPU cleanly. It is
+# also the state the HIP comment above describes, where Cycles found no usable device
+# at all and took Rhino down with it.
+#
+# So fill the gaps from the committed payload. Only kernels this build did not produce,
+# only for devices this build actually enabled, and never into the release payload
+# itself - publish_payload.ps1 owns that one and builds the full set.
+#
+# The inherited kernels come from whenever the payload was last published, so they can
+# predate local kernel edits. That is said out loud rather than papered over: it is the
+# right trade against having no kernels, but it is exactly the mixture that makes a
+# render look fine while testing old code.
+function Copy-InheritedKernels {
+    param(
+        [Parameter(Mandatory)][string]$TargetPayload,
+        [bool]$Hip,
+        [bool]$Cuda,
+        [bool]$Optix
+    )
+
+    if ((Split-Path -Leaf $TargetPayload) -eq 'release') { return 0 }
+
+    $releaseLib = Join-Path (Join-Path (Split-Path -Parent $TargetPayload) 'release') 'lib'
+    $targetLib = Join-Path $TargetPayload 'lib'
+    if (-not (Test-Path $releaseLib)) { return 0 }
+
+    $wanted = [System.Collections.Generic.List[string]]::new()
+    if ($Hip) {
+        foreach ($a in $CyclesHipShippingArches) { $wanted.Add("kernel_$a.fatbin.zst") }
+    }
+    if ($Cuda) {
+        foreach ($a in $CyclesCudaShippingArches) {
+            $ext = if ($a -like 'compute_*') { 'ptx' } else { 'cubin' }
+            $wanted.Add("kernel_$a.$ext.zst")
+        }
+    }
+    if ($Optix) {
+        foreach ($m in $CyclesOptixModules) { $wanted.Add("$m.ptx.zst") }
+    }
+
+    $inherited = 0
+    foreach ($name in $wanted) {
+        if (Test-Path (Join-Path $targetLib $name)) { continue }
+        $src = Join-Path $releaseLib $name
+        if (-not (Test-Path $src)) { continue }
+        $null = New-Item -ItemType Directory -Force -Path $targetLib
+        Copy-Item -LiteralPath $src -Destination (Join-Path $targetLib $name) -Force
+        $inherited++
+    }
+
+    return $inherited
+}
+
+$inherited = Copy-InheritedKernels -TargetPayload $InstallDir -Hip $deviceHip -Cuda $deviceCuda -Optix $deviceOptix
+if ($inherited) {
+    Write-Step "Filled $inherited kernel(s) from the committed payload"
+    Write-Host "   These are for devices this build supports but did not compile kernels" -ForegroundColor DarkYellow
+    Write-Host "   for - usually a GPU vendor whose SDK is not installed here. They are as" -ForegroundColor DarkYellow
+    Write-Host "   old as the last publish, so if you changed kernel code, they do not" -ForegroundColor DarkYellow
+    Write-Host "   contain it. Your own GPU's kernels were built from your tree." -ForegroundColor DarkYellow
+}
+
 Write-Step "Done - installed to $(ConvertTo-CMakePath $InstallDir)"
