@@ -174,6 +174,37 @@ if ($missing.Count) {
            "of that kernel failed. Check the build log above rather than re-running.")
 }
 
+# --------------------------------------------------------------------------- prune
+
+# CMake's install step adds and overwrites; it never deletes. So a kernel for an
+# architecture we have stopped shipping stays in the payload, gets committed, and ships
+# forever - kernel_compute_52.ptx.zst survived exactly that way after the CUDA list
+# changed, a Maxwell PTX sitting next to the cubins that replaced it.
+#
+# Only files in lib/ that look like kernels are considered, and only ones the shipping
+# lists do not name. Everything else in the payload - the OpenImageIO and OpenVDB DLLs
+# at the root, the installed source/ tree, shader/ - is left alone.
+Write-Step "Pruning kernels we no longer ship"
+
+$expected = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($arch in $CyclesHipShippingArches) { [void]$expected.Add("kernel_$arch.fatbin.zst") }
+foreach ($arch in $CyclesCudaShippingArches) {
+    $ext = if ($arch -like 'compute_*') { 'ptx' } else { 'cubin' }
+    [void]$expected.Add("kernel_$arch.$ext.zst")
+}
+foreach ($m in $CyclesOptixModules) { [void]$expected.Add("$m.ptx.zst") }
+
+$stale = @(Get-ChildItem $libDir -File -Filter 'kernel_*' -ErrorAction SilentlyContinue |
+    Where-Object { -not $expected.Contains($_.Name) })
+
+if ($stale.Count) {
+    foreach ($f in $stale) {
+        Write-Warn 'removing' $f.Name
+        Remove-Item -LiteralPath $f.FullName -Force
+    }
+}
+else { Write-Ok 'nothing stale' 'every kernel in lib/ is one we ship' }
+
 # -------------------------------------------------------------------------- manifest
 
 Write-Step "Writing the manifest"
@@ -304,17 +335,41 @@ if ($Configuration -eq 'Debug') {
 
 Write-Step "Staging in big_libs"
 
-Push-Location $repoRoot
+# big_libs is a submodule, not a folder inside the Rhino repo. Staging the payload from
+# the parent fails outright - "Pathspec ... is in submodule 'big_libs'" - so this has to
+# run inside it. Publishing therefore takes two commits: the payload in big_libs, then
+# the new submodule pointer in the Rhino repo. Both are printed below; neither is made
+# here, because the message should name the kernel change that made a republish
+# necessary.
+$bigLibs = Join-Path $repoRoot 'big_libs'
+$payloadRel = "RhinoCycles/ccycles/win/$payloadName"
+
+Push-Location $bigLibs
 try {
-    & git add -- 'big_libs/RhinoCycles/ccycles/win/release'
-    $staged = @(& git diff --cached --name-only -- 'big_libs/RhinoCycles/ccycles/win/release')
-    Write-Ok 'staged' "$($staged.Count) file(s)"
+    & git add -- $payloadRel
+    if ($LASTEXITCODE -ne 0) {
+        throw "git add failed inside the big_libs submodule (exit $LASTEXITCODE)."
+    }
+    $staged = @(& git diff --cached --name-only -- $payloadRel)
 }
 finally { Pop-Location }
 
+if (-not $staged.Count) {
+    # Not a failure. It means the kernels and binaries just built are byte-identical to
+    # what big_libs already holds, so there is nothing to publish.
+    Write-Warn 'nothing staged' 'this payload is identical to the one already committed'
+    Write-Step "Done - payload checked, nothing to publish"
+    return
+}
+
+Write-Ok 'staged' "$($staged.Count) file(s) in the big_libs submodule"
+
 Write-Host ""
-Write-Host "Payload is complete and staged. Commit it with a message naming the kernel" -ForegroundColor Cyan
-Write-Host "change that made it necessary, then open a PR:" -ForegroundColor Cyan
+Write-Host "Payload is complete and staged. Commit it in big_libs first, then record the" -ForegroundColor Cyan
+Write-Host "new submodule pointer in the Rhino repo, naming the kernel change that made a" -ForegroundColor Cyan
+Write-Host "republish necessary:" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "    git -C `"$repoRoot`" commit -m `"Cycles: republish the payload for <change>`"" -ForegroundColor White
+Write-Host "    git -C `"$bigLibs`" commit -m `"Cycles: republish the payload for <change>`"" -ForegroundColor White
+Write-Host "    git -C `"$repoRoot`" add big_libs" -ForegroundColor White
+Write-Host "    git -C `"$repoRoot`" commit -m `"Cycles: bump big_libs for the republished payload`"" -ForegroundColor White
 Write-Host ""
