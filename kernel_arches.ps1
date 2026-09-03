@@ -86,19 +86,29 @@ function Get-CyclesKernelSourceHash {
 
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
-        $buffer = [System.Text.StringBuilder]::new()
+        $lines = [System.Collections.Generic.List[string]]::new()
         foreach ($sub in 'src\kernel', 'src\util') {
             $root = Join-Path $CyclesRoot $sub
             if (-not (Test-Path $root)) { continue }
-            Get-ChildItem $root -Recurse -File |
-                Sort-Object FullName |
-                ForEach-Object {
-                    $rel = $_.FullName.Substring($CyclesRoot.Length).Replace('\', '/')
-                    $fileHash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($_.FullName))).Replace('-', '')
-                    [void]$buffer.AppendLine("$rel $fileHash")
-                }
+            foreach ($file in Get-ChildItem $root -Recurse -File) {
+                $rel = $file.FullName.Substring($CyclesRoot.Length).Replace('\', '/')
+                $fileHash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($file.FullName))).Replace('-', '')
+                $lines.Add("$rel $fileHash")
+            }
         }
-        $bytes = [Text.Encoding]::UTF8.GetBytes($buffer.ToString())
+
+        # Ordinal sort, explicitly. Sort-Object compares with the current culture, which
+        # made this hash depend on the shell it ran in: on an en-FI machine pwsh 7 and
+        # Windows PowerShell 5.1 produced different hashes for an identical tree, because
+        # Finnish collation treats v and w as one letter and the two comparers disagree
+        # about such pairs. A hash that depends on the locale of whoever computed it
+        # reports a stale payload on a tree that is perfectly current, which is worse
+        # than not checking at all - it is a check nobody will believe twice.
+        $lines.Sort([System.StringComparer]::Ordinal)
+
+        # Newline chosen explicitly for the same reason: AppendLine would have used
+        # Environment.NewLine, so the same tree would hash differently on a Mac.
+        $bytes = [Text.Encoding]::UTF8.GetBytes(($lines -join "`n") + "`n")
         return [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
     }
     finally { $sha.Dispose() }

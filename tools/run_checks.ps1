@@ -72,6 +72,60 @@ if (-not $RenderOnly) {
   }
 }
 
+if (-not $RenderOnly) {
+  # Is the committed payload built from these kernel sources?
+  #
+  # The audits above catch a kernel that is wrong. This catches a kernel that is
+  # right and not shipped: change kernel code, merge without republishing, and
+  # everyone on a plain build gets the new ccycles.dll with the old kernels. That
+  # is not slow but wrong - an SVM renumbering means every render is garbage - and
+  # nothing else notices, because the build succeeds and the audits pass.
+  #
+  # A failure here rather than a warning, unlike the same comparison in
+  # build_cycles.ps1. That one fires on every build while iterating, so it can only
+  # inform; this runs when someone deliberately asks whether the tree is ready, and
+  # its exit code is meant to gate. Same fact, two severities, chosen by when it is
+  # being asked.
+  Write-Host '--- payload freshness'
+  $arches = Join-Path $repo 'kernel_arches.ps1'
+  # cycles -> RDK -> Plug-ins -> rhino4 -> src4 -> repo root
+  $manifest = Join-Path $repo '..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\release\ccycles_payload.json'
+
+  if (-not (Test-Path $arches)) {
+    Write-Host '  kernel_arches.ps1 not found'
+    Add-Result 'payload freshness' 2 'kernel_arches.ps1 missing'
+  }
+  elseif (-not (Test-Path $manifest)) {
+    # A payload published before manifests existed, or a checkout without big_libs.
+    # Not a failure: there is nothing to compare against, and saying so is the
+    # useful part.
+    Write-Host '  no ccycles_payload.json in the committed payload - nothing to compare'
+    Add-Result 'payload freshness' 0 'no manifest'
+  }
+  else {
+    . $arches
+    $recorded = (Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json).kernelSourceHash
+    $current = Get-CyclesKernelSourceHash -CyclesRoot $repo
+
+    if (-not $recorded) {
+      Write-Host '  the payload manifest records no kernel source hash'
+      Add-Result 'payload freshness' 0 'manifest has no hash'
+    }
+    elseif ($recorded -eq $current) {
+      Write-Host "  payload matches the kernel sources ($($current.Substring(0,16)))"
+      Add-Result 'payload freshness' 0 ''
+    }
+    else {
+      Write-Host "  payload was built from different kernel sources"
+      Write-Host "    payload: $($recorded.Substring(0,16))"
+      Write-Host "    tree:    $($current.Substring(0,16))"
+      Write-Host "  Run publish_payload.ps1 and commit the payload, or this change ships"
+      Write-Host "  a new ccycles.dll with the previously published kernels."
+      Add-Result 'payload freshness' 1 'republish needed'
+    }
+  }
+}
+
 if ($Render -or $RenderOnly) {
   $script = Join-Path $toolsDir 'render_regression.ps1'
   if (-not (Test-Path $script)) { Add-Result 'render regression' 2 'missing' }
