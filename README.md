@@ -27,22 +27,42 @@ For the OSL scene you need to enable the OSL shading system:
 	
 ## Building ccycles for Rhino
 
-Cycles builds from Visual Studio like any other Rhino project. Build
-`src4/BuildSolutions/Rhino.sln` in the `Debug+Cycles` or `ReleaseDebuggable+Cycles`
-configuration and `ccycles.vcxproj` configures and builds Cycles, installs it
-into `big_libs/RhinoCycles/ccycles/win/{debug,release}`, and
-`RhinoCyclesCore.csproj` copies it into the plug-in output. The plain `Debug` and
-`Release` configurations use the prebuilt payload instead, so no CMake, CUDA or
-OptiX SDK is needed. RhinoBuilder offers the same configurations.
+Run `bootstrap.exe /cycles` from the repo root once, which installs the GPU SDKs
+on top of a normal bootstrap. Then Cycles builds from Visual Studio like any
+other Rhino project: build `src4/BuildSolutions/Rhino.sln` in the `Debug+Cycles`
+or `ReleaseDebuggable+Cycles` configuration and `ccycles.vcxproj` configures and
+builds Cycles, installs it into a payload under
+`big_libs/RhinoCycles/ccycles/win`, and `RhinoCyclesCore.csproj` copies it into
+the plug-in output. The plain `Debug` and `Release` configurations use the
+prebuilt payload instead, so no CMake, CUDA or OptiX SDK is needed. RhinoBuilder
+offers the same configurations.
+
+Such a build makes kernels for the GPUs in your own machine only - a kernel for
+a card you do not own cannot be tested - and fills the rest in from the committed
+payload. It writes a gitignored `local` payload rather than the committed one, so
+it cannot replace what everyone else runs with kernels for a single card.
+`RhinoCyclesCore` prefers `local` while it is newer than the committed payload,
+so your Rhino runs what you built and a pull that republishes takes over again by
+itself.
 
 Building a single project is the usual mistake: `ccycles.vcxproj` alone updates
-`big_libs` but not the plug-in output, and `RhinoCyclesCore.csproj` alone copies
-whatever `big_libs` already holds without rebuilding Cycles. Do both, or the
+the payload but not the plug-in output, and `RhinoCyclesCore.csproj` alone copies
+whatever the payload already holds without rebuilding Cycles. Do both, or the
 solution.
 
-To publish a payload, commit the installed files in `big_libs` on a branch. Only
-the release payload is tracked; a `Debug/` rule in `big_libs/.gitignore` catches
-the debug one, so it stays local unless force-added.
+To publish a payload - which is what a kernel change needs before it merges, or
+everyone on a plain build gets a new `ccycles.dll` with the old kernels:
+
+    powershell -File publish_payload.ps1
+
+One command. It builds every backend for every shipping architecture, checks the
+result file by file, writes a manifest, and stages the payload in `big_libs`; it
+prints the two commits to make and does not make them. It requires all four
+SDKs, and stops rather than shipping a payload missing a backend.
+
+`tools/run_checks.ps1` answers whether the tree is sound, including whether the
+committed payload still matches the kernel sources. A second, and its exit code
+gates.
 
 See `RHINO-CYCLES-5.md` for the state of the port, and `tools/DIAGNOSTICS.md` for
 the diagnostic switches and what each one established.
