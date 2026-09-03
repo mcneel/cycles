@@ -1897,3 +1897,56 @@ what it actually emits answers it more cheaply:
 
 That leaves the `MixNode` null-deref fix as the only one genuinely waiting on a volume
 scene, and it is a null dereference: reachable or not, the fix is unambiguous.
+
+## The HIP stall: a Debug-only pipe deadlock in the kernel compiler
+
+The "HIP renders bump-mapped surfaces black" symptom was parked after nine hypotheses
+came to nothing. Re-testing it first - parked conclusions in this project have a habit of
+being stale - showed something simpler: **HIP produces no render at all.** The pass ran
+for 25 minutes, wrote nothing, no `RhinoCyclesKernelCompiler` process was alive, and the
+kernel cache was empty. Nothing had been compiled.
+
+`RcCore.SetupProcessStartInfo` appends `inception` to the compiler's arguments **in
+Debug builds only**:
+
+    #if ON_RUNTIME_WIN
+    #if DEBUG
+        argumentsToProgramToRun += " inception";
+    #endif
+    #endif
+
+In `RhinoCyclesKernelCompiler`, that extra argument sets `hacky = args.Length > 2`, and
+the `hacky` branch launches a **child copy of itself** with `RedirectStandardOutput` and
+`RedirectStandardError` both true - then waits for the child to exit and only afterwards
+calls `ReadToEnd` on both pipes.
+
+That is a guaranteed deadlock once the child writes more than the pipe buffer holds
+(~4KB): the child blocks in `write`, so it never exits, so the wait loop spins forever.
+Compiling Cycles kernels for every GPU architecture produces vastly more output than
+that. Release sets `hacky = false` and calls `RunCompile` in-process, starting no child
+at all - which is exactly why this presented as "dev-only".
+
+Fixed by draining both streams while the child runs (`OutputDataReceived` /
+`ErrorDataReceived` with `BeginOutputReadLine` / `BeginErrorReadLine`, then
+`WaitForExit`). The fix is in the RhinoCycles repo, not this one.
+
+**Building that project standalone is not supported**, which is worth writing down: the
+post-build step deploys the Cycles payload from `$(SolutionDir)..\..ig_libs\...`, and
+`$(SolutionDir)` is undefined outside a solution build, so the copy silently targets a
+path that does not exist. It builds with
+
+    msbuild RhinoCyclesKernelCompiler.csproj /p:Configuration=Debug \
+      /p:RhinoBinDir=<repo>\src4in "/p:SolutionDir=<repo>\src4hino4\"
+
+and the Debug payload is only used when `big_libs\RhinoCycles\ccycles\win\debug\ccycles.dll`
+exists - otherwise it falls back to the release payload, so `build_cycles.ps1 -InstallDir`
+has to have populated the matching tree first.
+
+### A harness flaw this exposed
+
+`runarea.ps1` read `<model>.hdr` back after each device pass. A device that stalls leaves
+the previous device's file in place, so the numbers printed for HIP were **the CPU render
+read a second time** - identical to four decimals, which reads as "the two devices agree"
+and would have been reported as the bug being fixed. It now compares the file's write
+time against the start of the pass and refuses to report anything it did not just
+produce.
