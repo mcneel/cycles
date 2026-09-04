@@ -930,15 +930,66 @@ if ($ConfigureOnly) {
     return
 }
 
-# Bare --parallel means "use every core", which is fine for C++ but not for the
-# GPU kernels: each clang compiling a HIP architecture peaks around 1.2 GB, and
-# Ninja will happily start all 18 at once. On a 24-core, 32 GB machine that is
-# roughly 21 GB of compilers plus everything else. Cap it, leaving headroom, and
-# let -Jobs override for a machine that can take more.
+# Bare --parallel means "use every core", which is fine for C++ but not for the GPU
+# kernels: each clang compiling a HIP architecture peaks around 1.2 GB, and Ninja will
+# happily start twenty-two at once. So the limit here is memory, not cores - which is
+# why it is derived from memory rather than being the flat cap of 12 it used to be. That
+# number was chosen for a 32 GB machine and then applied everywhere: half the build on a
+# 128 GB workstation, and still too many on a 16 GB laptop.
+#
+# Total memory rather than free memory, deliberately. Free memory fluctuates, so the job
+# count would differ between two runs on the same machine and a build that succeeded in
+# the morning could thrash in the afternoon. A predictable number that is occasionally
+# conservative beats an adaptive one nobody can reproduce.
+#
+# The reserve covers two things: the operating system and whatever else is open, and the
+# oneAPI kernel link, which is a single job that peaks around 8 GB - far beyond its share
+# of the per-job budget. Ninja counts jobs, not bytes, so nothing else accounts for it.
+#
+# -Jobs still overrides, and is the right answer for a machine whose memory this guesses
+# wrong.
 if (-not $Jobs) {
     $cores = [int]$env:NUMBER_OF_PROCESSORS
     if (-not $cores) { $cores = 4 }
-    $Jobs = [Math]::Max(2, [Math]::Min($cores - 2, 12))
+
+    $totalMB = 0
+    try {
+        $totalMB = [int]((Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).TotalPhysicalMemory / 1MB)
+    }
+    catch {
+        # No CIM - fall back to the old flat cap rather than guessing wildly.
+        $totalMB = 0
+    }
+
+    if ($totalMB -gt 0) {
+        # The worst case this has to survive is the oneAPI kernel link running while the
+        # HIP fan-out is in flight: one job at about 8 GB alongside the rest at about
+        # 1.2 GB each. So reserve the oneAPI peak plus room for the machine to be in use,
+        # and divide what is left by the per-job cost. The +1 is that oneAPI job, which
+        # the reserve has already paid for.
+        #
+        # These are the peaks documented upstream and in this file, not measurements
+        # taken here, so treat the result as a sane default rather than a tuned one -
+        # -Jobs is the lever when a machine disagrees.
+        $reserveMB = 12288  # oneAPI link ~8 GB, plus ~4 GB for the OS and an editor
+        $perJobMB = 1228    # a HIP clang peaks near 1.2 GB
+        $byMemory = [Math]::Floor(($totalMB - $reserveMB) / $perJobMB) + 1
+        $Jobs = [Math]::Max(2, [Math]::Min($cores - 2, $byMemory))
+        Write-Host ("   {0,-12} {1} jobs ({2} GB, {3} cores)" -f 'parallelism', $Jobs,
+                    [Math]::Round($totalMB / 1024), $cores) -ForegroundColor DarkGray
+
+        # Below about 14 GB the arithmetic asks for fewer than two jobs, and the floor of
+        # two wins. Say so: the build will still run, but it is over budget from the
+        # start and a machine that swaps through the oneAPI link will look hung rather
+        # than slow.
+        if ($byMemory -lt 2) {
+            Write-Missing 'memory' ("{0} GB is below what a full Cycles build wants; expect swapping" -f
+                                    [Math]::Round($totalMB / 1024))
+        }
+    }
+    else {
+        $Jobs = [Math]::Max(2, [Math]::Min($cores - 2, 12))
+    }
 }
 
 Write-Step "Building ($cmakeConfig, $Jobs jobs)"
