@@ -1,5 +1,6 @@
 bin/
 obj/
 rel/
+dbg/
 *.ppm
 *.log

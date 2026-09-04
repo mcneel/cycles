@@ -230,12 +230,17 @@ function Get-GitDescribe {
     try {
         $sha = & git rev-parse --short HEAD 2>$null
         $branch = & git rev-parse --abbrev-ref HEAD 2>$null
-        $dirty = & git status --porcelain 2>$null
+        # Only the paths that enter the build count. Asking git about the whole tree
+        # made every payload dirty: this directory also holds the render harness,
+        # smoke-test leftovers and build directories, and untracked scratch beside the
+        # source says nothing about what was compiled. Untracked files under these
+        # paths do count - a new kernel file not yet added is a real difference.
+        $dirty = & git status --porcelain -- src/ cmake/ CMakeLists.txt third_party/ 2>$null
         return [ordered]@{
             commit = if ($sha) { $sha.Trim() } else { 'unknown' }
             branch = if ($branch) { $branch.Trim() } else { 'unknown' }
-            # A payload built from a dirty tree cannot be reproduced from the commit it
-            # names, which is worth knowing later even though it is normal while
+            # A payload built from modified sources cannot be reproduced from the commit
+            # it names, which is worth knowing later even though it is normal while
             # iterating.
             dirty  = [bool]$dirty
         }
