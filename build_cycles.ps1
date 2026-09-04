@@ -1,10 +1,10 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Configures, builds and installs Cycles + ccycles for Rhino.
 
 .DESCRIPTION
-    Replaces make_rhino.bat and build_cycles_for_rhino.ps1.
+    Replaced make_rhino.bat and build_cycles_for_rhino.ps1, both since deleted.
 
     Everything that used to be a hardcoded absolute path is now discovered:
 
@@ -23,14 +23,14 @@
                            kernels already in the payload keep serving the GPU.
                            OptiX is the exception - it needs its SDK headers
                            and nvcc, with no dynamic-loading path around either.
+      * MSVC redist and
+        Windows Kits     - dropped entirely; CMake locates these itself.
 
     Kernels are built for the GPUs in this machine, not for every architecture
     Cycles supports. Rebuilding kernels is how you test a kernel change, and a
     kernel for a card you do not own cannot be tested - so an AMD-only machine
-    should not spend an hour on 18 HIP fatbins plus the CUDA and OptiX kernels
+    should not spend an hour on 22 HIP fatbins plus the CUDA and OptiX kernels
     every time a kernel header changes. Pass -AllArches for the shipping set.
-      * MSVC redist and
-        Windows Kits     - dropped entirely; CMake locates these itself.
 
     The shipping architecture lists for CUDA and HIP live in kernel_arches.ps1
     and are passed with -D, so upstream's CMakeLists keeps taking merges
@@ -84,7 +84,7 @@
     Ninja is much faster here, and the GPU kernels are why. Every architecture's
     kernel is an add_custom_command on one target, and MSBuild runs a project's
     custom build steps strictly in order - its /m parallelism works across
-    projects, not within one. So the 18 HIP fatbins compiled one at a time, at
+    projects, not within one. So the 22 HIP fatbins compiled one at a time, at
     3m20s each: an hour of a 24-core machine sitting mostly idle. Ninja has no
     such restriction and runs them concurrently.
 
@@ -97,10 +97,11 @@
     sees what CMake generated.
 
 .PARAMETER Jobs
-    How many compiles to run at once. Defaults to a cap rather than the core
-    count, because the kernel compilers are memory-hungry - each clang building a
-    HIP kernel peaks around 1.2 GB, and letting all 18 architectures go at once
-    wants more RAM than a 32 GB machine has to spare.
+    How many compiles to run at once. Defaults to a figure derived from this
+    machine's memory rather than its core count, because the kernel compilers are
+    what constrain it: each clang building a HIP kernel peaks around 1.2 GB, and
+    the oneAPI link peaks around 8 GB. Pass this when that guess is wrong for a
+    particular machine.
 
 .EXAMPLE
     .\build_cycles.ps1 -Configuration Release

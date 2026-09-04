@@ -143,7 +143,18 @@ quietly shipping a payload without that backend.
 Kernel code changed means a republish is needed. `ccycles_payload.json` records
 a hash of the kernel sources - `src/kernel` and `src/util`, because Cycles' own
 dependency tracking covers only the first - so a payload can be compared against
-the tree it should have been built from.
+the tree it should have been built from. `tools/run_checks.ps1` makes that
+comparison and fails when they differ.
+
+**`DockerfileHIP`, `DockerfileOneAPI`, `make_hip.sh` and `make_oneapi.sh` are
+unwired on purpose.** They build kernels in a Linux container, which was how the
+retired pipeline produced the HIP fatbins, and nothing calls them now: ROCm
+installs on Windows and `hipcc` cross-compiles, so a publisher needs no AMD
+hardware and no container. They are kept for one case that has never been tested
+- whether AMD's Windows installer will install the SDK on a machine with no AMD
+GPU at all. If it refuses, that is the way round it. Note both are stale: they
+copy `*.fatbin` where this tree produces `*.fatbin.zst`, and their architecture
+lists have drifted from `kernel_arches.ps1`.
 
 Why the configuration choice is explicit rather than automatic: `ccycles.vcxproj`
 drives CMake and so declares no source files, leaving MSBuild nothing to compare
