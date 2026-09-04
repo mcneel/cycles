@@ -27,6 +27,8 @@ For the OSL scene you need to enable the OSL shading system:
 	
 ## Building ccycles for Rhino
 
+**In a hurry: [QUICKSTART.md](QUICKSTART.md).** One page, no history.
+
 Run `bootstrap.exe /cycles` from the repo root once, which installs the GPU SDKs
 on top of a normal bootstrap. Then Cycles builds from Visual Studio like any
 other Rhino project: build `src4/BuildSolutions/Rhino.sln` in the `Debug+Cycles`

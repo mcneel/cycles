@@ -52,6 +52,10 @@ Build the **solution**, not single projects:
 That is all most people need. Cycles comes prebuilt from `big_libs`, so no
 CMake, CUDA or OptiX SDK is required.
 
+If you only want to get building, [QUICKSTART.md](QUICKSTART.md) is one page and
+says nothing about why. The rest of this section is the same ground with the
+reasoning attached.
+
 ### Setting up to build Cycles
 
     bootstrap.exe /cycles
