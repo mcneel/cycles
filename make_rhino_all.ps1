@@ -142,6 +142,61 @@ function Resolve-VsBuildEnv {
     }
 }
 
+function Resolve-CudaToolkit {
+    # Deliberately does NOT consult PATH or CUDA_PATH -- drifting to whatever toolkit the
+    # machine happens to have is the bug this guards against. Set RHINO_CUDA_ROOT to
+    # override with a non-standard install (an extracted conda tarball works fine).
+    param([string]$Version)
+
+    $candidates = @(
+        $env:RHINO_CUDA_ROOT,
+        "C:\cuda$($Version -replace '\.', '')",
+        "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v$Version"
+    ) | Where-Object { $_ }
+
+    foreach ($candidate in $candidates) {
+        $nvcc = Join-Path $candidate "bin\nvcc.exe"
+        if (-not (Test-Path $nvcc)) { continue }
+        $reported = (& $nvcc --version 2>&1 | Select-String -Pattern 'release ([0-9]+\.[0-9]+)').Matches.Groups[1].Value
+        if ($reported -eq $Version) {
+            Write-Log "CUDA $Version toolkit: $candidate"
+            return $candidate
+        }
+        Write-Log "Ignoring CUDA toolkit at '$candidate': reports $reported, need $Version."
+    }
+
+    throw ("No CUDA $Version toolkit found (looked in: $($candidates -join '; ')). " +
+           "Kernels MUST be built with $Version -- a newer nvcc emits a PTX ISA that older " +
+           "drivers reject (RH-98331). Install it, or point RHINO_CUDA_ROOT at it. " +
+           "No admin needed: extract " +
+           "https://conda.anaconda.org/nvidia/win-64/cuda-nvcc-$Version.140-0.tar.bz2 " +
+           "(plus cuda-cudart-dev- and cuda-cccl- of the same version) into one folder.")
+}
+
+function Assert-KernelPtxIsaVersion {
+    # Backstop for anyone who bypasses this script or hand-copies kernels: the ISA version
+    # is right there in the PTX header, so check it rather than trusting the build.
+    param([string]$LibDir, [string]$MaxIsaVersion)
+
+    $ptxFiles = @(Get-ChildItem -Path $LibDir -Filter "*.ptx" -File -ErrorAction SilentlyContinue)
+    if ($ptxFiles.Count -eq 0) {
+        Write-Log "No PTX in '$LibDir' to verify."
+        return
+    }
+
+    $max = [version]$MaxIsaVersion
+    foreach ($ptx in $ptxFiles) {
+        $line = Select-String -Path $ptx.FullName -Pattern '^\.version\s+([0-9]+\.[0-9]+)' | Select-Object -First 1
+        if (-not $line) { throw "No .version directive in '$($ptx.Name)'." }
+        $isa = [version]$line.Matches.Groups[1].Value
+        if ($isa -gt $max) {
+            throw ("'$($ptx.Name)' is PTX ISA $isa, max allowed is $max. Built with too new a " +
+                   "CUDA toolkit -- older drivers will fail with 'Unsupported PTX version' (RH-98331).")
+        }
+        Write-Log "PTX ISA OK: $($ptx.Name) = $isa"
+    }
+}
+
 $buildDirInput = if ($env:BUILD_DIR) { $env:BUILD_DIR } else { "build" }
 $buildDir = if ([System.IO.Path]::IsPathRooted($buildDirInput)) { [System.IO.Path]::GetFullPath($buildDirInput) } else { [System.IO.Path]::GetFullPath((Join-Path $scriptRoot $buildDirInput)) }
 $expectedBuildDir = [System.IO.Path]::GetFullPath((Join-Path $scriptRoot "build"))
@@ -169,6 +224,15 @@ $kernelDestinations = @(
 
 $cmakeExe = if (Test-Path "C:\Tools\cmake329\bin\cmake.exe") { "C:\Tools\cmake329\bin\cmake.exe" } else { "cmake" }
 $optixRoot = "C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.6.0"
+
+# nvcc stamps the PTX ISA version, and a driver refuses any PTX newer than it knows.
+# 12.2 => ISA 8.2 => back to driver r535. A 12.9 toolkit emits ISA 8.8, which needs r576
+# and breaks OptiX outright (no cubin fallback). That regression has shipped twice:
+# RH-87727, then RH-98331. Pinned explicitly because CMake would otherwise take nvcc from
+# CUDA_PATH/PATH, so building on a 12.9 box silently reintroduces it.
+$requiredCudaVersion = "12.2"
+$maxPtxIsaVersion = "8.2"
+$cudaRoot = (Resolve-CudaToolkit -Version $requiredCudaVersion) -replace '\', '/'
 # Absolute, so the build no longer depends on being launched from the cycles folder.
 $dpcppRoot = ([System.IO.Path]::GetFullPath((Join-Path $libRoot "win64_vc15\dpcpp"))) -replace '\\', '/'
 $levelZeroRoot = ([System.IO.Path]::GetFullPath((Join-Path $libRoot "win64_vc15\level-zero"))) -replace '\\', '/'
@@ -375,6 +439,7 @@ function Copy-KernelArtifacts {
         }
 
         Copy-Item -Path (Join-Path $installLibDir "*") -Destination $destination -Force
+        Assert-KernelPtxIsaVersion -LibDir $destination -MaxIsaVersion $maxPtxIsaVersion
     }
 }
 
@@ -614,6 +679,8 @@ try {
                 "-DWITH_CYCLES_CUDA_BINARIES=OFF",
                 "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;compute_75",
                 "-DOPTIX_ROOT_DIR=$optixRoot",
+                "-DCUDA_TOOLKIT_ROOT_DIR=$cudaRoot",
+                "-DCUDA_NVCC_EXECUTABLE=$cudaRoot/bin/nvcc.exe",
                 "-DWITH_CYCLES_DEVICE_HIP=ON",
                 "-DWITH_CYCLES_HIP_BINARIES=OFF",
                 "-DWITH_CYCLES_DEVICE_ONEAPI=OFF",
@@ -626,6 +693,8 @@ try {
                 "-DWITH_CYCLES_DEVICE_OPTIX=ON",
                 "-DCYCLES_CUDA_BINARIES_ARCH=sm_50;sm_52;sm_60;sm_61;sm_70;sm_75;sm_86;sm_89;compute_75",
                 "-DOPTIX_ROOT_DIR=$optixRoot",
+                "-DCUDA_TOOLKIT_ROOT_DIR=$cudaRoot",
+                "-DCUDA_NVCC_EXECUTABLE=$cudaRoot/bin/nvcc.exe",
                 "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
                 "-DWITH_CYCLES_DEVICE_HIP=ON"
             )
