@@ -69,6 +69,11 @@ gates.
 See `RHINO-CYCLES-5.md` for the state of the port, and `tools/DIAGNOSTICS.md` for
 the diagnostic switches and what each one established.
 
+All of the above is Windows. The Mac has none of it yet: see
+[MACOS-PLAN.md](MACOS-PLAN.md) for what is actually there today - eighteen `cp`
+lines in `MacDotNetMakefile`, a committed payload that is still Cycles 3.5, and no
+Metal kernel binaries to build because Metal compiles from source at runtime.
+
 The previous procedure for this - twelve manual steps per platform, editing
 `cycles_device.vcxproj` by hand, ResourceHacker, and copying DLLs into `big_libs`
 - no longer applies: it assumed a nested `RDK/cycles/cycles` directory and a
