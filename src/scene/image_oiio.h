@@ -26,6 +26,8 @@ class OIIOImageLoader : public ImageLoader {
 
   bool equals(const ImageLoader &other) const override;
 
+  uint64_t source_version() const override;
+
  protected:
   ustring filepath;
 };

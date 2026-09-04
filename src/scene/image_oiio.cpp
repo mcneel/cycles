@@ -17,6 +17,17 @@ OIIOImageLoader::~OIIOImageLoader()
 {
 }
 
+uint64_t OIIOImageLoader::source_version() const
+{
+  const uint64_t mtime = path_modified_time(filepath.string());
+  if (mtime == 0) {
+    return 0;
+  }
+
+  /* mtime alone only has second resolution, so mix in the size as well. */
+  return mtime ^ (uint64_t(path_file_size(filepath.string())) << 32);
+}
+
 bool OIIOImageLoader::load_metadata(const ImageDeviceFeatures & /*features*/,
                                     ImageMetaData &metadata)
 {

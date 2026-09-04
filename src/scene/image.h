@@ -116,6 +116,11 @@ class ImageLoader {
   /* Optional for tiled textures loaded externally. */
   virtual int get_tile_number() const;
 
+  /* Fingerprint of the source data (e.g. file modification time and size).
+   * 0 means unknown. Used to notice that an already loaded image has been
+   * changed behind our back and must be re-read. */
+  virtual uint64_t source_version() const;
+
   /* Free any memory used for loading metadata and pixels. */
   virtual void cleanup(){};
 
@@ -203,6 +208,9 @@ class ImageManager {
     bool need_metadata;
     bool need_load;
     bool builtin;
+
+    /* source_version() as of the last load, to detect out-of-date pixels. */
+    uint64_t loaded_version;
 
     string mem_name;
     device_texture *mem;

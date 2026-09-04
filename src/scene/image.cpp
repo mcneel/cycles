@@ -304,6 +304,11 @@ int ImageLoader::get_tile_number() const
   return 0;
 }
 
+uint64_t ImageLoader::source_version() const
+{
+  return 0;
+}
+
 bool ImageLoader::equals(const ImageLoader *a, const ImageLoader *b)
 {
   if (a == NULL && b == NULL) {
@@ -463,6 +468,15 @@ size_t ImageManager::add_image_slot(ImageLoader *loader,
   for (slot = 0; slot < images.size(); slot++) {
     img = images[slot];
     if (img && ImageLoader::equals(img->loader, loader) && img->params == params) {
+      /* RH-98332: the file may have been edited in another application since we
+       * loaded it. The shader graph is rebuilt in that case, but this cache hit
+       * would otherwise keep handing out the stale pixels. */
+      const uint64_t version = img->loader->source_version();
+      if (version != 0 && version != img->loaded_version) {
+        img->need_metadata = true;
+        img->need_load = true;
+        need_update_ = true;
+      }
       img->users++;
       delete loader;
       return slot;
@@ -488,6 +502,7 @@ size_t ImageManager::add_image_slot(ImageLoader *loader,
   img->builtin = builtin;
   img->users = 1;
   img->mem = NULL;
+  img->loaded_version = 0;
 
   images[slot] = img;
 
@@ -697,6 +712,9 @@ void ImageManager::device_load_image(Device *device, Scene *scene, size_t slot, 
   progress->set_status("Updating Images", "Loading " + img->loader->name());
 
   const int texture_limit = scene->params.texture_limit;
+
+  /* Sample before reading, so a change made while we load is picked up next time. */
+  img->loaded_version = img->loader->source_version();
 
   load_image_metadata(img);
   ImageDataType type = img->metadata.type;

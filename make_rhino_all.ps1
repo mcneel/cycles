@@ -137,16 +137,67 @@ function Resolve-VsBuildEnv {
     }
 
     return [PSCustomObject]@{
-        Generator = $generator
-        RedistDir = ($redistDir -replace '\\', '/')
+        Generator   = $generator
+        RedistDir   = ($redistDir -replace '\\', '/')
+        InstallPath = $installPath
     }
+}
+
+function Import-CudaHostToolsetEnv {
+    # nvcc resolves its own host compiler and headers from the environment, so -T v142 (which
+    # only steers the C++ projects) does not reach it. MSVC 14.40+ ships an STL that hard-errors
+    # on any CUDA older than 12.4 ("STL1002"), so with 12.2 pinned for the PTX ISA (RH-98331) the
+    # kernels cannot compile until the environment is pinned to a 14.3x-or-older toolset too.
+    # Import a vcvars environment for the newest toolset that predates that assert.
+    param([Parameter(Mandatory = $true)][string]$InstallPath,
+          [string]$MaxToolsetVersion = "14.39")
+
+    $toolsRoot = Join-Path $InstallPath "VC\Tools\MSVC"
+    if (-not (Test-Path $toolsRoot)) {
+        throw "MSVC tools folder not found at '$toolsRoot'."
+    }
+
+    $max = [version]$MaxToolsetVersion
+    $toolset = Get-ChildItem $toolsRoot -Directory |
+        Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
+        Where-Object { [version]("{0}.{1}" -f $_.Name.Split('.')[0], $_.Name.Split('.')[1]) -le $max } |
+        Sort-Object { [version]$_.Name } |
+        Select-Object -Last 1
+
+    if (-not $toolset) {
+        $installed = (Get-ChildItem $toolsRoot -Directory | ForEach-Object { $_.Name }) -join ', '
+        throw ("No MSVC toolset <= $MaxToolsetVersion found under '$toolsRoot' (installed: $installed). " +
+               "nvcc needs one: 14.40+ ships an STL that refuses CUDA older than 12.4, and the kernels " +
+               "must be built with 12.2 (RH-98331). Install the 'MSVC v142 - VS 2019 C++ build tools' " +
+               "component from the Visual Studio Installer -- it sits alongside your current toolset.")
+    }
+
+    $vcvarsall = Join-Path $InstallPath "VC\Auxiliary\Build\vcvarsall.bat"
+    if (-not (Test-Path $vcvarsall)) {
+        throw "vcvarsall.bat not found at '$vcvarsall'."
+    }
+
+    $verArg = "{0}.{1}" -f $toolset.Name.Split('.')[0], $toolset.Name.Split('.')[1]
+    $imported = 0
+    cmd /c "`"$vcvarsall`" x64 -vcvars_ver=$verArg >nul 2>&1 && set" | ForEach-Object {
+        if ($_ -match '^([^=]+)=(.*)$') {
+            Set-Item -Path ("Env:" + $matches[1]) -Value $matches[2] -ErrorAction SilentlyContinue
+            $imported++
+        }
+    }
+
+    if ($imported -eq 0 -or [string]::IsNullOrWhiteSpace($env:VCToolsVersion)) {
+        throw "Failed to import a vcvars environment for MSVC $verArg from '$vcvarsall'."
+    }
+
+    Write-Log "nvcc host toolset pinned to MSVC $env:VCToolsVersion (<= $MaxToolsetVersion, so its STL accepts CUDA $requiredCudaVersion)."
 }
 
 function Resolve-CudaToolkit {
     # Deliberately does NOT consult PATH or CUDA_PATH -- drifting to whatever toolkit the
     # machine happens to have is the bug this guards against. Set RHINO_CUDA_ROOT to
     # override with a non-standard install (an extracted conda tarball works fine).
-    param([string]$Version)
+    param([string]$Version, [switch]$AllowAnyVersion)
 
     $candidates = @(
         $env:RHINO_CUDA_ROOT,
@@ -163,6 +214,26 @@ function Resolve-CudaToolkit {
             return $candidate
         }
         Write-Log "Ignoring CUDA toolkit at '$candidate': reports $reported, need $Version."
+    }
+
+    if ($AllowAnyVersion) {
+        # Wrapper mode compiles no kernels, but DEVICE_CUDA/DEVICE_OPTIX stay ON, so CMake
+        # still needs a toolkit for headers and the driver stubs -- just not a specific one.
+        $anyRoots = @($env:RHINO_CUDA_ROOT, $env:CUDA_PATH)
+        $anyRoots += @(Get-ChildItem -Path "C:\" -Directory -Filter "cuda*" -ErrorAction SilentlyContinue |
+                       Sort-Object Name -Descending | ForEach-Object { $_.FullName })
+        $anyRoots += @(Get-ChildItem -Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA" -Directory -ErrorAction SilentlyContinue |
+                       Sort-Object Name -Descending | ForEach-Object { $_.FullName })
+
+        foreach ($root in ($anyRoots | Where-Object { $_ })) {
+            $nvcc = Join-Path $root "bin\nvcc.exe"
+            if (-not (Test-Path $nvcc)) { continue }
+            $reported = (& $nvcc --version 2>&1 | Select-String -Pattern 'release ([0-9]+\.[0-9]+)').Matches.Groups[1].Value
+            Write-Log ("WARNING: wrapper mode is using CUDA $reported at '$root' (wanted $Version). " +
+                       "No kernels are built here so the PTX ISA pin is not at stake, but a release " +
+                       "build on this machine will still fail until $Version is installed.")
+            return $root
+        }
     }
 
     throw ("No CUDA $Version toolkit found (looked in: $($candidates -join '; ')). " +
@@ -232,7 +303,6 @@ $optixRoot = "C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.6.0"
 # CUDA_PATH/PATH, so building on a 12.9 box silently reintroduces it.
 $requiredCudaVersion = "12.2"
 $maxPtxIsaVersion = "8.2"
-$cudaRoot = (Resolve-CudaToolkit -Version $requiredCudaVersion) -replace '\', '/'
 # Absolute, so the build no longer depends on being launched from the cycles folder.
 $dpcppRoot = ([System.IO.Path]::GetFullPath((Join-Path $libRoot "win64_vc15\dpcpp"))) -replace '\\', '/'
 $levelZeroRoot = ([System.IO.Path]::GetFullPath((Join-Path $libRoot "win64_vc15\level-zero"))) -replace '\\', '/'
@@ -257,6 +327,13 @@ $buildConfig = switch ($buildMode) {
 
 $wrappersConfig = if ($buildMode -eq "release") { "RelWithDebInfo" } else { $null }
 $isWrapperMode = ($buildMode -eq "wrapper")
+# Resolved here, not with the other roots above, because how strict we can be about the
+# toolkit version depends on whether this build actually compiles kernels.
+$cudaRoot = (Resolve-CudaToolkit -Version $requiredCudaVersion -AllowAnyVersion:$isWrapperMode) -replace '\\', '/'
+if (-not $isWrapperMode) {
+    # Only kernel builds run nvcc, and only nvcc needs the older host toolset.
+    Import-CudaHostToolsetEnv -InstallPath $vsBuildEnv.InstallPath
+}
 $script:SvnRetryCount = 500
 $script:SvnRetryDelaySeconds = 1
 
