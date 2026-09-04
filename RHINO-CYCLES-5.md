@@ -67,6 +67,30 @@ kernels, which means publishing a payload, or testing on an AMD card.
 Nothing here is needed for a normal Rhino build, and `/cycles` is opt-in, so
 nobody who is not working on Cycles is affected.
 
+**Overrides, which nobody needs to set.** Three environment variables change what
+`/cycles` installs. All have working defaults, so they exist for the unusual case
+rather than the normal one - which is why `bootstrap /help` does not list them.
+
+| Variable | Default |
+| --- | --- |
+| `RHINO_CUDA_VERSION` | `12.9` |
+| `RHINO_OPTIX_REPO` | `https://github.com/NVIDIA/optix-dev.git` |
+| `RHINO_ROCM_INSTALLER` | unset - offers AMD's download page |
+
+The CUDA version is pinned rather than latest on purpose: CUDA 13 dropped Maxwell,
+Pascal and Volta, which are four of the nine cubins Rhino ships, and 12.9 is what
+the MSVC toolset pinning in `build_cycles.ps1` is validated against.
+
+`RHINO_ROCM_INSTALLER` is the only one with a plausible use: point it at a copy of
+AMD's HIP SDK installer on a share and the ROCm step launches that instead of
+opening the download page. It still runs the installer's own UI, because its
+command line cannot install the SDK without the driver, and that is not a choice
+to make silently on someone else's machine.
+
+Set them machine- or user-level - `setx NAME value /M` - not in a shell.
+bootstrap relaunches itself elevated, and the elevated process does not inherit a
+session-only variable.
+
 ### Building Cycles itself
 
 Pick a different configuration. That is the whole mechanism.
