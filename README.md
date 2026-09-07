@@ -33,33 +33,20 @@ Ensure both the **Mac** and the **Windows** sections are completed.
 
 ### Mac
 
-1. **For Apple Silicon devices:**
-   - Ensure you have the universal binaries.
-     Download them [here](https://drive.google.com/file/d/10UxUQBOm9kRH1y6GN1NXLdFU4dpu-dCq/view?usp=sharing).
-   - Use the Terminal to delete the quarantine attribute from the zip-file: `xattr -d com.apple.quarantine darwin_universal.zip`.
-   - Unzip the binaries to `RDK/cycles/lib/darwin_universal`.
+All commands run from `RDK/cycles/cycles`.
 
-2. **For non-Apple Silicon devices:**
-   - Navigate to `RDK/cycles/cycles`.
-   - Run the command `make update`.
+1. Get the dependency libraries.
 
-3. Go to `RDK/cycles/cycles` and run `make clean && make release`.
+   - **Apple Silicon:** download the [universal binaries](https://drive.google.com/file/d/10UxUQBOm9kRH1y6GN1NXLdFU4dpu-dCq/view?usp=sharing), run `xattr -d com.apple.quarantine darwin_universal.zip`, and unzip them into `RDK/cycles/lib/darwin_universal`.
+   - **Otherwise:** `make update`
 
-4. Make the built `libccycles.dylib` portable (strips the machine-specific absolute rpaths `make release` bakes in and adds portable `@loader_path` rpaths so the RhinoCycles kernel compiler can find the Cycles dependency dylibs — see RH-96549):
+2. Build and copy into `big_libs`:
 
  ```
-./fix-cycles-rpaths.sh
+make clean && make release && cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/
  ```
 
-5. Execute `cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/`.
-
-   Steps 3-5 as one command, from `RDK/cycles/cycles`:
-
- ```
-make clean && make release && ./fix-cycles-rpaths.sh && cp -r install/* ../../../../../../big_libs/RhinoCycles/ccycles/osx/release/
- ```
-
-6. Go to `big_libs`, create a branch if needed and execute:
+3. Commit from `big_libs`, on a branch:
 
  ```
 git add -f RhinoCycles/ccycles/osx/release/libccycles.dylib
