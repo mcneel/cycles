@@ -770,6 +770,15 @@ uint ShaderManager::get_kernel_features(Scene *scene)
         kernel_features |= KERNEL_FEATURE_NODE_BUMP_STATE;
       }
     }
+    /* has_volume_connected is captured once, in set_graph(). Consumers that build a graph
+     * incrementally after set_graph (csycles/RhinoCycles do) never re-run it, so the flag stays
+     * false and a Volume closure on the output is silently dropped from the kernel. The graph is
+     * still un-optimised at this point - Session::run calls load_kernels() before update_scene()
+     * - so re-derive it here. Only ever set, never clear: on a later update the graph has been
+     * optimised and the link may legitimately be gone. */
+    if (shader->graph && shader->graph->output()->input("Volume")->link != NULL) {
+      shader->has_volume_connected = true;
+    }
     /* On top of volume nodes, also check if we need volume sampling because
      * e.g. an Emission node would slip through the KERNEL_FEATURE_NODE_VOLUME check */
     if (shader->has_volume_connected) {
