@@ -88,7 +88,9 @@ const vector<id<MTLDevice>> &MetalInfo::get_usable_devices()
   }
 
   metal_printf("Usable Metal devices:");
-  for (id<MTLDevice> device in MTLCopyAllDevices()) {
+  /* MTLCopyAllDevices() follows the Copy rule - the array is owned here and released below. */
+  NSArray<id<MTLDevice>> *devices = MTLCopyAllDevices();
+  for (id<MTLDevice> device in devices) {
     string device_name = get_device_name(device);
     bool usable = false;
 

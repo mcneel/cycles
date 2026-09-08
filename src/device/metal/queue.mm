@@ -600,9 +600,16 @@ bool MetalDeviceQueue::enqueue(DeviceKernel kernel,
                                device_kernel_as_string(kernel),
                                errCStr);
         }
+        id<MTLLogContainer> logs = command_buffer.logs;
+        for (id<MTLFunctionLog> log in logs) {
+          NSLog(@"%@", log);
+        }
       }
       if (!str.empty()) {
         metal_device_->set_error(str);
+        /* Close the compute encoder properly on error. If this isn't done then switching
+         * away from Raytraced will cause a separate Metal related thread to crash. */
+        close_compute_encoder();
       }
     }];
 
@@ -618,22 +625,6 @@ bool MetalDeviceQueue::enqueue(DeviceKernel kernel,
               "__"
               "______________________________________\n");
         }
-        id<MTLLogContainer> logs = command_buffer.logs;
-        for (id<MTLFunctionLog> log in logs) {
-          NSLog(@"%@", log);
-        }
-        // Close command encoder properly on error. If this isn't done then
-        // switching away from Raytraced will cause a separate Metal related
-        // thread to crash.
-        close_compute_encoder();
-      }
-      else if (command_buffer.error) {
-        metal_device_->set_error(string("CommandBuffer Failed: ") + [kernel_name UTF8String]);
-        // See comment in previous if-block.
-        close_compute_encoder();
-      }
-    }
-  }];
 
         printf("%-40s| %7d threads |%5.2fms | buckets [",
                device_kernel_as_string(kernel),
