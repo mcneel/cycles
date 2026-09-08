@@ -37,7 +37,10 @@ internal static class Program
         Directory.CreateDirectory(userpath);
 
         Console.WriteLine("path_init  : " + path);
-        cycles_debug_install_crash_handler();
+        // Tolerate an older ccycles that predates the crash handler, so this harness can
+        // be pointed at a 3.5 build for A/B comparison against the 5.2 port.
+        try { cycles_debug_install_crash_handler(); }
+        catch (EntryPointNotFoundException) { Console.WriteLine("crashhandler: absent (old ccycles)"); }
         CSycles.path_init(path, userpath);
         // SMOKE_DEVMASK exercises device enumeration beyond CPU. Rhino defaults to
         // a GPU device, so CPU-only initialisation never touched the code path that
@@ -175,7 +178,13 @@ internal static class Program
             1f, 0f, 0f, 0f,
             0f, 1f, 0f, 0f,
             0f, 0f, 1f, 0f));
-        Console.WriteLine("object     : added");
+        // The Rhino fork shades per OBJECT, not per triangle: kernel/geom/triangle.h uses
+        // object_shader(kg, object) where upstream reads kernel_data_fetch(tri_shader, prim).
+        // Binding the shader to the mesh alone leaves the object on scene->default_surface,
+        // which is deliberately magenta - so the quad rendered magenta no matter what the
+        // mesh said.
+        CSycles.object_set_shader(session, obj, diffuse);
+        Console.WriteLine("object     : added, shader bound");
         }
 
         IntPtr lightShader = CSycles.create_shader(session);
@@ -315,6 +324,21 @@ internal static class Program
             int mid = (int)((H / 2) * W + W / 2) * comps;
             Console.WriteLine("centre px  : " + buf[mid] + " " + buf[mid+1] + " " + buf[mid+2] + " " + buf[mid+3]);
             Console.WriteLine("corner px  : " + buf[0] + " " + buf[1] + " " + buf[2] + " " + buf[3]);
+
+            // Per-channel statistics. A neutral scene (grey light, grey BSDF) must give
+            // R==G==B; anything else localises the fault to a channel rather than a device.
+            for (int c = 0; c < comps; c++) {
+                double csum = 0.0; float cmn = float.MaxValue, cmx = float.MinValue;
+                int nonzero = 0;
+                for (int i = c; i < n; i += comps) {
+                    csum += buf[i];
+                    if (buf[i] < cmn) cmn = buf[i];
+                    if (buf[i] > cmx) cmx = buf[i];
+                    if (buf[i] != 0.0f) nonzero++;
+                }
+                Console.WriteLine("chan " + "RGBA"[c] + "     : sum=" + csum.ToString("F4")
+                    + " min=" + cmn + " max=" + cmx + " nonzero=" + nonzero);
+            }
 
             string ppm = Path.Combine(path, "smoketest.ppm");
             using (var fs = new FileStream(ppm, FileMode.Create))

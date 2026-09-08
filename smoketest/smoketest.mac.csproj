@@ -1,0 +1,22 @@
+<!-- Mac build of the smoke test. The Windows smoketest.csproj targets net48 and
+     references a prebuilt csycles.dll; neither works on macOS, so this project
+     compiles the csycles sources directly against a modern TFM. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>smoketest</AssemblyName>
+    <RootNamespace>smoketest</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CS0618;CS0067;CS0169;CS0414</NoWarn>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)mac-bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)mac-obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../src/csycles/**/*.cs"
+             Exclude="../src/csycles/Properties/AssemblyInfo.cs" />
+  </ItemGroup>
+</Project>
