@@ -6,8 +6,9 @@
 # app's Frameworks dir; this strips the absolute rpaths and adds @loader_path
 # rpaths that reach the deps from each place the dylib is deployed. See RH-96549.
 #
-# Run from RDK/cycles after `make release`, before copying install/* to big_libs. (The
-# cycles submodule was flattened for 10.x - this used to live one level deeper.)
+# `make release` runs this for you on Mac, together with fix-cycles-tbb.sh, so a
+# regenerated payload cannot miss it. Run it by hand only if you built some other way.
+# (The cycles submodule was flattened for 10.x - this used to live one level deeper.)
 #   ./fix-cycles-rpaths.sh [path/to/libccycles.dylib]   # default: install/libccycles.dylib
 
 set -euo pipefail

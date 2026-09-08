@@ -69,10 +69,33 @@ gates.
 See `RHINO-CYCLES-5.md` for the state of the port, and `tools/DIAGNOSTICS.md` for
 the diagnostic switches and what each one established.
 
-All of the above is Windows. The Mac has none of it yet: see
-[MACOS-PLAN.md](MACOS-PLAN.md) for what is actually there today - eighteen `cp`
-lines in `MacDotNetMakefile`, a committed payload that is still Cycles 3.5, and no
-Metal kernel binaries to build because Metal compiles from source at runtime.
+All of the above is Windows. The Mac has no equivalent tooling - no
+`publish_payload.ps1`, no manifest, no `run_checks.ps1` - and it needs far less of
+it, because Metal compiles its kernels from the shipped `source/` tree at runtime,
+so there are no kernel binaries to build or verify. A Mac payload is the dylib, its
+dependencies, and `source/`. See [MACOS-PLAN.md](MACOS-PLAN.md).
+
+Building it:
+
+    make release
+
+which also runs two fixups that the payload is not fit to ship without, so that
+regenerating it cannot skip them:
+
+- `fix-cycles-rpaths.sh` replaces the machine-specific absolute rpaths the build
+  bakes into `libccycles.dylib` with portable `@loader_path` ones (RH-96549).
+  `MacDotNetMakefile` fails the Rhino build if this was not done.
+- `fix-cycles-tbb.sh` renames the payload's oneTBB to `libtbb.12.cycles.dylib` and
+  repoints the payload at it. Both Rhino and Cycles otherwise want to own
+  `libtbb.dylib` in `Contents/Frameworks`, and they are not interchangeable: Rhino's
+  is TBB 2020.3, which USD needs, and Cycles' is oneTBB (RH-98415).
+
+Then copy `install/*` into `big_libs/RhinoCycles/ccycles/osx/release`. Use
+`rsync -a --delete` rather than `cp -r`: `cp` merges the new `source/` over the old
+one and leaves both kernel generations in place, and on Mac `source/` completeness
+is the correctness condition.
+
+The committed Mac payload is still Cycles 3.5 and does not match a 5.x `csycles`.
 
 The previous procedure for this - twelve manual steps per platform, editing
 `cycles_device.vcxproj` by hand, ResourceHacker, and copying DLLs into `big_libs`
