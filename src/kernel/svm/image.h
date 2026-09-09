@@ -601,6 +601,79 @@ ccl_device_noinline void svm_node_tex_image_box(KernelGlobals kg,
   }
 }
 
+/* Rhino environment projections.
+ *
+ * Upstream Cycles knows only equirectangular and mirror ball. Rhino adds the
+ * modes in NodeEnvironmentProjection, and every env_* helper for them is still
+ * in this file - but taking this node from upstream during the 5.2 merge dropped
+ * the dispatch, so projections 2..10 all fell through to mirror ball. A wallpaper
+ * background was therefore sampled as a mirror ball and looked blank (RH-98416),
+ * and the same held for emap, box, cube maps and hemispherical.
+ *
+ * Restored from the 3.5 implementation. These are not differentiable, so they
+ * return a plain float2 and the caller wraps it in a dual2 with zero derivatives,
+ * which is the behaviour they had before 5.2 introduced dual numbers here. */
+
+ccl_device_inline float3 svm_env_projection_co(const float3 co)
+{
+  return co;
+}
+
+ccl_device_inline float3 svm_env_projection_co(const dual3 co)
+{
+  return co.val;
+}
+
+ccl_device_inline float2 svm_node_tex_environment_projection_rhino(
+    KernelGlobals kg, ccl_private const ShaderData *ccl_restrict sd, float3 co, const uint proj)
+{
+  if (proj == NODE_ENVIRONMENT_WALLPAPER) {
+    /* Screen projection: the wallpaper sits in NDC, not on the sphere, so it is
+     * derived from the shading point through the camera rather than from co. */
+    Transform worldtocamera = kernel_data.cam.worldtocamera;
+    Transform cameratondc = kernel_data.cam.cameratondc;
+
+    float3 P = normalize(sd->P);
+    P = transform_direction(&worldtocamera, P);
+    P = P / dot(P, make_float3(0.0f, 0.0f, 1.0f));
+    P = transform_point(&cameratondc, P);
+    return make_float2(P.x, P.y);
+  }
+
+  co = safe_normalize(co);
+
+  float3 r = co;
+  switch (proj) {
+    case NODE_ENVIRONMENT_EMAP:
+      r = env_emap(co);
+      break;
+    case NODE_ENVIRONMENT_BOX:
+      r = env_box(co);
+      break;
+    case NODE_ENVIRONMENT_LIGHT_PROBE:
+      r = env_light_probe(co);
+      break;
+    case NODE_ENVIRONMENT_CUBEMAP:
+      r = env_cubemap(co);
+      break;
+    case NODE_ENVIRONMENT_CUBEMAP_HORIZONTAL:
+      r = env_cubemap_horizontal_cross(co);
+      break;
+    case NODE_ENVIRONMENT_CUBEMAP_VERTICAL:
+      r = env_cubemap_vertical_cross(co);
+      break;
+    case NODE_ENVIRONMENT_HEMISPHERICAL:
+      r = env_hemispherical(co);
+      break;
+    case NODE_ENVIRONMENT_SPHERICAL:
+      r = env_spherical(make_float3(co.y, -co.z, -co.x));
+      break;
+    default:
+      break;
+  }
+  return make_float2(r.x, r.y);
+}
+
 template<class Float3Type>
 ccl_device_inline auto svm_node_tex_environment_projection(Float3Type co, const uint proj)
 {
@@ -619,7 +692,10 @@ ccl_device_noinline void svm_node_tex_environment(
     const ccl_global SVMNodeTexEnvironment &ccl_restrict node)
 {
   const Float3Type co = stack_load<Float3Type>(stack, node.co);
-  const dual2 uv(svm_node_tex_environment_projection(co, node.projection));
+  const dual2 uv = (node.projection <= NODE_ENVIRONMENT_MIRROR_BALL) ?
+                       dual2(svm_node_tex_environment_projection(co, node.projection)) :
+                       dual2(svm_node_tex_environment_projection_rhino(
+                           kg, sd, svm_env_projection_co(co), node.projection));
 
   const float4 f = svm_image_texture(kg, sd, node.id, uv, node.flags);
 
