@@ -14,6 +14,25 @@ ifndef BUILD_DIR
 	BUILD_DIR:=./build
 endif
 
+# arm64 only. Blender stopped publishing Intel macOS dependencies after 4.5 - the
+# lib-macos_x64 release branches end there and its main was last touched in June 2025,
+# missing fourteen of the packages the arm64 set has. Building Cycles 5.x for Intel would
+# mean maintaining that dependency stack ourselves, and Intel Mac support is not wanted.
+# Override if that ever changes:  make release MAC_ARCHS="x86_64;arm64"
+# Alembic, Hydra, the standalone GUI and USD stay off, matching Windows - Rhino does not
+# use them through Cycles, and each one is another dependency in the payload.
+#
+# Embree, OSL, OpenImageDenoise and OpenVDB/NanoVDB used to be switched off here. Those
+# were build workarounds from the 3.5 era - "temporarily disable ... in order to get Cycles
+# kernels building", and "Metal building fixes" - not decisions about what Mac should ship.
+# Windows never disabled any of them, so Mac was quietly missing denoising, volumes, OSL and
+# Embree's BVH. They build and render fine on 5.2, so they are back on and the two platforms
+# now agree.
+
+ifndef MAC_ARCHS
+	MAC_ARCHS:=arm64
+endif
+
 ifndef INSTALL_DIR
 	INSTALL_DIR:=./install
 endif
@@ -54,16 +73,19 @@ all: release
 
 release:
 	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_EMBREE=OFF -DWITH_CYCLES_OSL=OFF -DWITH_CYCLES_OPENIMAGEDENOISE=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DWITH_CYCLES_OPENVDB=OFF -DWITH_CYCLES_NANOVDB=OFF -DCMAKE_BUILD_TYPE=Release .. && cmake --build . -j $(PARALLEL_JOBS) --target install
+	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DCMAKE_BUILD_TYPE=Release .. && cmake --build . -j $(PARALLEL_JOBS) --target install
 	$(FIX_PAYLOAD)
 
 debug:
 	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_EMBREE=OFF -DWITH_CYCLES_OSL=OFF -DWITH_CYCLES_OPENIMAGEDENOISE=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DWITH_CYCLES_OPENVDB=OFF -DWITH_CYCLES_NANOVDB=OFF -DCMAKE_BUILD_TYPE=Debug .. && cmake --build . -j $(PARALLEL_JOBS) --target install
+	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DCMAKE_BUILD_TYPE=Debug .. && cmake --build . -j $(PARALLEL_JOBS) --target install
 	$(FIX_PAYLOAD)
 
+# INSTALL_DIR too: it is not overwritten, only added to, so libraries from a previous
+# configuration linger there and get published. A build with Embree off still shipped the
+# Embree dylib from an earlier build with it on.
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(INSTALL_DIR)
 
 test:
 	cd $(BUILD_DIR) && ctest --output-on-failure
