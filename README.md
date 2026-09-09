@@ -69,33 +69,56 @@ gates.
 See `RHINO-CYCLES-5.md` for the state of the port, and `tools/DIAGNOSTICS.md` for
 the diagnostic switches and what each one established.
 
-All of the above is Windows. The Mac has no equivalent tooling - no
-`publish_payload.ps1`, no manifest, no `run_checks.ps1` - and it needs far less of
-it, because Metal compiles its kernels from the shipped `source/` tree at runtime,
-so there are no kernel binaries to build or verify. A Mac payload is the dylib, its
-dependencies, and `source/`. See [MACOS-PLAN.md](MACOS-PLAN.md).
+All of the above is Windows. The Mac needs far less of it, because Metal compiles
+its kernels from the shipped `source/` tree at runtime - there are no kernel
+binaries to build, verify or inherit. A Mac payload is the dylib, its dependency
+dylibs, and `source/`.
 
-Building it:
+## Building Cycles on macOS
 
-    make release
+One command, from `RDK/cycles`:
 
-which also runs two fixups that the payload is not fit to ship without, so that
-regenerating it cannot skip them:
+    make payload
 
-- `fix-cycles-rpaths.sh` replaces the machine-specific absolute rpaths the build
-  bakes into `libccycles.dylib` with portable `@loader_path` ones (RH-96549).
-  `MacDotNetMakefile` fails the Rhino build if this was not done.
-- `fix-cycles-tbb.sh` renames the payload's oneTBB to `libtbb.12.cycles.dylib` and
-  repoints the payload at it. Both Rhino and Cycles otherwise want to own
-  `libtbb.dylib` in `Contents/Frameworks`, and they are not interchangeable: Rhino's
-  is TBB 2020.3, which USD needs, and Cycles' is oneTBB (RH-98415).
+That fetches the dependency libraries, builds, applies the two fixups the payload
+is not fit to ship without, and copies the result into `big_libs`. Then commit it
+from `big_libs`, on a branch.
 
-Then copy `install/*` into `big_libs/RhinoCycles/ccycles/osx/release`. Use
-`rsync -a --delete` rather than `cp -r`: `cp` merges the new `source/` over the old
-one and leaves both kernel generations in place, and on Mac `source/` completeness
-is the correctness condition.
+The steps are also available separately:
 
-The committed Mac payload is still Cycles 3.5 and does not match a 5.x `csycles`.
+| | |
+| --- | --- |
+| `make deps` | fetch Blender's dependency libraries at the pinned commit |
+| `make release` | build, then run both fixups |
+| `make publish` | copy `install/` into `big_libs` |
+| `make clean` | remove `build/` **and** `install/` |
+
+Notes on why each exists, since none of them is guessable:
+
+- **`make deps`** is needed because the dependency submodule is declared
+  `update = none`, so `git submodule update --init` silently skips it and a fresh
+  checkout has an empty `lib/`. It fetches only the pinned commit, shallow - about
+  2.4 GB once, rather than the repository's full history.
+- **`make release`** runs `fix-cycles-rpaths.sh`, which replaces the
+  machine-specific absolute rpaths the build bakes into `libccycles.dylib` with
+  portable `@loader_path` ones (RH-96549) - `MacDotNetMakefile` fails the Rhino
+  build if this was skipped - and `fix-cycles-tbb.sh`, which renames the payload's
+  oneTBB to `libtbb.12.cycles.dylib`. Rhino and Cycles otherwise both want to own
+  `libtbb.dylib` in `Contents/Frameworks`, and they are not interchangeable:
+  Rhino's is TBB 2020.3, which USD needs, and Cycles' is oneTBB (RH-98415).
+- **`make publish`** uses `rsync --delete`, not `cp -r`. `cp` merges the new
+  `source/` over the old one and leaves both kernel generations in place, and on
+  Mac `source/` completeness is the correctness condition.
+- **`make clean`** removes `install/` too. It is only ever added to, so libraries
+  and CMake cache values from a previous configuration otherwise survive and get
+  published.
+
+The payload is arm64. Blender stopped publishing Intel macOS dependencies after
+4.5, and Intel Mac support is not wanted; `make release MAC_ARCHS="x86_64;arm64"`
+if that ever changes.
+
+[MACOS-PLAN.md](MACOS-PLAN.md) has the state of the port, what is still missing,
+and the reasoning behind each of these.
 
 The previous procedure for this - twelve manual steps per platform, editing
 `cycles_device.vcxproj` by hand, ResourceHacker, and copying DLLs into `big_libs`

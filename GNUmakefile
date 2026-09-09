@@ -69,6 +69,48 @@ else
 FIX_PAYLOAD:=true
 endif
 
+# --- macOS payload: one command ---------------------------------------------------
+#
+#   make payload
+#
+# fetches the dependency libraries, builds, applies the two payload fixups, and copies
+# the result into big_libs. The individual steps are available separately below.
+
+MAC_LIB_DIR:=lib/macos_arm64
+MAC_LIB_URL:=https://projects.blender.org/blender/lib-macos_arm64.git
+BIG_LIBS:=../../../../../big_libs/RhinoCycles/ccycles/osx/release
+
+# Blender's dependency libraries. The submodule is declared `update = none`, so
+# `git submodule update --init` skips it and a fresh checkout has an empty lib/ - which
+# is why this target exists rather than being a line in the README nobody finds. Only
+# the pinned commit is fetched, shallow: the full history is enormous and unwanted.
+deps:
+	@if [ -d "$(MAC_LIB_DIR)/tbb" ]; then \
+		echo "deps: $(MAC_LIB_DIR) already present"; \
+	else \
+		sha=`git ls-tree HEAD $(MAC_LIB_DIR) | awk '{print $$3}'`; \
+		echo "deps: fetching $(MAC_LIB_DIR) at $$sha (about 2.4 GB, once)"; \
+		mkdir -p "$(MAC_LIB_DIR)"; \
+		if [ ! -d "$(MAC_LIB_DIR)/.git" ]; then \
+			git -C "$(MAC_LIB_DIR)" init -q .; \
+			git -C "$(MAC_LIB_DIR)" remote add origin $(MAC_LIB_URL); \
+		fi; \
+		git -C "$(MAC_LIB_DIR)" fetch --depth 1 origin $$sha; \
+		git -C "$(MAC_LIB_DIR)" checkout -q FETCH_HEAD; \
+	fi
+
+# --delete, not `cp -r`: cp merges the new source/ over the old one and leaves both
+# kernel generations in place, and on Mac source/ completeness is what decides whether
+# Metal can compile its kernels at all.
+publish:
+	@test -f "$(INSTALL_DIR)/libccycles.dylib" || { echo "publish: nothing built - run make release" >&2; exit 1; }
+	rsync -a --delete "$(INSTALL_DIR)/lib/" "$(BIG_LIBS)/lib/"
+	rsync -a --delete "$(INSTALL_DIR)/source/" "$(BIG_LIBS)/source/"
+	cp "$(INSTALL_DIR)/libccycles.dylib" "$(BIG_LIBS)/"
+	@echo "publish: payload copied into big_libs - commit it there, on a branch"
+
+payload: deps release publish
+
 all: release
 
 release:
@@ -84,6 +126,8 @@ debug:
 # INSTALL_DIR too: it is not overwritten, only added to, so libraries from a previous
 # configuration linger there and get published. A build with Embree off still shipped the
 # Embree dylib from an earlier build with it on.
+.PHONY: all release debug clean test deps publish payload
+
 clean:
 	rm -rf $(BUILD_DIR) $(INSTALL_DIR)
 
