@@ -18,7 +18,6 @@ limitations under the License.
 #include <filesystem>
 #include <cstdlib>
 #include <numeric>
-#include <random>
 
 namespace fs = std::filesystem;
 
@@ -393,11 +392,9 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 		shn = (ShaderNode *)ntype->create(ntype);
 		shn->set_owner(graph);
 		{
-			std::random_device r;
-			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
-			std::uniform_real_distribution<> dist(0.0, 1.0);
+			// Fixed magenta: still an obvious "nothing assigned" marker, but reproducible.
 			ccl::BackgroundNode *bgn = (ccl::BackgroundNode *)shn;
-			bgn->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
+			bgn->set_color(ccl::make_float3(1.0f, 0.0f, 1.0f));
 			bgn->set_strength(1.5f);
 		}
 		graph->add(shn);
@@ -416,11 +413,9 @@ static void prep_session(ccl::Session *session, std::vector<std::unique_ptr<CCyc
 		shader_node = (ShaderNode *)ntype->create(ntype);
 		shader_node->set_owner(graph);
 		{
-			std::random_device r;
-			std::mt19937 gen(r());	 // Standard mersenne_twister_engine seeded with rd()
-			std::uniform_real_distribution<> dist(0.0, 1.0);
+			// Fixed magenta: still an obvious "nothing assigned" marker, but reproducible.
 			auto diff = (ccl::DiffuseBsdfNode *)shader_node;
-			diff->set_color(ccl::make_float3(dist(gen), dist(gen), dist(gen)));
+			diff->set_color(ccl::make_float3(1.0f, 0.0f, 1.0f));
 			diff->set_roughness(1.0f);
 		}
 		graph->add(shader_node);
