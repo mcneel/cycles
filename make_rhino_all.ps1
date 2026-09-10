@@ -701,7 +701,7 @@ try {
     Write-Log "Install dir: $installDir"
     Write-Log "HIP build dir: $hipBuildDir"
     Write-Log "Rhino branch root: $rhinoBranchRoot"
-    Write-Log "Rhino branch: $rhinoBranchName (major $rhinoMajorVersion, source $($branchInfo.Source))"
+    Write-Log "Rhino branch: $rhinoBranchName (label from $($branchInfo.Source)); major $rhinoMajorVersion from $($branchInfo.MajorSource)"
     Write-Log "Docker volume: $dockerVolume"
     Write-Log "SVN retries after first failure: $script:SvnRetryCount (fixed $script:SvnRetryDelaySeconds second delay)."
     Write-Log "Allowed cleanup paths: $($script:AllowedCleanupPaths -join ', ')"
