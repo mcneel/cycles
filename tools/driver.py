@@ -127,8 +127,24 @@ def dget(d, key):
 try:
     log("OPENING {0}".format(MODEL))
     ok = rs.Command('_-Open "{0}"'.format(MODEL), False)
+    # On Mac the open has not finished when the command returns - ActiveDoc is still
+    # the previous (empty) document, and rendering it produces a blank image at the
+    # wrong size while every step still reports success. Wait for the document to
+    # actually swap in. On Windows the open is already done and this exits on the
+    # first pass.
+    want = os.path.basename(MODEL).lower()
+    waited = 0.0
+    for _ in range(1200):
+        doc = Rhino.RhinoDoc.ActiveDoc
+        if doc is not None and doc.Path and os.path.basename(doc.Path).lower() == want:
+            break
+        Rhino.RhinoApp.Wait()
+        System.Threading.Thread.Sleep(500)
+        waited += 0.5
     doc = Rhino.RhinoDoc.ActiveDoc
-    log("OPENED rc={0} path={1}".format(ok, doc.Path))
+    log("OPENED rc={0} path={1} waited={2}s".format(ok, doc.Path, waited))
+    if not doc.Path or os.path.basename(doc.Path).lower() != want:
+        raise RuntimeError("document did not open: " + MODEL)
     log("RHINO {0}".format(Rhino.RhinoApp.Version))
 
     if LIGHTS:
