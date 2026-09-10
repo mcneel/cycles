@@ -65,13 +65,16 @@ hino-render-test-models",
   # model that renders wrongly would enshrine the bug as the expected result, so
   # these stay out until their issues are fixed:
   #   PBRMatTest                 - 620 MB, and the only file with UseViewportSize set
-  #   Test_backgroundimage       - RH-98416, wallpaper background does not render
-  #   Wash Basin v7 room         - RH-98416, same wallpaper fault, window renders white
-  #   Rhino Logo_texture_...     - RH-98419, every texture-mapped object renders black
+  #   Wash Basin v7 room         - renders, but its lighting is warmer than shipping's
+  #                                and that difference is not yet explained
+  #   Rhino Logo_texture_...     - no longer black (RH-98419), but its distant light
+  #                                now lands about 1.6x shipping's intensity and that
+  #                                is not explained either
   #   GoudaSSS_Distribute_Candle - RH-98420, hangs in RDK scene construction
+  #
+  # Test_backgroundimage came back with the environment projections (RH-98416).
   [string[]]$Exclude = @(
     'PBRMatTest'
-    'Test_backgroundimage'
     'Wash Basin v7 room'
     'Rhino Logo_texture_mapping_types_saved_from_v8'
     'GoudaSSS_Distribute_Candle'

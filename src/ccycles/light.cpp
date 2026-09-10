@@ -132,8 +132,19 @@ void CCyclesLight::flush()
 	 * in that column therefore aims the quad away from whatever Rhino pointed it at.
 	 * Measured on Brian25YearRhinoGlas.3dm: the file's Direction has dot +0.97 with
 	 * the direction from the light to the scene, and the kernel received exactly the
-	 * negation. The spot sign above was checked with spots, whose placement differs. */
-	if (type == ccl::LIGHT_AREA && have_dir) {
+	 * negation. The spot sign above was checked with spots, whose placement differs.
+	 *
+	 * A distant light needs the same negation, and for the same reason.
+	 * SunLight::copy_to_kernel also reads -column2, and sun_light_sample then fires
+	 * the shadow ray along ls->D = -klight->co - so co has to be the direction the
+	 * light travels, and column2 has to hold -dir. With +dir there, every distant
+	 * light was aimed backwards: the faces pointing at the sun failed dot(N, D) > 0,
+	 * light_sample_from_position rejected 83% of shading points, and only a thin rim
+	 * at the silhouette caught anything. Rhino Logo_texture_mapping_types is lit by a
+	 * single distant light and rendered black; it is the only model in the RH-81636
+	 * set whose one enabled light is distant, which is why nothing else showed it
+	 * (RH-98419). */
+	if ((type == ccl::LIGHT_AREA || type == ccl::LIGHT_SUN) && have_dir) {
 		z = -z;
 	}
 	ccl::float3 x = axisu;

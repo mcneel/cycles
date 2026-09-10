@@ -14,12 +14,15 @@
 #include "scene/shader.h"
 #include "scene/shader_graph.h"
 #include "scene/shader_nodes.h"
+#include "scene/rhino_shader_nodes.h"
 #include "scene/stats.h"
 #include "scene/svm.h"
 
 #include "kernel/svm/node_types.h"
 
 #include "util/log.h"
+#include "util/string.h"
+#include "util/thread.h"
 #include "util/map.h"
 #include "util/math_float3.h"
 #include "util/progress.h"
@@ -27,6 +30,101 @@
 #include "util/task.h"
 
 CCL_NAMESPACE_BEGIN
+
+/* Report every node the SVM compiler emits, with the stack offset it assigned to
+ * each socket. A shader graph can be byte-identical to the one a working build
+ * produces and still compile to a program that reads the wrong stack slot - the
+ * graph dumps cannot see that, and it is the failure mode behind the black
+ * environment projections and the black bump surfaces. Set CCYCLES_DUMP_SVM to a
+ * path to get it; SVM_STACK_INVALID prints as -1. */
+static void ccycles_dump_svm_node(const char *shader_name,
+                                  ShaderType type,
+                                  const ShaderNode *node)
+{
+  static FILE *svm_file = nullptr;
+  static bool tried = false;
+  static thread_mutex svm_dump_mutex;
+
+  /* Shaders compile on a task pool, so one fprintf per line interleaves records
+   * from several shaders and the result cannot be read. Build the whole record
+   * first and write it under a lock. */
+  const thread_scoped_lock lock(svm_dump_mutex);
+
+  if (!tried) {
+    tried = true;
+    const char *path = getenv("CCYCLES_DUMP_SVM");
+    if (path != nullptr && path[0] != 0) {
+      svm_file = fopen(path, "a");
+    }
+  }
+  if (svm_file == nullptr) {
+    return;
+  }
+
+  const char *type_name = (type == SHADER_TYPE_SURFACE)      ? "surface" :
+                          (type == SHADER_TYPE_VOLUME)       ? "volume" :
+                          (type == SHADER_TYPE_DISPLACEMENT) ? "displacement" :
+                                                               "bump";
+  string rec = string_printf("[%s] shader '%s' node '%s' (%s)\n",
+                             type_name,
+                             shader_name == nullptr ? "?" : shader_name,
+                             node->name.c_str(),
+                             node->type->name.c_str());
+  for (const ShaderInput *in : node->inputs) {
+    rec += string_printf("    in  %-28s off=%d link=%s\n",
+                         in->socket_type.name.c_str(),
+                         (int)in->stack_offset,
+                         in->link == nullptr ? "-" : in->link->parent->name.c_str());
+  }
+  for (const ShaderOutput *out : node->outputs) {
+    rec += string_printf("    out %-28s off=%d users=%d\n",
+                         out->socket_type.name.c_str(),
+                         (int)out->stack_offset,
+                         (int)out->links.size());
+  }
+  /* The transform on a matrix_math node is a node member, not a socket, so it
+   * never appears in a graph dump - two builds can print identical graphs and
+   * feed the procedurals different coordinates. A zero row here means the
+   * coordinate arriving at the texture is zero whatever the texco node produced. */
+  if (node->type == MatrixMathNode::get_node_type()) {
+    const MatrixMathNode *mm = static_cast<const MatrixMathNode *>(node);
+    const Transform t = mm->tfm;
+    rec += string_printf("    matrix_math tfm type=%d\n", (int)mm->type);
+    rec += string_printf("      x %f %f %f %f\n", t.x.x, t.x.y, t.x.z, t.x.w);
+    rec += string_printf("      y %f %f %f %f\n", t.y.x, t.y.y, t.y.z, t.y.w);
+    rec += string_printf("      z %f %f %f %f\n", t.z.x, t.z.y, t.z.z, t.z.w);
+  }
+
+  /* Extension, interpolation and alpha handling are node members too, and CLIP
+   * returns a transparent black sample for any coordinate outside 0..1 - which
+   * looks exactly like a texture that failed to load. Print them, along with
+   * whether Rhino handed the pixels over in memory rather than as a file. */
+  if (node->type == ImageTextureNode::get_node_type()) {
+    const ImageTextureNode *it = static_cast<const ImageTextureNode *>(node);
+    rec += string_printf(
+        "    image_texture params ext=%d interp=%d alpha_type=%d proj=%d alt_tiles=%d\n",
+        (int)it->get_extension(),
+        (int)it->get_interpolation(),
+        (int)it->get_alpha_type(),
+        (int)it->get_projection(),
+        (int)it->get_alternate_tiles());
+    rec += string_printf("      colorspace='%s'\n", it->get_colorspace().c_str());
+    rec += string_printf("      filename='%s'\n", it->get_filename().c_str());
+    rec += string_printf("      mem name='%s' %dx%d ch=%d float=%d pixels=%s\n",
+                         it->rhino_mem_name.c_str(),
+                         it->rhino_mem_width,
+                         it->rhino_mem_height,
+                         it->rhino_mem_channels,
+                         (int)it->rhino_mem_is_float,
+                         it->rhino_mem_pixels == nullptr ? "null" : "set");
+    rec += string_printf("      handle empty=%d kernel_id=%d\n",
+                         (int)it->handle.empty(),
+                         it->handle.empty() ? -1 : it->handle.kernel_id());
+  }
+
+  fputs(rec.c_str(), svm_file);
+  fflush(svm_file);
+}
 
 /* Shader Manager */
 
@@ -639,6 +737,8 @@ void SVMCompiler::generate_node(ShaderNode *node, ShaderNodeSet &done)
   current_node = node;
   node->compile(*this);
   current_node = nullptr;
+  ccycles_dump_svm_node(
+      current_shader == nullptr ? nullptr : current_shader->name.c_str(), current_type, node);
   stack_zero_incomplete_derivatives(node);
   stack_clear_users(node, done);
   stack_clear_temporary(node);

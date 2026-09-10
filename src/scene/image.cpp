@@ -674,6 +674,58 @@ void ImageManager::device_update(Device *device, Scene *scene, Progress &progres
   device_copy_image_textures(device, scene);
 
   need_update_ = false;
+
+  /* Report what the manager ended up holding. A texture that renders black is
+   * either a slot that never loaded or a slot whose pixels are zero, and neither
+   * shows up in a shader graph or in the compiled SVM - the node only carries the
+   * slot id. Set CCYCLES_DUMP_IMAGES to a path. */
+  const char *dumpimages = getenv("CCYCLES_DUMP_IMAGES");
+  if (dumpimages != nullptr && dumpimages[0] != 0) {
+    FILE *f = fopen(dumpimages, "a");
+    if (f != nullptr) {
+      for (auto [image_texture_id, img] : images.enumerate()) {
+        if (img == nullptr) {
+          fprintf(f, "image slot %d: <empty>\n", (int)image_texture_id);
+          continue;
+        }
+        const ImageMetaData &md = img->metadata;
+        fprintf(f,
+                "image slot %d: id=%d users=%d need_load=%d need_metadata=%d builtin=%d\n",
+                (int)image_texture_id,
+                img->image_texture_id,
+                (int)img->users,
+                (int)img->need_load,
+                (int)img->need_metadata,
+                (int)img->builtin);
+        fprintf(f,
+                "    %lldx%lld ch=%d type=%d avg=(%f %f %f %f)\n",
+                (long long)md.width,
+                (long long)md.height,
+                md.channels,
+                (int)md.type,
+                md.average_color.x,
+                md.average_color.y,
+                md.average_color.z,
+                md.average_color.w);
+        fprintf(f,
+                "    colorspace='%s' srgb=%d unassoc_alpha=%d ignore_alpha=%d\n",
+                md.colorspace.c_str(),
+                (int)md.is_compressible_as_srgb,
+                (int)md.is_unassociated_alpha,
+                (int)md.ignore_alpha);
+        fprintf(f,
+                "    params ext=%d interp=%d alpha_type=%d colorspace='%s'\n",
+                (int)img->params.extension,
+                (int)img->params.interpolation,
+                (int)img->params.alpha_type,
+                img->params.colorspace.c_str());
+        fprintf(f,
+                "    loader='%s'\n",
+                img->loader == nullptr ? "<null>" : img->loader->name().c_str());
+      }
+      fclose(f);
+    }
+  }
 }
 
 void ImageManager::device_load_images(Device *device,

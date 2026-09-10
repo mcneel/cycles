@@ -403,8 +403,12 @@ void ShaderGraph::finalize(Scene *scene, bool do_bump, bool bump_in_object_space
 
   /* cycles_shader_dump_graph runs where RhinoCycles builds the graph, which is before
    * simplify() and constant folding, so two builds can emit byte-identical dumps and still
-   * compile different graphs. With CCYCLES_DUMP_FINAL=<prefix> the background graph is
-   * dumped again here, after finalize, which is the graph the SVM compiler actually sees. */
+   * compile different graphs. With CCYCLES_DUMP_FINAL=<prefix> the graph is dumped again
+   * here, after finalize, which is the graph the SVM compiler actually sees.
+   *
+   * Background and material graphs are tagged apart in the filename: a material graph that
+   * survives DumpMaterialShaderGraph intact can still lose its closure chain to constant
+   * folding, and that is invisible in the pre-finalize dump. */
   const char *dumpfinal = getenv("CCYCLES_DUMP_FINAL");
   if (dumpfinal != nullptr && dumpfinal[0] != 0) {
     bool is_background = false;
@@ -414,12 +418,10 @@ void ShaderGraph::finalize(Scene *scene, bool do_bump, bool bump_in_object_space
         break;
       }
     }
-    if (is_background) {
-      static int dumpfinal_counter = 0;
-      std::string path = std::string(dumpfinal) + "_final_" +
-                         std::to_string(dumpfinal_counter++) + ".dot";
-      dump_graph(path.c_str());
-    }
+    static int dumpfinal_counter = 0;
+    std::string path = std::string(dumpfinal) + (is_background ? "_final_bg_" : "_final_mat_") +
+                       std::to_string(dumpfinal_counter++) + ".dot";
+    dump_graph(path.c_str());
   }
 }
 

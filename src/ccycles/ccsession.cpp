@@ -311,7 +311,13 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 						             (int)sh->has_surface_spatial_varying,
 						             (int)sh->has_light_path_node,
 						             (int)sh->emission_is_constant);
+						ccycles_diag("           refs=%d graph_closures=%d\n",
+						             sh->reference_count(),
+						             sh->graph == nullptr ? -1 : sh->graph->get_num_closures());
 					}
+					ccycles_diag("max_closures=%u (0 means no surface closure can be "
+					             "allocated at all)\n",
+					             sc->dscene.data.max_closures);
 				}
 			}
 		}
