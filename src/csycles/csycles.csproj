@@ -202,8 +202,47 @@
   <ItemGroup>
     <Folder Include="License\" />
   </ItemGroup>
-  <!-- RhinoCore's OpenImageIO runtime closure (OpenImageIORH, OpenEXR, boost, jpeg62)
-       is deployed by rhino4\Rhino.vcxproj itself (target CopyOpenImageIORuntime), not
-       from here: RhinoCore is what links those DLLs, and CCSycles carrying that copy
-       is what let it vanish when cycles-core replaced CCSycles. -->
+  <!--
+    RhinoCore.dll links Rhino's own OpenImageIO build (big_libs\OpenImageIO-2.2.19, the
+    RH-suffixed DLLs), but nothing in Rhino.vcxproj copies that runtime closure next to
+    Rhino.exe. CCSycles' csycles.csproj used to do it; when cycles-core replaced CCSycles
+    the step was lost, and a fresh bin\<Config> then fails to start with
+    "Error Loading RhinoCore.dll" (win32 126, module not found: OpenImageIORH_d.dll).
+
+    The closure below is what dumpbin /dependents reports for OpenImageIORH(_d).dll:
+    OpenImageIO_UtilRH, jpeg62, OpenEXR 2.5 (Half, Iex, IlmImf, IlmThread, Imath) and
+    boost filesystem + thread. Debug takes the _d / -gd- variants, everything else the
+    release ones. Paths hang off this project's directory rather than $(SolutionDir),
+    which is undefined outside a solution build - same reasoning as RhinoCyclesCore.csproj.
+  -->
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <RhinoBigLibsDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\..\..\..\..\big_libs'))</RhinoBigLibsDir>
+    <RhinoRuntimeDepsDestination Condition="'$(RhinoOutputDir)' != ''">$(RhinoOutputDir)</RhinoRuntimeDepsDestination>
+    <RhinoRuntimeDepsDestination Condition="'$(RhinoRuntimeDepsDestination)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\..\..\..\bin\$(Configuration)'))\</RhinoRuntimeDepsDestination>
+    <OpenImageIOSuffix Condition="$(Configuration.Contains('Debug'))">RH_d</OpenImageIOSuffix>
+    <OpenImageIOSuffix Condition="'$(OpenImageIOSuffix)' == ''">RH</OpenImageIOSuffix>
+    <!-- jpeg62.dll exists in two CRT flavours: lib\Debug links ucrtbased, lib\Release
+         (and the loose copy in lib) links ucrtbase. OpenImageIORH_d.dll hands jpeg62 a
+         FILE* it opened with the debug CRT, so a release jpeg62 next to a debug OIIO
+         fast-fails inside fread (0xc0000409) the first time a texture is sized. -->
+    <OpenImageIOJpegDir Condition="$(Configuration.Contains('Debug'))">Debug</OpenImageIOJpegDir>
+    <OpenImageIOJpegDir Condition="'$(OpenImageIOJpegDir)' == ''">Release</OpenImageIOJpegDir>
+    <OpenEXRSuffix Condition="$(Configuration.Contains('Debug'))">RH-2_5_d</OpenEXRSuffix>
+    <OpenEXRSuffix Condition="'$(OpenEXRSuffix)' == ''">RH-2_5</OpenEXRSuffix>
+    <BoostStageDir Condition="$(Configuration.Contains('Debug'))">stagedebug</BoostStageDir>
+    <BoostStageDir Condition="'$(BoostStageDir)' == ''">stagerelease</BoostStageDir>
+    <BoostSuffix Condition="$(Configuration.Contains('Debug'))">-mt-gd-x64-RH-v142</BoostSuffix>
+    <BoostSuffix Condition="'$(BoostSuffix)' == ''">-mt-x64-RH-v142</BoostSuffix>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\OpenImageIO-2.2.19\lib\*$(OpenImageIOSuffix).dll" />
+    <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\OpenImageIO-2.2.19\lib\$(OpenImageIOJpegDir)\jpeg62.dll" />
+    <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\OpenEXR-2.5.5\lib\*$(OpenEXRSuffix).dll" />
+    <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\boost\$(BoostStageDir)\lib\boost_filesystem$(BoostSuffix).dll" />
+    <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\boost\$(BoostStageDir)\lib\boost_thread$(BoostSuffix).dll" />
+  </ItemGroup>
+  <Target Name="CopyRhinoRuntimeDeps" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT' And Exists('$(RhinoBigLibsDir)\OpenImageIO-2.2.19\lib')">
+    <Message Importance="high" Text="csycles: copying RhinoCore's OpenImageIO runtime closure to $(RhinoRuntimeDepsDestination)" />
+    <Copy SourceFiles="@(RhinoRuntimeDeps)" DestinationFolder="$(RhinoRuntimeDepsDestination)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
