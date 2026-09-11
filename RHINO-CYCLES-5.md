@@ -102,7 +102,7 @@ Pick a different configuration. That is the whole mechanism.
 | Configuration | Cycles |
 | --- | --- |
 | `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload, as in Rhino 9.x |
-| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source, kernels for the GPUs in your machine |
+| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source as RelWithDebInfo (optimised, with PDBs), kernels for the GPUs in your machine |
 
 Visual Studio lists them in the configuration dropdown; RhinoBuilder lists them
 in Configurations. Same choice, both tools, nothing to set up and nothing to
@@ -173,11 +173,16 @@ Two things are still worth knowing:
   and built in every x64 configuration. MSBuild's Makefile `Build` target has no
   inputs or outputs, so its command runs on every build; the stamp comparison,
   not an up-to-date check, is what decides whether it does any work.
-- **Native debugging needs the debug payload.** `RhinoCyclesCore` copies the
+- **Native debugging needs a local payload.** `RhinoCyclesCore` copies the
   `debug` payload only when that folder exists in `big_libs`, and only `release`
-  is committed — the debug one is 444 MB and gitignored. So on a fresh checkout a
-  Debug Rhino runs *release* Cycles and stepping into `ccycles` gets you nothing.
-  One `Debug+Cycles` build produces one.
+  is committed — the local one is large and gitignored. So on a fresh checkout a
+  Debug Rhino runs the committed *release* Cycles with no PDBs, and stepping into
+  `ccycles` gets you nothing. One `Debug+Cycles` build produces a local payload
+  with symbols. It is a RelWithDebInfo build on purpose: a Debug Rhino has always
+  run release Cycles kernels, and unoptimised kernels make every CPU render about
+  ten times slower. For a genuinely unoptimised `ccycles`, run
+  `build_cycles.ps1 -Configuration Debug -InstallDir <big_libs>\RhinoCycles\ccycles\win\debug`
+  by hand.
 
 Two traps, both of which have cost real time:
 

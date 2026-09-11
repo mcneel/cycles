@@ -68,9 +68,18 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
 
   <PropertyGroup>
-    <!-- build_cycles.ps1 understands Debug / Release / RelWithDebInfo. -->
+    <!-- build_cycles.ps1 understands Debug / Release / RelWithDebInfo.
+
+         Debug+Cycles builds RelWithDebInfo, not Debug. A Debug Rhino has always run
+         release Cycles kernels: 9.x only ever had the prebuilt release payload, and
+         an unoptimised kernel makes a CPU render ten times slower without helping
+         anyone debug Rhino. RelWithDebInfo keeps the PDBs, so ccycles is still
+         steppable, just optimised. A true Debug Cycles is still one command away:
+             build_cycles.ps1 -Configuration Debug -InstallDir <the debug payload>
+         The payload dir stays "debug" (below), so RhinoCyclesCore's preference for
+         a locally built payload in Debug is unchanged. -->
     <CyclesConfiguration>Release</CyclesConfiguration>
-    <CyclesConfiguration Condition="$(Configuration.StartsWith('Debug'))">Debug</CyclesConfiguration>
+    <CyclesConfiguration Condition="$(Configuration.StartsWith('Debug'))">RelWithDebInfo</CyclesConfiguration>
     <CyclesConfiguration Condition="$(Configuration.StartsWith('ReleaseDebuggable'))">RelWithDebInfo</CyclesConfiguration>
 
     <CyclesScript>$(MSBuildThisFileDirectory)..\..\build_cycles.ps1</CyclesScript>
