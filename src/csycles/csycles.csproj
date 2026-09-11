@@ -221,6 +221,12 @@
     <RhinoRuntimeDepsDestination Condition="'$(RhinoRuntimeDepsDestination)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\..\..\..\bin\$(Configuration)'))\</RhinoRuntimeDepsDestination>
     <OpenImageIOSuffix Condition="$(Configuration.Contains('Debug'))">RH_d</OpenImageIOSuffix>
     <OpenImageIOSuffix Condition="'$(OpenImageIOSuffix)' == ''">RH</OpenImageIOSuffix>
+    <!-- jpeg62.dll exists in two CRT flavours: lib\Debug links ucrtbased, lib\Release
+         (and the loose copy in lib) links ucrtbase. OpenImageIORH_d.dll hands jpeg62 a
+         FILE* it opened with the debug CRT, so a release jpeg62 next to a debug OIIO
+         fast-fails inside fread (0xc0000409) the first time a texture is sized. -->
+    <OpenImageIOJpegDir Condition="$(Configuration.Contains('Debug'))">Debug</OpenImageIOJpegDir>
+    <OpenImageIOJpegDir Condition="'$(OpenImageIOJpegDir)' == ''">Release</OpenImageIOJpegDir>
     <OpenEXRSuffix Condition="$(Configuration.Contains('Debug'))">RH-2_5_d</OpenEXRSuffix>
     <OpenEXRSuffix Condition="'$(OpenEXRSuffix)' == ''">RH-2_5</OpenEXRSuffix>
     <BoostStageDir Condition="$(Configuration.Contains('Debug'))">stagedebug</BoostStageDir>
@@ -230,7 +236,7 @@
   </PropertyGroup>
   <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
     <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\OpenImageIO-2.2.19\lib\*$(OpenImageIOSuffix).dll" />
-    <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\OpenImageIO-2.2.19\lib\jpeg62.dll" />
+    <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\OpenImageIO-2.2.19\lib\$(OpenImageIOJpegDir)\jpeg62.dll" />
     <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\OpenEXR-2.5.5\lib\*$(OpenEXRSuffix).dll" />
     <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\boost\$(BoostStageDir)\lib\boost_filesystem$(BoostSuffix).dll" />
     <RhinoRuntimeDeps Include="$(RhinoBigLibsDir)\boost\$(BoostStageDir)\lib\boost_thread$(BoostSuffix).dll" />
