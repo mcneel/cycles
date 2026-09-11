@@ -184,8 +184,19 @@ Two things are still worth knowing:
   `build_cycles.ps1 -Configuration Debug -InstallDir <big_libs>\RhinoCycles\ccycles\win\debug`
   by hand.
 
-Two traps, both of which have cost real time:
+Three traps, all of which have cost real time:
 
+- **RhinoCore's OpenImageIO DLLs come from `csycles.csproj`, not from
+  `Rhino.vcxproj`.** RhinoCore links the RH build of OpenImageIO 2.2.19 from
+  `big_libs`, but its project never copies the runtime DLLs next to `Rhino.exe`;
+  CCSycles did that as a side effect, and the first cycles-core rewrite of
+  `csycles.csproj` dropped it. A fresh `bin\Debug` then failed to start with
+  "Error Loading RhinoCore.dll" (win32 126, `OpenImageIORH_d.dll` not found).
+  The `CopyRhinoRuntimeDeps` target in `csycles.csproj` restores it, with one
+  subtlety: `jpeg62.dll` ships in two CRT flavours, and Debug must take
+  `lib\Debug\jpeg62.dll`. The release one beside the debug OpenImageIO fast-fails
+  in `fread` (0xc0000409) the first time a bitmap texture is sized, which is the
+  first render, every time.
 - **Single-project builds from the command line still leave the tree
   inconsistent.** `ccycles.vcxproj` alone updates `big_libs` but not the plug-in
   output; `RhinoCyclesCore.csproj` alone copies `big_libs` without rebuilding

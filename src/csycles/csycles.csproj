@@ -53,7 +53,7 @@
   <PropertyGroup>
     <!-- csycles takes its assembly version from Rhino's shared version.cs, which
          lives in the Rhino source tree rather than in this repository. The default
-         below assumes this repo is checked out as the RDK/cycles submodule. Set
+         below assumes this repo is checked out as the RDK/cycles-core submodule. Set
          RhinoVersionCs to build against a Rhino tree somewhere else; leave it unset
          and absent and csycles still builds, just without Rhino's version on it. -->
     <RhinoVersionCs Condition="'$(RhinoVersionCs)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\..\..\version.cs</RhinoVersionCs>

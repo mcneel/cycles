@@ -705,8 +705,8 @@ else {
 $cmakeConfig = if ($Configuration -eq 'Release') { 'RelWithDebInfo' } else { $Configuration }
 
 if (-not $InstallDir) {
-    # This repository is Rhino's RDK/cycles submodule, so:
-    #   RDK/cycles -> RDK -> Plug-ins -> rhino4 -> src4
+    # This repository is Rhino's RDK/cycles-core submodule, so:
+    #   RDK/cycles-core -> RDK -> Plug-ins -> rhino4 -> src4
     # It used to be one deeper, nested inside CCSycles, which is why this walked
     # five levels rather than four.
     $src4 = Resolve-Path (Join-Path $cyclesRoot '..\..\..\..') -ErrorAction SilentlyContinue

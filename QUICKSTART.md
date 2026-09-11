@@ -17,6 +17,11 @@ Open `src4/BuildSolutions/Rhino.sln`, pick **Debug+Cycles**, build the solution.
 
 `Debug` and `Release` do not build Cycles at all. They use the prebuilt one.
 
+Both `+Cycles` configurations build Cycles optimised, as RelWithDebInfo. A
+Debug Rhino has always run release Cycles kernels; an unoptimised kernel makes
+every CPU render about ten times slower and helps nobody debug Rhino. The PDBs
+are kept, so you can still step into `ccycles`.
+
 ## What that builds
 
 Kernels for the GPUs in your machine, and nothing else. Minutes, not an hour.
@@ -37,7 +42,7 @@ A payload is `ccycles.dll` plus its kernels. They live in
 | --- | --- |
 | `release` | committed, what everyone gets |
 | `local` | what you just built, ignored by git |
-| `debug` | the same, for Debug builds |
+| `debug` | what `Debug+Cycles` writes: optimised, with PDBs, ignored by git |
 
 Your Rhino uses `local` while it is newer than `release`. Pull a newer `release`
 and it takes over again by itself.

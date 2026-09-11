@@ -37,7 +37,10 @@ builds Cycles, installs it into a payload under
 `big_libs/RhinoCycles/ccycles/win`, and `RhinoCyclesCore.csproj` copies it into
 the plug-in output. The plain `Debug` and `Release` configurations use the
 prebuilt payload instead, so no CMake, CUDA or OptiX SDK is needed. RhinoBuilder
-offers the same configurations.
+offers the same configurations. Both `+Cycles` configurations build Cycles as
+RelWithDebInfo: a Debug Rhino has always run release Cycles kernels, and an
+unoptimised kernel makes CPU renders about ten times slower for nothing. The
+PDBs stay next to the build, so `ccycles` remains steppable.
 
 Such a build makes kernels for the GPUs in your own machine only - a kernel for
 a card you do not own cannot be tested - and fills the rest in from the committed
@@ -51,6 +54,15 @@ Building a single project is the usual mistake: `ccycles.vcxproj` alone updates
 the payload but not the plug-in output, and `RhinoCyclesCore.csproj` alone copies
 whatever the payload already holds without rebuilding Cycles. Do both, or the
 solution.
+
+`csycles.csproj` has one more job, inherited from CCSycles: it copies RhinoCore's
+OpenImageIO runtime closure - `OpenImageIORH`, `OpenImageIO_UtilRH`, `jpeg62`,
+OpenEXR 2.5 and boost filesystem/thread from `big_libs` - into `bin\<Config>`.
+`Rhino.vcxproj` links those libraries but never deploys them, so without this
+step a fresh checkout dies at startup with "Error Loading RhinoCore.dll". Debug
+takes the debug-CRT flavours, including `lib\Debug\jpeg62.dll`; the release
+`jpeg62.dll` beside the debug OpenImageIO crashes Rhino in `fread` the first
+time a bitmap texture is sized, because the two CRTs do not share a `FILE*`.
 
 To publish a payload - which is what a kernel change needs before it merges, or
 everyone on a plain build gets a new `ccycles.dll` with the old kernels:
@@ -76,7 +88,7 @@ dylibs, and `source/`.
 
 ## Building Cycles on macOS
 
-One command, from `RDK/cycles`:
+One command, from `RDK/cycles-core`:
 
     make payload
 
