@@ -33,9 +33,9 @@ Paths are relative to the Rhino checkout root.
 
 | What | Where |
 | --- | --- |
-| Cycles itself, plus the Rhino port | `src4/rhino4/Plug-ins/RDK/cycles` (own repo, branch `lars/10.x/cycles-5.2`) |
-| `ccycles` — the C API over Cycles | `.../cycles/src/ccycles` |
-| `csycles` — the C# P/Invoke layer | `.../cycles/src/csycles` |
+| Cycles itself, plus the Rhino port | `src4/rhino4/Plug-ins/RDK/cycles-core` (own repo, branch `lars/10.x/cycles-5.2`) |
+| `ccycles` — the C API over Cycles | `.../cycles-core/src/ccycles` |
+| `csycles` — the C# P/Invoke layer | `.../cycles-core/src/csycles` |
 | `RhinoCycles` — the Rhino plug-in | `src4/rhino4/Plug-ins/RDK/RhinoCycles` (branch `lars/10.x/cycles-modernization`) |
 | Prebuilt Cycles payload | `big_libs/RhinoCycles/ccycles/win/{debug,release}` |
 | Solutions | `src4/BuildSolutions/Rhino.sln` |
