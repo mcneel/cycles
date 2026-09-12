@@ -324,11 +324,20 @@ else {
 $libModern = Join-Path $cyclesRoot 'lib\windows_x64'
 $libLegacy = Join-Path (Split-Path -Parent $cyclesRoot) 'lib'
 
+# An uninitialised submodule leaves an empty directory behind (lib/windows_x64 is
+# 'update = none' in .gitmodules, so a plain clone --recurse-submodules leaves it
+# that way), and Test-Path is true for an empty directory. Present means non-empty,
+# or a fresh clone skips 'make update' and fails much later inside CMake.
+function Test-HasContent([string]$Dir) {
+    (Test-Path -LiteralPath $Dir -PathType Container) -and
+        [bool](Get-ChildItem -LiteralPath $Dir -Force | Select-Object -First 1)
+}
+
 Write-Step "Checking precompiled libraries"
-if (Test-Path $libModern) {
+if (Test-HasContent $libModern) {
     Write-Found 'libraries' $libModern
 }
-elseif (Test-Path $libLegacy) {
+elseif (Test-HasContent $libLegacy) {
     Write-Found 'libraries' "$libLegacy (legacy layout)"
 }
 else {
@@ -353,7 +362,7 @@ else {
     $proc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "`"$makeBat`"", 'update' `
         -WorkingDirectory $cyclesRoot -NoNewWindow -Wait -PassThru
     if ($proc.ExitCode -ne 0) { throw "'make update' failed with exit code $($proc.ExitCode)." }
-    if (-not (Test-Path $libModern) -and -not (Test-Path $libLegacy)) {
+    if (-not (Test-HasContent $libModern) -and -not (Test-HasContent $libLegacy)) {
         throw "'make update' completed but no library folder appeared. On Cycles 3.5 this is expected: it fetches from Blender's decommissioned SVN server. Update to Cycles 4.2 or newer, which uses Git LFS."
     }
 }
