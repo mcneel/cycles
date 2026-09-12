@@ -1038,8 +1038,8 @@ if (Test-Path $hipBuilt) {
 # at all and took Rhino down with it.
 #
 # So fill the gaps from the committed payload. Only kernels this build did not produce,
-# only for devices this build actually enabled, and never into the release payload
-# itself - publish_payload.ps1 owns that one and builds the full set.
+# and never into the release payload itself - publish_payload.ps1 owns that one and
+# builds the full set.
 #
 # The inherited kernels come from whenever the payload was last published, so they can
 # predate local kernel edits. That is said out loud rather than papered over: it is the
@@ -1055,9 +1055,18 @@ function Copy-InheritedKernels {
 
     if ((Split-Path -Leaf $TargetPayload) -eq 'release') { return 0 }
 
-    $releaseLib = Join-Path (Join-Path (Split-Path -Parent $TargetPayload) 'release') 'lib'
+    # The committed payload sits at a fixed place in the Rhino tree. The install
+    # directory does not have to: the default is bin\<Config>\Plug-ins, and -InstallDir
+    # can point anywhere. Look in the tree first, then next to the target so a payload
+    # tree kept elsewhere still works.
+    $candidates = @(
+        (Join-Path $cyclesRoot '..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\release\lib'),
+        (Join-Path (Join-Path (Split-Path -Parent $TargetPayload) 'release') 'lib')
+    )
+    $releaseLib = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $releaseLib) { return 0 }
+    $releaseLib = (Resolve-Path $releaseLib).Path
     $targetLib = Join-Path $TargetPayload 'lib'
-    if (-not (Test-Path $releaseLib)) { return 0 }
 
     $wanted = [System.Collections.Generic.List[string]]::new()
     if ($Hip) {
@@ -1086,7 +1095,14 @@ function Copy-InheritedKernels {
     return $inherited
 }
 
-$inherited = Copy-InheritedKernels -TargetPayload $InstallDir -Hip $deviceHip -Cuda $deviceCuda -Optix $deviceOptix
+# HIP and CUDA device support is compiled in unconditionally (WITH_CYCLES_DEVICE_HIP and
+# WITH_CYCLES_DEVICE_CUDA are always ON above), so their kernels are needed whether or not
+# this build enabled the backend. Keying the fill on the enabled set left a -Devices cpu
+# build - which is what a machine with no GPU SDK gets automatically - with a ccycles.dll
+# that has the HIP device and not one HIP kernel (found 2026-09-12). Fill for both device
+# families regardless; the function only ever adds kernels this build did not produce.
+# OptiX stays tied to its device, which is compiled out without the SDK.
+$inherited = Copy-InheritedKernels -TargetPayload $InstallDir -Hip $true -Cuda $true -Optix $deviceOptix
 if ($inherited) {
     Write-Step "Filled $inherited kernel(s) from the committed payload"
     Write-Host "   For devices this build supports but compiled no kernels for. They are as" -ForegroundColor DarkYellow

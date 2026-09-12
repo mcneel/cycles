@@ -119,6 +119,11 @@ committed payload, and the build says so. Two consequences worth knowing:
   your change. If a GPU in your machine is one whose SDK you have not installed,
   the build warns loudly, because then a kernel edit will not show up in your
   own renders however often you rebuild.
+- No GPU SDK at all is the same case taken to its end: the build is CPU-only
+  and every GPU kernel is inherited, so the payload is complete and Rhino renders
+  on the GPU as before - just not with your kernel edits. HIP and CUDA support
+  is compiled into `ccycles.dll` regardless of SDKs (only OptiX needs its SDK),
+  which is why the fill has to happen whether or not a backend was enabled.
 - A narrow build does not overwrite the committed payload. It writes
   `big_libs/RhinoCycles/ccycles/win/local`, which is gitignored and which
   `RhinoCyclesCore` prefers while it is newer than the committed one - so your

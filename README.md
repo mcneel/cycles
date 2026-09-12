@@ -44,7 +44,8 @@ PDBs stay next to the build, so `ccycles` remains steppable.
 
 Such a build makes kernels for the GPUs in your own machine only - a kernel for
 a card you do not own cannot be tested - and fills the rest in from the committed
-payload. It writes a gitignored `local` payload rather than the committed one, so
+payload; with no GPU SDK installed that means all of them, and the GPU still
+renders. It writes a gitignored `local` payload rather than the committed one, so
 it cannot replace what everyone else runs with kernels for a single card.
 `RhinoCyclesCore` prefers `local` while it is newer than the committed payload,
 so your Rhino runs what you built and a pull that republishes takes over again by
