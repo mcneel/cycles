@@ -244,6 +244,45 @@ node losing its wiring. All four currently pass.
 The fourth was added after the first three all passed on a tree whose decals were
 broken — worth remembering when the audits are green and the pixels are not.
 
+### Verified developer scenarios
+
+Run on 2026-09-12 on this branch: Windows, one AMD GPU, CUDA, OptiX and ROCm
+SDKs installed, Visual Studio 2026. "Renders" means the harness's three checks:
+a production render on the CPU, one on HIP, and the Raytraced viewport reaching
+its pass count. Nothing was staged by hand in any of them.
+
+| Scenario | Outcome |
+| --- | --- |
+| Fresh clone of the branch, `Debug`, run, renders | works: 16 min first build with nothing staged by hand; renders on the committed `release` payload |
+| `git pull` that bumps `cycles-core`, incremental `Debug`, renders | works; incremental build 25 s, renders |
+| Fresh clone, `Debug+Cycles` with no Cycles libraries checked out, renders | works: fetches the 6.5 GiB library bundle itself, builds one HIP kernel (gfx1150), fills the other 40 from the committed payload, renders from its own `debug` payload - after the two fixes below |
+| `git clean -xfd` in the superproject and every submodule, `Debug`, run, renders | works |
+| Same, with the gitignored `debug` payload absent so the committed `release` one is deployed | works |
+| Edit a C# file, incremental `Debug`, renders | works |
+| `ReleaseDebuggable`, run, renders | works, once the `-Release-` settings scheme has plug-in registrations (below) |
+| `Debug+Cycles` twice in a row | second build is 5 s: nothing to do but relink `ccycles.dll` |
+| `Debug+Cycles` on a machine that builds fewer kernels than the committed payload holds | diverted to the gitignored `local` payload; Rhino renders from it |
+| `build_cycles.ps1 -Devices cpu`, standing in for a machine with no GPU SDK | CPU-only `ccycles.dll` plus all 41 GPU kernels inherited from the committed payload; the warning about the AMD card in this machine prints |
+
+Two things worth knowing that came out of it:
+
+- A Release-family Rhino (`bin\Release`, so `Release` and `ReleaseDebuggable`
+  alike) runs under the `9.0-WIP-Developer-Release-trunk` settings scheme. On a
+  machine that has only ever run Debug builds that scheme starts with no core
+  plug-ins registered - no Python, no Rhino Render, no RhinoCycles - so scripted
+  tests silently do nothing. Copying the Debug scheme's `Plug-Ins` registry key
+  across fixes it. Not a Cycles matter; identical on 9.x.
+- Before 2026-09-12 the no-SDK case inherited nothing. The fill was keyed on
+  which GPU backends the build enabled, a CPU-only build enables none, and so the
+  payload had the HIP device compiled in and not one HIP kernel.
+- The fresh-clone `Debug+Cycles` run found two more, both fixed the same day. An
+  uninitialised `lib/windows_x64` is an empty directory, which `Test-Path` calls
+  present, so `make update` never ran and CMake failed later. And
+  `RhinoCyclesCore.csproj` chose its payload in a static property, evaluated
+  before `ccycles.vcxproj` had installed anything, so the very first
+  `Debug+Cycles` build deployed release Cycles next to the debug payload it had
+  just built; the choice is made when the deploy target runs now.
+
 ### Which Cycles is loaded
 
 `RhinoCycles_ListDevices` prints the version and the path of the `ccycles.dll`
