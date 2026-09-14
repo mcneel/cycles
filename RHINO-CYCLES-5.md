@@ -111,9 +111,8 @@ clone between trees. `-AllowLibraryMismatch` turns the stop into a warning, for
 the one afternoon you know better.
 
 Upstream Cycles moves to a newer bundle with each Blender release. A weekly
-GitHub Actions job (`.github/workflows/lib-bundle-watch.yaml`) compares upstream's
-pin on the release line we track and on `main` with ours and keeps one issue open
-while they differ. Moving the pin is a normal commit here - change the submodule
+GitHub Actions job (`.github/workflows/lib-bundle-watch.yaml`) compares the pin on
+upstream `main` with ours and keeps one issue open while they differ. Moving the pin is a normal commit here - change the submodule
 commit, build, `publish_payload.ps1`, commit the payload - and everyone's next
 `+Cycles` build tells them to run `make update`.
 
