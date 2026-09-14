@@ -127,6 +127,19 @@ if (-not $RenderOnly) {
 }
 
 if (-not $RenderOnly) {
+  # Is lib\windows_x64 the library bundle this repository pins, with its LFS objects
+  # pulled? build_cycles.ps1 stops a build on a mismatch; this makes the same fact
+  # visible from the gate. Not verifiable (no checkout, unknown layout) and not
+  # checked out at all are reported, not failed - a standalone or host-only tree is
+  # allowed to have no bundle.
+  Write-Host '--- library bundle'
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $toolsDir 'check_lib_bundle.ps1') -CyclesRoot $repo 2>&1 | ForEach-Object { "  $_" }
+  $code = $LASTEXITCODE
+  $note = switch ($code) { 1 { 'not the pinned commit' } 2 { 'LFS pointers not pulled' } 3 { 'not verifiable' } 4 { 'not checked out' } default { '' } }
+  Add-Result 'library bundle' $(if ($code -eq 1 -or $code -eq 2) { 1 } else { 0 }) $note
+}
+
+if (-not $RenderOnly) {
   # Does the installer ship the kernels we build?
   #
   # Worth a second because it was wrong in the worst way: Cycles.wxs listed 32 kernel

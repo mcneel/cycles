@@ -78,6 +78,12 @@
 .PARAMETER ConfigureOnly
     Run the CMake configure step and stop, leaving a solution to open in VS.
 
+.PARAMETER AllowLibraryMismatch
+    Build even though lib\windows_x64 is not the library bundle this repository pins
+    (or holds unpulled LFS pointers). The check still prints its red banner; the
+    result is a Cycles nobody else builds. For debugging a bundle change, not for
+    getting past the message.
+
 .PARAMETER Generator
     ninja (the default) or vs.
 
@@ -129,6 +135,8 @@ param(
     [switch]$Force,
 
     [switch]$ConfigureOnly,
+
+    [switch]$AllowLibraryMismatch,
 
     [ValidateSet('ninja', 'vs')]
     [string]$Generator = 'ninja',
@@ -364,6 +372,27 @@ else {
     if ($proc.ExitCode -ne 0) { throw "'make update' failed with exit code $($proc.ExitCode)." }
     if (-not (Test-HasContent $libModern) -and -not (Test-HasContent $libLegacy)) {
         throw "'make update' completed but no library folder appeared. On Cycles 3.5 this is expected: it fetches from Blender's decommissioned SVN server. Update to Cycles 4.2 or newer, which uses Git LFS."
+    }
+}
+
+# ---------------------------------------------------------- library bundle pin
+#
+# Present is not enough: it has to be the bundle this repository pins, or Cycles
+# links against other library versions and nothing says so. tools\check_lib_bundle.ps1
+# knows both layouts (a submodule checkout, or junctions into a sibling clone) and
+# prints a red banner with the fix. A mismatch stops the build; -AllowLibraryMismatch
+# turns that into a warning for someone who knows exactly what they are doing.
+$bundleCheck = Join-Path $cyclesRoot 'tools\check_lib_bundle.ps1'
+if (Test-Path $bundleCheck) {
+    & $bundleCheck -CyclesRoot $cyclesRoot
+    $bundleExit = $LASTEXITCODE
+    if ($bundleExit -eq 1 -or $bundleExit -eq 2) {
+        if ($AllowLibraryMismatch) {
+            Write-Host "   continuing because -AllowLibraryMismatch was given. This build is not what everyone else builds." -ForegroundColor Red
+        }
+        else {
+            throw "lib\windows_x64 is not the pinned library bundle - see the banner above for the fix, or pass -AllowLibraryMismatch to build against it anyway."
+        }
     }
 }
 

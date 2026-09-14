@@ -95,6 +95,28 @@ Set them machine- or user-level - `setx NAME value /M` - not in a shell.
 bootstrap relaunches itself elevated, and the elevated process does not inherit a
 session-only variable.
 
+### The library bundle
+
+Cycles builds against Blender's precompiled third-party libraries - OpenImageIO,
+OSL, Embree, OpenVDB, TBB, LLVM and the rest, 6.5 GB - and this repository pins
+one exact bundle through the `lib/windows_x64` submodule commit. Everyone builds
+against that one. The first `+Cycles` build on a machine fetches it (`make
+update`, about fifteen minutes); after that nothing downloads anything.
+
+Every `+Cycles` build checks that the checked-out bundle is the pinned commit and
+that its files were actually pulled, and stops with a red banner and the fix when
+not (`tools\check_lib_bundle.ps1`, also one of the `run_checks.ps1` audits). It
+knows the submodule layout and the junction layout some of us use to share one
+clone between trees. `-AllowLibraryMismatch` turns the stop into a warning, for
+the one afternoon you know better.
+
+Upstream Cycles moves to a newer bundle with each Blender release. A weekly
+GitHub Actions job (`.github/workflows/lib-bundle-watch.yaml`) compares upstream's
+pin on the release line we track and on `main` with ours and keeps one issue open
+while they differ. Moving the pin is a normal commit here - change the submodule
+commit, build, `publish_payload.ps1`, commit the payload - and everyone's next
+`+Cycles` build tells them to run `make update`.
+
 ### Building Cycles itself
 
 Pick a different configuration. That is the whole mechanism.

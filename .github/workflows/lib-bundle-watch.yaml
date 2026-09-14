@@ -1,0 +1,113 @@
+# Tells us when upstream Cycles moves to a newer Blender library bundle.
+#
+# This repository pins one bundle through the lib/windows_x64 submodule commit, and
+# every developer builds against exactly that one (tools/check_lib_bundle.ps1 stops a
+# build on any other). Moving the pin is a deliberate commit here, followed by a
+# payload republish. What this job adds is the signal: once a week it reads the bundle
+# upstream Cycles pins on the branches we care about and, if any differs from ours,
+# opens one issue - or updates the one already open - and closes it once we caught up.
+#
+# It never fails: a moved bundle is news, not an error.
+
+name: Library bundle watch
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  UPSTREAM_REPO: https://github.com/blender/cycles.git
+  # The release line this fork tracks, and main for what is coming. Update the release
+  # branch with the next upstream merge.
+  UPSTREAM_REFS: "release/5.2 main"
+  LABEL: lib-bundle
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Read our pin and upstream's
+        id: pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          ours=$(git ls-tree HEAD lib/windows_x64 | awk '{print $3}')
+          echo "ours=$ours" >> "$GITHUB_OUTPUT"
+          echo "ours: $ours"
+
+          moved=0
+          report=""
+          for ref in $UPSTREAM_REFS; do
+            dir="up-$(echo "$ref" | tr '/' '_')"
+            # --no-checkout --depth 1 fetches the tree only: a few MB, no libraries.
+            if ! git clone --quiet --depth 1 --no-checkout --branch "$ref" "$UPSTREAM_REPO" "$dir" 2>/dev/null; then
+              report+=$'\n'"- \`$ref\`: not found upstream"
+              continue
+            fi
+            theirs=$(git -C "$dir" ls-tree HEAD lib/windows_x64 | awk '{print $3}')
+            at=$(git -C "$dir" rev-parse --short HEAD)
+            if [ "$theirs" != "$ours" ]; then
+              moved=1
+              report+=$'\n'"- \`$ref\` (upstream \`$at\`) pins [\`${theirs:0:9}\`](https://projects.blender.org/blender/lib-windows_x64/commit/$theirs)"
+            else
+              report+=$'\n'"- \`$ref\` (upstream \`$at\`) pins the same bundle as we do"
+            fi
+            echo "$ref: $theirs"
+          done
+          echo "moved=$moved" >> "$GITHUB_OUTPUT"
+          {
+            echo "report<<EOF"
+            echo "$report"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open, update or close the issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OURS: ${{ steps.pins.outputs.ours }}
+          MOVED: ${{ steps.pins.outputs.moved }}
+          REPORT: ${{ steps.pins.outputs.report }}
+        run: |
+          set -euo pipefail
+          gh label create "$LABEL" --description "Blender precompiled library bundle" --color B60205 --force >/dev/null 2>&1 || true
+          existing=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')
+
+          title="Blender library bundle moved upstream (ours: ${OURS:0:9})"
+          body=$(cat <<EOF
+          Upstream Cycles pins a different Blender library bundle than this repository does.
+
+          Ours: [\`${OURS:0:9}\`](https://projects.blender.org/blender/lib-windows_x64/commit/$OURS) (the \`lib/windows_x64\` submodule commit)
+          $REPORT
+
+          Moving the pin is a deliberate commit: change the \`lib/windows_x64\` submodule commit, rebuild,
+          then run \`publish_payload.ps1\` and commit the payload. Every developer's next \`+Cycles\` build
+          stops with a red banner until they run \`make update\`. This issue closes itself once the pins agree.
+
+          _Weekly check by \`.github/workflows/lib-bundle-watch.yaml\`. Last run: $(date -u +%Y-%m-%d)._
+          EOF
+          )
+
+          if [ "$MOVED" = "1" ]; then
+            if [ -n "$existing" ]; then
+              gh issue edit "$existing" --title "$title" --body "$body" >/dev/null
+              echo "updated issue #$existing"
+            else
+              gh issue create --title "$title" --body "$body" --label "$LABEL"
+            fi
+          else
+            echo "pins agree"
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --comment "The pins agree again (ours: \`${OURS:0:9}\`). Closing." >/dev/null
+              echo "closed issue #$existing"
+            fi
+          fi
