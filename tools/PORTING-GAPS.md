@@ -134,6 +134,15 @@ marked in the UI rather than silently ignored:
 - PBR opacity roughness, and `RefractionRoughness` on the standard path
 - PBR subsurface scattering colour
 
+**Filed as RH-98667** (Rendering: Cycles) on 2026-09-15, because a decision nobody
+outside this document knows about is not a decision. Framed there as a **pending
+regression rather than a current bug**, which is the part worth being exact about: the
+3.5 baseline this port replaces does register both sockets -
+`git show rhino9_cycles35:src/scene/shader_nodes.cpp` has `subsurface_color` at 2873 and
+`transmission_roughness` at 2889 - so **these two controls work in shipping Rhino today
+and stop working when 5.2 lands.** Everything above describes the port branch, and reading
+it as a description of shipping would be wrong.
+
 Revisiting means combining rather than connecting twice - mixing the subsurface
 colour into the base-colour graph before it reaches `BaseColor`, and choosing a
 single roughness. Both are user-visible and neither is forced by 5.2, which is
