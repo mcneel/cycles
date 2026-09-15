@@ -45,8 +45,24 @@ regression:**
 shader colours, `prune()` never running, both `prune()` loops' unchecked `Mesh` casts,
 and the host-side instrumentation strip.
 
-**Still open:** the HIP bump black render (parked), a dev-only preview-render deadlock
-(never investigated), and the `Test lights ceilings 2` sweep (818 MB, never run).
+**Still open, as of 2026-09-15: nothing in this document is unexplained.** The three
+items this line used to carry were all closed on 2026-09-03: the HIP bump black render
+(stale fatbins the build never deployed, not a renderer bug), the preview-render deadlock
+(does not reproduce) and the `Test lights ceilings 2` sweep (clean at 1.0114).
+
+What remains is not diagnosis but decisions and housekeeping:
+
+| item | shape |
+|---|---|
+| Two principled inputs dropped | decided (keep); the two dead Rhino controls should be hidden or marked in the UI |
+| `velvet_bsdf`, `anisotropic_bsdf`, `musgrave_texture` | accepted as unreachable; re-verified 2026-09-15, still no RhinoCycles callers |
+| `Test lights ceilings 2.3dm` | seven objects with invalid geometry - a model problem, not a renderer one |
+| MCP scripting against a dev build | worked around, not fixed - `ScriptEditor` wants a file path |
+
+Two items were **retracted** on 2026-09-15 after re-reading the code: the per-object
+shadow-catcher flag (guarded all along) and the `MixNode` null-deref's need for a volume
+scene (unreachable). One new regression was found in the same pass and fixed - the Cycles
+Glass material's Frost control. All three are written up below.
 
 ---
 
@@ -122,6 +138,63 @@ Revisiting means combining rather than connecting twice - mixing the subsurface
 colour into the base-colour graph before it reaches `BaseColor`, and choosing a
 single roughness. Both are user-visible and neither is forced by 5.2, which is
 why they can wait.
+
+### A third input was being dropped, and this one was a regression - FIXED 2026-09-15
+
+The section above settles what happens to `subsurface_color` and
+`transmission_roughness` on the **PBR principled path**, and the answer there was "keep
+the current behaviour". Re-reading the call sites on 2026-09-15 to confirm that decision
+still held turned up a third write to a retired socket that the decision never covered,
+in a different material, with a different and much worse consequence.
+
+`Materials/GlassMaterial.cs` is the Cycles-specific **Glass** material. It builds a
+`PrincipledBsdfNode` with `Transmission = 1.0`, and it exposes exactly two controls:
+Frost and IOR. Frost was wired to `glass.ins.TransmissionRoughness` - the retired socket -
+and **nothing in that shader writes `Roughness` at all**.
+
+So the write was dropped and `roughness` kept the value Cycles gives it,
+`SOCKET_IN_FLOAT(roughness, "Roughness", 0.5f)`. The Cycles Glass material rendered at a
+fixed half-rough transmission at every Frost setting, **including Frost = 0, which should
+be clear glass**. The control was not merely ignored; the value it was ignored in favour
+of is a conspicuous one.
+
+This is a port regression rather than an old wart, and the history says so plainly:
+
+| commit | Frost goes to |
+|---|---|
+| before `2816bd2` | `TransmissionRoughness` - live in 3.5, correct |
+| `2816bd2` "Move to Cycles 4.4" | `CoatRoughness` - Nathan re-pointed it when the socket went |
+| `536c4f8` Revert "Move to Cycles 4.4" | `TransmissionRoughness` - restored, now retired and silent |
+
+That is the **second** bug the 4.4 revert reintroduced by restoring a call site Nathan had
+already corrected, after `BumpNode.invert`. Both share a signature worth naming: the
+revert is only safe for sockets that still exist, and a retired socket absorbs the write
+without a word.
+
+**The fix is `glass.ins.Roughness`, and it is not a judgement call here.** Blender 4.0
+removed Transmission Roughness precisely because the transmission lobe now takes the main
+Roughness, so that is the faithful mapping; `Shaders/RhinoFullNxt.cs:603` already routes
+the same Rhino value into `glassRed/Green/Blue/Core.ins.Roughness` on the other glass
+path, so it is also the consistent one. And the reason the PBR path had to be *decided*
+rather than fixed - that `Roughness` was already claimed, so a second connection would
+lose the race in `ShaderGraph::connect` - does not apply: nothing else connects it.
+`CoatRoughness`, 4.4's choice, would be wrong; it roughens the clearcoat, not the glass.
+
+### Two older bugs in the same file, deliberately not fixed
+
+Both predate the port - they are in shipping too - so they are reported rather than
+changed. Neither is a Cycles question and both change rendered output, which makes them
+someone's decision and not this branch's:
+
+- `GlassMaterial.cs:107` feeds **Frost** into `glass.ins.IOR`. The material has an `Ior`
+  slot, set up at `:54` and read at `:64`, which never reaches the shader. So the IOR
+  slider does nothing and frosting the glass bends the light instead.
+- `GlassMaterial.cs:65` loads `Ior.Texture` into **`ColorTexture`**, overwriting the
+  colour texture. `IorTexture` is allocated at `:47` and disposed at `:144` and is never
+  written to or read from.
+
+Fixing the first would change every existing Cycles Glass material's appearance, which is
+why it wants a decision rather than a patch.
 
 ## A parameter exposed as both a member and a socket loses the member
 
@@ -1861,15 +1934,40 @@ This has been open as "area-only negation in `CCyclesLight::flush`, or the globa
 double-negate area lights, and the per-type behaviour dev needs is already verified by
 measurement for the two types where direction matters.
 
-### One latent bug found in passing, not fixed here
+### One latent bug found in passing - RETRACTED 2026-09-15, it does not exist
 
-`ChangeDatabase` calls `film_set_use_approximate_shadow_catcher(session,
-ob.IsShadowCatcher)` **once per object**, so a single global film flag ends up holding
-whatever the last object processed happened to be. It lands correctly on
-`SimpleVaseTest` (one catcher, called once with 1), but a scene with a catcher followed
-by a non-catcher would clear it. That is RhinoCycles rather than Cycles, so it is
-recorded here rather than changed - the fix is to set it from whether the scene has any
-catcher at all, not per object.
+The claim below was that `ChangeDatabase` calls
+`film_set_use_approximate_shadow_catcher(session, ob.IsShadowCatcher)` **once per
+object**, so the global film flag would end up holding whatever object came last, and a
+catcher followed by a non-catcher would clear it. **That reading was wrong**, and it was
+wrong because the call was read without the function it sits in.
+
+The call site is `HandleGroundPlaneShadowcatcherState`
+(`Database/ChangeDatabase.cs:2028`), which opens with
+
+    if (ob.obid == GroundPlaneMeshInstanceId)
+
+so it is a no-op for every object that is not the ground plane. The two loops in
+`UploadObjectChanges` do invoke it per object, which is what the original reading saw,
+but at most one of those invocations can reach the setter. That guard has been present
+since `85eb34f`, the commit that introduced the helper - it was never absent.
+
+**Nothing else in Rhino can be a shadow catcher anyway.** `IsShadowCatcher` is assigned
+at exactly two `CyclesObject` construction sites: the ground plane, from `gp.IsShadowOnly`
+(`:1631`), and the light mesh, hard-coded `false` (`:1967`). Every other object takes the
+`false` default. So one global film flag fed from the ground plane is not an
+approximation of per-object state - it is the whole of the state.
+
+A stale `true` after the ground plane is deleted or disabled is also harmless:
+`pass_accessor.cpp:179` only consults the flag for `PASS_SHADOW_CATCHER_MATTE`, and that
+pass does not exist without a catcher object.
+
+**No fix follows. Do not "correct" this to a scene-wide `has_shadow_catcher` query** -
+that would be the same value by a longer route.
+
+This is the fifth parked conclusion in this document to evaporate on re-test, and the
+first to do so from reading rather than rendering. The others each needed a build; this
+one needed the enclosing function.
 
 ### The "unexercised fixes" item, resolved by checking reachability instead
 
@@ -1895,8 +1993,23 @@ what it actually emits answers it more cheaply:
   GPU fix removes an uninitialised value on a path Rhino never takes: keep it as
   hardening, and no test scene is possible, let alone needed.
 
-That leaves the `MixNode` null-deref fix as the only one genuinely waiting on a volume
-scene, and it is a null dereference: reachable or not, the fix is unambiguous.
+- **The `MixNode` null deref is unreachable too - checked 2026-09-15.** This was left as
+  "the only one genuinely waiting on a volume scene". It is not. `is_linear_operation` has
+  exactly one caller, `ShaderGraph::optimize_volume_output`
+  (`src/scene/shader_graph.cpp:730`), and that function's first two statements are
+
+      ShaderInput *volume_in = output()->input("Volume");
+      if (volume_in->link == nullptr) return;
+
+  RhinoCycles never links that output. Across the whole plug-in there are 28 connections
+  to `Output.ins.Surface` and 1 to `Output.ins.Displacement`; `Output.ins.Volume` appears
+  nowhere. So no Rhino material can enter the traversal, and no test scene would exercise
+  the fix even if one were authored.
+
+So **all four** of the "unexercised fixes" are resolved by reachability, and the item is
+closed. The fixes stay in as hardening - each is correct on its own terms, and three of
+them would bite the moment a caller appears. What is closed is the idea that someone owes
+this branch a purpose-built volume scene. Nobody does.
 
 ## The HIP stall: a Debug-only pipe deadlock in the kernel compiler
 
