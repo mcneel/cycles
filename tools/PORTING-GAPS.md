@@ -202,21 +202,50 @@ keeps the dark refractive detail a clear surface should have (min 62, eleven buc
 Frost 1 washes out to a flat bright ball (min 194, seven). Before the fix both columns were
 the same render.
 
-### Two older bugs in the same file, deliberately not fixed
+### Two older bugs in the same file - FIXED 2026-09-15 on Lars' call
 
-Both predate the port - they are in shipping too - so they are reported rather than
-changed. Neither is a Cycles question and both change rendered output, which makes them
-someone's decision and not this branch's:
+These predate the port and are in shipping too, so they were first written up here as
+someone else's decision rather than this branch's. Asked, Lars said fix them. Both are
+copy-paste slips where the wrong variable was passed, and one is considerably worse than
+its first description.
 
-- `GlassMaterial.cs:107` feeds **Frost** into `glass.ins.IOR`. The material has an `Ior`
-  slot, set up at `:54` and read at `:64`, which never reaches the shader. So the IOR
-  slider does nothing and frosting the glass bends the light instead.
-- `GlassMaterial.cs:65` loads `Ior.Texture` into **`ColorTexture`**, overwriting the
-  colour texture. `IorTexture` is allocated at `:47` and disposed at `:144` and is never
-  written to or read from.
+**`GlassMaterial.cs:107` fed `Frost` into `glass.ins.IOR`.** The first write-up called
+this "frosting the glass bends the light instead", which undersells it. `PbrGraphForSlot`
+builds and connects a value node **whether or not the slot is switched on**, so the IOR
+input did not merely track the wrong slider - it received Frost's value, and Frost
+defaults to 0. **Every Cycles Glass material has been refracting at IOR 0 while its own
+slider read 1.45.** The `Ior` slot was set up at `:54` and read at `:64` and then went
+nowhere at all.
 
-Fixing the first would change every existing Cycles Glass material's appearance, which is
-why it wants a decision rather than a patch.
+**`GlassMaterial.cs:65` loaded `Ior.Texture` into `ColorTexture`.** `IorTexture` is
+allocated at `:47` and disposed at `:144` and was never written to or read from. This one
+is bounded: `Utilities.HandleRenderTexture` opens with `if (rt == null) return;`, so it
+only bit a material that actually had an IOR texture assigned, and then it replaced the
+glass colour with the IOR map.
+
+Both fixed by passing the variable the line was always reaching for - `IorTexture` at
+`:65`, and `Ior, IorTexture` at `:107`.
+
+#### Verified the same one-directional way
+
+The IOR slider reached nothing before the fix, so two scenes differing only in IOR had to
+render identically; any difference proves it now arrives. At Frost 0, IOR 1.45 against
+1.9: **23.6% of pixels differ**, mean absolute difference 0.0085.
+
+The size of the correction shows up against the earlier Frost-0 render, which was made
+with the IOR input still holding Frost's 0:
+
+| sphere patch | mean | min |
+|---|---|---|
+| IOR input at 0 (what shipped) | 0.7636 | 62 |
+| IOR input at 1.45 (what the slider said) | 0.8394 | 175 |
+
+So this is not a subtle correction to an edge case. A default Cycles Glass material
+renders visibly differently now, and the new render is the one the material's own
+parameters asked for.
+
+**Expect golden images containing Cycles Glass to move.** That is this change, not a
+regression.
 
 ## A parameter exposed as both a member and a socket loses the member
 
