@@ -42,6 +42,47 @@ the shader graphs where the fault actually was. Note that RhinoCycles bakes worl
 coordinates into the vertices and leaves the transforms identity, so a
 non-identity transform in this dump is itself news.
 
+## Scripting a scene that has render content in it
+
+Authoring a test scene from `_-RunPythonScript` is the normal way to get a minimal
+reproducer, and it has one trap that costs ten minutes per encounter because the symptom
+is indistinguishable from a hang in whatever the script was doing.
+
+**After `sc.doc.RenderMaterials.Add(...)`, nothing that goes through Rhino's command queue
+comes back.** Not `_-Render`, which is the documented stall, but also `_-SaveAs`, which is
+not a render at all. The RDK starts preview renders on that call and the queue stops
+serving. A script that adds a material and then saves logs its "saving" line and never its
+"saved" one; the runner then kills Rhino at its deadline and no .3dm is written.
+
+Three rules make it a non-event:
+
+1. **Write the file with the API, not the command.**
+
+       opts = Rhino.FileIO.FileWriteOptions()
+       sc.doc.WriteFile(out, opts)
+
+   This is a direct call rather than a queued command and returns while previews are still
+   running. `rs.Command('_-SaveAs ...')` does not.
+
+2. **Put the render content last.** Geometry, materials on the `doc.Materials` table,
+   skylight, camera and view all happen first. Create and assign the RenderMaterial, then
+   write the file. Nothing queued may follow the `Add`.
+
+3. **The `Add` is not optional.** Assigning to `obj.RenderMaterial` before the content is
+   in the document throws `The material is not attached to a document.`, so the preview
+   trigger cannot simply be skipped - only sequenced around.
+
+Log a line before and after every step. The line the log stops on is the entire diagnosis,
+and without it the failure looks like the renderer rather than the queue.
+
+`makeglass.py` and `runglass.ps1` in the harness are a worked example: they build a Cycles
+Glass sphere at two Frost values in one Rhino session each, and render the saved scenes in
+fresh sessions. Note also that a private `[CustomRenderContent(IsPrivate=true)]` material
+such as Cycles Glass has no UI entry and must be created by type id -
+`Rhino.Render.RenderContentType.NewContentFromTypeId(System.Guid("3CEC0E39-..."))` - with
+its parameters set by their field names (`frost-amount`, `ior`, `glass_color`), not their
+display labels.
+
 ## Where are the pixels
 
 | Variable | Effect |
@@ -558,8 +599,19 @@ Individually:
     python tools/audit_sockets.py --unexposed   # what Cycles offers that csycles does not
     python tools/audit_enums.py                 # enum members and values against Cycles
     python tools/audit_svm_nodes.py             # add_node_packed on stock node types
+    python tools/audit_member_socket_clash.py   # a parameter that is both member and socket
+    python tools/audit_retired_socket_writes.py # RhinoCycles writing to a Retired socket
+    python tools/audit_svm_dispatch.py          # an SVM case falling into the next one
 
 Each exits non-zero on a real problem, so any of them can gate a build. Between
-them they cover the three ways this port has silently drifted: a renamed or
-retyped socket, a renumbered enum, and a stock SVM node emitted in Rhino's packed
-layout.
+them they cover the ways this port has silently drifted: a renamed or retyped
+socket, a renumbered enum, a stock SVM node emitted in Rhino's packed layout, a
+parameter exposed as both a member and a socket, a write to a socket csycles has
+retired, and an interpreter case that falls through into the next one.
+
+The last two are the ones that catch a **revert**. When upstream removes a socket,
+csycles keeps the property and marks it `Retired`, so an old call site still
+compiles and its write is dropped in silence. Restoring such a call site is how
+`BumpNode.invert` came back after the 4.4 revert had already fixed it, and how the
+Glass material's Frost slider stopped doing anything - see PORTING-GAPS.md. Neither
+is visible in a diff that looks correct on its own terms.

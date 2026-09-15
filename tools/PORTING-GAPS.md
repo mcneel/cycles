@@ -180,6 +180,28 @@ rather than fixed - that `Roughness` was already claimed, so a second connection
 lose the race in `ShaderGraph::connect` - does not apply: nothing else connects it.
 `CoatRoughness`, 4.4's choice, would be wrong; it roughens the clearcoat, not the glass.
 
+#### Verified in pixels, not just in the diff
+
+The wiring argument above is also what makes this testable with one build instead of two.
+Under the old code Frost reached no live socket and nothing else wrote `Roughness`, so two
+scenes differing only in Frost **had to render identically**. Any difference at all is
+therefore the fix working, and shipping is not a useful control - it has a live Transmission
+Roughness socket and would differ for reasons of its own.
+
+`makeglass.py` and `runglass.ps1` in the harness build a Cycles Glass sphere over a grey
+floor, skylit, no textures and no local lights, at two Frost values, and render each at 30
+samples on CPU:
+
+| | sphere patch mean | min | tonal buckets |
+|---|---|---|---|
+| Frost 0 | 0.7636 | 62 | 11 |
+| Frost 1 | 0.8795 | 194 | 7 |
+
+32.6% of pixels differ, mean absolute difference 0.042. The direction is right too: Frost 0
+keeps the dark refractive detail a clear surface should have (min 62, eleven buckets), and
+Frost 1 washes out to a flat bright ball (min 194, seven). Before the fix both columns were
+the same render.
+
 ### Two older bugs in the same file, deliberately not fixed
 
 Both predate the port - they are in shipping too - so they are reported rather than
