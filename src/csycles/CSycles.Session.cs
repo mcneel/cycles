@@ -388,6 +388,26 @@ namespace ccl
 			return "";
 		}
 
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+		private static extern bool cycles_progress_get_error(IntPtr sessionId, IntPtr strHolder);
+		/// <summary>
+		/// Get the message the session failed with, or an empty string when the
+		/// session has not run into an error.
+		/// </summary>
+		public static string progress_get_error(IntPtr sessionId)
+		{
+			using (CSStringHolder stringHolder = new CSStringHolder())
+			{
+				bool hasError = cycles_progress_get_error(sessionId, stringHolder.Ptr);
+				if (hasError)
+				{
+					return stringHolder.Value;
+				}
+			}
+
+			return "";
+		}
+
 		#endregion
 	}
 }

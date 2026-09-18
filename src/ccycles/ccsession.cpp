@@ -862,6 +862,33 @@ CCL_CAPI bool CDECL cycles_progress_get_substatus(ccl::Session* session_id, void
 	return false;
 }
 
+/* Get the error a session failed with, if any. Returns true and fills strholder
+ * with the message when the session or its device has run into an error,
+ * false when the session is healthy.
+ *
+ * The device is checked as well as the progress: a device failure is only
+ * copied into the progress at two points in Session::run_main_render_loop, so
+ * one that happens outside those (during pixel readback, say) is otherwise
+ * invisible to the host. */
+CCL_CAPI bool CDECL cycles_progress_get_error(ccl::Session* session_id, void* strholder)
+{
+	CCSession* ccsess = nullptr;
+	ccl::Session* session = nullptr;
+	if (session_find(session_id, &ccsess, &session)) {
+		StringHolder* holder = (StringHolder*)strholder;
+		if (session->progress.get_error()) {
+			holder->thestring = session->progress.get_error_message();
+			return true;
+		}
+		if (session->device && session->device->have_error()) {
+			holder->thestring = session->device->error_message();
+			return true;
+		}
+	}
+
+	return false;
+}
+
 #ifdef __cplusplus
 }
 #endif
