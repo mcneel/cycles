@@ -1033,7 +1033,8 @@ happens to carry both a colour and a bump texture, and it is the bump one that m
 
 The reproducer is now three objects and needs no rebuild:
 
-    .unarea.ps1 -Light rect -Shade none -Tex bump
+    .
+unarea.ps1 -Light rect -Shade none -Tex bump
 
 Note the symptom: a black bump-mapped surface is exactly what the missing `break` in
 `NODE_SET_BUMP` produced on CPU earlier in this document. This is a second instance of the
@@ -1219,8 +1220,10 @@ Shipping showing 61.6% in that same scene settles it.
 Reproduce with `hdrdiff.py`, which compares every pixel rather than patch means - a patch
 mean can hide a bump that moves shading around without changing its average:
 
-    .unarea.ps1 -Light rect -Shade none -Tex none
-    .unarea.ps1 -Light rect -Shade none -Tex bump
+    .
+unarea.ps1 -Light rect -Shade none -Tex none
+    .
+unarea.ps1 -Light rect -Shade none -Tex bump
     python hdrdiff.py renders\dev\arealight-rect-none-none.CPU.hdr renders\dev\arealight-rect-none-bump.CPU.hdr
 
 This is almost certainly the cause of image differences across the whole test-model sweep,
@@ -1271,7 +1274,8 @@ coordinate types, not a stub.
 
 Unverified: whether bump currently has *any* effect on Rhino materials on CPU. The
 reasoning above says it should not, which is worth measuring before acting - the reproducer
-`.unarea.ps1 -Light rect -Shade none -Tex bump` renders a bump-textured floor on CPU and
+`.
+unarea.ps1 -Light rect -Shade none -Tex bump` renders a bump-textured floor on CPU and
 the bump detail in it can be compared against the untextured variant.
 
 ## Audit: every place the port worked around something 5.2 removed
@@ -2109,7 +2113,8 @@ post-build step deploys the Cycles payload from `$(SolutionDir)..\..ig_libs\...
 path that does not exist. It builds with
 
     msbuild RhinoCyclesKernelCompiler.csproj /p:Configuration=Debug \
-      /p:RhinoBinDir=<repo>\src4in "/p:SolutionDir=<repo>\src4hino4\"
+      /p:RhinoBinDir=<repo>\src4in "/p:SolutionDir=<repo>\src4
+hino4\"
 
 and the Debug payload is only used when `big_libs\RhinoCycles\ccycles\win\debug\ccycles.dll`
 exists - otherwise it falls back to the release payload, so `build_cycles.ps1 -InstallDir`
@@ -2493,3 +2498,116 @@ adaptive-sampling-off rendering black, in-memory images being unimplemented, and
 `0.0000` shadow-catcher pass. The pattern is consistent enough to state as a rule:
 **before investigating a parked symptom, spend ten minutes reproducing it.** Every one of
 those four cost hours of theory built on a premise that no longer held.
+
+---
+
+# Transmission is too bright: two bugs, found 2026-09-22
+
+Driven by the render regression suite (`C:\tools\rhinotest`), 7 models against baselines
+recorded with **9.0.26253.22503** - which is also the installed Rhino 9 WIP, so it is a
+real 3.5 oracle and every claim below is an A/B against it, not a reading of the code
+alone.
+
+Three of the seven models showed transmissive surfaces rendering lighter and washed
+toward white, with opaque surfaces in the same frames unchanged: wine in a glass +24%,
+a tinted aircraft canopy +26%, a glass sphere +34% with its green channel clipped at
+255. That turned out to be two independent bugs.
+
+## 1. The transmission tint lost half its exponent
+
+Blender 4.0's principled rework hands `sqrt(clamped_base_color)` to the Fresnel as the
+transmission tint (`src/kernel/svm/closure.h:409`, and `node_principled_bsdf.osl:160`),
+so that a ray entering *and* leaving a closed solid is tinted by the base colour in
+total. 3.5 allocated the refraction BSDF with weight
+`base_color * glass_weight * refraction_fresnel` - the base colour **once per surface
+crossed**.
+
+Rhino's Transparency colour has always meant the per-surface tint. So a closed solid came
+out lighter by 1/colour and a single surface by 1/sqrt(colour).
+
+**Fix:** square the base colour in proportion to the transmission weight, which is
+exactly what `sqrt()` undoes:
+
+    BaseColor_effective = mix(BaseColor, BaseColor^2, Fac = transmission weight)
+
+Weight 0 leaves opaque materials untouched; weight 1 gives `sqrt(c*c) = c` per interface.
+In between it is an approximation and cannot be made exact - 4.x drives diffuse, specular
+and transmission from one shared base colour where 3.5 had separate tints.
+
+**It has to go in on both paths.** `RhinoFullNxt.GetShader()` splits on `part.IsPbr`: the
+PBR branch (`pbr_principled`) and the standard/custom branch (`principledbsdf117`).
+Fixing only the custom one moved nothing measurable, because **nearly every material in
+these models is PBR** - every RDK Glass, Metal, Plastic and Paint. `part.IsPbr` comes
+from `rm.ToMaterial(TextureGeneration.Allow).PhysicallyBased != null`
+(`CyclesShader.cs:468`); `SimulatedMaterial().PhysicallyBased.Supported` is a different
+test and reports the opposite, which is how the first attempt went into the wrong branch.
+Read the dumped graph's node name to settle which branch a material takes.
+
+## 2. The glass closure ids were renumbered, and csycles carried the number not the meaning
+
+|  | 3.5 | 5.2 |
+|---|---|---|
+| `CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID` | **26** | 25 |
+| `CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID` | 24 | **26** |
+
+`csycles` `PrincipledBsdfNode.Distributions` had `GGX = 26`, and that is the default set
+on every principled node. In 3.5 that selected `GGX_GLASS_ID`, the id the kernel tests
+for to take the **single-scatter** path. In 5.2 the same 26 is `MULTI_GGX_GLASS_ID` - the
+marker that turns multiscatter on - so `microfacet_ggx_preserve_energy()` began running
+on the transmission lobe. `cycles_shadernode_set_enum` casts the int straight to a
+`ClosureType` with no name lookup, so nothing caught it. `Multiscatter_GGX = 24` was
+wrong too: 24 is `BECKMANN_GLASS_ID` in 5.2. Neither member meant what it said.
+
+**Fix:** `GGX = 25`, `Multiscatter_GGX = 26`.
+
+Measured on a scripted probe - five white, fully transmissive PBR spheres, roughness 0 to
+1, skylit, `C:\tools\rhinotest\probes\make_transmission_roughness.py`. dev/shipping per
+sphere:
+
+| roughness | before | after |
+|---|---|---|
+| 0.00 | 1.044 | 1.044 |
+| 0.25 | 1.056 | 1.052 |
+| 0.50 | 1.121 | 1.062 |
+| 0.75 | 1.344 | 1.063 |
+| 1.00 | **1.652** | 1.048 |
+| floor (control) | 1.009 | 1.009 |
+
+A slope from 1.04 to 1.65 became flat. White was chosen deliberately so the tint fix
+above is the identity here and cannot contribute.
+
+## Both are compatibility choices, not corrections
+
+Upstream's `sqrt` is deliberate, and its own principled default genuinely is multiscatter
+- energy preservation is the more physically correct behaviour. Both fixes were taken to
+match shipping Rhino, because that is what the regression suite grades and what existing
+customer models were authored against. Either could be argued the other way; they are
+recorded here so that argument can happen.
+
+## What these two did not fix
+
+- **~4.5% still on transmission, independent of roughness.** Environment loading was
+  ruled out directly: both builds log `Updating Images: Loading RhinoStudio8.exr`, both
+  report `sky True skystrength 1`, both read the same RhinoCycles profile folder. And it
+  is not a lighting difference - on the probe, background (environment only) 1.000,
+  diffuse opaque floor 1.009, transmissive glass 1.044. It is confined to the
+  transmission lobe. Prime suspect is the model change itself: 3.5 built the glass lobe
+  from an explicit dielectric Fresnel, 5.2 from `FresnelGeneralizedSchlick` with
+  `f0 = F0_from_ior(ior)`. Schlick and exact Fresnel differ by a few percent, which is
+  the right order. If so there is no bug, only a decision.
+- **The aircraft canopy.** Its Transparency colour is near-white, so squaring is the
+  identity and neither fix touches it. Unexplained.
+- **The flat, unreflective gold RDK Paint spheres.** Opaque, so unrelated to transmission
+  entirely. Unexplained.
+
+Suite effect of both fixes, mean error / Peak SNR against the 3.5 baselines:
+
+| model | before | after |
+|---|---|---|
+| some_common_material_cases | 0.01066 / 29.82 | 0.00957 / 31.22 |
+| Bottle_and_glas 001 | 0.02110 / 26.04 | 0.01927 / 26.83 |
+| airplane_render | 0.03667 / 21.56 | 0.03664 / 21.57 |
+| test-keyfob (opaque control) | 0.010044 / 35.53 | 0.010045 / 35.53 |
+
+All four still fail the suite's thresholds. Two real bugs are closed; the scene-level
+gaps are not.

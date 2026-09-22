@@ -155,13 +155,29 @@ namespace ccl.ShaderNodes
 		/// against ClosureType in kernel/svm/types.h whenever Cycles moves.
 		///
 		/// The distribution values look wrong and are not: for the principled BSDF the
-		/// kernel tests distribution == MULTI_GGX_GLASS (26) to select multiscatter GGX,
-		/// so 26 is a marker rather than a request for glass.
+		/// kernel tests distribution == MULTI_GGX_GLASS to select multiscatter GGX, so
+		/// that id is a marker rather than a request for a glass closure.
+		///
+		/// The glass ids were renumbered between 3.5 and 5.2, and these were carried
+		/// across by number instead of by meaning:
+		///
+		///                          3.5   5.2
+		///   GGX_GLASS_ID            26    25
+		///   MULTI_GGX_GLASS_ID      24    26
+		///
+		/// so the 26 that used to mean GGX_GLASS - the id the kernel tests for to take
+		/// the single-scatter path - became MULTI_GGX_GLASS, the marker that turns
+		/// multiscatter on. cycles_shadernode_set_enum casts the int straight to a
+		/// ClosureType with no name lookup, so nothing caught it. Shipping Rhino renders
+		/// the principled transmission lobe single-scatter; with 26 it gained 4.x's
+		/// energy preservation, which brightens rough transmissive materials and leaves
+		/// smooth ones alone. Measured against 9.0.26253.22503 on a white PBR roughness
+		/// sweep: 1.04x at roughness 0, 1.12x at 0.5, 1.65x and blown out at 1.0.
 		/// </summary>
 		public enum Distributions
 		{
-			GGX = 26,
-			Multiscatter_GGX = 24
+			GGX = 25,               // CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID
+			Multiscatter_GGX = 26   // CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID
 		}
 
 		/// <summary>
