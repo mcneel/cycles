@@ -104,12 +104,31 @@ deps:
 # Metal can compile its kernels at all.
 publish:
 	@test -f "$(INSTALL_DIR)/libccycles.dylib" || { echo "publish: nothing built - run make release" >&2; exit 1; }
+	mkdir -p "$(BIG_LIBS)"
 	rsync -a --delete "$(INSTALL_DIR)/lib/" "$(BIG_LIBS)/lib/"
 	rsync -a --delete "$(INSTALL_DIR)/source/" "$(BIG_LIBS)/source/"
 	cp "$(INSTALL_DIR)/libccycles.dylib" "$(BIG_LIBS)/"
-	@echo "publish: payload copied into big_libs - commit it there, on a branch"
+	@echo "publish: payload copied into $(BIG_LIBS)"
 
 payload: deps release publish
+
+# --- macOS local payload: what the "Debug Cycles" / "Release Cycles" schemes run ---
+#
+#   make local
+#
+# The Mac counterpart of Windows' Debug+Cycles and ReleaseDebuggable+Cycles. Builds
+# RelWithDebInfo, as both of those do - release-speed kernels, and still symbols for
+# stepping into ccycles - into big_libs' osx/local/, which is gitignored. It has its own
+# build and install folders, so it never disturbs a `make release` tree kept for
+# publishing, and never touches the committed osx/release/ payload.
+# MacDotNetMakefile deploys local/ instead of release/ while it is the newer of the two.
+LOCAL_BUILD_DIR:=./build-local
+LOCAL_INSTALL_DIR:=./install-local
+BIG_LIBS_LOCAL:=../../../../../big_libs/RhinoCycles/ccycles/osx/local
+
+local: deps
+	$(MAKE) relwithdebinfo BUILD_DIR=$(LOCAL_BUILD_DIR) INSTALL_DIR=$(LOCAL_INSTALL_DIR)
+	$(MAKE) publish INSTALL_DIR=$(LOCAL_INSTALL_DIR) BIG_LIBS=$(BIG_LIBS_LOCAL)
 
 all: release
 
@@ -123,10 +142,17 @@ debug:
 	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DCMAKE_BUILD_TYPE=Debug .. && cmake --build . -j $(PARALLEL_JOBS) --target install
 	$(FIX_PAYLOAD)
 
+# The install prefix is passed explicitly: CMakeLists.txt defaults it to ./install, which
+# is only right while INSTALL_DIR is left at its default.
+relwithdebinfo:
+	mkdir -p $(BUILD_DIR)
+	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$(abspath $(INSTALL_DIR))" .. && cmake --build . -j $(PARALLEL_JOBS) --target install
+	$(FIX_PAYLOAD)
+
 # INSTALL_DIR too: it is not overwritten, only added to, so libraries from a previous
 # configuration linger there and get published. A build with Embree off still shipped the
 # Embree dylib from an earlier build with it on.
-.PHONY: all release debug clean test deps publish payload
+.PHONY: all release debug relwithdebinfo clean test deps publish payload local
 
 clean:
 	rm -rf $(BUILD_DIR) $(INSTALL_DIR)

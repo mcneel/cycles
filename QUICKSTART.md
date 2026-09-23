@@ -22,6 +22,17 @@ Debug Rhino has always run release Cycles kernels; an unoptimised kernel makes
 every CPU render about ten times slower and helps nobody debug Rhino. The PDBs
 are kept, so you can still step into `ccycles`.
 
+### Mac
+
+Open `src4/rhino4/MacRhino.xcworkspace`, pick the **RhinoApplication - Debug
+Cycles** or **- Release Cycles** scheme, build. Needs CMake; the first build
+also fetches Blender's dependency libraries (about 2.4 GB, once).
+
+`RhinoApplication - Debug` and `- Release` do not build Cycles, exactly as on
+Windows. The Cycles schemes run `make local` here, which builds RelWithDebInfo
+into `big_libs/RhinoCycles/ccycles/osx/local` - ignored by git, and used while it
+is newer than `osx/release`, the same rule as `win/local` below.
+
 ## What that builds
 
 Kernels for the GPUs in your machine, and nothing else. Minutes, not an hour.
