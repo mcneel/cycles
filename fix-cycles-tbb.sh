@@ -71,6 +71,24 @@ for f in "$LIB"/*.dylib "$INSTALL/libccycles.dylib"; do
 	fi
 done
 
+# The build also installs oneTBB's allocator, libtbbmalloc.dylib and
+# libtbbmalloc_proxy.dylib. Nothing in the payload links them, and they carry the
+# same filenames as the TBB 2020.3 allocator Rhino ships in Contents/Frameworks -
+# the collision above, waiting for a build order that lets Cycles' copy win. Drop
+# them, unless something has started to need them.
+for m in libtbbmalloc.dylib libtbbmalloc_proxy.dylib; do
+	[ -f "$LIB/$m" ] || continue
+	for f in "$LIB"/*.dylib "$INSTALL/libccycles.dylib"; do
+		case "$(basename "$f")" in libtbbmalloc.dylib|libtbbmalloc_proxy.dylib) continue ;; esac
+		if otool -L "$f" | tail -n +2 | grep -q "/$m "; then
+			echo "fix-cycles-tbb: $(basename "$f") links $m - it has to be renamed like libtbb, not dropped" >&2
+			exit 1
+		fi
+	done
+	rm "$LIB/$m"
+	echo "  dropped $m"
+done
+
 echo "fix-cycles-tbb: done - payload oneTBB is libtbb.12.cycles.dylib"
 
 # Nothing may still reference the old name, or it will resolve to Rhino's TBB 2020.3.
