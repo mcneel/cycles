@@ -1,0 +1,47 @@
+// Version resources for @cycles_kernel_oneapi_lib_name@, configured by CMakeLists.txt.
+// The version numbers and copyright information come from Rhino's version.h, or
+// the fallback beside ccycles_version.rc when this is not inside a Rhino tree.
+//
+// The DLL is not a CMake target - the SYCL clang++ compiles and links it in one
+// custom command - so this cannot be listed as a source the way ccycles does it.
+// CMakeLists.txt compiles it with rc.exe inside that command instead and hands
+// the .res to link.exe.
+#include "@cycles_kernel_oneapi_version_h@"
+
+// The fallback version.h does not pull in verrsrc.h.
+#ifndef VS_VERSION_INFO
+#define VS_VERSION_INFO 1
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION VERSION_WITH_COMMAS
+ PRODUCTVERSION VERSION_WITH_COMMAS
+ FILEFLAGSMASK RHINO_FILE_FLAGS_MASK
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080904e4"
+        BEGIN
+            VALUE "CompanyName", "Robert McNeel & Associates"
+            VALUE "FileDescription", "Cycles oneAPI kernels"
+            VALUE "FileVersion", RMA_VERSION_WITH_PERIODS_STRING
+            VALUE "InternalName", "@cycles_kernel_oneapi_lib_name@"
+            VALUE "LegalCopyright", COPYRIGHT
+            VALUE "OriginalFilename", "@cycles_kernel_oneapi_lib_name@"
+            VALUE "ProductName", "Cycles for Rhino"
+            VALUE "ProductVersion", RMA_VERSION_WITH_PERIODS_STRING
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x809, 1252
+    END
+END

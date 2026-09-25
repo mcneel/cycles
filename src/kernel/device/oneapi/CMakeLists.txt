@@ -244,8 +244,31 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
       -L"${sycl_compiler_root}/../compiler/lib/intel64_win" # To find libircmt.lib (when using `icpx`)
     )
 
+    # VERSIONINFO, from the same version.h as ccycles.dll. RHINO_VERSION_H is set
+    # by src/ccycles, which is configured before this directory.
+    if(DEFINED RHINO_VERSION_H AND EXISTS "${RHINO_VERSION_H}")
+      set(cycles_kernel_oneapi_version_h "${RHINO_VERSION_H}")
+    else()
+      set(cycles_kernel_oneapi_version_h "${CMAKE_CURRENT_SOURCE_DIR}/../../../ccycles/version.h")
+    endif()
+    get_filename_component(cycles_kernel_oneapi_lib_name ${cycles_kernel_oneapi_lib} NAME)
+    set(cycles_kernel_oneapi_rc ${CMAKE_CURRENT_BINARY_DIR}/cycles_kernel_oneapi_version.rc)
+    set(cycles_kernel_oneapi_res ${CMAKE_CURRENT_BINARY_DIR}/cycles_kernel_oneapi_version.res)
+    configure_file(
+      ${CMAKE_CURRENT_SOURCE_DIR}/cycles_kernel_oneapi_version.rc.in
+      ${cycles_kernel_oneapi_rc}
+      @ONLY
+    )
+
+    # The resource is compiled inside the kernel command, and version.h is
+    # deliberately not a dependency: this command is the whole SYCL compile, and
+    # Rhino regenerates version.h with a new build number every day, so depending
+    # on it would rebuild the kernels for a version bump alone. The DLL carries
+    # the Rhino version its kernels were last built with.
     add_custom_command(
       OUTPUT ${cycles_kernel_oneapi_lib} ${cycles_kernel_oneapi_linker_lib}
+      COMMAND ${CMAKE_RC_COMPILER} /nologo "$<$<CONFIG:Debug>:/D_DEBUG>"
+        /fo "${cycles_kernel_oneapi_res}" "${cycles_kernel_oneapi_rc}"
       COMMAND ${CMAKE_COMMAND} -E env
         "PATH=${OCLOC_INSTALL_DIR}\;${sycl_compiler_root}"
         ${SYCL_COMPILER}
@@ -253,8 +276,11 @@ if(WITH_CYCLES_DEVICE_ONEAPI)
         "$<$<CONFIG:RelWithDebInfo>:${sycl_compiler_flags_RelWithDebInfo}>"
         "$<$<CONFIG:Debug>:${sycl_compiler_flags_Debug}>"
         "$<$<CONFIG:MinSizeRel>:${sycl_compiler_flags_Release}>"
+        # Through -Wl so the .res reaches link.exe as-is rather than going
+        # through the SYCL driver's handling of input files.
+        "-Wl,${cycles_kernel_oneapi_res}"
       COMMAND_EXPAND_LISTS
-      DEPENDS ${cycles_oneapi_kernel_sources} ${SYCL_COMPILER})
+      DEPENDS ${cycles_oneapi_kernel_sources} ${SYCL_COMPILER} ${cycles_kernel_oneapi_rc})
   else()
     # The following join/replace operations are to prevent cmake from
     # escaping space chars with backslashes in add_custom_command.
