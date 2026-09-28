@@ -66,7 +66,18 @@ void CCyclesLight::flush()
 		object->set_geometry(light);
 	}
 
-	/* Shared properties. */
+	/* Shared properties.
+	 *
+	 * Before 5.x every light carried is_shadow_catcher, default true. Now it is the
+	 * light Object's flag, default false, and a light without it is skipped on the
+	 * shadow-catcher pass (SHADER_EXCLUDE_SHADOW_CATCHER). That pass is the
+	 * denominator of the catcher's shadow ratio, so every catcher shadow came out
+	 * lighter - about 10% on some_common_material_cases, where stock Blender 3.5 and
+	 * 5.2 agree with shipping. Blender's sync sets it on the world light for the same
+	 * reason ("Lights should be shadow catchers by default"). */
+	if (object != nullptr) {
+		object->set_is_shadow_catcher(true);
+	}
 	light->set_cast_shadow(cast_shadow);
 	light->set_use_mis(use_mis);
 	light->set_max_bounces(max_bounces);
