@@ -855,6 +855,11 @@ $cmakeArgs = @(
     # the largest single item in the installer. RDK ships its own OpenImageDenoise in
     # System for the Intel Denoiser; this copy was a second one next to rdk.rhp.
     '-DWITH_CYCLES_OPENIMAGEDENOISE=OFF'
+    # Rhino renders with SVM only: ccsession.cpp forces SHADINGSYSTEM_SVM and every
+    # RhinoCycles render engine asks for it. With OSL on, ccycles.dll links oslexec,
+    # oslcomp and oslquery anyway - 72 MB of DLLs, LLVM inside - plus six OptiX OSL
+    # modules that nothing loads.
+    '-DWITH_CYCLES_OSL=OFF'
 )
 
 # Cycles builds the CPU kernel once per SIMD variant (SSE4.2, AVX2 and so on) even though

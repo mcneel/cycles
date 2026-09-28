@@ -69,16 +69,13 @@ $CyclesCudaShippingArches = @(
 # The OptiX modules. Architecture-independent PTX compiled by the OptiX runtime at
 # load, so there is no list to choose - but a payload missing one of these is a payload
 # that will fail at runtime on an NVIDIA card, so publish checks for them by name.
+#
+# No kernel_optix_osl* modules: Cycles is built with WITH_CYCLES_OSL=OFF (see
+# build_cycles.ps1), since Rhino renders with SVM only, so those six are never built.
 $CyclesOptixModules = @(
     'kernel_optix'
     'kernel_optix_mnee'
     'kernel_optix_shader_raytrace'
-    'kernel_optix_osl'
-    'kernel_optix_osl_camera'
-    'kernel_optix_osl_mnee'
-    'kernel_optix_osl_services'
-    'kernel_optix_osl_shader_raytrace'
-    'kernel_optix_osl_volume'
 )
 
 # Identifies the kernel sources a payload was built from. publish_payload.ps1 records it

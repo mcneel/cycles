@@ -129,14 +129,15 @@ disabled them, so Mac was quietly rendering without denoising, volumes, OSL and
 Embree's BVH.
 
 They build and render fine on 5.2 and are back on. Mac and Windows now disable
-the same set and nothing more: Alembic, Hydra, the standalone GUI, USD, and
-OpenImageDenoise.
+the same set and nothing more: Alembic, Hydra, the standalone GUI, USD,
+OpenImageDenoise and OSL.
 
-OpenImageDenoise went back off later on both platforms, by decision rather than
-as a workaround: Rhino never uses Cycles' denoiser (`ccsession.cpp` sets
-`DENOISER_NONE`, and Rhino has its own denoiser post-effects), so the payload
-carried 45 MB of `libOpenImageDenoise_core` on Mac and 62 MB of OIDN on Windows
-for nothing.
+OpenImageDenoise and OSL went back off later on both platforms, by decision
+rather than as a workaround. Rhino never uses Cycles' denoiser (`ccsession.cpp`
+sets `DENOISER_NONE`, and Rhino has its own denoiser post-effects), and renders
+with SVM only (`ccsession.cpp` forces `SHADINGSYSTEM_SVM`). So the payload
+carried 45 MB of `libOpenImageDenoise_core` on Mac, 62 MB of OIDN on Windows and
+the OSL libraries on both for nothing.
 
 ## Still outstanding
 

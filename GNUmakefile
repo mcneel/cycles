@@ -28,12 +28,13 @@ endif
 # Windows never disabled any of them, so Mac was quietly missing volumes, OSL and Embree's
 # BVH. They build and render fine on 5.2, so they are back on and the two platforms agree.
 #
-# OpenImageDenoise is the exception, and off on both platforms by decision this time: Rhino
-# never uses Cycles' denoiser (ccsession.cpp sets DENOISER_NONE; Rhino has its own denoiser
-# post-effects), so it was 45 MB of libOpenImageDenoise_core in the payload for nothing.
-# build_cycles.ps1 passes the same flag. After turning it off, `make clean` before
-# `make payload` - INSTALL_DIR only accumulates, and a stale OIDN dylib would be published.
-CYCLES_CMAKE_FLAGS:=-DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DWITH_CYCLES_OPENIMAGEDENOISE=OFF
+# OpenImageDenoise and OSL are the exceptions, off on both platforms by decision this time.
+# Rhino never uses Cycles' denoiser (ccsession.cpp sets DENOISER_NONE; Rhino has its own
+# denoiser post-effects), and renders with SVM only (ccsession.cpp forces SHADINGSYSTEM_SVM),
+# so the payload carried libOpenImageDenoise and the OSL libraries for nothing.
+# build_cycles.ps1 passes the same flags. After changing them, `make clean` before
+# `make payload` - INSTALL_DIR only accumulates, and stale dylibs would be published.
+CYCLES_CMAKE_FLAGS:=-DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DWITH_CYCLES_OPENIMAGEDENOISE=OFF -DWITH_CYCLES_OSL=OFF
 
 ifndef MAC_ARCHS
 	MAC_ARCHS:=arm64
