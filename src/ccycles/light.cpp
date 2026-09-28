@@ -102,9 +102,22 @@ void CCyclesLight::flush()
 		                              ~ccl::PATH_RAY_VISIBILITY_CAMERA));
 	}
 
+	/* Area lights: Cycles 4.0 corrected the power-to-radiance conversion from
+	 * 1/(4 * area) to 1/(pi * area) (upstream a21af93e6), so the same strength now
+	 * emits 4/pi, about 27%, more. Rhino's light intensity did not change meaning,
+	 * so scale it back, as Blender's own versioning does for files made before 4.0.
+	 * Point, spot and sun conversions are unchanged. */
+	const bool is_area = (dynamic_cast<ccl::AreaLight *>(light) != nullptr);
+	light->set_strength(ccl::make_float3(is_area ? M_PI_4_F : 1.0f));
+
 	/* Type specific properties. */
 	if (ccl::PointLight *point = dynamic_cast<ccl::PointLight *>(light)) {
 		point->set_radius(size);
+		/* Cycles 4.0 made point and spot lights with a radius hard-edged spheres;
+		 * Blender turns "Soft Falloff" on for every light, old or new, which is the
+		 * oriented-disk emitter this switches back to. It only differs close to a
+		 * light with a radius. SpotLight derives from PointLight, so spots get it too. */
+		point->set_is_sphere(false);
 	}
 	if (ccl::SpotLight *spot = dynamic_cast<ccl::SpotLight *>(light)) {
 		spot->set_angle(spot_angle);
