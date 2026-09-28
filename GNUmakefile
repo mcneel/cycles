@@ -25,9 +25,15 @@ endif
 # Embree, OSL, OpenImageDenoise and OpenVDB/NanoVDB used to be switched off here. Those
 # were build workarounds from the 3.5 era - "temporarily disable ... in order to get Cycles
 # kernels building", and "Metal building fixes" - not decisions about what Mac should ship.
-# Windows never disabled any of them, so Mac was quietly missing denoising, volumes, OSL and
-# Embree's BVH. They build and render fine on 5.2, so they are back on and the two platforms
-# now agree.
+# Windows never disabled any of them, so Mac was quietly missing volumes, OSL and Embree's
+# BVH. They build and render fine on 5.2, so they are back on and the two platforms agree.
+#
+# OpenImageDenoise is the exception, and off on both platforms by decision this time: Rhino
+# never uses Cycles' denoiser (ccsession.cpp sets DENOISER_NONE; Rhino has its own denoiser
+# post-effects), so it was 45 MB of libOpenImageDenoise_core in the payload for nothing.
+# build_cycles.ps1 passes the same flag. After turning it off, `make clean` before
+# `make payload` - INSTALL_DIR only accumulates, and a stale OIDN dylib would be published.
+CYCLES_CMAKE_FLAGS:=-DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DWITH_CYCLES_OPENIMAGEDENOISE=OFF
 
 ifndef MAC_ARCHS
 	MAC_ARCHS:=arm64
@@ -134,19 +140,19 @@ all: release
 
 release:
 	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DCMAKE_BUILD_TYPE=Release .. && cmake --build . -j $(PARALLEL_JOBS) --target install
+	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 $(CYCLES_CMAKE_FLAGS) -DCMAKE_BUILD_TYPE=Release .. && cmake --build . -j $(PARALLEL_JOBS) --target install
 	$(FIX_PAYLOAD)
 
 debug:
 	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DCMAKE_BUILD_TYPE=Debug .. && cmake --build . -j $(PARALLEL_JOBS) --target install
+	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 $(CYCLES_CMAKE_FLAGS) -DCMAKE_BUILD_TYPE=Debug .. && cmake --build . -j $(PARALLEL_JOBS) --target install
 	$(FIX_PAYLOAD)
 
 # The install prefix is passed explicitly: CMakeLists.txt defaults it to ./install, which
 # is only right while INSTALL_DIR is left at its default.
 relwithdebinfo:
 	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 -DWITH_CYCLES_ALEMBIC=OFF -DWITH_CYCLES_USD=OFF -DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF -DWITH_CYCLES_STANDALONE_GUI=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$(abspath $(INSTALL_DIR))" .. && cmake --build . -j $(PARALLEL_JOBS) --target install
+	cd $(BUILD_DIR) && cmake $(BUILD_CMAKE_ARGS) -DCMAKE_OSX_ARCHITECTURES="$(MAC_ARCHS)" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.4 $(CYCLES_CMAKE_FLAGS) -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$(abspath $(INSTALL_DIR))" .. && cmake --build . -j $(PARALLEL_JOBS) --target install
 	$(FIX_PAYLOAD)
 
 # INSTALL_DIR too: it is not overwritten, only added to, so libraries from a previous

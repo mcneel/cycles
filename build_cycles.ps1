@@ -849,6 +849,12 @@ $cmakeArgs = @(
     '-DWITH_CYCLES_ALEMBIC=OFF'
     '-DWITH_CYCLES_USD=OFF'
     '-DWITH_CYCLES_HYDRA_RENDER_DELEGATE=OFF'
+    # Rhino never uses Cycles' denoiser - ccsession.cpp sets DENOISER_NONE and Rhino has
+    # its own denoiser post-effects - yet with this on ccycles.dll links OpenImageDenoise
+    # and the payload carries 62 MB of it (core plus CUDA, HIP and SYCL device backends),
+    # the largest single item in the installer. RDK ships its own OpenImageDenoise in
+    # System for the Intel Denoiser; this copy was a second one next to rdk.rhp.
+    '-DWITH_CYCLES_OPENIMAGEDENOISE=OFF'
 )
 
 # Cycles builds the CPU kernel once per SIMD variant (SSE4.2, AVX2 and so on) even though
