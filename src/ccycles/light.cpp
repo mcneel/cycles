@@ -123,13 +123,7 @@ void CCyclesLight::flush()
 
 	/* Placement. Pre-5.2 the light carried co, dir and (for area lights) axisu
 	 * and axisv directly; 5.2 takes all of it from the Object transform, with
-	 * the light pointing down local -Z.
-	 *
-	 * The local axis is +Z, not -Z. SpotLight::copy_to_kernel reads the cone
-	 * axis as -column2, which reads as though it should be -dir here, but a
-	 * spot placed between the camera and a quad only lights the quad with the
-	 * sign below - see the smoke test's SMOKE_SPOTZ sweep. Position and cone
-	 * shape were checked the same way and are right. */
+	 * the light pointing down local -Z. */
 	/* A background light has no direction, so dir is still zero here and
 	 * normalize() of it is NaN. That NaN used to go into the object transform
 	 * below, and from there into the light tree, where it poisoned the
@@ -154,8 +148,17 @@ void CCyclesLight::flush()
 	 * at the silhouette caught anything. Rhino Logo_texture_mapping_types is lit by a
 	 * single distant light and rendered black; it is the only model in the RH-81636
 	 * set whose one enabled light is distant, which is why nothing else showed it
-	 * (RH-98419). */
-	if ((type == ccl::LIGHT_AREA || type == ccl::LIGHT_SUN) && have_dir) {
+	 * (RH-98419).
+	 *
+	 * Spots too: SpotLight::copy_to_kernel takes the cone axis as -column2, and
+	 * spot_light_to_local measures the cone about local -Z. With +dir in column 2 the
+	 * cone pointed away from the scene, so a spot lit nothing directly - the floor
+	 * under the test spot was lit only indirectly, flat, shadowless and the same at
+	 * every HotSpot. The smoke test's SMOKE_SPOTZ sweep, which this once cited as
+	 * proof of +dir, lit its quad only at -1. */
+	if ((type == ccl::LIGHT_AREA || type == ccl::LIGHT_SUN || type == ccl::LIGHT_SPOT) &&
+	    have_dir)
+	{
 		z = -z;
 	}
 	ccl::float3 x = axisu;

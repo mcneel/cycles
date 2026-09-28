@@ -316,7 +316,15 @@ remove the `break` that separates them. Run the audit after merging upstream.
 
 ## Light direction: two competing fixes, only one should exist
 
-Open, and the choice matters more than it looks.
+**Settled 2026-09-28: spots needed the flip as well.** `flush` now negates for area, sun
+and spot. The `SMOKE_SPOTZ` sweep lit its quad only at `-1` before the change and only at
+`+1` after it, which matches the README. In Rhino the single-spot scene's floor had
+been flat, shadowless and the same at every HotSpot, because the cone pointed away and
+only indirect light reached the floor. With the flip it follows HotSpot again: 1.436,
+1.336 and 0.869 at 1.0, 0.5 and 0.1, against 3.5's 1.355, 1.258 and 0.807. Point lights
+use only the translation, so they were never affected. The text below is the history.
+
+The question was open, and the choice mattered more than it looked.
 
 `ccycles/light.cpp` flips the light basis for area lights only:
 
@@ -1990,6 +1998,8 @@ This has been open as "area-only negation in `CCyclesLight::flush`, or the globa
 - Dev has the **area-only** negation in `flush`, and it is measured: Brian's file has
   Direction with dot +0.97 toward the scene and the kernel received exactly the negation,
   while the spot sign was checked separately with the smoke test's `SMOKE_SPOTZ` sweep.
+  (Wrong for spots: that sweep lit the quad only at `-1`, so spots were aimed backwards
+  too. Fixed 2026-09-28, see "Light direction" above.)
 - The two agree for area lights, which is why the rect-light reproducer renders correctly
   in both. Making the basis right-handed as well (`z = -z` plus swapping u and v)
   measured a **no-op to four decimals**, so handedness is not part of this.
