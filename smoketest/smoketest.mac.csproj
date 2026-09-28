@@ -17,6 +17,6 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="../src/csycles/**/*.cs"
-             Exclude="../src/csycles/Properties/AssemblyInfo.cs" />
+             Exclude="../src/csycles/Properties/AssemblyInfo.cs;../src/csycles/obj/**;../src/csycles/bin/**" />
   </ItemGroup>
 </Project>
