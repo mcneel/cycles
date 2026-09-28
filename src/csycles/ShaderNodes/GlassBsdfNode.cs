@@ -56,12 +56,17 @@ namespace ccl.ShaderNodes
 	public class GlassBsdfNode : ShaderNode
 	{
 
+		/// <summary>
+		/// Cycles 5 ClosureType values - ccycles passes them straight through. These were
+		/// older numbering: Multiscatter_GGX, the default and what the gem shader uses,
+		/// landed on the transparent BSDF. Sharp has no Cycles 5 closure; see SetEnums.
+		/// </summary>
 		public enum GlassDistribution
 		{
-			Sharp = 34,
-			Beckmann = 31,
-			GGX = 32,
-			Multiscatter_GGX = 30
+			Sharp = -1,
+			Beckmann = 24,              // CLOSURE_BSDF_MICROFACET_BECKMANN_GLASS_ID
+			GGX = 25,                   // CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID
+			Multiscatter_GGX = 26       // CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID
 		}
 
 		public GlassInputs ins => (GlassInputs)inputs;
@@ -95,6 +100,14 @@ namespace ccl.ShaderNodes
 
 		internal override void SetEnums()
 		{
+			/* Cycles 4.0 removed the sharp closure; GGX at roughness 0 is the same
+			 * smooth glass. Enums are written before sockets, so this roughness wins. */
+			if (Distribution == GlassDistribution.Sharp)
+			{
+				ins.Roughness.Value = 0.0f;
+				CSycles.shadernode_set_enum(Id, "distribution", (int)GlassDistribution.GGX);
+				return;
+			}
 			CSycles.shadernode_set_enum(Id, "distribution", (int)Distribution);
 		}
 

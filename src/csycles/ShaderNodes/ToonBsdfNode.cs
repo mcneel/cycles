@@ -65,10 +65,14 @@ namespace ccl.ShaderNodes
 		public ToonBsdfInputs ins => (ToonBsdfInputs)inputs;
 		public ToonBsdfOutputs outs => (ToonBsdfOutputs)outputs;
 
+		/// <summary>
+		/// Cycles 5 ClosureType values - ccycles passes them straight through. The old
+		/// numbering put Diffuse on the sheen BSDF.
+		/// </summary>
 		public enum Components
 		{
-			Diffuse = 7,
-			Glossy = 24,
+			Diffuse = 8,                // CLOSURE_BSDF_DIFFUSE_TOON_ID
+			Glossy = 18,                // CLOSURE_BSDF_GLOSSY_TOON_ID
 		}
 
 		/// <summary>

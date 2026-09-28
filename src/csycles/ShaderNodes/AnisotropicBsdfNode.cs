@@ -66,12 +66,16 @@ namespace ccl.ShaderNodes
 	[ShaderNode("anisotropic_bsdf")]
 	public class AnisotropicBsdfNode : ShaderNode
 	{
+		/// <summary>
+		/// Cycles 5 ClosureType values, the same as the glossy BSDF's. Cycles 5 has no
+		/// anisotropic_bsdf node, so nothing reads these until one is mapped onto glossy.
+		/// </summary>
 		public enum AnisotropicDistribution
 		{
-			Beckmann = 20,
-			GGX = 16,
-			Multiscatter_GGX = 18,
-			Asihkmin_Shirley = 21,
+			Beckmann = 13,              // CLOSURE_BSDF_MICROFACET_BECKMANN_ID
+			GGX = 12,                   // CLOSURE_BSDF_MICROFACET_GGX_ID
+			Multiscatter_GGX = 14,      // CLOSURE_BSDF_MICROFACET_MULTI_GGX_ID
+			Asihkmin_Shirley = 15,      // CLOSURE_BSDF_ASHIKHMIN_SHIRLEY_ID
 		}
 		public AnisotropicBsdfInputs ins => (AnisotropicBsdfInputs)inputs;
 		public AnisotropicBsdfOutputs outs => (AnisotropicBsdfOutputs)outputs;

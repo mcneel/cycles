@@ -53,13 +53,18 @@ namespace ccl.ShaderNodes
 	public class GlossyBsdfNode : ShaderNode
 	{
 
+		/// <summary>
+		/// Cycles 5 ClosureType values - ccycles passes them straight through. These were
+		/// older numbering: GGX landed on the translucent BSDF and Multiscatter_GGX, the
+		/// default, on Beckmann. Sharp has no Cycles 5 closure; see SetEnums.
+		/// </summary>
 		public enum GlossyDistribution
 		{
-			Sharp = 8,
-			Beckmann = 12,
-			GGX = 9,
-			Asihkmin_Shirley = 15,
-			Multiscatter_GGX = 13
+			Sharp = -1,
+			Beckmann = 13,              // CLOSURE_BSDF_MICROFACET_BECKMANN_ID
+			GGX = 12,                   // CLOSURE_BSDF_MICROFACET_GGX_ID
+			Asihkmin_Shirley = 15,      // CLOSURE_BSDF_ASHIKHMIN_SHIRLEY_ID
+			Multiscatter_GGX = 14       // CLOSURE_BSDF_MICROFACET_MULTI_GGX_ID
 		}
 
 		public GlossyInputs ins => (GlossyInputs)inputs;
@@ -102,6 +107,14 @@ namespace ccl.ShaderNodes
 
 		internal override void SetEnums()
 		{
+			/* Cycles 4.0 removed the sharp closure; GGX at roughness 0 is the same
+			 * perfect mirror. Enums are written before sockets, so this roughness wins. */
+			if (Distribution == GlossyDistribution.Sharp)
+			{
+				ins.Roughness.Value = 0.0f;
+				CSycles.shadernode_set_enum(Id, "distribution", (int)GlossyDistribution.GGX);
+				return;
+			}
 			CSycles.shadernode_set_enum(Id, "distribution", (int)Distribution);
 		}
 

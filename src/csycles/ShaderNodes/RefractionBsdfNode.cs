@@ -56,11 +56,16 @@ namespace ccl.ShaderNodes
 	[ShaderNode("refraction_bsdf")]
 	public class RefractionBsdfNode : ShaderNode
 	{
+		/// <summary>
+		/// Cycles 5 ClosureType values - ccycles passes them straight through. These were
+		/// older numbering: GGX, the default and what RhinoFullNxt uses, landed on the ray
+		/// portal BSDF. Sharp has no Cycles 5 closure; see SetEnums.
+		/// </summary>
 		public enum RefractionDistribution
 		{
-			Sharp = 27,
-			Beckmann = 28,
-			GGX = 29
+			Sharp = -1,
+			Beckmann = 20,              // CLOSURE_BSDF_MICROFACET_BECKMANN_REFRACTION_ID
+			GGX = 21                    // CLOSURE_BSDF_MICROFACET_GGX_REFRACTION_ID
 		}
 		public RefractionBsdfInputs ins => (RefractionBsdfInputs)inputs;
 		public RefractionBsdfOutputs outs => (RefractionBsdfOutputs)outputs;
@@ -97,6 +102,14 @@ namespace ccl.ShaderNodes
 
 		internal override void SetEnums()
 		{
+			/* Cycles 4.0 removed the sharp closure; GGX at roughness 0 is the same
+			 * smooth refraction. Enums are written before sockets, so this roughness wins. */
+			if (Distribution == RefractionDistribution.Sharp)
+			{
+				ins.Roughness.Value = 0.0f;
+				CSycles.shadernode_set_enum(Id, "distribution", (int)RefractionDistribution.GGX);
+				return;
+			}
 			CSycles.shadernode_set_enum(Id, "distribution", (int)Distribution);
 		}
 

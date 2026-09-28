@@ -562,6 +562,31 @@ CCL_CAPI void CDECL cycles_shadernode_texmapping_set_type(ccl::ShaderNode *shnod
 	}
 }
 
+/* Cycles renumbers ClosureType between releases - 4.x and 5.x inserted sheen, the
+ * conductors, thin glass and the ray portal - and a raw cast of a stale number does
+ * not fail, it selects whichever closure has that number now. csycles still sent
+ * older numbering, so a glass BSDF asking for multiscatter GGX became the transparent
+ * BSDF and a GGX refraction became the ray portal. Check the value against the
+ * node's own enum, so the next renumbering is reported instead of rendered. */
+static void set_closure_enum(ccl::ShaderNode *shnode, const char *socket_name, const int value)
+{
+	const ccl::SocketType *socket = shnode->type->find_input(ccl::ustring(socket_name));
+	if (socket == nullptr || socket->type != ccl::SocketType::ENUM) {
+		ccycles_diag("cycles_shadernode_set_enum: node type '%s' has no enum '%s'\n",
+					 shnode->type->name.c_str(),
+					 socket_name);
+		return;
+	}
+	if (!socket->enum_values->exists(value)) {
+		ccycles_diag("cycles_shadernode_set_enum: %d is not a valid '%s' on node type '%s'\n",
+					 value,
+					 socket_name,
+					 shnode->type->name.c_str());
+		return;
+	}
+	shnode->set(*socket, value);
+}
+
 /* TODO: add all enum possibilities.
  */
 CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const char *enum_name, int value)
@@ -592,28 +617,15 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		ccl::MixNode *node = dynamic_cast<ccl::MixNode *>(shnode);
 		node->set_mix_type((ccl::NodeMix)value);
 	}
-	else if (shntype == "refraction_bsdf") {
-		ccl::RefractionBsdfNode *node = dynamic_cast<ccl::RefractionBsdfNode *>(shnode);
-		node->set_distribution((ccl::ClosureType)value);
+	else if (shntype == "refraction_bsdf" || shntype == "glossy_bsdf" || shntype == "glass_bsdf") {
+		set_closure_enum(shnode, "distribution", value);
 	}
 	else if (shntype == "toon_bsdf") {
-		ccl::ToonBsdfNode *node = dynamic_cast<ccl::ToonBsdfNode *>(shnode);
-		node->set_component((ccl::ClosureType)value);
-	}
-	else if (shntype == "glossy_bsdf") {
-		ccl::GlossyBsdfNode *node = dynamic_cast<ccl::GlossyBsdfNode *>(shnode);
-		node->set_distribution((ccl::ClosureType)value);
-	}
-	else if (shntype == "glass_bsdf") {
-		ccl::GlassBsdfNode *node = dynamic_cast<ccl::GlassBsdfNode *>(shnode);
-		node->set_distribution((ccl::ClosureType)value);
+		set_closure_enum(shnode, "component", value);
 	}
 	else if (shntype == "anisotropic_bsdf") {
-		/* Removed in Blender 4.0, merged into the glossy BSDF. */
-		ccl::GlossyBsdfNode *node = dynamic_cast<ccl::GlossyBsdfNode *>(shnode);
-		if (node != nullptr) {
-			node->set_distribution((ccl::ClosureType)value);
-		}
+		/* Removed in Blender 4.0, merged into the glossy BSDF, so no node of this
+		 * type is ever created and there is nothing to set. */
 	}
 	else if (shntype == "wave_texture") {
 		if (ename == "wave") {
@@ -682,18 +694,14 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		node->set_gradient_type((ccl::NodeGradientType)value);
 	}
 	else if (shntype == "subsurface_scattering") {
-		ccl::SubsurfaceScatteringNode *node = dynamic_cast<ccl::SubsurfaceScatteringNode *>(
-			shnode);
-		node->set_method((ccl::ClosureType)value);
+		set_closure_enum(shnode, "method", value);
 	}
 	else if (shntype == "principled_bsdf") {
 		if (ename == "distribution") {
-		ccl::PrincipledBsdfNode *node = dynamic_cast<ccl::PrincipledBsdfNode *>(shnode);
-		node->set_distribution((ccl::ClosureType)value);
+		set_closure_enum(shnode, "distribution", value);
 		}
 		else if (ename == "sss") {
-		ccl::PrincipledBsdfNode *node = dynamic_cast<ccl::PrincipledBsdfNode *>(shnode);
-		node->set_subsurface_method((ccl::ClosureType)value);
+		set_closure_enum(shnode, "subsurface_method", value);
 		}
 	}
 	else if (shntype == "normal_map") {

@@ -64,14 +64,19 @@ namespace ccl.ShaderNodes
 	[ShaderNode("subsurface_scattering")]
 	public class SubsurfaceScatteringNode : ShaderNode
 	{
+		/// <summary>
+		/// Cycles 5 ClosureType values - ccycles passes them straight through. Burley is 31;
+		/// at 32 the Burley family selected random walk. Cubic, Gaussian and Principled
+		/// were removed in Cycles 3.0 and fall back to Burley.
+		/// </summary>
 		public enum FalloffTypes
 		{
-			Cubic = 32,
-			Gaussian = 32,
-			Principled = 32,
-			Burley = 32,
-			RandomWalk = 33,
-			PrincipledRandomWalk = 34
+			Cubic = 31,
+			Gaussian = 31,
+			Principled = 31,
+			Burley = 31,                // CLOSURE_BSSRDF_BURLEY_ID
+			RandomWalk = 33,            // CLOSURE_BSSRDF_RANDOM_WALK_LEGACY_ID
+			PrincipledRandomWalk = 34   // CLOSURE_BSSRDF_RANDOM_WALK_SKIN_ID
 		}
 
 
