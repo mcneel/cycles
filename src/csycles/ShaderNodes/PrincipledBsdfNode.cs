@@ -188,12 +188,17 @@ namespace ccl.ShaderNodes
 		/// These were off by one against 5.2's ClosureType: BSSRDF_BURLEY is 31, not 32,
 		/// so asking for Burley selected random walk, random walk selected the legacy
 		/// variant, and fixed radius selected the skin variant.
+		///
+		/// The names follow Cycles 5, whose "random walk" is a new model. 3.5's random walk
+		/// is RandomWalkSkin: Cycles 4.0 renamed it and gave the old name to 3.5's fixed
+		/// radius variant, which 5.x keeps as RandomWalkFixedRadius (random_walk_legacy).
 		/// </summary>
 		public enum ScatterMethod
 		{
-			Burley = 31,
-			RandomWalk = 32,
-			RandomWalkFixedRadius = 33,
+			Burley = 31,                // CLOSURE_BSSRDF_BURLEY_ID
+			RandomWalk = 32,            // CLOSURE_BSSRDF_RANDOM_WALK_ID
+			RandomWalkFixedRadius = 33, // CLOSURE_BSSRDF_RANDOM_WALK_LEGACY_ID
+			RandomWalkSkin = 34,        // CLOSURE_BSSRDF_RANDOM_WALK_SKIN_ID
 		}
 
 		public PrincipledBsdfInputs ins => (PrincipledBsdfInputs)inputs;
