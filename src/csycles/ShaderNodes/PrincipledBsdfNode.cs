@@ -29,6 +29,7 @@ namespace ccl.ShaderNodes
 		public FloatSocket Metallic { get; set; }
 		public FloatSocket Subsurface { get; set; }
 		public VectorSocket SubsurfaceRadius { get; set; }
+		public FloatSocket SubsurfaceScale { get; set; }
 		public FloatSocket Specular { get; set; }
 		public FloatSocket Roughness { get; set; }
 		public ColorSocket SpecularTint { get; set; }
@@ -76,10 +77,12 @@ namespace ccl.ShaderNodes
 			 *
 			 * The two that are gone are marked Retired rather than deleted, so the
 			 * RhinoCycles code that still feeds them keeps compiling while the values go
-			 * nowhere. Both need a real migration to render faithfully again. */
+			 * nowhere. RhinoFullNxt's PBR path migrates Subsurface Color into the base
+			 * colour, with Subsurface Scale; Transmission Roughness still needs one. */
 			BaseColor = new ColorSocket(parentNode, "Base Color", "base_color");
 			Subsurface = new FloatSocket(parentNode, "Subsurface Weight", "subsurface_weight");
 			SubsurfaceRadius = new VectorSocket(parentNode, "Subsurface Radius", "subsurface_radius");
+			SubsurfaceScale = new FloatSocket(parentNode, "Subsurface Scale", "subsurface_scale");
 			SubsurfaceColor = new ColorSocket(parentNode, "Subsurface Color", "subsurface_color") { Retired = true };
 			Metallic = new FloatSocket(parentNode, "Metallic", "metallic");
 			Specular = new FloatSocket(parentNode, "Specular IOR Level", "specular_ior_level");
@@ -105,6 +108,7 @@ namespace ccl.ShaderNodes
 			//AddSocket(SpecularColor);
 			AddSocket(Subsurface);
 			AddSocket(SubsurfaceRadius);
+			AddSocket(SubsurfaceScale);
 			AddSocket(SubsurfaceColor);
 			AddSocket(Metallic);
 			AddSocket(Specular);
@@ -226,6 +230,9 @@ namespace ccl.ShaderNodes
 			ins.Subsurface.Value = 0.0f;
 			ins.SubsurfaceColor.Value = new float4(0.7f, 0.1f, 0.1f);
 			ins.SubsurfaceRadius.Value = new float4(0.7f, 1.0f, 1.0f, 1.0f);
+			/* Cycles' own default. Every socket's value is pushed, so leaving it at 0 would
+			 * switch subsurface off - Cycles skips the closure at scale 0. */
+			ins.SubsurfaceScale.Value = 0.005f;
 			ins.Roughness.Value = 0.0f;
 			ins.Anisotropic.Value = 0.0f;
 			ins.AnisotropicRotation.Value = 0.0f;
@@ -261,6 +268,7 @@ namespace ccl.ShaderNodes
 			//Utilities.Instance.get_float4(ins.SpecularColor, xmlNode);
 			Utilities.Instance.get_float(ins.Subsurface, xmlNode);
 			Utilities.Instance.get_float4(ins.SubsurfaceRadius, xmlNode);
+			Utilities.Instance.get_float(ins.SubsurfaceScale, xmlNode);
 			Utilities.Instance.get_float4(ins.SubsurfaceColor, xmlNode);
 			Utilities.Instance.get_float(ins.Metallic, xmlNode);
 			Utilities.Instance.get_float(ins.Specular, xmlNode);
