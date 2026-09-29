@@ -152,6 +152,10 @@ namespace ccl
 		{
 			foreach (var node in m_nodes)
 			{
+				/* A node type Cycles no longer has comes back from ccycles as a null
+				 * node; ccycles dereferences every node it is handed values for. */
+				if (node.Id == IntPtr.Zero) continue;
+
 				/* set enumerations */
 				node.SetEnums();
 
@@ -173,6 +177,8 @@ namespace ccl
 		/// <param name="toin"></param>
 		public bool Connect(ShaderNode from, string fromout, ShaderNode to, string toin)
 		{
+			/* Cycles could not create one of them; ccycles has already said which type. */
+			if (from.Id == IntPtr.Zero || to.Id == IntPtr.Zero) return false;
 			return CSycles.shader_connect_nodes(Id, from.Id, fromout, to.Id, toin);
 		}
 
