@@ -2525,6 +2525,11 @@ a tinted aircraft canopy +26%, a glass sphere +34% with its green channel clippe
 
 ## 1. The transmission tint lost half its exponent
 
+**Reversed 2026-09-29 (RhinoCycles 47a4a62), Lars's call:** the squaring described
+below is gone from both paths, and Cycles 5's tint stands, because it is a 3.5 look
+rather than a bug. The PBR green glass on the look-change grid now reads 1.007 of stock
+Blender 5.2. Section 2 (the glass closure ids) still holds.
+
 Blender 4.0's principled rework hands `sqrt(clamped_base_color)` to the Fresnel as the
 transmission tint (`src/kernel/svm/closure.h:409`, and `node_principled_bsdf.osl:160`),
 so that a ray entering *and* leaving a closed solid is tinted by the base colour in
