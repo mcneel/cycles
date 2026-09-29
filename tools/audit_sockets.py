@@ -127,10 +127,11 @@ def main():
         print('audit_sockets: found no node definitions - run me from the repo root')
         return 2
 
-    # Node types that upstream retired and that Rhino does not instantiate. Listed
-    # so the audit stays silent about them while still failing on anything new.
-    known_missing_types = {'anisotropic_bsdf', 'musgrave_texture', 'velvet_bsdf',
-                           'shadernode base', 'texture_node_base'}
+    # Abstract csycles bases with no Cycles node of their own. Listed so the audit
+    # stays silent about them while still failing on anything new. (anisotropic_bsdf,
+    # musgrave_texture and velvet_bsdf used to be here; they now name their Cycles 5
+    # replacements through ShaderNodeTypeName and are audited against those.)
+    known_missing_types = {'shadernode base', 'texture_node_base'}
 
     bad_types, bad_sockets, bad_internal, bad_kind = [], [], [], []
     odd_kind = []

@@ -155,7 +155,7 @@ namespace ccl.ShaderNodes
 			// do nothing
 		}
 
-		internal void SetSockets()
+		internal virtual void SetSockets()
 		{
 			/* set node attributes */
 			if (inputs != null)

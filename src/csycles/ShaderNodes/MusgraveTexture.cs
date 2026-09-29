@@ -41,7 +41,9 @@ namespace ccl.ShaderNodes
 			AddSocket(Scale);
 			Detail = new FloatSocket(parentNode, "Detail", "detail");
 			AddSocket(Detail);
-			Dimension = new FloatSocket(parentNode, "Dimension", "dimension");
+			/* The noise texture has no fractal dimension; MusgraveTexture.SetSockets turns
+			 * this value into Roughness. */
+			Dimension = new FloatSocket(parentNode, "Dimension", "dimension") { Retired = true };
 			AddSocket(Dimension);
 			Lacunarity = new FloatSocket(parentNode, "Lacunarity", "lacunarity");
 			AddSocket(Lacunarity);
@@ -87,6 +89,13 @@ namespace ccl.ShaderNodes
 
 		public MusgraveInputs ins => (MusgraveInputs)inputs;
 		public MusgraveOutputs outs => (MusgraveOutputs)outputs;
+
+		/* Cycles 4.1 folded musgrave into the noise texture, whose five fractal types are
+		 * musgrave's loops reparametrised: noise runs detail + 1 octaves where musgrave ran
+		 * detail, its per-octave roughness is musgrave's lacunarity^-dimension, and with
+		 * Normalize off the output is musgrave's unscaled value. SetSockets converts. The
+		 * attribute keeps the old name as the XML key; see SeparateRgbNode. */
+		public override string ShaderNodeTypeName => "noise_texture";
 
 		public MusgraveTexture(Shader shader) : this(shader, "a musgrave texture") { }
 		public MusgraveTexture(Shader shader, string name)
@@ -140,8 +149,18 @@ namespace ccl.ShaderNodes
 
 		internal override void SetEnums()
 		{
-			CSycles.shadernode_set_enum(Id, "musgrave", (int)MusgraveType);
-			CSycles.shadernode_set_enum(Id, "dimension", (int)Dimension);
+			/* MusgraveTypes has NodeNoiseType's order, and both count dimensions from 1. */
+			CSycles.shadernode_set_enum(Id, "type", (int)MusgraveType);
+			CSycles.shadernode_set_enum(Id, "dimensions", (int)Dimension);
+		}
+
+		internal override void SetSockets()
+		{
+			base.SetSockets();
+			CSycles.shadernode_set_attribute_float(Id, "detail", Math.Max(ins.Detail.Value - 1.0f, 0.0f));
+			CSycles.shadernode_set_attribute_float(Id, "roughness",
+				(float)Math.Pow(ins.Lacunarity.Value, -ins.Dimension.Value));
+			CSycles.shadernode_set_attribute_bool(Id, "use_normalize", false);
 		}
 
 		internal override void ParseXml(XmlReader xmlNode)

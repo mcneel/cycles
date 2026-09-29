@@ -568,7 +568,7 @@ CCL_CAPI void CDECL cycles_shadernode_texmapping_set_type(ccl::ShaderNode *shnod
  * older numbering, so a glass BSDF asking for multiscatter GGX became the transparent
  * BSDF and a GGX refraction became the ray portal. Check the value against the
  * node's own enum, so the next renumbering is reported instead of rendered. */
-static void set_closure_enum(ccl::ShaderNode *shnode, const char *socket_name, const int value)
+static void set_checked_enum(ccl::ShaderNode *shnode, const char *socket_name, const int value)
 {
 	const ccl::SocketType *socket = shnode->type->find_input(ccl::ustring(socket_name));
 	if (socket == nullptr || socket->type != ccl::SocketType::ENUM) {
@@ -617,15 +617,15 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		ccl::MixNode *node = dynamic_cast<ccl::MixNode *>(shnode);
 		node->set_mix_type((ccl::NodeMix)value);
 	}
-	else if (shntype == "refraction_bsdf" || shntype == "glossy_bsdf" || shntype == "glass_bsdf") {
-		set_closure_enum(shnode, "distribution", value);
+	else if (shntype == "refraction_bsdf" || shntype == "glossy_bsdf" || shntype == "glass_bsdf" ||
+	         shntype == "sheen_bsdf")
+	{
+		/* csycles' anisotropic_bsdf arrives as glossy_bsdf and velvet_bsdf as sheen_bsdf,
+		 * the nodes Cycles 4.0 merged them into. */
+		set_checked_enum(shnode, "distribution", value);
 	}
 	else if (shntype == "toon_bsdf") {
-		set_closure_enum(shnode, "component", value);
-	}
-	else if (shntype == "anisotropic_bsdf") {
-		/* Removed in Blender 4.0, merged into the glossy BSDF, so no node of this
-		 * type is ever created and there is nothing to set. */
+		set_checked_enum(shnode, "component", value);
 	}
 	else if (shntype == "wave_texture") {
 		if (ename == "wave") {
@@ -649,10 +649,11 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		node->set_dimensions(value);
 		}
 	}
-	else if (shntype == "musgrave_texture") {
-		/* Removed in Blender 4.1. The noise texture that replaced it has no
-		 * musgrave_type or dimension equivalent, so these are accepted and
-		 * ignored; materials relying on them need a real migration. */
+	else if (shntype == "noise_texture") {
+		/* Only csycles' musgrave_texture sets these: Cycles 4.1 folded musgrave into
+		 * the noise texture, whose "type" holds the five musgrave types and
+		 * "dimensions" the 1D-4D choice. */
+		set_checked_enum(shnode, ename.c_str(), value);
 	}
 	else if (shntype == "sky_texture") {
 		ccl::SkyTextureNode *node = dynamic_cast<ccl::SkyTextureNode *>(shnode);
@@ -694,14 +695,14 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 		node->set_gradient_type((ccl::NodeGradientType)value);
 	}
 	else if (shntype == "subsurface_scattering") {
-		set_closure_enum(shnode, "method", value);
+		set_checked_enum(shnode, "method", value);
 	}
 	else if (shntype == "principled_bsdf") {
 		if (ename == "distribution") {
-		set_closure_enum(shnode, "distribution", value);
+		set_checked_enum(shnode, "distribution", value);
 		}
 		else if (ename == "sss") {
-		set_closure_enum(shnode, "subsurface_method", value);
+		set_checked_enum(shnode, "subsurface_method", value);
 		}
 	}
 	else if (shntype == "normal_map") {

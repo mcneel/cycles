@@ -80,6 +80,11 @@ namespace ccl.ShaderNodes
 		public AnisotropicBsdfInputs ins => (AnisotropicBsdfInputs)inputs;
 		public AnisotropicBsdfOutputs outs => (AnisotropicBsdfOutputs)outputs;
 
+		/* Cycles 4.0 merged the anisotropic BSDF into the glossy one, which has the same
+		 * sockets and distributions. The attribute keeps the old name as the XML key; see
+		 * SeparateRgbNode. */
+		public override string ShaderNodeTypeName => "glossy_bsdf";
+
 		/// <summary>
 		/// Create a new Anisotropic BSDF closure.
 		/// </summary>

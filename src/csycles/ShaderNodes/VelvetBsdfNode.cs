@@ -31,7 +31,8 @@ namespace ccl.ShaderNodes
 		{
 			Color = new ColorSocket(parentNode, "Color", "color");
 			AddSocket(Color);
-			Sigma = new FloatSocket(parentNode, "Sigma", "sigma");
+			/* The sheen BSDF that replaced velvet calls sigma Roughness. */
+			Sigma = new FloatSocket(parentNode, "Roughness", "roughness");
 			AddSocket(Sigma);
 			Normal = new VectorSocket(parentNode, "Normal", "normal");
 			AddSocket(Normal);
@@ -61,6 +62,16 @@ namespace ccl.ShaderNodes
 	{
 		public VelvetBsdfInputs ins => (VelvetBsdfInputs)inputs;
 		public VelvetBsdfOutputs outs => (VelvetBsdfOutputs)outputs;
+
+		/* Cycles 4.0 replaced velvet with the sheen BSDF and kept the old model as its
+		 * "ashikhmin" distribution. The attribute keeps the old name as the XML key; see
+		 * SeparateRgbNode. */
+		public override string ShaderNodeTypeName => "sheen_bsdf";
+
+		internal override void SetEnums()
+		{
+			CSycles.shadernode_set_enum(Id, "distribution", 16); /* CLOSURE_BSDF_ASHIKHMIN_VELVET_ID */
+		}
 
 		/// <summary>
 		/// Create a new Velvet BSDF closure.
