@@ -1636,9 +1636,9 @@ CCL_CAPI bool CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id,
 								 const char *to)
 {
 	bool res = false;
-	/* A node Cycles could not create reaches here as null, and the asserts that were
-	 * here took a Debug Rhino down for any material using a node type upstream has
-	 * retired. cycles_add_shader_node has already named the type; skip the link. */
+	/* A node Cycles could not create reaches here as null - cycles_add_shader_node
+	 * has already named its type. Say which link that breaks before the asserts, so
+	 * a Debug stop comes with its reason; Release skips the link below. */
 	if (shader_id == nullptr || from_id == nullptr || to_id == nullptr) {
 		ccycles_diag("cannot connect %s to %s: %s is null\n",
 		             from,
@@ -1646,8 +1646,10 @@ CCL_CAPI bool CDECL cycles_shader_connect_nodes(ccl::Shader *shader_id,
 		             (shader_id == nullptr) ? "the shader" :
 		             (from_id == nullptr)   ? "the source node" :
 		                                      "the target node");
-		return false;
 	}
+	assert(shader_id);
+	assert(from_id);
+	assert(to_id);
 	if (shader_id && from_id && to_id)
 	{
 		ccl::ShaderInput *to_input = to_id->input(to);

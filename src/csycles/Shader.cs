@@ -177,8 +177,6 @@ namespace ccl
 		/// <param name="toin"></param>
 		public bool Connect(ShaderNode from, string fromout, ShaderNode to, string toin)
 		{
-			/* Cycles could not create one of them; ccycles has already said which type. */
-			if (from.Id == IntPtr.Zero || to.Id == IntPtr.Zero) return false;
 			return CSycles.shader_connect_nodes(Id, from.Id, fromout, to.Id, toin);
 		}
 
