@@ -133,6 +133,7 @@ set(SRC_KERNEL_SVM_HEADERS
   svm/svm_rhino_matrix_math.h
   svm/svm_rhino_azimuth_altitude_transform.h
   svm/svm_rhino_procedurals.h
+  svm/svm_rhino_bump.h
   svm/svm_rhino_types.h
   svm/ao.h
   svm/aov.h

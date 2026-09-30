@@ -200,6 +200,7 @@ CCL_NAMESPACE_END
 #include "kernel/svm/svm_rhino_matrix_math.h"
 #include "kernel/svm/svm_rhino_azimuth_altitude_transform.h"
 #include "kernel/svm/svm_rhino_procedurals.h"
+#include "kernel/svm/svm_rhino_bump.h"
 
 #ifdef __SHADER_RAYTRACE__
 #  include "kernel/svm/ao.h"
@@ -407,6 +408,18 @@ ccl_device void svm_eval_nodes(KernelGlobals kg,
       break;
       SVM_CASE(RHINO_NODE_NORMAL_PART2_TEXTURE)
       svm_rhino_node_normal_part2_texture(kg, sd, stack, node, &offset);
+      break;
+      SVM_CASE(RHINO_NODE_BUMP)
+      offset = svm_rhino_node_bump<node_feature_mask>(kg, sd, stack, node, offset);
+      break;
+      SVM_CASE(RHINO_NODE_BUMP_OFFSETS)
+      offset = svm_rhino_node_bump_offsets(kg, sd, stack, node, offset);
+      break;
+      SVM_CASE(RHINO_NODE_BUMP_SHIFT)
+      svm_rhino_node_bump_shift(kg, sd, stack, node);
+      break;
+      SVM_CASE(RHINO_NODE_BUMP_DIFFERENTIALS)
+      svm_rhino_node_bump_differentials(sd, stack, node);
       break;
       SVM_CASE(NODE_ATTR_BUMP_DX)
       IF_KERNEL_NODES_FEATURE(BUMP)

@@ -4110,6 +4110,9 @@ NODE_DEFINE(RhinoTextureCoordinateNode)
   decal_projection_enum.insert("backward", NODE_IMAGE_DECAL_BACKWARD);
   SOCKET_ENUM(decal_projection, "Decal Direction", decal_projection_enum, NODE_IMAGE_DECAL_BOTH);
 
+  /* World offset of the point, linked only in the copies refine_rhino_bump_node() makes. */
+  SOCKET_IN_VECTOR(neighbour_offset, "Offset", make_float3(0.0f, 0.0f, 0.0f));
+
   SOCKET_OUT_POINT(generated, "Generated");
   SOCKET_OUT_NORMAL(normal, "Normal");
   SOCKET_OUT_POINT(UV, "UV");
@@ -4221,6 +4224,17 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
     texco_node = NODE_TEX_COORD_BUMP_DY;
     attr_node = NODE_ATTR_BUMP_DY;
     geom_node = NODE_GEOMETRY_BUMP_DY;
+  }
+
+  /* Evaluate at the offset point, see svm_rhino_node_bump_shift. */
+  ShaderInput *offset_in = input("Offset");
+  int state_p = SVM_STACK_INVALID, state_uv = SVM_STACK_INVALID;
+  if (offset_in->link) {
+    state_p = compiler.stack_find_offset(SocketType::VECTOR);
+    state_uv = compiler.stack_find_offset(SocketType::VECTOR);
+    compiler.add_node(
+        RHINO_NODE_BUMP_SHIFT,
+        compiler.encode_uchar4(compiler.stack_assign(offset_in), state_p, state_uv, 1));
   }
 
   out = output("Generated");
@@ -4362,6 +4376,12 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
   out = output("DecalCylindrical");
   if (!out->links.empty()) {
     decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_CYLINDRICAL, compiler);
+  }
+
+  if (offset_in->link) {
+    compiler.add_node(RHINO_NODE_BUMP_SHIFT, compiler.encode_uchar4(0, state_p, state_uv, 0));
+    compiler.stack_clear_offset(SocketType::VECTOR, state_p);
+    compiler.stack_clear_offset(SocketType::VECTOR, state_uv);
   }
 }
 

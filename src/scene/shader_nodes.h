@@ -981,6 +981,7 @@ class RhinoTextureCoordinateNode : public ShaderNode {
   NODE_SOCKET_API(bool, from_dupli);
   NODE_SOCKET_API(bool, use_transform);
   NODE_SOCKET_API(Transform, ob_tfm);
+  NODE_SOCKET_API(float3, neighbour_offset);
 
   /* decal origin */
   float3 decal_origin;

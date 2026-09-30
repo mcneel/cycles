@@ -1,5 +1,6 @@
 #include "scene/rhino_shader_nodes.h"
 #include <atomic>
+#include "scene/constant_fold.h"
 #include "scene/svm.h"
 
 CCL_NAMESPACE_BEGIN
@@ -1181,6 +1182,179 @@ void RhinoNormalPart2TextureNode::compile(SVMCompiler &compiler)
 }
 
 void RhinoNormalPart2TextureNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Bump */
+
+NODE_DEFINE(RhinoBumpNode)
+{
+  NodeType *type = NodeType::add("rhino_bump", create, NodeType::SHADER);
+
+  /* False: the strength scales the tilted normal (PBR). True: it scales the slope (Custom). */
+  SOCKET_BOOLEAN(linear, "Linear", false);
+
+  /* Not used by this node; refine_rhino_bump_node() copies them to the RhinoBumpOffsetsNode. */
+  /* UVW to texels: the rows of the linear part, then the translation. */
+  SOCKET_VECTOR(texel_u, "TexelU", make_float3(1.0f, 0.0f, 0.0f));
+  SOCKET_VECTOR(texel_v, "TexelV", make_float3(0.0f, 1.0f, 0.0f));
+  SOCKET_VECTOR(texel_w, "TexelW", make_float3(0.0f, 0.0f, 1.0f));
+  SOCKET_VECTOR(texel_origin, "TexelOrigin", make_float3(0.0f, 0.0f, 0.0f));
+  /* Put the neighbours at texel centres, for images with Filter off. */
+  SOCKET_BOOLEAN(snap, "Snap", false);
+
+  /* Height and UVW are only for connecting; refine_rhino_bump_node() replaces them. */
+  SOCKET_IN_FLOAT(height, "Height", 1.0f);
+  SOCKET_IN_POINT(uvw, "UVW", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_IN_FLOAT(sample0, "Sample0", 0.0f);
+  SOCKET_IN_FLOAT(sample1, "Sample1", 0.0f);
+  SOCKET_IN_FLOAT(sample2, "Sample2", 0.0f);
+  SOCKET_IN_FLOAT(sample3, "Sample3", 0.0f);
+  SOCKET_IN_FLOAT(sample4, "Sample4", 0.0f);
+  SOCKET_IN_FLOAT(sample5, "Sample5", 0.0f);
+  SOCKET_IN_FLOAT(sample6, "Sample6", 0.0f);
+  SOCKET_IN_FLOAT(sample7, "Sample7", 0.0f);
+  SOCKET_IN_VECTOR(axis_u, "AxisU", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_VECTOR(axis_v, "AxisV", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_NORMAL(normal, "Normal", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_NORMAL);
+  SOCKET_IN_FLOAT(strength, "Strength", 1.0f);
+
+  SOCKET_OUT_NORMAL(normal, "Normal");
+
+  return type;
+}
+
+RhinoBumpNode::RhinoBumpNode() : ShaderNode(node_type)
+{
+  special_type = SHADER_SPECIAL_TYPE_BUMP;
+}
+
+void RhinoBumpNode::constant_fold(const ConstantFolder &folder)
+{
+  ShaderInput *height_in = input("Height");
+  ShaderInput *normal_in = input("Normal");
+
+  if (height_in->link == NULL) {
+    if (normal_in->link == NULL) {
+      GeometryNode *geom = folder.graph->create_node<GeometryNode>();
+      folder.graph->add(geom);
+      folder.bypass(geom->output("Normal"));
+    }
+    else {
+      folder.bypass(normal_in->link);
+    }
+  }
+}
+
+void RhinoBumpNode::compile(SVMCompiler &compiler)
+{
+  int samples[8];
+  for (int k = 0; k < 8; k++) {
+    samples[k] = compiler.stack_assign(input(string_printf("Sample%d", k).c_str()));
+  }
+  const int axis_u = compiler.stack_assign(input("AxisU"));
+  const int axis_v = compiler.stack_assign(input("AxisV"));
+  const int normal_in = compiler.stack_assign_if_linked(input("Normal"));
+  const int strength = compiler.stack_assign(input("Strength"));
+  const int normal_out = compiler.stack_assign(output("Normal"));
+
+  compiler.add_node(RHINO_NODE_BUMP,
+                    compiler.encode_uchar4(samples[0], samples[1], samples[2], samples[3]),
+                    compiler.encode_uchar4(samples[4], samples[5], samples[6], samples[7]),
+                    compiler.encode_uchar4(axis_u, axis_v, normal_out));
+  compiler.add_node(compiler.encode_uchar4(normal_in, strength, linear));
+}
+
+void RhinoBumpNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Bump offsets */
+
+NODE_DEFINE(RhinoBumpOffsetsNode)
+{
+  NodeType *type = NodeType::add("rhino_bump_offsets", create, NodeType::SHADER);
+
+  SOCKET_VECTOR(texel_u, "TexelU", make_float3(1.0f, 0.0f, 0.0f));
+  SOCKET_VECTOR(texel_v, "TexelV", make_float3(0.0f, 1.0f, 0.0f));
+  SOCKET_VECTOR(texel_w, "TexelW", make_float3(0.0f, 0.0f, 1.0f));
+  SOCKET_VECTOR(texel_origin, "TexelOrigin", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_BOOLEAN(snap, "Snap", false);
+
+  /* Texture coordinates at the point and along dP.dx and dP.dy. */
+  SOCKET_IN_POINT(uvw_center, "UVWCenter", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_POINT(uvw_x, "UVWX", make_float3(0.0f, 0.0f, 0.0f));
+  SOCKET_IN_POINT(uvw_y, "UVWY", make_float3(0.0f, 0.0f, 0.0f));
+
+  SOCKET_OUT_VECTOR(offset0, "Offset0");
+  SOCKET_OUT_VECTOR(offset1, "Offset1");
+  SOCKET_OUT_VECTOR(offset2, "Offset2");
+  SOCKET_OUT_VECTOR(offset3, "Offset3");
+  SOCKET_OUT_VECTOR(offset4, "Offset4");
+  SOCKET_OUT_VECTOR(offset5, "Offset5");
+  SOCKET_OUT_VECTOR(offset6, "Offset6");
+  SOCKET_OUT_VECTOR(offset7, "Offset7");
+  SOCKET_OUT_VECTOR(axis_u, "AxisU");
+  SOCKET_OUT_VECTOR(axis_v, "AxisV");
+
+  return type;
+}
+
+RhinoBumpOffsetsNode::RhinoBumpOffsetsNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoBumpOffsetsNode::compile(SVMCompiler &compiler)
+{
+  const int uvw_c = compiler.stack_assign(input("UVWCenter"));
+  const int uvw_x = compiler.stack_assign(input("UVWX"));
+  const int uvw_y = compiler.stack_assign(input("UVWY"));
+  int offsets[8];
+  for (int k = 0; k < 8; k++) {
+    offsets[k] = compiler.stack_assign(output(string_printf("Offset%d", k).c_str()));
+  }
+  const int axis_u = compiler.stack_assign(output("AxisU"));
+  const int axis_v = compiler.stack_assign(output("AxisV"));
+
+  compiler.add_node(RHINO_NODE_BUMP_OFFSETS,
+                    compiler.encode_uchar4(uvw_c, uvw_x, uvw_y, snap),
+                    compiler.encode_uchar4(offsets[0], offsets[1], offsets[2], offsets[3]),
+                    compiler.encode_uchar4(offsets[4], offsets[5], offsets[6], offsets[7]));
+  compiler.add_node(axis_u, axis_v);
+  compiler.add_node(make_float4(texel_u.x, texel_u.y, texel_u.z, texel_origin.x));
+  compiler.add_node(make_float4(texel_v.x, texel_v.y, texel_v.z, texel_origin.y));
+  compiler.add_node(make_float4(texel_w.x, texel_w.y, texel_w.z, texel_origin.z));
+}
+
+void RhinoBumpOffsetsNode::compile(OSLCompiler &compiler)
+{
+}
+
+/* Bump differentials */
+
+NODE_DEFINE(RhinoBumpDifferentialsNode)
+{
+  NodeType *type = NodeType::add("rhino_bump_differentials", create, NodeType::SHADER);
+
+  SOCKET_OUT_VECTOR(dx, "DX");
+  SOCKET_OUT_VECTOR(dy, "DY");
+
+  return type;
+}
+
+RhinoBumpDifferentialsNode::RhinoBumpDifferentialsNode() : ShaderNode(node_type)
+{
+}
+
+void RhinoBumpDifferentialsNode::compile(SVMCompiler &compiler)
+{
+  compiler.add_node(RHINO_NODE_BUMP_DIFFERENTIALS,
+                    compiler.stack_assign(output("DX")),
+                    compiler.stack_assign(output("DY")));
+}
+
+void RhinoBumpDifferentialsNode::compile(OSLCompiler &compiler)
 {
 }
 

@@ -897,6 +897,11 @@ void ShaderGraph::refine_bump_nodes()
 
   foreach (ShaderNode *node, nodes) {
     if (node->special_type == SHADER_SPECIAL_TYPE_BUMP && node->input("Height")->link) {
+      if (node->type == RhinoBumpNode::get_node_type()) {
+        refine_rhino_bump_node(static_cast<RhinoBumpNode *>(node));
+        continue;
+      }
+
       ShaderInput *bump_input = node->input("Height");
       ShaderNodeSet nodes_bump;
 
@@ -941,6 +946,94 @@ void ShaderGraph::refine_bump_nodes()
       disconnect(bump_input);
     }
   }
+}
+
+/* Appends node and the nodes of set it depends on to order, dependencies first. */
+static void rhino_bump_dependency_order(ShaderNode *node,
+                                        const unordered_set<ShaderNode *> &set,
+                                        unordered_set<ShaderNode *> &visited,
+                                        vector<ShaderNode *> &order)
+{
+  if (!set.count(node) || !visited.insert(node).second) {
+    return;
+  }
+  foreach (ShaderInput *input, node->inputs) {
+    if (input->link) {
+      rhino_bump_dependency_order(input->link->parent, set, visited, order);
+    }
+  }
+  order.push_back(node);
+}
+
+void ShaderGraph::refine_rhino_bump_node(RhinoBumpNode *bump)
+{
+  /* The nodes feeding Height are copied once per neighbour, and the ones feeding UVW once along
+   * dP.dx and once along dP.dy. Every copy evaluates its texture coordinates at a shifted point,
+   * so all coordinates come from the same kernel code, whatever the projection. */
+  RhinoBumpOffsetsNode *offsets = create_node<RhinoBumpOffsetsNode>();
+  offsets->texel_u = bump->texel_u;
+  offsets->texel_v = bump->texel_v;
+  offsets->texel_w = bump->texel_w;
+  offsets->texel_origin = bump->texel_origin;
+  offsets->snap = bump->snap;
+
+  /* Copies sources with their texture coordinates shifted by shift, returns the copy of out.
+   * The copies are added dependencies first, because SVMCompiler compiles nodes in id order,
+   * so each copy then compiles in one go. In the order the nodes were created, every copy
+   * stalls at the same node and all of them hold their stack slots at once. */
+  auto copy_shifted = [this](ShaderNodeSet &sources, ShaderOutput *out, ShaderOutput *shift) {
+    ShaderNodeMap copies;
+    copy_nodes(sources, copies);
+
+    unordered_set<ShaderNode *> copy_set;
+    foreach (NodePair &pair, copies)
+      copy_set.insert(pair.second);
+    unordered_set<ShaderNode *> visited;
+    vector<ShaderNode *> order;
+    rhino_bump_dependency_order(copies[out->parent], copy_set, visited, order);
+
+    foreach (ShaderNode *node, order) {
+      node->bump = SHADER_BUMP_CENTER;
+      if (node->type == RhinoTextureCoordinateNode::get_node_type()) {
+        connect(shift, node->input("Offset"));
+      }
+      add(node);
+    }
+    return copies[out->parent]->output(out->name());
+  };
+
+  ShaderInput *uvw_input = bump->input("UVW");
+  if (uvw_input->link) {
+    RhinoBumpDifferentialsNode *differentials = create_node<RhinoBumpDifferentialsNode>();
+    add(differentials);
+
+    ShaderNodeSet nodes_uvw;
+    find_dependencies(nodes_uvw, uvw_input);
+
+    ShaderOutput *out = uvw_input->link;
+    connect(out, offsets->input("UVWCenter"));
+    connect(copy_shifted(nodes_uvw, out, differentials->output("DX")), offsets->input("UVWX"));
+    connect(copy_shifted(nodes_uvw, out, differentials->output("DY")), offsets->input("UVWY"));
+    disconnect(uvw_input);
+  }
+  /* After the UVW copies it takes inputs from, before the height copies that take its outputs. */
+  add(offsets);
+
+  ShaderInput *height_input = bump->input("Height");
+  ShaderOutput *height_out = height_input->link;
+  ShaderNodeSet nodes_height;
+  find_dependencies(nodes_height, height_input);
+
+  for (int k = 0; k < 8; k++) {
+    connect(copy_shifted(nodes_height,
+                         height_out,
+                         offsets->output(string_printf("Offset%d", k).c_str())),
+            bump->input(string_printf("Sample%d", k).c_str()));
+  }
+  disconnect(height_input);
+
+  connect(offsets->output("AxisU"), bump->input("AxisU"));
+  connect(offsets->output("AxisV"), bump->input("AxisV"));
 }
 
 void ShaderGraph::bump_from_displacement(bool use_object_space)

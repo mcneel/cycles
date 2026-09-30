@@ -301,6 +301,68 @@ class RhinoNormalPart2TextureNode : public ShaderNode {
   float3 color8;
 };
 
+/* Bump like Rhino's display: the slope comes from comparing the height at the 8 texels around
+ * the shading point (a Sobel filter), so it doesn't depend on object size, units or zoom.
+ * Connect the height texture to Height and its texture coordinates to UVW; before compiling,
+ * ShaderGraph::refine_rhino_bump_node() does the rest. The kernel code is in svm_rhino_bump.h. */
+class RhinoBumpNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoBumpNode)
+  void constant_fold(const ConstantFolder &folder);
+  bool has_spatial_varying()
+  {
+    return true;
+  }
+  virtual int get_feature()
+  {
+    return KERNEL_FEATURE_NODE_BUMP;
+  }
+
+  bool linear;
+  float3 texel_u, texel_v, texel_w, texel_origin;
+  bool snap;
+  float height;
+  float3 uvw;
+  float sample0, sample1, sample2, sample3, sample4, sample5, sample6, sample7;
+  float3 axis_u, axis_v;
+  float3 normal;
+  float strength;
+};
+
+/* World offsets from the shading point to its 8 neighbouring texels. Each copy of the height
+ * texture is evaluated at one of these neighbours. */
+class RhinoBumpOffsetsNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoBumpOffsetsNode)
+  bool has_spatial_varying()
+  {
+    return true;
+  }
+  virtual int get_feature()
+  {
+    return KERNEL_FEATURE_NODE_BUMP;
+  }
+
+  float3 texel_u, texel_v, texel_w, texel_origin;
+  bool snap;
+  float3 uvw_center, uvw_x, uvw_y;
+};
+
+/* dP.dx and dP.dy as world offsets. RhinoBumpOffsetsNode measures the texel grid from the
+ * texture coordinates at P + dP.dx and P + dP.dy. */
+class RhinoBumpDifferentialsNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RhinoBumpDifferentialsNode)
+  bool has_spatial_varying()
+  {
+    return true;
+  }
+  virtual int get_feature()
+  {
+    return KERNEL_FEATURE_NODE_BUMP;
+  }
+};
+
 CCL_NAMESPACE_END
 
 #endif /* __RHINONODES_H__ */

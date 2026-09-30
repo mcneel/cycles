@@ -30,6 +30,7 @@ class OSLCompiler;
 class OutputNode;
 class ConstantFolder;
 class MD5Hash;
+class RhinoBumpNode;
 
 /* Bump
  *
@@ -355,6 +356,7 @@ class ShaderGraph : public NodeOwner {
   void break_cycles(ShaderNode *node, vector<bool> &visited, vector<bool> &on_stack);
   void bump_from_displacement(bool use_object_space);
   void refine_bump_nodes();
+  void refine_rhino_bump_node(RhinoBumpNode *bump);
   void expand();
   void default_inputs(bool do_osl);
   void transform_multi_closure(ShaderNode *node, ShaderOutput *weight_out, bool volume);
