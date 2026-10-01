@@ -115,6 +115,7 @@ Shader::Shader() : Node(get_node_type())
   emission_estimate = zero_float3();
   emission_sampling = EMISSION_SAMPLING_NONE;
   emission_is_constant = true;
+  emission_falloff_power = 0;
 
   displacement_method = DISPLACE_BUMP;
 
@@ -261,6 +262,18 @@ void Shader::estimate_emission()
 
   ShaderInput *surf = graph->output()->input("Surface");
   emission_estimate = fabs(output_estimate_emission(surf->link, emission_is_constant));
+
+  emission_falloff_power = 0;
+  foreach (ShaderNode *node, graph->nodes) {
+    if (node->type == LightFalloffNode::get_node_type()) {
+      if (!node->output("Constant")->links.empty()) {
+        emission_falloff_power = 2;
+      }
+      else if (!node->output("Linear")->links.empty()) {
+        emission_falloff_power = max(emission_falloff_power, 1);
+      }
+    }
+  }
 
   if (is_zero(emission_estimate)) {
     emission_sampling = EMISSION_SAMPLING_NONE;

@@ -1422,8 +1422,8 @@ typedef struct KernelLightTreeNode {
   /* Bit trail. */
   uint bit_trail;
 
-  /* Padding. */
-  int pad;
+  /* Highest Light Falloff power among the node's emitters (see `Shader::emission_falloff_power`). */
+  int falloff_power;
 } KernelLightTreeNode;
 static_assert_align(KernelLightTreeNode, 16);
 
@@ -1442,6 +1442,10 @@ typedef struct KernelLightTreeEmitter {
 
   /* Parent. */
   int parent_index;
+
+  /* Light Falloff power of the emitter's shader (see `Shader::emission_falloff_power`). */
+  int falloff_power;
+  int pad1, pad2, pad3;
 } KernelLightTreeEmitter;
 static_assert_align(KernelLightTreeEmitter, 16);
 

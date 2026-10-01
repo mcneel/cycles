@@ -583,6 +583,7 @@ void LightManager::device_update_tree(Device *,
 
     light_tree_nodes[index].bit_trail = node.bit_trail;
     light_tree_nodes[index].num_prims = node.num_prims;
+    light_tree_nodes[index].falloff_power = node.falloff_power;
 
     /* Here we need to make a distinction between interior and leaf nodes. */
     if (node.is_leaf()) {
@@ -593,6 +594,7 @@ void LightManager::device_update_tree(Device *,
         LightTreePrimitive &prim = light_prims[emitter_index];
 
         light_tree_emitters[emitter_index].energy = prim.energy;
+        light_tree_emitters[emitter_index].falloff_power = prim.falloff_power;
         light_tree_emitters[emitter_index].theta_o = prim.bcone.theta_o;
         light_tree_emitters[emitter_index].theta_e = prim.bcone.theta_e;
 
