@@ -64,6 +64,7 @@ struct LightTreePrimitive {
   float3 centroid;
   OrientationBounds bcone;
   BoundBox bbox;
+  int falloff_power = 0; /* `Shader::emission_falloff_power` of the emitter's shader. */
 
   LightTreePrimitive(Scene *scene, int prim_id, int object_id);
 
@@ -95,6 +96,7 @@ struct LightTreeNode {
   OrientationBounds bcone;
   float energy;
   uint bit_trail;
+  int falloff_power = 0; /* Highest of the node's primitives. */
   int num_prims = -1;
   union {
     int first_prim_index;  /* leaf nodes contain an index to first primitive. */

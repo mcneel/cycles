@@ -117,6 +117,9 @@ class Shader : public Node {
   float3 emission_estimate;
   EmissionSampling emission_sampling;
   bool emission_is_constant;
+  /* Power of distance a Light Falloff node multiplies the emission by: 0 Quadratic, 1 Linear,
+   * 2 Constant. The light tree needs it, its importance assumes inverse-square falloff. */
+  int emission_falloff_power;
 
   /* requested mesh attributes */
   AttributeRequestSet attributes;

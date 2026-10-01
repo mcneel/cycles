@@ -89,6 +89,7 @@ LightTreePrimitive::LightTreePrimitive(Scene *scene, int prim_id, int object_id)
     /* TODO: need a better way to handle this when textures are used. */
     float area = triangle_area(vertices[0], vertices[1], vertices[2]);
     energy = area * average(shader->emission_estimate);
+    falloff_power = shader->emission_falloff_power;
 
     /* NOTE: the original implementation used the bounding box centroid, but primitive centroid
      * seems to work fine */
@@ -188,6 +189,7 @@ LightTreePrimitive::LightTreePrimitive(Scene *scene, int prim_id, int object_id)
 
     if (lamp->get_shader()) {
       strength *= lamp->get_shader()->emission_estimate;
+      falloff_power = lamp->get_shader()->emission_falloff_power;
     }
 
     /* Use absolute value of energy so lights with negative strength are properly
@@ -240,6 +242,7 @@ int LightTree::recursive_build(
   OrientationBounds bcone = OrientationBounds::empty;
   BoundBox centroid_bounds = BoundBox::empty;
   float energy_total = 0.0;
+  int falloff_power = 0;
   int num_prims = end - start;
   int current_index = nodes_.size();
 
@@ -250,9 +253,11 @@ int LightTree::recursive_build(
     centroid_bounds.grow(prim.centroid);
 
     energy_total += prim.energy;
+    falloff_power = max(falloff_power, prim.falloff_power);
   }
 
   nodes_.emplace_back(bbox, bcone, energy_total, bit_trail);
+  nodes_.back().falloff_power = falloff_power;
 
   bool try_splitting = num_prims > 1 && len(centroid_bounds.size()) > 0.0f;
   int split_dim = -1, split_bucket = 0, num_left_prims = 0;
