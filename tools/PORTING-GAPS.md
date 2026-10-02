@@ -2528,7 +2528,8 @@ a tinted aircraft canopy +26%, a glass sphere +34% with its green channel clippe
 **Reversed 2026-09-29 (RhinoCycles 47a4a62), Lars's call:** the squaring described
 below is gone from both paths, and Cycles 5's tint stands, because it is a 3.5 look
 rather than a bug. The PBR green glass on the look-change grid now reads 1.007 of stock
-Blender 5.2. Section 2 (the glass closure ids) still holds.
+Blender 5.2. Section 2's enum values still hold; its single-scatter default was reversed
+on 2026-10-02.
 
 Blender 4.0's principled rework hands `sqrt(clamped_base_color)` to the Fresnel as the
 transmission tint (`src/kernel/svm/closure.h:409`, and `node_principled_bsdf.osl:160`),
@@ -2559,6 +2560,15 @@ test and reports the opposite, which is how the first attempt went into the wron
 Read the dumped graph's node name to settle which branch a material takes.
 
 ## 2. The glass closure ids were renumbered, and csycles carried the number not the meaning
+
+**Default reversed 2026-10-02, Lars's call:** the enum values below stand, but the
+principled default is `Multiscatter_GGX` again, as in Blender, because single scatter is a
+3.5 look rather than a bug. It showed on `glasstest-frost1` (Cycles Glass, Frost 1): dev
+rendered the sphere mid-grey, and stock Blender 5.2 fed the identical graph
+(`blender-replica/frostglass.py` in the harness) renders it near white with multiscatter
+and grey with `GGX`. The "after" column below is therefore history; rough transmission is
+back on the "before" slope. 3.5 was no oracle for that scene: its `GlassMaterial` wired
+Frost to IOR as well, so Frost 1 was IOR 1, an invisible sphere.
 
 |  | 3.5 | 5.2 |
 |---|---|---|
@@ -2592,6 +2602,9 @@ A slope from 1.04 to 1.65 became flat. White was chosen deliberately so the tint
 above is the identity here and cannot contribute.
 
 ## Both are compatibility choices, not corrections
+
+(Both have since been reversed in favour of Cycles 5's behaviour - the tint on 2026-09-29,
+the distribution default on 2026-10-02. The reasoning is kept for the record.)
 
 Upstream's `sqrt` is deliberate, and its own principled default genuinely is multiscatter
 - energy preservation is the more physically correct behaviour. Both fixes were taken to

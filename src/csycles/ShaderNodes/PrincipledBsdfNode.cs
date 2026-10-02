@@ -172,11 +172,14 @@ namespace ccl.ShaderNodes
 		/// so the 26 that used to mean GGX_GLASS - the id the kernel tests for to take
 		/// the single-scatter path - became MULTI_GGX_GLASS, the marker that turns
 		/// multiscatter on. cycles_shadernode_set_enum casts the int straight to a
-		/// ClosureType with no name lookup, so nothing caught it. Shipping Rhino renders
-		/// the principled transmission lobe single-scatter; with 26 it gained 4.x's
-		/// energy preservation, which brightens rough transmissive materials and leaves
-		/// smooth ones alone. Measured against 9.0.26253.22503 on a white PBR roughness
-		/// sweep: 1.04x at roughness 0, 1.12x at 0.5, 1.65x and blown out at 1.0.
+		/// ClosureType with no name lookup, so nothing caught it.
+		///
+		/// The default is Multiscatter_GGX, as in Blender. Shipping Rhino rendered the
+		/// principled transmission lobe single-scatter, which loses energy as roughness
+		/// rises: a Cycles Glass sphere at Frost 1 came out mid-grey where Blender 5.2,
+		/// fed the same graph, renders it near white. Against 9.0.26253.22503 on a white
+		/// PBR roughness sweep multiscatter is 1.04x at roughness 0, 1.12x at 0.5 and
+		/// 1.65x at 1.0 - Cycles 5's behaviour, not a fault to correct.
 		/// </summary>
 		public enum Distributions
 		{
@@ -255,7 +258,7 @@ namespace ccl.ShaderNodes
 			ins.Emission.Value = new float4(0.0f);
 			ins.EmissionStrength.Value = 0.0f;
 			ins.Alpha.Value = 1.0f;
-			Distribution = Distributions.GGX;
+			Distribution = Distributions.Multiscatter_GGX;
 		}
 
 		public Distributions Distribution { get; set; }
