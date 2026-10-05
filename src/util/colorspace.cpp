@@ -307,30 +307,10 @@ ustring ColorSpaceManager::detect_known_colorspace(ustring colorspace,
     LOG_WARNING << "OCIO config error: " << exception.what();
   }
 
-  /* A guess is only usable if the config knows it and it is not a data space. Rhino sets no
-   * $OCIO, so OpenColorIO runs on its built-in raw config: one colorspace, "raw", which is
-   * data, behind the "default" role, and no default_byte role (an empty string, not null).
-   * Taking either made every image that asked for auto detection data or scene linear, so
-   * 8-bit sRGB textures lost their decode - washed out and brighter than 3.5, which guessed
-   * sRGB for them. A data space is never a sensible guess for an auto request, so skip it
-   * and fall through to the simple guess below. */
-  auto usable_guess = [&config](const char *name) {
-    if (name == nullptr || name[0] == '\0') {
-      return false;
-    }
-    try {
-      const OCIO::ConstColorSpaceRcPtr space = config->getColorSpace(name);
-      return space && !space->isData();
-    }
-    catch (const OCIO::Exception &) {
-      return false;
-    }
-  };
-
   /* Rely on OpenImageIO and OpenColorIO guessed color spaces when available. This relies on
    * recent OpenImageIO versions supporting interop IDs. */
   if (config && colorspace == u_colorspace_auto) {
-    if (usable_guess(file_colorspace)) {
+    if (file_colorspace[0] && config->getColorSpace(file_colorspace)) {
       colorspace = file_colorspace;
     }
     else {
@@ -357,30 +337,21 @@ ustring ColorSpaceManager::detect_known_colorspace(ustring colorspace,
 #  else
       const char *role_colorspace = (is_float) ? config->getRoleColorSpace("default_float") :
                                                  config->getRoleColorSpace("default_byte");
-      role_colorspace = (role_colorspace && role_colorspace[0]) ?
-                            role_colorspace :
-                            config->getRoleColorSpace("default");
+      role_colorspace = (role_colorspace) ? role_colorspace : config->getRoleColorSpace("default");
 #  endif
-      if (usable_guess(role_colorspace)) {
+      if (role_colorspace) {
         colorspace = role_colorspace;
       }
     }
   }
 #endif
 
-  /* Fall back to simple guess if we don't have OpenColorIO.
-   *
-   * An sRGB guess is scene_linear_srgb, not u_colorspace_srgb: the latter expects an OCIO
-   * processor for the sRGB to linear part and only re-encodes on top of it, so with no usable
-   * config (Rhino's raw one) the decode was dropped and the encode kept - brighter and paler
-   * than the file. scene_linear_srgb is decoded by the image node itself
-   * (NODE_IMAGE_COMPRESS_AS_SRGB), which is exact whenever scene linear is Rec.709, as it is
-   * without a config. */
+  /* Fall back to simple guess if we don't have OpenColorIO. */
   if (colorspace == u_colorspace_auto) {
     colorspace = (is_float && !(strcmp(file_colorspace, "srgb_rec709_scene") == 0 ||
                                 strcmp(file_colorspace, "srgb_rec709_display") == 0)) ?
                      u_colorspace_scene_linear :
-                     u_colorspace_scene_linear_srgb;
+                     u_colorspace_srgb;
   }
 
   /* Builtin colorspaces. */
