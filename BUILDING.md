@@ -144,8 +144,7 @@ than stage an incomplete payload. `-SkipBuild` re-checks and re-stages.
 About a second, no build needed (python for the audits). Runs the static audits,
 checks that the committed payload matches the kernel sources, that the library
 bundle is the pinned one, and that the installer's kernel list matches. Exit code is
-non-zero on failure. `-Render` adds the golden-image test; see
-[KNOWN-ISSUES.md](KNOWN-ISSUES.md).
+non-zero on failure.
 
 ### Run
 

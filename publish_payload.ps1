@@ -29,8 +29,7 @@
 
     This is also what the build agent will run when someone gets to it. Nothing here
     needs a GPU: nvcc and hipcc both cross-compile, and this machine builds all 22 HIP
-    targets with a single AMD APU in it. Testing them is another matter, which is what
-    tools/run_checks.ps1 -Render is for.
+    targets with a single AMD APU in it. Testing them needs the hardware.
 
 .PARAMETER Configuration
     Release (the default) writes the tracked payload. Debug writes the debug one, which

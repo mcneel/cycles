@@ -20,12 +20,6 @@ Known issues
 - **macOS: Apple Silicon only.** Blender publishes no Intel macOS libraries for
   Cycles 5.
 
-## Tooling
-
-- `tools/render_regression.ps1`, and so `tools/run_checks.ps1 -Render`, only runs on
-  the machine it was written on: its default paths and the render harness it calls
-  (`render_one.ps1`) are outside this repository.
-
 ## Expected look changes from Cycles 3.5
 
 Accepted, not bugs.

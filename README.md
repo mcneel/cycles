@@ -43,7 +43,6 @@ See [BUILDING.md](BUILDING.md).
 | `make.bat` | upstream wrapper; `make.bat update` fetches the Windows libraries |
 | `lib/` | Blender's precompiled libraries, as submodules fetched on demand |
 | `tools/run_checks.ps1`, `tools/audit_*.py`, `tools/check_lib_bundle.ps1` | static checks |
-| `tools/render_regression.ps1`, `tools/reference/`, `tools/driver.py` | golden-image render test |
 | `tools/DIAGNOSTICS.md` | runtime diagnostic switches |
 | `smoketest/` | console harness that renders through csycles without Rhino |
 
