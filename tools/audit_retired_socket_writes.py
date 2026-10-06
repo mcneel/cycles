@@ -50,16 +50,7 @@ def write_re(name: str) -> re.Pattern[str]:
 
 # Known and accepted. Keep the reason with the entry so it can be re-judged, and keep it
 # specific to a file so a new call site elsewhere still reports.
-ACCEPTED = {
-    # Decided, not overlooked: 4.4 mapped PbrSubsurfaceColor to BaseColor and
-    # PbrTransmissionRoughness to Roughness, and both lost the race in
-    # ShaderGraph::connect because those inputs were already taken - so 4.4's effective
-    # behaviour was to ignore them, and PORTING-GAPS.md keeps that. Unlike the Glass
-    # case these are not silently landing on an unchosen default: the parameter they
-    # would have shared is set deliberately by another slot.
-    ("RhinoFullNxt.cs", "SubsurfaceColor"),
-    ("RhinoFullNxt.cs", "TransmissionRoughness"),
-}
+ACCEPTED: set[tuple[str, str]] = set()
 
 
 def retired_sockets() -> dict[str, list[str]]:

@@ -41,11 +41,7 @@ INPUTS_CLASS_RE = re.compile(r'class\s+\w*Inputs\s*:\s*Inputs\b')
 CLASS_RE = re.compile(r"^\s*(?:public|internal|private)?\s*class\s+\w+", re.M)
 
 # Known and accepted. Keep the reason with the entry so it can be re-judged.
-ACCEPTED = {
-    # musgrave_texture is not a registered node type in 5.2 and has no RhinoCycles
-    # caller, so the clash is unreachable. See PORTING-GAPS.md.
-    ("MusgraveTexture.cs", "dimension"),
-}
+ACCEPTED: set[tuple[str, str]] = set()
 
 
 def delegating_members(src: str) -> set[str]:
@@ -95,7 +91,7 @@ def main() -> int:
         print(f"{filename}: '{name}' is both a direct member and an input socket - "
               f"SetSockets runs last and overwrites the member")
     for filename, name in accepted_seen:
-        print(f"{filename}: '{name}' clashes, accepted (see PORTING-GAPS.md)")
+        print(f"{filename}: '{name}' clashes, accepted")
 
     if clashes:
         print(f"member/socket clash: {len(clashes)} unaccepted, "
