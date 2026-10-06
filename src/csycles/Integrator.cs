@@ -56,18 +56,6 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set the minimum amount of bounces for a ray.
-		/// </summary>
-		public int MinBounce
-		{
-			set
-			{
-				CSycles.integrator_set_min_bounce(Session.Id, value);
-
-			}
-		}
-
-		/// <summary>
 		/// Set the maximum amount of bounces for a transparency ray.
 		///
 		/// Used when BranchedPath tracing is set.
@@ -77,18 +65,6 @@ namespace ccl
 			set
 			{
 				CSycles.integrator_set_transparent_max_bounce(Session.Id, value);
-			}
-		}
-		/// <summary>
-		/// Set the minimum amount of bounces for a transparency ray.
-		///
-		/// Used when BranchedPath tracing is set.
-		/// </summary>
-		public int TransparentMinBounce
-		{
-			set
-			{
-				CSycles.integrator_set_transparent_min_bounce(Session.Id, value);
 			}
 		}
 
@@ -279,28 +255,6 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set the step rate for volume tracing
-		/// </summary>
-		public float VolumeStepRate
-		{
-			set
-			{
-				CSycles.integrator_set_volume_step_rate(Session.Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set the maximum amount of steps for volume tracing.
-		/// </summary>
-		public int VolumeMaxSteps
-		{
-			set
-			{
-				CSycles.integrator_set_volume_max_steps(Session.Id, value);
-			}
-		}
-
-		/// <summary>
 		/// Set the seed for sampling
 		/// </summary>
 		public int Seed
@@ -345,7 +299,7 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set the sampling pattern to use (CMJ or Sobol).
+		/// Set the sampling pattern to use.
 		/// </summary>
 		public SamplingPattern SamplingPattern
 		{

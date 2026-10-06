@@ -35,9 +35,6 @@ namespace cclext
 
 namespace ccl
 {
-
-  public delegate void ConsoleWriteDelegate(string message);
-
 	public class Utilities
 	{
 		public static Utilities g_utilities;
@@ -49,19 +46,6 @@ namespace ccl
 		}
 
 		public static Utilities Instance => g_utilities ?? (g_utilities = new Utilities());
-
-		private static ConsoleWriteDelegate m_consoleWriter = null;
-
-		public static void RegisterConsoleWriter(ConsoleWriteDelegate consoleWriter)
-		{
-			m_consoleWriter = consoleWriter;
-		}
-
-		public static void ConsoleWrite(string message) {
-			if(m_consoleWriter!=null) {
-				m_consoleWriter(message);
-			}
-		}
 
 		public float[] parse_floats(string floats)
 		{
@@ -104,7 +88,6 @@ namespace ccl
 		/// <returns>true if a parsing was possible</returns>
 		public bool get_float4(float4 f4, string floats)
 		{
-			//f4 = new float4(0.0f);
 			if (string.IsNullOrEmpty(floats)) return false;
 
 			var vec = parse_floats(floats);
@@ -190,21 +173,6 @@ namespace ccl
 			if (string.IsNullOrEmpty(nr)) return;
 
 			socket.Value = int.Parse(nr);
-		}
-
-		public int[] parse_ints(string ints)
-		{
-			ints = ints.Trim();
-			ints = ints.Replace("  ", " ");
-			ints = ints.Replace(",", "");
-			var fs = ints.Split(' ');
-			var realints = new int[fs.Length];
-			for (var i = 0; i < fs.Length; i++)
-			{
-				realints[i] = int.Parse(fs[i]);
-			}
-
-			return realints;
 		}
 
 		public bool get_bool(ref bool val, string booleanstring)

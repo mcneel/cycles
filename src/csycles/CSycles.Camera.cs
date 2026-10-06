@@ -64,13 +64,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_camera_set_panorama_type(IntPtr sessionId, uint type);
-		public static void camera_set_panorama_type(IntPtr sessionId, PanoramaType type)
-		{
-			cycles_camera_set_panorama_type(sessionId, (uint)type);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_camera_compute_auto_viewplane(IntPtr sessionId);
 		public static void camera_compute_auto_viewplane(IntPtr sessionId)
 		{
@@ -113,13 +106,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_camera_set_nearclip(IntPtr sessionId, float nearclip);
-		public static void camera_set_nearclip(IntPtr sessionId, float nearclip)
-		{
-			cycles_camera_set_nearclip(sessionId, nearclip);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_camera_set_farclip(IntPtr sessionId, float farclip);
 		public static void camera_set_farclip(IntPtr sessionId, float farclip)
 		{
@@ -155,31 +141,10 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_camera_set_shuttertime(IntPtr sessionId, float shuttertime);
-		public static void camera_set_shuttertime(IntPtr sessionId, float shuttertime)
-		{
-			cycles_camera_set_shuttertime(sessionId, shuttertime);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_camera_set_focaldistance(IntPtr sessionId, float focaldistance);
 		public static void camera_set_focaldistance(IntPtr sessionId, float focaldistance)
 		{
 			cycles_camera_set_focaldistance(sessionId, focaldistance);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_camera_set_fisheye_fov(IntPtr sessionId, float fisheyeFov);
-		public static void camera_set_fisheye_fov(IntPtr sessionId, float fisheyeFov)
-		{
-			cycles_camera_set_fisheye_fov(sessionId, fisheyeFov);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_camera_set_fisheye_lens(IntPtr sessionId, float fisheyeLens);
-		public static void camera_set_fisheye_lens(IntPtr sessionId, float fisheyeLens)
-		{
-			cycles_camera_set_fisheye_lens(sessionId, fisheyeLens);
 		}
 		#endregion
 	}

@@ -29,24 +29,18 @@ namespace ccl
 		public uint Id { get; }
 
 		/// <summary>
-		/// Session reference of this client
-		/// </summary>
-		//public Session Session { get; set; }
-
-		/// <summary>
 		/// Create a new client
 		/// </summary>
 		public Client()
 		{
-			Id = 0; // CSycles.new_client();
+			Id = 0;
 		}
 
 		/// <summary>
-		/// Release client memory
+		/// Nothing to release; ccycles keeps no per-client state.
 		/// </summary>
 		public void Dispose()
 		{
-			//CSycles.release_client();
 		}
 	}
 }

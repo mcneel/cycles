@@ -40,11 +40,6 @@ namespace ccl
 			Code = "";
 			Xml = "";
 			m_nodes.Clear();
-
-			// TODO XXXX
-
-			/*Output = new OutputNode();
-			AddNode(Output);*/
 		}
 
 		/// <summary>

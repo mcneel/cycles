@@ -24,7 +24,6 @@ namespace ccl.ShaderNodes
 	public class PrincipledBsdfInputs : Inputs
 	{
 		public ColorSocket BaseColor { get; set; }
-		//public ColorSocket SpecularColor { get; set; }
 		public ColorSocket SubsurfaceColor { get; set; }
 		public FloatSocket Metallic { get; set; }
 		public FloatSocket Subsurface { get; set; }
@@ -105,7 +104,6 @@ namespace ccl.ShaderNodes
 			Tangent = new VectorSocket(parentNode, "Tangent", "tangent");
 
 			AddSocket(BaseColor);
-			//AddSocket(SpecularColor);
 			AddSocket(Subsurface);
 			AddSocket(SubsurfaceRadius);
 			AddSocket(SubsurfaceScale);
@@ -274,7 +272,6 @@ namespace ccl.ShaderNodes
 		internal override void ParseXml(XmlReader xmlNode)
 		{
 			Utilities.Instance.get_float4(ins.BaseColor, xmlNode);
-			//Utilities.Instance.get_float4(ins.SpecularColor, xmlNode);
 			Utilities.Instance.get_float(ins.Subsurface, xmlNode);
 			Utilities.Instance.get_float4(ins.SubsurfaceRadius, xmlNode);
 			Utilities.Instance.get_float(ins.SubsurfaceScale, xmlNode);

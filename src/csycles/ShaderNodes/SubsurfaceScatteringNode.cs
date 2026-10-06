@@ -104,20 +104,6 @@ namespace ccl.ShaderNodes
 			return "Burley";
 		}
 
-		static public FalloffTypes SssEnumFromInt(int m)
-		{
-			var falloff = FalloffTypes.Burley;
-			var falloffstr = SssMethodFromInt(m);
-			if (!string.IsNullOrEmpty(falloffstr))
-			{
-				if (Enum.TryParse(falloffstr, out FalloffTypes ft))
-				{
-					falloff = ft;
-				}
-			}
-			return falloff;
-		}
-
 		public SubsurfaceScatteringInputs ins => (SubsurfaceScatteringInputs)inputs;
 		public SubsurfaceScatteringOutputs outs => (SubsurfaceScatteringOutputs)outputs;
 

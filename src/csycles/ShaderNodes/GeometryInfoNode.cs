@@ -22,7 +22,6 @@ namespace ccl.ShaderNodes
 {
 	public class GeometryInfoOutputs : Outputs
 	{
-		//public VectorSocket NormalIn { get; set; }
 		/// <summary>
 		/// Position of the shading point
 		/// </summary>
@@ -61,9 +60,7 @@ namespace ccl.ShaderNodes
 
 		internal GeometryInfoOutputs(ShaderNode parentNode)
 		{
-			//IsCameraRay = new FloatSocket(parentNode, "Is Camera Ray");
-			//AddSocket(IsCameraRay);
-			Position = new VectorSocket(parentNode, "Position", "position");
+			Position =new VectorSocket(parentNode, "Position", "position");
 			AddSocket(Position);
 			Normal = new VectorSocket(parentNode, "Normal", "normal");
 			AddSocket(Normal);

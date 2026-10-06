@@ -130,9 +130,6 @@ void CCyclesLight::flush()
 	if (ccl::SunLight *sun = dynamic_cast<ccl::SunLight *>(light)) {
 		sun->set_angle(angle);
 	}
-	if (ccl::BackgroundLight *bg = dynamic_cast<ccl::BackgroundLight *>(light)) {
-		bg->set_map_resolution(map_resolution);
-	}
 
 	/* Placement. Pre-5.2 the light carried co, dir and (for area lights) axisu
 	 * and axisv directly; 5.2 takes all of it from the Object transform, with
@@ -232,12 +229,6 @@ void cycles_light_set_use_mis(ccl::Session *session_id, CCyclesLight *light, uns
 void cycles_light_set_max_bounces(ccl::Session *session_id, CCyclesLight *light, unsigned int max_bounces)
 {
 	light->max_bounces = (int)max_bounces;
-	light->flush();
-}
-
-void cycles_light_set_map_resolution(ccl::Session *session_id, CCyclesLight *light, unsigned int map_resolution)
-{
-	light->map_resolution = (int)map_resolution;
 	light->flush();
 }
 

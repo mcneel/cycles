@@ -136,10 +136,6 @@ namespace ccl.ShaderNodes
 		/// </summary>
 		public float ProjectionBlend { get; set; }
 		/// <summary>
-		/// ImageTexture float image
-		/// </summary>
-		public bool IsFloat { get; set; }
-		/// <summary>
 		/// ImageTexture use alpha channel if true
 		///
 		/// TODO [NATHANLOOK] hook up different alpha usage types. For now auto (true), ignore (false)
@@ -176,7 +172,6 @@ namespace ccl.ShaderNodes
 			CSycles.shadernode_set_member_float(Id, "projection_blend", ProjectionBlend);
 			CSycles.shadernode_set_member_int(Id, "extension", (int)Extension);
 			CSycles.shadernode_set_member_bool(Id, "use_alpha", UseAlpha);
-			//CSycles.shadernode_set_member_bool(Id, "is_linear", IsLinear);
 			CSycles.shadernode_set_member_bool(Id, "alternate_tiles", AlternateTiles);
 		}
 		private void SetProjection(string projection)
@@ -207,7 +202,6 @@ namespace ccl.ShaderNodes
 			{
 				SetInterpolation(interpolation);
 			}
-			ImageParseXml(xmlNode);
 		}
 
 		public override string CreateXmlAttributes()

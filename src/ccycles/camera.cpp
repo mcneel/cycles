@@ -63,14 +63,6 @@ void cycles_camera_set_type(ccl::Session* session_id, camera_type type)
 	}
 }
 
-void cycles_camera_set_panorama_type(ccl::Session* session_id, panorama_type type)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->camera->set_panorama_type((ccl::PanoramaType)type);
-	}
-}
-
 void cycles_camera_set_matrix(ccl::Session* session_id,
 	float a, float b, float c, float d,
 	float e, float f, float g, float h,
@@ -151,14 +143,6 @@ void cycles_camera_set_sensor_height(ccl::Session* session_id, float sensor_heig
 	}
 }
 
-void cycles_camera_set_nearclip(ccl::Session* session_id, float nearclip)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->camera->set_nearclip(nearclip);
-	}
-}
-
 void cycles_camera_set_farclip(ccl::Session* session_id, float farclip)
 {
 	ccl::Scene* sce = nullptr;
@@ -204,29 +188,5 @@ void cycles_camera_set_focaldistance(ccl::Session* session_id, float focaldistan
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		sce->camera->set_focaldistance(focaldistance);
-	}
-}
-
-void cycles_camera_set_shuttertime(ccl::Session* session_id, float shuttertime)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->camera->set_shuttertime(shuttertime);
-	}
-}
-
-void cycles_camera_set_fisheye_fov(ccl::Session* session_id, float fisheye_fov)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->camera->set_fisheye_fov(fisheye_fov);
-	}
-}
-
-void cycles_camera_set_fisheye_lens(ccl::Session* session_id, float fisheye_lens)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->camera->set_fisheye_lens(fisheye_lens);
 	}
 }

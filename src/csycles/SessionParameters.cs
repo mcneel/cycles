@@ -65,17 +65,6 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set the output path to which final render should be written
-		/// </summary>
-		public string OutputPath
-		{
-			set
-			{
-				CSycles.session_params_set_output_path(Id, value);
-			}
-		}
-
-		/// <summary>
 		/// Set to true if experimental shading features should be used
 		/// </summary>
 		public bool Experimental
@@ -118,39 +107,6 @@ namespace ccl
 			set
 			{
 				CSycles.session_params_set_threads(Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set the cancel timeout
-		/// </summary>
-		public double CancelTimeout
-		{
-			set
-			{
-				CSycles.session_params_set_cancel_timeout(Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set the reset timeout
-		/// </summary>
-		public double ResetTimeout
-		{
-			set
-			{
-				CSycles.session_params_set_reset_timeout(Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set the text timeout
-		/// </summary>
-		public double TextTimeout
-		{
-			set
-			{
-				CSycles.session_params_set_text_timeout(Id, value);
 			}
 		}
 

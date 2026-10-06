@@ -153,7 +153,6 @@ namespace ccl.ShaderNodes
 			{
 				SetInterpolation(interpolation);
 			}
-			ImageParseXml(xmlNode);
 		}
 
 

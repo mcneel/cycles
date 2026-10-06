@@ -15,125 +15,9 @@ limitations under the License.
 **/
 
 using System;
-using System.Runtime.InteropServices;
 
 namespace ccl
 {
-	internal struct _f4Api
-	{
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		[return: MarshalAs(UnmanagedType.LPStruct)]
-		static public extern void cycles_f4_add([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		[return: MarshalAs(UnmanagedType.LPStruct)]
-		static public extern void cycles_f4_sub([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		[return: MarshalAs(UnmanagedType.LPStruct)]
-		static public extern void cycles_f4_mul([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		[return: MarshalAs(UnmanagedType.LPStruct)]
-		static public extern void cycles_f4_div([MarshalAs(UnmanagedType.Struct)] _float4 a, [MarshalAs(UnmanagedType.Struct)] _float4 b, [In, Out, MarshalAs(UnmanagedType.Struct)] ref _float4 res);
-
-	}
-	[StructLayout(LayoutKind.Sequential, Pack = 8)]
-	public struct _float4
-	{
-		public float x;
-		public float y;
-		public float z;
-		public float w;
-
-		public _float4(float a, float b, float c, float d)
-		{
-			x = a;
-			y = b;
-			z = c;
-			w = d;
-		}
-
-		public static explicit operator float4(_float4 _f4)
-		{
-			float4 f4 = new float4(_f4.x, _f4.y, _f4.z, _f4.w);
-
-			return f4;
-		}
-
-		public static explicit operator _float4(float4 f4)
-		{
-			_float4 _f4 = new _float4(f4.x, f4.y, f4.z, f4.w);
-
-			return _f4;
-		}
-
-		public static _float4 operator +(_float4 a, _float4 b)
-		{
-			_float4 res = new _float4();
-			_f4Api.cycles_f4_add(a, b, ref res);
-			return res;
-		}
-
-		public static _float4 operator -(_float4 a, _float4 b)
-		{
-			_float4 res = new _float4();
-			_f4Api.cycles_f4_sub(a, b, ref res);
-			return res;
-		}
-		public static _float4 operator *(_float4 a, _float4 b)
-		{
-			_float4 res = new _float4();
-			_f4Api.cycles_f4_mul(a, b, ref res);
-			return res;
-		}
-		public static _float4 operator /(_float4 a, _float4 b)
-		{
-			_float4 res = new _float4();
-			_f4Api.cycles_f4_div(a, b, ref res);
-			return res;
-		}
-		public float this[int index]
-		{
-			get
-			{
-				switch (index)
-				{
-					case 0:
-						return x;
-					case 1:
-						return y;
-					case 2:
-						return z;
-					case 3:
-						return w;
-					default:
-						throw new IndexOutOfRangeException("Only 0-3 are acceptable");
-				}
-			}
-			set
-			{
-				switch (index)
-				{
-					case 0:
-						x = value;
-						break;
-					case 1:
-						y = value;
-						break;
-					case 2:
-						z = value;
-						break;
-					case 3:
-						w = value;
-						break;
-					default:
-						throw new IndexOutOfRangeException("Only 0-3 are acceptable");
-				}
-
-			}
-		}
-
-
-	}
 	public class float4
 	{
 		public float x;
@@ -325,11 +209,6 @@ namespace ccl
 		public static float Dot(float4 a, float4 b)
 		{
 			return (a.x * b.x + a.y * b.y) + (a.z * b.z + a.w * b.w);
-		}
-
-		public static float4 Normalize(float4 a)
-		{
-			return a / a.Length();
 		}
 
 		public bool IsZero(bool checkW)

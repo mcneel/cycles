@@ -74,22 +74,6 @@ namespace ccl
 	}
 
 	/// <summary>
-	/// Integration method used for ray casting.
-	/// </summary>
-	public enum IntegratorMethod : int
-	{
-		/// <summary>
-		/// On each hit rays get split up for all possible equivalents
-		/// </summary>
-		BranchedPath = 0,
-		Path
-	}
-
-	/// <summary>
-	/// Sampling patterns available in
-	/// Cycles.
-	/// </summary>
-	/// <summary>
 	/// Sampling patterns. Mirrors ccl::SamplingPattern in kernel/types.h.
 	///
 	/// The old members were Sobol = 0 and CMJ = 1. Correlated multi-jitter is
@@ -108,65 +92,12 @@ namespace ccl
 		Automatic = 5,
 	}
 
-	public enum BvhType : uint
-	{
-		Dynamic,
-		Static
-	}
-
-	/// <summary>
-	/// BVH layouts. Mirrors ccl::KernelBVHLayout in kernel/types.h (ccl::BVHLayout
-	/// is an alias of it).
-	///
-	/// Cycles dropped the wide BVH builders, so Bvh4 and Bvh8 no longer exist.
-	/// They used to sit on bits 1 and 2, which upstream now uses for Embree and
-	/// OptiX - so the old Default, being Bvh8, was asking for BVH_LAYOUT_OPTIX,
-	/// and the old OptiX was asking for MULTI_OPTIX_EMBREE. The only caller is
-	/// behind #if LEGACY and is not compiled, so nothing was misbuilding.
-	/// </summary>
-	[Flags]
-	public enum BvhLayout : uint
-	{
-		None = 0,
-
-		Bvh2 = (1 << 0),
-		Embree = (1 << 1),
-		OptiX = (1 << 2),
-		MultiOptiX = (1 << 3),
-		MultiOptiXEmbree = (1 << 4),
-		Metal = (1 << 5),
-		MultiMetal = (1 << 6),
-		MultiMetalEmbree = (1 << 7),
-		Hiprt = (1 << 8),
-		MultiHiprt = (1 << 9),
-		MultiHiprtEmbree = (1 << 10),
-		EmbreeGpu = (1 << 11),
-		MultiEmbreeGpu = (1 << 12),
-		MultiEmbreeGpuEmbree = (1 << 13),
-
-		/* Default BVH layout to use for CPU. */
-		Auto = Embree,
-		All = Bvh2 | Embree | OptiX | Metal | Hiprt | MultiHiprt | MultiHiprtEmbree |
-		      EmbreeGpu | MultiEmbreeGpu | MultiEmbreeGpuEmbree,
-	}
-
 	public enum CameraType : uint
 	{
 		Perspective,
 		Orthographic,
 		Panorama,
 		Custom,
-	}
-
-	public enum PanoramaType : uint
-	{
-		Equirectangular,
-		FisheyeEquidistant,
-		FisheyeEquisolid,
-		MirrorBall,
-		FisheyeLensPolynomial,
-		EquiangularCubemapFace,
-		CentralCylindrical
 	}
 
 	public enum FilterType : uint

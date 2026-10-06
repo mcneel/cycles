@@ -139,14 +139,12 @@ namespace ccl.ShaderNodes
 		/// </summary>
 		public string Filename { get; set; }
 		/// <summary>
-		/// Get or set the float data for image. Use for HDR images
+		/// Get or set the float pixels for an image Rhino holds in memory. Use for HDR images
 		/// </summary>
-		public float[] FloatImage { set; get; }
 		public IntPtr FloatImagePtr { set; get; } = IntPtr.Zero;
 		/// <summary>
-		/// Get or set the byte data for image
+		/// Get or set the byte pixels for an image Rhino holds in memory
 		/// </summary>
-		public byte[] ByteImage { set; get; }
 		public IntPtr ByteImagePtr { set; get; } = IntPtr.Zero;
 		/// <summary>
 		/// Get or set image resolution width
@@ -240,40 +238,6 @@ namespace ccl.ShaderNodes
 			CSycles.shadernode_texmapping_set_mapping(Id, (uint)XMapping, (uint)YMapping, (uint)ZMapping);
 
 			CSycles.shadernode_texmapping_set_type(Id, (uint)Mapping);
-
-			//CSycles.shadernode_set_member_bool(Id, "is_linear", IsLinear);
-		}
-
-		protected void ImageParseXml(System.Xml.XmlReader xmlNode)
-		{
-#if DISABLEFORNOW
-			var imgsrc = xmlNode.GetAttribute("src");
-			if (!string.IsNullOrEmpty(imgsrc) && System.IO.File.Exists(imgsrc))
-			{
-				using (var bmp = new System.Drawing.Bitmap(imgsrc))
-				{
-					bmp.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
-					var l = bmp.Width * bmp.Height * 4;
-					var bmpdata = new byte[l];
-					for (var x = 0; x < bmp.Width; x++)
-					{
-						for (var y = 0; y < bmp.Height; y++)
-						{
-							var pos = y * bmp.Width * 4 + x * 4;
-							var pixel = bmp.GetPixel(x, y);
-							bmpdata[pos] = pixel.R;
-							bmpdata[pos + 1] = pixel.G;
-							bmpdata[pos + 2] = pixel.B;
-							bmpdata[pos + 3] = pixel.A;
-						}
-					}
-					ByteImage = bmpdata;
-					Width = (uint)bmp.Width;
-					Height = (uint)bmp.Height;
-					Filename = imgsrc;
-				}
-			}
-#endif
 		}
 	}
 }

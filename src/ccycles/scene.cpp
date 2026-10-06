@@ -16,95 +16,16 @@ limitations under the License.
 
 #include "internal_types.h"
 
-/* Find pointers for CCScene and ccl::Scene. Return false if either fails. */
+/* Find the ccl::Scene of a session. Return false if it has none. */
 bool scene_find(ccl::Session* sid, ccl::Scene** sce)
 {
 	(*sce) = sid->scene.get();
 	return *sce != nullptr;
 }
 
-
-/* Find a ccl::Shader in a given ccl::Scene, based on shader_id
-*/
-ccl::Shader* find_shader_in_scene(ccl::Scene* sce, unsigned int shader_id)
-{
-	/* 5.2: Scene::shaders is a unique_ptr_vector - indexed, not iterated. */
-	if (shader_id < sce->shaders.size()) {
-		return sce->shaders[shader_id];
-	}
-	return nullptr;
-}
-
-unsigned int get_idx_for_shader_in_scene(ccl::Scene* sce, ccl::Shader* sh)
-{
-	for (size_t idx = 0; idx < sce->shaders.size(); idx++) {
-		if (sce->shaders[idx] == sh) {
-			return (unsigned int)idx;
-		}
-	}
-	return (unsigned int)-1;
-
-}
-
-/* implement CCScene methods*/
-
-void CCScene::builtin_image_info(const std::string& builtin_name, void* builtin_data, ccl::ImageMetaData& imdata) //bool& is_float, int& width, int& height, int& depth, int& channels)
-{
-	CCImage* img = static_cast<CCImage*>(builtin_data);
-	imdata.width = img->width;
-	imdata.height = img->height;
-	/* ImageMetaData has no depth in 5.2; 3D image metadata was dropped. */
-	imdata.channels = img->channels;
-
-	assert(false);
-	// TODO: XXXX figure out how to do images
-    // TODO: XXXX probably just utilize OIIO directly
-    //imdata.is_float = img->is_float;
-}
-
-bool CCScene::builtin_image_pixels(const std::string& builtin_name, void* builtin_data, int tile, unsigned char* pixels, const size_t pixels_size, const bool associate_alpha, const bool free_cache)
-{
-	CCImage* img = static_cast<CCImage*>(builtin_data);
-	memcpy(pixels, img->builtin_data, (size_t)(img->width*img->height*img->channels)*sizeof(unsigned char));
-	return false;
-}
-
-bool CCScene::builtin_image_float_pixels(const std::string& builtin_name, void* builtin_data, int tile, float* pixels, const size_t pixels_size, const bool associate_alpha, const bool free_cache)
-{
-	CCImage* img = static_cast<CCImage*>(builtin_data);
-	memcpy(pixels, img->builtin_data, (size_t)(img->width*img->height*img->channels)*sizeof(float));
-	return false;
-}
-
-/* *** */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-CCL_CAPI unsigned int CDECL cycles_scene_create(unsigned int scene_params_id, unsigned int session_id)
-{
-	return UINT_MAX;
-}
-
-CCL_CAPI void CDECL cycles_scene_set_default_surface_shader(ccl::Session *session_id, ccl::Shader *shader_id)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->default_surface = shader_id;
-		logger.logit("Scene ", session_id, " set default surface shader ", shader_id);
-	}
-}
-
-CCL_CAPI ccl::Shader* CDECL cycles_scene_get_default_surface_shader(ccl::Session *session_id)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		return sce->default_surface;
-	}
-
-	return nullptr;
-}
 
 CCL_CAPI ccl::Shader* CDECL cycles_scene_get_background_shader(ccl::Session* session_id)
 {
@@ -115,12 +36,7 @@ CCL_CAPI ccl::Shader* CDECL cycles_scene_get_background_shader(ccl::Session* ses
 	return nullptr;
 }
 
-/* Set shader_id as default background shader for session_id.
- * Note that shader_id is the ID for the shader specific to this scene.
- * 
- * The correct ID can be found with cycles_scene_shader_id. The ID is also
- * returned from cycles_scene_add_shader.
- */
+/* Set shader_id as default background shader for session_id. */
 CCL_CAPI void CDECL cycles_scene_set_background_shader(ccl::Session *session_id, ccl::Shader *shader_id)
 {
 	ccl::Scene* sce = nullptr;
@@ -144,11 +60,6 @@ CCL_CAPI void CDECL cycles_scene_reset(ccl::Session* session_id)
 CCL_CAPI bool CDECL cycles_scene_try_lock(ccl::Session* session)
 {
 	return session->scene->mutex.try_lock();
-}
-
-CCL_CAPI void CDECL cycles_scene_lock(ccl::Session* session)
-{
-	session->scene->mutex.lock();
 }
 
 CCL_CAPI void CDECL cycles_scene_unlock(ccl::Session* session)

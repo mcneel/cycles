@@ -39,17 +39,6 @@ ccl::Object* cycles_scene_add_object(ccl::Session* session_id)
 	return nullptr;
 }
 
-void cycles_scene_object_delete(ccl::Session* session, ccl::Object* obj)
-{
-	#if 0
-	ccl::Scene* sce = session->scene.get();
-	if(sce)
-	{
-		sce->delete_node(obj);
-	}
-	#endif
-}
-
 void cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object* object, ccl::Geometry* geometry)
 {
 	assert(object);
@@ -319,22 +308,4 @@ unsigned int cycles_scene_add_clipping_plane(ccl::Session* session_id, float a, 
 	}
 
 	return UINT_MAX;
-}
-
-void cycles_scene_discard_clipping_plane(ccl::Session* session_id, unsigned int cp_id)
-{
-	cycles_scene_set_clipping_plane(session_id, cp_id, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
-}
-
-void cycles_scene_set_clipping_plane(ccl::Session* session_id, unsigned int cp_id, float a, float b, float c, float d)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		ccl::float4 cp = ccl::make_float4(a, b, c, d);
-		sce->clipping_planes[cp_id] = cp;
-
-		logger.logit("Setting clipping plane ", sce->clipping_planes.size() - 1, " to scene ", session_id);
-
-		sce->object_manager->need_clipping_plane_update = true;
-	}
 }

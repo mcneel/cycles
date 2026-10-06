@@ -82,14 +82,8 @@ void cycles_geometry_set_shader(ccl::Session *session, ccl::Geometry *mesh_id, c
 
 void cycles_geometry_clear(ccl::Session* session, ccl::Geometry* geometry)
 {
+	/* No-op: the geometry stays in the scene. */
 	assert(geometry);
-
-	#if 0
-	if (geometry && session->scene.get())
-	{
-		session->scene->delete_node(geometry);
-	}
-	#endif
 }
 
 void cycles_geometry_tag_rebuild(ccl::Session* session_id, ccl::Geometry* geometry)
@@ -99,45 +93,6 @@ void cycles_geometry_tag_rebuild(ccl::Session* session_id, ccl::Geometry* geomet
 	{
 		geometry->tag_update(sce, true);
 		sce->light_manager->tag_update(sce, ccl::LightManager::MESH_NEED_REBUILD);
-	}
-}
-
-void cycles_mesh_set_smooth(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int smooth)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce))
-	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
-
-		assert(mesh);
-
-		if (mesh)
-		{
-			bool use_smooth = smooth == 1;
-			mesh->get_smooth().resize(mesh->get_triangles().size());
-
-			for (int i = 0; i < mesh->get_triangles().size(); i++)
-			{
-				mesh->get_smooth()[i] = use_smooth;
-			}
-		}
-	}
-}
-
-
-void cycles_mesh_reserve(ccl::Session* session_id, ccl::Geometry* geometry, unsigned vcount, unsigned fcount)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce))
-	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
-
-		assert(mesh);
-
-		if (mesh)
-		{
-			mesh->resize_mesh(vcount, fcount);
-		}
 	}
 }
 
@@ -194,14 +149,9 @@ void cycles_mesh_set_verts(ccl::Session* session_id, ccl::Geometry* geometry, fl
 				cycles_vertex.y = in_verts[i + 1];
 				cycles_vertex.z = in_verts[i + 2];
 
-
-				//logger.logit("v: ", f3.x, ",", f3.y, ",", f3.z);
 				cycles_mesh_vertices[j] = cycles_vertex;
 				generated[j] = cycles_vertex;
 			}
-
-			//ALB: IT looks like all meshes are triangles in CyclesX
-			//mesh->get_geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 		}
 	}
 }
@@ -227,19 +177,12 @@ void cycles_mesh_set_tris(ccl::Session *session_id, ccl::Geometry *geometry, int
 
 			for (auto i = 0U, j = 0U; i < fcount * 3; i += 3, j++)
 			{
-				//logger.logit("f: ", faces[i], ",", faces[i + 1], ",", faces[i + 2]);
 				cycles_mesh_triangles[i + 0] = faces[i + 0];
 				cycles_mesh_triangles[i + 1] = faces[i + 1];
 				cycles_mesh_triangles[i + 2] = faces[i + 2];
 
-				// TODO: XXXX revisit shader handling
-				//mesh->shader[j] = shader_id;
-
 				mesh->get_smooth()[j] = (1 == smooth);
 			}
-
-			//ALB: IT looks like all meshes are triangles in CyclesX
-			//mesh->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 
 			/* Writing straight into the socket arrays bypasses the generated
 			 * setters, so nothing marks them dirty and GeometryManager skips
@@ -252,77 +195,6 @@ void cycles_mesh_set_tris(ccl::Session *session_id, ccl::Geometry *geometry, int
 			mesh->tag_update(sce, true);
 
 			cycles_geometry_set_shader(session_id, geometry, shader_id);
-		}
-	}
-}
-
-void cycles_mesh_set_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned tri_idx, unsigned int v0, unsigned int v1, unsigned int v2, ccl::Shader *shader_id, unsigned int smooth)
-{
-	assert(false);
-
-	#if OLD_NOT_USED
-	assert(geometry);
-
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce))
-	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
-
-		assert(mesh);
-
-		if (mesh)
-		{
-			mesh->get_triangle(tri_idx).v[0] = (int)v0;
-			mesh->get_triangle(tri_idx).v[1] = (int)v1;
-			mesh->get_triangle(tri_idx).v[2] = (int)v2;
-
-
-			// TODO: XXXX revisit shader handling
-			//me->shader[tri_idx / 3] = shader_id;
-
-			mesh->get_smooth()[tri_idx] = (1 == smooth);
-
-			//I'm not sure about this - this is the old code. [NATHAN_LOOK]
-			//mesh->get_smooth()[mesh_id] = (1 == smooth);
-		}
-	}
-	#endif
-}
-
-void cycles_mesh_add_triangle(ccl::Session* session_id, ccl::Geometry* geometry, unsigned int v0, unsigned int v1, unsigned int v2, ccl::Shader *shader_id, unsigned int smooth)
-{
-	assert(geometry);
-
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce))
-	{
-		auto mesh = dynamic_cast<ccl::Mesh*>(geometry);
-
-		assert(mesh);
-
-		if (mesh)
-		{
-			/* 5.2 dropped Mesh::add_triangle; the triangle indices, per-face shader and
-			 * smooth flags are plain node sockets now.
-			 *
-			 * NODE_SOCKET_API_ARRAY's getter returns a non-const reference, so append in
-			 * place and flag the socket modified. Binding the getters to values instead
-			 * copied all three arrays on every call, which made adding n triangles O(n^2) -
-			 * unnoticed because RhinoCycles uploads meshes through the bulk
-			 * cycles_mesh_set_verts / set_tris path and never calls this. */
-			ccl::array<int> &tris = mesh->get_triangles();
-			tris.push_back_slow((int)v0);
-			tris.push_back_slow((int)v1);
-			tris.push_back_slow((int)v2);
-			mesh->tag_triangles_modified();
-
-			ccl::array<int> &shaders = mesh->get_shader();
-			shaders.push_back_slow(shader_id->id);
-			mesh->tag_shader_modified();
-
-			ccl::array<bool> &smooths = mesh->get_smooth();
-			smooths.push_back_slow(smooth == 1);
-			mesh->tag_smooth_modified();
 		}
 	}
 }
@@ -385,9 +257,6 @@ void cycles_mesh_set_vertex_normals(ccl::Session* session_id, ccl::Geometry* geo
 				f3.z = vnormals[i + 2];
 				fdata[j] = f3;
 			}
-
-			//ALB: IT looks like all meshes are triangles in CyclesX
-			//me->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 		}
 	}
 }
@@ -419,11 +288,8 @@ void cycles_mesh_set_vertex_colors(ccl::Session* session_id, ccl::Geometry* geom
 				f4.y = vcolors[i + 1];
 				f4.z = vcolors[i + 2];
 				f4.w = 1.0f;
-				cdata[j] = ccl::color_float4_to_uchar4(f4); //ccl::color_float_to_byte(f3);
+				cdata[j] = ccl::color_float4_to_uchar4(f4);
 			}
-
-			//ALB: IT looks like all meshes are triangles in CyclesX
-			//me->geometry_flags = ccl::Mesh::GeometryFlags::GEOMETRY_TRIANGLES;
 		}
 	}
 }
@@ -603,180 +469,3 @@ void cycles_mesh_attr_tangentspace(ccl::Session* session_id, ccl::Geometry* geom
 		}
 	}
 }
-
-#if 0 // POINTINESS
-/* Compare vertices by sum of their coordinates. */
-class VertexAverageComparator {
-public:
-	VertexAverageComparator(const ccl::array<ccl::float3>& verts)
-			: verts_(verts) {
-	}
-
-	bool operator()(const int& vert_idx_a, const int& vert_idx_b)
-	{
-		const ccl::float3 &vert_a = verts_[vert_idx_a];
-		const ccl::float3 &vert_b = verts_[vert_idx_b];
-		if(vert_a == vert_b) {
-			/* Special case for doubles, so we ensure ordering. */
-			return vert_idx_a > vert_idx_b;
-		}
-		const float x1 = vert_a.x + vert_a.y + vert_a.z;
-		const float x2 = vert_b.x + vert_b.y + vert_b.z;
-		return x1 < x2;
-	}
-
-protected:
-	const ccl::array<ccl::float3>& verts_;
-};
-
-void attr_create_pointiness(ccl::Mesh *mesh)
-{
-	const int num_verts = mesh->verts.size();
-	if(num_verts == 0) {
-		return;
-	}
-	/* STEP 1: Find out duplicated vertices and point duplicates to a single
-	 *         original vertex.
-	 */
-	ccl::vector<int> sorted_vert_indeices(num_verts);
-	for(int vert_index = 0; vert_index < num_verts; ++vert_index) {
-		sorted_vert_indeices[vert_index] = vert_index;
-	}
-	VertexAverageComparator compare(mesh->verts);
-	sort(sorted_vert_indeices.begin(), sorted_vert_indeices.end(), compare);
-	/* This array stores index of the original vertex for the given vertex
-	 * index.
-	 */
-	ccl::vector<int> vert_orig_index(num_verts);
-	for(int sorted_vert_index = 0;
-		sorted_vert_index < num_verts;
-		++sorted_vert_index)
-	{
-		const int vert_index = sorted_vert_indeices[sorted_vert_index];
-		const ccl::float3 &vert_co = mesh->verts[vert_index];
-		bool found = false;
-		for(int other_sorted_vert_index = sorted_vert_index + 1;
-			other_sorted_vert_index < num_verts;
-			++other_sorted_vert_index)
-		{
-			const int other_vert_index =
-					sorted_vert_indeices[other_sorted_vert_index];
-			const ccl::float3 &other_vert_co = mesh->verts[other_vert_index];
-			/* We are too far away now, we wouldn't have duplicate. */
-			if((other_vert_co.x + other_vert_co.y + other_vert_co.z) -
-			   (vert_co.x + vert_co.y + vert_co.z) > 3 * FLT_EPSILON)
-			{
-				break;
-			}
-			/* Found duplicate. */
-			if(len_squared(other_vert_co - vert_co) < FLT_EPSILON) {
-				found = true;
-				vert_orig_index[vert_index] = other_vert_index;
-				break;
-			}
-		}
-		if(!found) {
-			vert_orig_index[vert_index] = vert_index;
-		}
-	}
-	/* Make sure we always points to the very first orig vertex. */
-	for(int vert_index = 0; vert_index < num_verts; ++vert_index) {
-		int orig_index = vert_orig_index[vert_index];
-		while(orig_index != vert_orig_index[orig_index]) {
-			orig_index = vert_orig_index[orig_index];
-		}
-		vert_orig_index[vert_index] = orig_index;
-	}
-	sorted_vert_indeices.free_memory();
-	/* STEP 2: Calculate vertex normals taking into account their possible
-	 *         duplicates which gets "welded" together.
-	 */
-	ccl::vector<ccl::float3> vert_normal(num_verts, ccl::make_float3(0.0f, 0.0f, 0.0f));
-	/* First we accumulate all vertex normals in the original index. */
-	for(int vert_index = 0; vert_index < num_verts; ++vert_index) {
-		const ccl::float3 normal = ccl::make_float3(0.0f);// [TODO] ccl::get_float3(b_mesh.vertices[vert_index].normal());
-		const int orig_index = vert_orig_index[vert_index];
-		vert_normal[orig_index] += normal;
-	}
-	/* Then we normalize the accumulated result and flush it to all duplicates
-	 * as well.
-	 */
-	for(int vert_index = 0; vert_index < num_verts; ++vert_index) {
-		const int orig_index = vert_orig_index[vert_index];
-		vert_normal[vert_index] = normalize(vert_normal[orig_index]);
-	}
-	/* STEP 3: Calculate pointiness using single ring neighborhood. */
-	ccl::vector<int> counter(num_verts, 0);
-	ccl::vector<float> raw_data(num_verts, 0.0f);
-	ccl::vector<ccl::float3> edge_accum(num_verts, ccl::make_float3(0.0f, 0.0f, 0.0f));
-#if 0  // TODO FIXUP
-	BL::Mesh::edges_iterator e;
-	EdgeMap visited_edges;
-	int edge_index = 0;
-	memset(&counter[0], 0, sizeof(int) * counter.size());
-	for(b_mesh.edges.begin(e); e != b_mesh.edges.end(); ++e, ++edge_index) {
-		const int v0 = vert_orig_index[b_mesh.edges[edge_index].vertices()[0]],
-				  v1 = vert_orig_index[b_mesh.edges[edge_index].vertices()[1]];
-		if(visited_edges.exists(v0, v1)) {
-			continue;
-		}
-		visited_edges.insert(v0, v1);
-		ccl::float3 co0 = get_ccl::float3(b_mesh.vertices[v0].co()),
-			   co1 = get_ccl::float3(b_mesh.vertices[v1].co());
-		ccl::float3 edge = normalize(co1 - co0);
-		edge_accum[v0] += edge;
-		edge_accum[v1] += -edge;
-		++counter[v0];
-		++counter[v1];
-	}
-	for(int vert_index = 0; vert_index < num_verts; ++vert_index) {
-		const int orig_index = vert_orig_index[vert_index];
-		if(orig_index != vert_index) {
-			/* Skip duplicates, they'll be overwritten later on. */
-			continue;
-		}
-		if(counter[vert_index] > 0) {
-			const ccl::float3 normal = vert_normal[vert_index];
-			const float angle =
-					safe_acosf(dot(normal,
-								   edge_accum[vert_index] / counter[vert_index]));
-			raw_data[vert_index] = angle * M_1_PI_F;
-		}
-		else {
-			raw_data[vert_index] = 0.0f;
-		}
-	}
-#endif
-	/* STEP 3: Blur vertices to approximate 2 ring neighborhood. */
-	ccl::AttributeSet& attributes = mesh->attributes;
-	ccl::Attribute *attr = attributes.add(ccl::ATTR_STD_POINTINESS);
-	float *data = attr->data_for_write<float>();
-	memcpy(data, &raw_data[0], sizeof(float) * raw_data.size());
-	memset(&counter[0], 0, sizeof(int) * counter.size());
-#if 0 // TODO FIXUP
-	edge_index = 0;
-	visited_edges.clear();
-	for(b_mesh.edges.begin(e); e != b_mesh.edges.end(); ++e, ++edge_index) {
-		const int v0 = vert_orig_index[b_mesh.edges[edge_index].vertices()[0]],
-				  v1 = vert_orig_index[b_mesh.edges[edge_index].vertices()[1]];
-		if(visited_edges.exists(v0, v1)) {
-			continue;
-		}
-		visited_edges.insert(v0, v1);
-		data[v0] += raw_data[v1];
-		data[v1] += raw_data[v0];
-		++counter[v0];
-		++counter[v1];
-	}
-#endif
-	for(int vert_index = 0; vert_index < num_verts; ++vert_index) {
-		data[vert_index] /= counter[vert_index] + 1;
-	}
-	/* STEP 4: Copy attribute to the duplicated vertices. */
-	for(int vert_index = 0; vert_index < num_verts; ++vert_index) {
-		const int orig_index = vert_orig_index[vert_index];
-		data[vert_index] = data[orig_index];
-	}
-}
-
-#endif

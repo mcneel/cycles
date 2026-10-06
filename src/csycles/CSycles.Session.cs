@@ -37,13 +37,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_clear_passes(IntPtr sessionId);
-		public static void session_clear_passes(IntPtr sessionId)
-		{
-			cycles_session_clear_passes(sessionId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern IntPtr cycles_session_create(IntPtr sessionParamsId);
 		public static IntPtr session_create(IntPtr sessionParamsId)
 		{
@@ -51,10 +44,10 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern uint cycles_session_destroy(IntPtr sessionId);
-		public static uint session_destroy(IntPtr sessionId)
+		private static extern void cycles_session_destroy(IntPtr sessionId);
+		public static void session_destroy(IntPtr sessionId)
 		{
-			return cycles_session_destroy(sessionId);
+			cycles_session_destroy(sessionId);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
@@ -65,45 +58,10 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_prepare_run(IntPtr sessionId);
-		public static void session_prepare_run(IntPtr sessionId)
-		{
-			cycles_session_prepare_run(sessionId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern int cycles_session_sample(IntPtr sessionId);
-		public static int session_sample(IntPtr sessionId)
-		{
-			return cycles_session_sample(sessionId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_end_run(IntPtr sessionId);
-		public static void session_end_run(IntPtr sessionId)
-		{
-			cycles_session_end_run(sessionId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_wait(IntPtr sessionId);
-		public static void session_wait(IntPtr sessionId)
-		{
-			cycles_session_wait(sessionId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_session_set_pause(IntPtr sessionId, bool pause);
 		public static void session_set_pause(IntPtr sessionId, bool pause)
 		{
 			cycles_session_set_pause(sessionId, pause);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern bool cycles_session_is_paused(IntPtr sessionId);
-		public static bool session_is_paused(IntPtr sessionId)
-		{
-			return cycles_session_is_paused(sessionId);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
@@ -127,13 +85,6 @@ namespace ccl
 		public static void session_quickcancel(IntPtr sessionId)
 		{
 			cycles_session_quickcancel(sessionId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_get_float_buffer(IntPtr sessionId, int passType, ref IntPtr pixels);
-		public static void session_get_float_buffer(IntPtr sessionId, PassType passType, ref IntPtr pixels)
-		{
-			cycles_session_get_float_buffer(sessionId, (int)passType, ref pixels);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
@@ -173,14 +124,6 @@ namespace ccl
 			cycles_session_params_set_background(sessionParamsId, (uint)(background ? 1 : 0));
 		}
 
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-		[System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA2101:Specify marshaling for P/Invoke string arguments", Justification = "Using simple c string")]
-		private static extern void cycles_session_params_set_output_path(IntPtr sessionParamsId, [MarshalAs(UnmanagedType.LPStr)] string outputPath);
-		public static void session_params_set_output_path(IntPtr sessionParamsId, string outputPath)
-		{
-			cycles_session_params_set_output_path(sessionParamsId, outputPath);
-		}
-
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_session_params_set_experimental(IntPtr sessionParamsId, uint experimental);
 		public static void session_params_set_experimental(IntPtr sessionParamsId, bool experimental)
@@ -207,27 +150,6 @@ namespace ccl
 		public static void session_params_set_threads(IntPtr sessionParamsId, uint threads)
 		{
 			cycles_session_params_set_threads(sessionParamsId, threads);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_params_set_cancel_timeout(IntPtr sessionParamsId, double cancelTimeout);
-		public static void session_params_set_cancel_timeout(IntPtr sessionParamsId, double cancelTimeout)
-		{
-			cycles_session_params_set_cancel_timeout(sessionParamsId, cancelTimeout);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_params_set_reset_timeout(IntPtr sessionParamsId, double resetTimeout);
-		public static void session_params_set_reset_timeout(IntPtr sessionParamsId, double resetTimeout)
-		{
-			cycles_session_params_set_reset_timeout(sessionParamsId, resetTimeout);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_session_params_set_text_timeout(IntPtr sessionParamsId, double textTimeout);
-		public static void session_params_set_text_timeout(IntPtr sessionParamsId, double textTimeout)
-		{
-			cycles_session_params_set_text_timeout(sessionParamsId, textTimeout);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
@@ -286,13 +208,6 @@ namespace ccl
 		public static void progress_get_progress(IntPtr sessionId, out float progress)
 		{
 			cycles_progress_get_progress(sessionId, out progress);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_tilemanager_get_sample_info(IntPtr sessionId, out uint samples, out uint numSamples);
-		public static void tilemanager_get_sample_info(IntPtr sessionId, out uint samples, out uint numSamples)
-		{
-			cycles_tilemanager_get_sample_info(sessionId, out samples, out numSamples);
 		}
 
 		internal class CSStringHolder : IDisposable

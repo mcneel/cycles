@@ -17,7 +17,6 @@ limitations under the License.
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 
 namespace ccl
 {
@@ -67,19 +66,6 @@ namespace ccl
 			}
 		}
 
-		public string NiceNameSha
-		{
-			get
-			{
-				using (SHA256 sha = SHA256.Create())
-				{
-					var nicenamebytes = System.Text.Encoding.UTF8.GetBytes(NiceName);
-					var hash = sha.ComputeHash(nicenamebytes);
-					var strhash = string.Concat(hash.Select(b => b.ToString("x2")));
-					return strhash;
-				}
-			}
-		}
 		/// <summary>
 		/// Get the Cycles num for the device
 		/// </summary>
@@ -159,21 +145,6 @@ namespace ccl
 		/// True if this is a Multi Optix device
 		/// </summary>
 		public bool IsMultiOptix => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.Optix).Any();
-
-		/// <summary>
-		/// True if this is a Multi Metal device
-		/// </summary>
-		public bool IsMultiMetal => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.Metal).Any();
-
-		/// <summary>
-		/// True if this is a Multi Hip device
-		/// </summary>
-		public bool IsMultiHip => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.Hip).Any();
-
-		/// <summary>
-		/// True if this is a Multi OneApi device
-		/// </summary>
-		public bool IsMultiOneApi => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.OneApi).Any();
 
 		/// <summary>
 		/// String representation of this device

@@ -87,40 +87,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_mesh_set_triangle(IntPtr sessionId, IntPtr meshId, uint tri_idx, uint v0, uint v1, uint v2, IntPtr shaderId, uint smooth);
-
-		public static void mesh_set_triangle(IntPtr sessionId, IntPtr meshId, uint tri_idx, uint v0, uint v1, uint v2,
-			IntPtr shaderId, bool smooth)
-		{
-			cycles_mesh_set_triangle(sessionId, meshId, tri_idx, v0, v1, v2, shaderId, (uint)(smooth ? 1 : 0));
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_mesh_add_triangle(IntPtr sessionId, IntPtr meshId, uint v0, uint v1, uint v2, IntPtr shaderId, uint smooth);
-
-		public static void mesh_add_triangle(IntPtr sessionId, IntPtr meshId, uint v0, uint v1, uint v2,
-			IntPtr shaderId, bool smooth)
-		{
-			cycles_mesh_add_triangle(sessionId, meshId, v0, v1, v2, shaderId, (uint)(smooth ? 1 : 0));
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_mesh_set_smooth(IntPtr sessionId, IntPtr meshId, uint smooth);
-
-		public static void mesh_set_smooth(IntPtr sessionId, IntPtr meshId, bool smooth)
-		{
-			cycles_mesh_set_smooth(sessionId, meshId, (uint)(smooth ? 1 : 0));
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_geometry_set_shader(IntPtr sessionId, IntPtr geometry, IntPtr shader);
-
-		public static void geometry_set_shader(IntPtr sessionId, IntPtr geometry, IntPtr shaderId)
-		{
-			cycles_geometry_set_shader(sessionId, geometry, shaderId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_geometry_clear(IntPtr sessionId, IntPtr meshId);
 
 		public static void geometry_clear(IntPtr sessionId, IntPtr meshId)
@@ -134,14 +100,6 @@ namespace ccl
 		public static void mesh_resize(IntPtr sessionId, IntPtr meshId, uint vcount, uint fcount)
 		{
 			cycles_mesh_resize(sessionId, meshId, vcount, fcount);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_mesh_reserve(IntPtr sessionId, IntPtr meshId, uint vcount, uint fcount);
-
-		public static void mesh_reserve(IntPtr sessionId, IntPtr meshId, uint vcount, uint fcount)
-		{
-			cycles_mesh_reserve(sessionId, meshId, vcount, fcount);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]

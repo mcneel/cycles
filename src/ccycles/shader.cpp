@@ -26,36 +26,12 @@ limitations under the License.
 
 OIIO_NAMESPACE_USING
 
-ccl::ShaderNode* _shader_node_find(ccl::Session* session_id, unsigned int shader_id, unsigned int shnode_id)
-{
-	assert(false);
-#if LEGACY_SHADERS
-	ccl::Scene* sce = nullptr;
-	if (scene_find(session_id, &sce)) {
-		CCShader* sh = csce->shaders[shader_id];
-		auto psh = sh->graph->nodes.begin();
-		auto end = sh->graph->nodes.end();
-		while (psh != end)
-		{
-			ccl::ShaderNode* shn = (*psh);
-			if (shn->id == shnode_id) {
-				return shn;
-			}
-			++psh;
-		}
-	}
-#endif
-	return nullptr;
-}
-
 ustring _get_colorspace(int value)
 {
 	if (value == 0) {
-		//std::cout << "setting to " << ccl::u_colorspace_data << std::endl;
 		return ccl::u_colorspace_data;
 	}
 	else {
-		//std::cout << "setting to " << ccl::u_colorspace_auto << std::endl;
 		return ccl::u_colorspace_auto;
 	}
 }
@@ -102,160 +78,6 @@ CCL_CAPI bool CDECL cycles_shadernode_get_name(ccl::ShaderNode *shn, void *strho
 	return false;
 }
 
-CCL_CAPI int CDECL cycles_shadernode_get_socketcount(ccl::NodeType *shn, int input_output)
-{
-	int count = 0;
-	// 0 = input
-	if (input_output == 0) {
-		for (const ccl::SocketType &socket : shn->inputs) {
-			if (socket.type == ccl::SocketType::UNDEFINED) {
-				continue;
-			}
-			if (socket.flags & ccl::SocketType::INTERNAL) {
-				continue;
-			}
-			count++;
-		}
-	}
-	else {
-		for (const ccl::SocketType &socket : shn->outputs) {
-			if (socket.type == ccl::SocketType::UNDEFINED) {
-				continue;
-			}
-			if (socket.flags & ccl::SocketType::INTERNAL) {
-				continue;
-			}
-			count++;
-		}
-	}
-
-	return count;
-}
-
-CCL_CAPI const ccl::SocketType* CDECL cycles_shadernode_get_sockettype(ccl::NodeType *shn,
-														int idx,
-														int input_output)
-{
-	int count = 0;
-	// 0 = input
-	if (input_output == 0) {
-		for (const ccl::SocketType &socket : shn->inputs) {
-			if (socket.type == ccl::SocketType::UNDEFINED) {
-				continue;
-			}
-			if (socket.flags & ccl::SocketType::INTERNAL) {
-				continue;
-			}
-			if (idx == count) {
-				return &socket;
-			}
-			count++;
-		}
-	}
-	else {
-		for (const ccl::SocketType &socket : shn->outputs) {
-			if (socket.type == ccl::SocketType::UNDEFINED) {
-				continue;
-			}
-			if (socket.flags & ccl::SocketType::INTERNAL) {
-				continue;
-			}
-			if (idx == count) {
-				return &socket;
-			}
-			count++;
-		}
-	}
-
-	return nullptr;
-}
-
-CCL_CAPI bool CDECL cycles_sockettype_get_internal_name(ccl::SocketType *sock, void *strholder)
-{
-	if (sock && strholder) {
-		StringHolder *holder = (StringHolder *)strholder;
-		std::string name{sock->name.c_str()};
-
-		holder->thestring = name;
-
-		return true;
-	}
-
-	return false;
-}
-
-CCL_CAPI bool CDECL cycles_sockettype_get_ui_name(ccl::SocketType *sock, void *strholder)
-{
-	if (sock && strholder) {
-		StringHolder *holder = (StringHolder *)strholder;
-		std::string name{sock->ui_name.c_str()};
-
-		holder->thestring = name;
-
-		return true;
-	}
-
-	return false;
-}
-
-CCL_CAPI int CDECL cycles_sockettype_get_type(ccl::SocketType *sock)
-{
-	if (sock) {
-		return sock->type;
-	}
-
-	return -1;
-}
-
-CCL_CAPI int CDECL cycles_get_shadernodetype_count()
-{
-	int count = 0;
-	for (const ccl::ustring &name : ccl::NodeType::type_names()) {
-		const std::string nodename{name.c_str()};
-		if (std::string::npos != nodename.find("convert")) {
-			continue;
-		}
-		const ccl::NodeType *nodetype = ccl::NodeType::find(name);
-		if (nodetype != nullptr && nodetype->type == ccl::NodeType::SHADER) {
-			count++;
-		}
-	}
-	return count;
-}
-
-CCL_CAPI const ccl::NodeType* CDECL cycles_get_shadernodetype(int idx)
-{
-	int count = 0;
-	for (const ccl::ustring &name : ccl::NodeType::type_names()) {
-		const std::string nodename{name.c_str()};
-		if (std::string::npos != nodename.find("convert")) {
-			continue;
-		}
-		const ccl::NodeType *nodetype = ccl::NodeType::find(name);
-		if (nodetype != nullptr && nodetype->type == ccl::NodeType::SHADER) {
-			if (count == idx) {
-				return nodetype;
-			}
-			count++;
-		}
-	}
-	return nullptr;
-}
-
-CCL_CAPI bool CDECL cycles_nodetype_get_name(ccl::NodeType *nt, void *strholder)
-{
-	if (nt && strholder) {
-		StringHolder *holder = (StringHolder *)strholder;
-		std::string name{nt->name.c_str()};
-
-		holder->thestring = name;
-
-		return true;
-	}
-
-	return false;
-}
-
 CCL_CAPI bool CDECL cycles_shader_get_name(ccl::Shader *sh, void *strholder)
 {
 	if (sh && strholder) {
@@ -279,22 +101,6 @@ CCL_CAPI void CDECL cycles_scene_tag_shader(ccl::Session *session_id, ccl::Shade
 			shader_id->tag_used(sce);
 		}
 	}
-}
-
-/* Get Cycles shader ID in specific scene. */
-CCL_CAPI unsigned int CDECL cycles_scene_shader_id(ccl::Session *session_id, unsigned int shader_id)
-{
-	assert(false);
-#if LEGACY_SHADERS
-	ccl::Scene *sce = nullptr;
-	if (scene_find(session_id, &sce)) {
-		CCShader *sh = csce->shaders[shader_id];
-		if (sh->scene_mapping.find(session_id) != sh->scene_mapping.end()) {
-			return sh->scene_mapping[session_id];
-		}
-	}
-#endif
-	return (unsigned int)(-1);
 }
 
 CCL_CAPI void CDECL cycles_shader_new_graph(ccl::Shader *shader)
@@ -326,12 +132,7 @@ CCL_CAPI void CDECL cycles_shader_set_use_mis(ccl::Session *session_id,
 							   ccl::Shader *shader_id,
 							   unsigned int use_mis)
 {
-	// TODO: XXXX Look into this - we clearly need to change the signature of this method to
-	// support three different sampling methods.
-	// if (shader_id)
-	//	shader_id->set_volume_sampling_method(use_mis == 1 ?
-	//											  ccl::VOLUME_SAMPLING_MULTIPLE_IMPORTANCE :
-	//											  ccl::VOLUME_SAMPLING_DISTANCE);
+	/* No-op: this used to pick the volume sampling method, which is no longer an MIS on/off choice. */
 }
 
 CCL_CAPI void CDECL cycles_shader_set_use_transparent_shadow(ccl::Session *session_id,
@@ -403,21 +204,6 @@ CCL_CAPI ccl::ShaderNode* CDECL cycles_add_shader_node(ccl::Shader *shader_id,
 }
 #endif
 
-enum class attr_type {
-	INT,
-	FLOAT,
-	FLOAT4,
-};
-
-struct attrunion {
-	attr_type type;
-	union {
-		int i;
-		float f;
-		ccl::float4 f4;
-	};
-};
-
 void _set_texture_mapping_transformation(ccl::TextureMapping& mapping, int transform_type, float x, float y, float z)
 {
 	switch (transform_type) {
@@ -435,20 +221,6 @@ void _set_texture_mapping_transformation(ccl::TextureMapping& mapping, int trans
 		mapping.scale.x = x;
 		mapping.scale.y = y;
 		mapping.scale.z = z;
-		break;
-	}
-}
-void _set_mapping_node(ccl::MappingNode* node, int transform_type, float x, float y, float z)
-{
-	switch (transform_type) {
-	case 0:
-		node->set_location(ccl::make_float3(x, y, z));
-		break;
-	case 1:
-		node->set_rotation(ccl::make_float3(x, y, z));
-		break;
-	case 2:
-		node->set_scale(ccl::make_float3(x, y, z));
 		break;
 	}
 }
@@ -480,10 +252,6 @@ CCL_CAPI void CDECL cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode *sh
 	std::string shn_type = shnode->type->name.string();
 	if (shn_type == "mapping") {
 		assert(false);
-		/*
-		ccl::MappingNode* node = dynamic_cast<ccl::MappingNode*>(shnode);
-		_set_texmapping_mapping(node->tex_mapping, x, y, z);
-		*/
 	}
 	else if (shn_type == "environment_texture") {
 		ccl::EnvironmentTextureNode *node = dynamic_cast<ccl::EnvironmentTextureNode *>(shnode);
@@ -528,27 +296,6 @@ CCL_CAPI void CDECL cycles_shadernode_texmapping_set_mapping(ccl::ShaderNode *sh
 		assert(false);
 	}
 	}
-}
-
-CCL_CAPI void CDECL cycles_shadernode_texmapping_set_projection(ccl::ShaderNode *shnode,
-												 ccl::TextureMapping::Projection tm_projection)
-{
-	assert(false);
-	/*
-	ccl::ShaderNode* shnode = _shader_node_find(session_id, shader_id, shnode_id);
-	if (shnode) {
-		switch (shn_type) {
-		case shadernode_type::MAPPING:
-			{
-				ccl::MappingNode* node = dynamic_cast<ccl::MappingNode*>(shnode);
-				node->tex_mapping.projection = tm_projection;
-			}
-			break;
-		default:
-			break;
-		}
-	}
-	*/
 }
 
 CCL_CAPI void CDECL cycles_shadernode_texmapping_set_type(ccl::ShaderNode *shnode, ccl::NodeMappingType tm_type)
@@ -734,84 +481,12 @@ CCL_CAPI void CDECL cycles_shadernode_set_enum(ccl::ShaderNode *shnode, const ch
 	}
 }
 
-#ifdef __cplusplus
-}
-#endif
-
-CCImage* find_existing_ccimage(std::string imgname, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels, bool is_float, CCScene* csce)
-{
-	CCImage *existing_image = nullptr;
-	for (CCImage *im : csce->images)
-	{
-		if (im
-				&& im->filename == imgname
-				&& im->width == (int)width
-				&& im->height == (int)height
-				&& im->depth == (int)depth
-				&& im->channels == (int)channels
-				&& im->is_float == is_float)
-		{
-			existing_image = im;
-			break;
-		}
-	}
-	return existing_image;
-}
-
-template <class T>
-CCImage* get_ccimage(std::string imgname, T* img, unsigned int width, unsigned int height, unsigned int depth, unsigned int channels, bool is_float, ccl::Session* session_id)
-{
-	assert(false);
-#if LEGACY_IMAGES
-	// TODO: XXXX
-	CCImage* nimg = nullptr;
-	ccl::Scene* sce = nullptr;
-	if (scene_find(session_id, &sce)) {
-		CCImage* existing_image = find_existing_ccimage(imgname, width, height, depth, channels, is_float, csce);
-		nimg = existing_image ? existing_image : new CCImage();
-		if (!existing_image) {
-			nimg->builtin_data = img;
-			nimg->filename = imgname;
-			nimg->width = (int)width;
-			nimg->height = (int)height;
-			nimg->depth = (int)depth;
-			nimg->channels = (int)channels;
-			nimg->is_float = is_float;
-			bool found_empty_slot = false;
-			int imgid{0};
-			for(CCImage* slotimg : csce->images) {
-				if(slotimg==nullptr) {
-					csce->images[imgid] = nimg;
-					found_empty_slot = true;
-					break;
-				}
-				imgid++;
-			}
-			if(!found_empty_slot) {
-				csce->images.push_back(nimg);
-			}
-		}
-		else {
-			existing_image->builtin_data = img;
-		}
-
-	}
-	return nimg;
-#endif
-	return nullptr;
-}
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Hand an image that Rhino already holds in memory to an image texture node.
  *
- * This replaces the builtin image callbacks that Cycles 5.x removed, and which
- * get_ccimage() below has been a stub for. Without it every generated or
- * .3dm-embedded texture reached the kernel as no image at all, so the surfaces
- * using them rendered black. Only the pointer is taken here; the copy happens in
- * RhinoMemoryImageLoader when the node builds its image handle. */
+ * This replaces the builtin image callbacks that Cycles 5.x removed. Without it
+ * every generated or .3dm-embedded texture reached the kernel as no image at all,
+ * so the surfaces using them rendered black. Only the pointer is taken here; the
+ * copy happens in RhinoMemoryImageLoader when the node builds its image handle. */
 CCL_CAPI void CDECL cycles_shadernode_set_image_mem(ccl::ShaderNode *shnode,
 									   const char *name,
 									   void *pixels,
@@ -1343,17 +1018,6 @@ CCL_CAPI void CDECL cycles_shadernode_set_member_vec(
 		}
 		else if (shn_type == "mapping") {
 			assert(false);
-			/*ccl::MappingNode* mapping = dynamic_cast<ccl::MappingNode*>(shnode);
-			if (mname == "min") {
-				mapping->tex_mapping.min.x = x;
-				mapping->tex_mapping.min.y = y;
-				mapping->tex_mapping.min.z = z;
-			}
-			else if (mname == "max") {
-				mapping->tex_mapping.max.x = x;
-				mapping->tex_mapping.max.y = y;
-				mapping->tex_mapping.max.z = z;
-			}*/
 		}
 		else if (shn_type == "rhino_texture_coordinate") {
 			ccl::RhinoTextureCoordinateNode *texco =

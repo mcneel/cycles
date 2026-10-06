@@ -64,7 +64,6 @@
     </Compile>
     <Compile Include="Attributes\ShaderNodeAttribute.cs" />
     <Compile Include="Background.cs" />
-    <Compile Include="Colors.cs" />
     <Compile Include="Film.cs" />
     <Compile Include="Camera.cs" />
     <Compile Include="Client.cs" />
@@ -91,7 +90,6 @@
     <Compile Include="Outputs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Scene.cs" />
-    <Compile Include="SceneParameters.cs" />
     <Compile Include="Session.cs" />
     <Compile Include="Shader.cs" />
     <Compile Include="ShaderNodes\AttributeNode.cs" />

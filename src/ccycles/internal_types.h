@@ -21,9 +21,7 @@ limitations under the License.
 #include <unordered_set>
 #include <vector>
 #include <chrono>
-//#include <ctime>
 #include <thread>
-//#include <mutex>
 #include <string>
 #include <functional>
 
@@ -159,9 +157,6 @@ static inline void ccycles_diag(const char *fmt, ...)
 
 class CCSession;
 
-//extern LOGGER_FUNC_CB logger_func;
-extern std::vector<LOGGER_FUNC_CB> loggers;
-
 /* Simple class to help with debug logging. */
 class Logger {
 public:
@@ -226,17 +221,6 @@ private:
  */
 extern Logger logger;
 
-struct CCImage {
-		std::string filename;
-		void *builtin_data;
-
-		int width;
-		int height;
-		int depth;
-		int channels;
-		bool is_float;
-};
-
 class CCyclesPassOutput {
 	public:
 		CCyclesPassOutput();
@@ -266,19 +250,6 @@ class CCyclesPassOutput {
 		int m_height;
 		int m_pixel_size;
 		std::vector<float> m_pixels;
-};
-
-class CCyclesDebugDriver : public ccl::OutputDriver {
-	public:
-		typedef std::function<void(const std::string &)> LogFunction;
-
-		CCyclesDebugDriver(LogFunction log);
-		virtual ~CCyclesDebugDriver();
-
-		void write_render_tile(const Tile &tile) override;
-
-	protected:
-		LogFunction log_;
 };
 
 class CCyclesOutputDriver : public ccl::OutputDriver {
@@ -371,7 +342,6 @@ struct CCyclesLight {
 	float spot_smooth{0.0f};
 	float sizeu{0.0f};
 	float sizev{0.0f};
-	int map_resolution{0};
 	int max_bounces{0};
 	bool cast_shadow{true};
 	bool use_mis{true};
@@ -397,9 +367,6 @@ public:
 	/* Create a new CCSession, initialise all necessary memory. */
 	static CCSession* create(int width, int height, unsigned int buffer_stride);
 
-	/* Returns true if size was changed. Will reset the has_changed flag. */
-	bool size_has_changed();
-
 	~CCSession() {
 		if(session != nullptr)
 		{
@@ -408,70 +375,13 @@ public:
 		}
 	}
 
-private:
-	bool _size_has_changed;
-
 protected:
 	/* Protected constructor, use CCSession::create to create a new CCSession. */
 	CCSession()
 	{	}
 };
 
-class CCShader {
-public:
-	/* Hold the Cycles shader. */
-	ccl::Shader* shader = new ccl::Shader();
-	/* Hold the shader node graph. */
-	ccl::ShaderGraph* graph = new ccl::ShaderGraph();
-	/* Map shader ID in scene to scene ID. */
-	std::map<unsigned int, unsigned int> scene_mapping;
-
-	~CCShader() {
-		scene_mapping.clear();
-	}
-};
-
-class CCScene final {
-public:
-	/* Hold the Cycles scene. */
-	ccl::Scene* scene = nullptr;
-
-	unsigned int params_id = -1;
-
-	std::vector<CCImage*> images;
-
-	std::vector<CCShader*> shaders;
-
-	/* Note: depth>1 if volumetric texture (i.e smoke volume data) */
-
-	void builtin_image_info(const std::string& builtin_name, void* builtin_data, ccl::ImageMetaData& meta); // bool& is_float, int& width, int& height, int& depth, int& channels);
-	bool builtin_image_pixels(const std::string& builtin_name, void* builtin_data, int tile, unsigned char* pixels, const size_t pixels_size, const bool associate_alpha, const bool free_cache);
-	bool builtin_image_float_pixels(const std::string& builtin_name, void* builtin_data, int tile, float* pixels, const size_t pixels_size, const bool associate_alpha, const bool free_cache);
-
-	~CCScene() {
-		for(CCImage* image : images) {
-			/* don't delete builtin_data, it isn't owned by this */
-			image->builtin_data = nullptr;
-			delete image;
-		}
-		images.clear();
-		for (CCShader* sh : shaders) {
-			if (sh != nullptr) {
-				// just setting to nullptr, as scene disposal frees this memory.
-				sh->graph = nullptr;
-				sh->shader = nullptr;
-
-				sh->scene_mapping.clear();
-
-				delete sh;
-			}
-		}
-		shaders.clear();
-	}
-};
-
 /* data */
-extern std::vector<ccl::SceneParams*> scene_params;
 extern std::vector<ccl::DeviceInfo> devices;
 extern std::vector<ccl::DeviceInfo> multi_devices;
 extern std::unordered_set<ccl::SessionParams*> session_params;
@@ -487,58 +397,7 @@ extern ccl::vector<float> ccycles_rhino_aaltonen_noise_table;
 /* Some utility functions		 */
 /********************************/
 
-extern ccl::Shader* find_shader_in_scene(ccl::Scene* sce, unsigned int shader_id);
-extern unsigned int get_idx_for_shader_in_scene(ccl::Scene* sce, ccl::Shader* sh);
 extern bool scene_find(ccl::Session* scid, ccl::Scene** sce);
 extern bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session);
-extern void scene_clear_pointer(ccl::Scene* sce);
-extern void set_ccscene_null(ccl::Session* session_id);
 
-extern void _cleanup_scenes();
 extern void _cleanup_sessions();
-extern void _init_shaders(ccl::Session* session_id);
-
-/********************************/
-/* Some useful defines			*/
-/********************************/
-
-
-/* Set boolean parameter varname of param_type. */
-#define PARAM_BOOL(param_type, params_id, varname) \
-	if (0 <= params_id && params_id < param_type.size()) { \
-		param_type[params_id]-> varname = varname == 1; \
-		logger.logit("Set " #param_type " " #varname " to ", varname); \
-	}
-
-/* Set parameter varname of param_type. */
-#define PARAM(param_type, params_id, varname) \
-	if (0 <= params_id && params_id < param_type.size()) { \
-		param_type[params_id]-> varname = varname; \
-		logger.logit("Set " #param_type " " #varname " to ", varname); \
-	}
-
-/* Set parameter varname of param_type, casting to typecast*/
-#define PARAM_CAST(param_type, params_id, typecast, varname) \
-	if (0 <= params_id && params_id < param_type.size()) { \
-		param_type[params_id]-> varname = static_cast<typecast>(varname); \
-		logger.logit("Set " #param_type " " #varname " to ", varname, " casting to " #typecast); \
-	}
-
-#define LIGHT_FIND(session_id, light_id) \
-	ccl::Scene* sce = nullptr; \
-	if(scene_find(session_id, &sce)) { \
-		ccl::Light *l = light_id; \
-
-#define LIGHT_FIND_END() \
-		l->tag_update(sce); \
-	}
-
-#define SHADER_VAR2(a,b) a ## b
-#define SHADER_VAR(a, b) SHADER_VAR2(a,b)
-/* Set a var of shader to val of type. */
-#define SHADER_SET(session_id, shid, type, var, val) \
-	ccl::Scene* sce = nullptr; \
-	if (scene_find(session_id, &sce)) { \
-		sh->shader-> var = (type)(val); \
-	}
-

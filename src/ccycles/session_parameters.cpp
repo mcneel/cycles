@@ -22,15 +22,6 @@ limitations under the License.
 /* Hold all created session parameters. */
 std::unordered_set<ccl::SessionParams*> session_params;
 
-#define SESSION_PARAM_BOOL(session_params_id, varname) \
-	PARAM_BOOL(session_params, session_params_id, varname)
-
-#define SESSION_PARAM(session_params_id, varname) \
-	PARAM(session_params, session_params_id, varname)
-
-#define SESSION_PARAM_CAST(session_params_id, typecast, varname) \
-	PARAM_CAST(session_params, session_params_id, typecast, varname)
-
 #ifdef __cplusplus
 extern "C" {
 #endif

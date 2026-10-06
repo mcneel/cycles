@@ -15,12 +15,9 @@ limitations under the License.
 **/
 
 #include <iostream>
-#include <filesystem>
 #include <cstdlib>
 #include <numeric>
 #include <random>
-
-namespace fs = std::filesystem;
 
 #ifdef _WIN32
 #include <eh.h>
@@ -34,12 +31,8 @@ namespace fs = std::filesystem;
 #include "scene/shader_nodes.h"
 #include "scene/shader_graph.h"
 
-extern "C" CCL_CAPI void CDECL cycles_debug_scene_stats(ccl::Session *session_id);
 #include "device/device.h"
 #include "util/thread.h"
-
-#include <OpenImageIO/imagebuf.h>
-#include <OpenImageIO/imagebufalgo.h>
 
 using namespace ccl;
 
@@ -47,18 +40,6 @@ using namespace ccl;
 std::unordered_set<CCSession*> sessions;
 
 static ccl::thread_mutex session_mutex;
-
-class CyclesRenderCrashException : std::exception
-{
-public:
-	CyclesRenderCrashException() : m_nVDE(-1) {}
-	CyclesRenderCrashException(unsigned int n) : m_nVDE(n) {}
-
-	unsigned int VDENumber() const { return m_nVDE; }
-
-private:
-	unsigned int m_nVDE;
-};
 
 /* Find pointers for CCSession and ccl::Session. Return false if either fails. */
 bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session)
@@ -99,15 +80,8 @@ CCSession* CCSession::create(int width, int height, unsigned int buffer_stride) 
 	CCSession* se = new CCSession();
 	se->width = width;
 	se->height = height;
-	se->_size_has_changed = false;
 
 	return se;
-}
-
-bool CCSession::size_has_changed() {
-	bool rc = _size_has_changed;
-	_size_has_changed = false;
-	return rc;
 }
 
 CCyclesPassOutput::CCyclesPassOutput()
@@ -188,32 +162,6 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 		return false;
 
 	bool doing_tiles = !(tile.size == tile.full_size);
-#if 0
-	const int width = tile.size.x;
-	const int height = tile.size.y;
-	vector<float> pixels(width * height * 1);
-
-	if (tile.get_sample() < 2 && tile.get_pass_pixels("depth", 1, pixels.data())) {
-		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
-		//fs::path save_path = "C:/Users/jesterKing/check_cycles_output.png";
-		fs::path save_path = "/Users/jesterking/check_cycles_output.exr";
-		//// !!!!!!!!!!!!! Remember to change path to something useful on dev machine
-		unique_ptr<ImageOutput> image_output(ImageOutput::create("exr"));
-		ImageSpec spec(width, height, 1, TypeDesc::FLOAT);
-		if(nullptr != image_output &&image_output->open(save_path.string(), spec))
-		{
-			ImageBuf image_buffer(spec,
-				pixels.data(),
-				AutoStride,
-				width * 1 * sizeof(float),
-				AutoStride);
-			/* Write to disk and close */
-			image_buffer.set_write_format(TypeDesc::FLOAT);
-			image_buffer.write(image_output.get());
-			image_output->close();
-		}
-	}
-#endif
 
 	if (doing_tiles) {
 		tile_passes.resize(full_passes->size());
@@ -513,22 +461,6 @@ CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 	}
 }
 
-CCL_CAPI void CDECL cycles_session_clear_passes(ccl::Session* session_id)
-{
-	/* 5.2: Scene::passes is a unique_ptr_vector; index it. */
-	for (size_t pi = session_id->scene->passes.size(); pi-- > 0;) {
-		ccl::Pass *pass = session_id->scene->passes[pi];
-		session_id->scene->delete_node(pass);
-	}
-
-
-	ccl::Session *session = nullptr;
-	CCSession *ccsess = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		ccsess->passes.clear();
-	}
-}
-
 CCL_CAPI void CDECL cycles_session_add_pass(ccl::Session *session_id, int pass_id)
 {
 	ccl::PassType passtype = (ccl::PassType)pass_id;
@@ -566,19 +498,7 @@ CCL_CAPI int CDECL cycles_session_reset(ccl::Session* session_id, int width, int
 			ccsess->params.samples = samples;
 			ccsess->params.pixel_size = pixel_size;
 
-			// TODO: XXXX remove temporary camera adjustment
-			//ccl::Camera *cam = session->scene->camera;
-			//cam->set_full_width(full_width);
-			//cam->set_full_height(full_height);
-			//cam->compute_auto_viewplane();
-			//cam->need_flags_update = true;
-			//cam->update(session->scene.get());
-
 			session->reset(ccsess->params, ccsess->buffer_params);
-		}
-		catch (CyclesRenderCrashException)
-		{
-			rc = -13;
 		}
 		catch (...)
 		{
@@ -610,16 +530,6 @@ CCL_CAPI void CDECL cycles_session_start(ccl::Session* session_id)
 	if (session_find(session_id, &ccsess, &session)) {
 		logger.logit("Starting session ", session_id);
 		session->start();
-	}
-}
-
-CCL_CAPI void CDECL cycles_session_wait(ccl::Session* session_id)
-{
-	CCSession* ccsess = nullptr;
-	ccl::Session* session = nullptr;
-	if (session_find(session_id, &ccsess, &session)) {
-		logger.logit("Waiting for session ", session_id);
-		session->wait();
 	}
 }
 

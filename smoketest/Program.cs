@@ -8,9 +8,6 @@ using ccl;
 // buffer readback, which is everything between "it links" and "it renders".
 internal static class Program
 {
-    // keep the delegate alive across the native call boundary
-    private static CSycles.LoggerCallback s_logger;
-
     private static IntPtr FindOutputNode(IntPtr shader)
     {
         int count = CSycles.shader_node_count(shader);
@@ -53,8 +50,6 @@ internal static class Program
         Console.WriteLine("devmask    : " + mask);
         CSycles.initialise(mask);
         CSycles.log_to_stdout(true);
-        s_logger = (msg) => Console.WriteLine("[ccycles] " + msg);
-        CSycles.set_logger(s_logger);
         Console.WriteLine("devices    : " + CSycles.number_devices());
         for (int i = 0; i < CSycles.number_devices(); i++)
             Console.WriteLine("   [" + i + "] " + CSycles.device_decription(i));
@@ -66,8 +61,6 @@ internal static class Program
 
         IntPtr session = CSycles.session_create(sp);
         Console.WriteLine("session    : " + (session != IntPtr.Zero ? "created" : "NULL"));
-        // NOTE: scene_create is legacy - csycles has it behind #if SCENESTUFF with
-        // the comment that scenes are created by the ccl::Session constructor now.
 
         CSycles.camera_set_size(session, W, H);
         CSycles.camera_compute_auto_viewplane(session);

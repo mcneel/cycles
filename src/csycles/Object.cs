@@ -25,10 +25,6 @@ namespace ccl
 		/// Id of the Cycles object.
 		/// </summary>
 		public uint Id { get; }
-		/// <summary>
-		/// Reference to the client.
-		/// </summary>
-		private Session Client { get; }
 
 		/// <summary>
 		/// Add a new clipping plane using given equation.
@@ -37,27 +33,8 @@ namespace ccl
 		/// <param name="equation"></param>
 		public ClippingPlane(Session client, float4 equation)
 		{
-			Client = client;
 			Id = CSycles.scene_add_clipping_plane(client.Scene.Id, equation);
 		}
-
-		/// <summary>
-		/// Set new equation for the clipping plane.
-		/// </summary>
-		/// <param name="equation"></param>
-		public void SetEquation(float4 equation)
-		{
-			CSycles.scene_set_clipping_plane(Client.Scene.Id, Id, equation);
-		}
-
-		/// <summary>
-		/// Mark the clipping plane as not used.
-		/// </summary>
-		public void Discard()
-		{
-			CSycles.scene_discard_clipping_plane(Client.Scene.Id, Id);
-		}
-
 	}
 	/// <summary>
 	/// Representation of a Cycles object.

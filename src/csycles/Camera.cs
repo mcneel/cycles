@@ -76,17 +76,6 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set panorama type.
-		/// </summary>
-		public PanoramaType PanoramaType
-		{
-			set
-			{
-				CSycles.camera_set_panorama_type(Session.Id, value);
-			}
-		}
-
-		/// <summary>
 		/// Set the Field of View.
 		/// </summary>
 		public float Fov
@@ -116,17 +105,6 @@ namespace ccl
 			set
 			{
 				CSycles.camera_set_sensor_height(Session.Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set the near clip.
-		/// </summary>
-		public float NearClip
-		{
-			set
-			{
-				CSycles.camera_set_nearclip(Session.Id, value);
 			}
 		}
 
@@ -193,39 +171,6 @@ namespace ccl
 			set
 			{
 				CSycles.camera_set_focaldistance(Session.Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set the shutter time.
-		/// </summary>
-		public float ShutterTime
-		{
-			set
-			{
-				CSycles.camera_set_shuttertime(Session.Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set Field of View, in case fish eye projection is used.
-		/// </summary>
-		public float FishEyeFov
-		{
-			set
-			{
-				CSycles.camera_set_fisheye_fov(Session.Id, value);
-			}
-		}
-
-		/// <summary>
-		/// Set lens length, in case fish eye projection is used.
-		/// </summary>
-		public float FishEyeLens
-		{
-			set
-			{
-				CSycles.camera_set_fisheye_lens(Session.Id, value);
 			}
 		}
 

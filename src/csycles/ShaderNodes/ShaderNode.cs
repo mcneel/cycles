@@ -89,27 +89,6 @@ namespace ccl.ShaderNodes
 			throw new NotImplementedException($"Should implement GetClosureSocket for this node {ShaderNodeTypeName}");
 		}
 
-#if OLDSTUFF
-		/// <summary>
-		/// Create node of type ShaderNodeType type
-		/// </summary>
-		/// <param name="type"></param>
-		internal ShaderNode(ShaderNodeType type) : this(type, String.Empty)
-		{
-		}
-
-		/// <summary>
-		/// Create node of type ShaderNodeType and with given name
-		/// </summary>
-		/// <param name="type"></param>
-		/// <param name="name"></param>
-		internal ShaderNode(ShaderNodeType type, string name)
-		{
-			Type = type;
-			Name = name;
-		}
-#endif
-
 		internal ShaderNode(Shader shader, string name)
 		{
 			ConstructShaderNode(shader, ShaderNodeTypeName, name);

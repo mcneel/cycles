@@ -89,19 +89,6 @@ namespace ccl
 			CSycles.shader_dump_graph(Id, filename);
 		}
 
-		/*
-		/// <summary>
-		/// Create a shader outside of the Cycles system. Can be used to set up a
-		/// shader graph for serialisation purposes.
-		/// </summary>
-		/// <param name="type"></param>
-		public Shader(ShaderType type)
-		{
-			Type = type;
-			Output = new OutputNode();
-		}
-		*/
-
 		/// <summary>
 		/// Clear the shader graph for this node, so it can be repopulated.
 		/// </summary>
@@ -134,11 +121,6 @@ namespace ccl
 		public virtual void AddNode(ShaderNode node)
 		{
 			m_nodes.Add(node);
-		}
-
-		public void CreateNode(string nodeTypeName)
-		{
-			// XXXX
 		}
 
 		/// <summary>

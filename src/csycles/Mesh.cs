@@ -44,7 +44,6 @@ namespace ccl
 			Client = client;
 			Shader = shader;
 			GeometryPointer = CSycles.scene_add_mesh(Client.Scene.Id, shader.Id);
-			//System.Diagnostics.Trace.WriteLine($"Created mesh {GeometryPointer} with shader {shader.Id}\n");
 		}
 
 		/// <summary>
@@ -70,18 +69,6 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Use given <c>shader</c> as new shader.
-		/// </summary>
-		/// <param name="shader"></param>
-		public void ReplaceShader(Shader shader)
-		{
-			System.Diagnostics.Trace.WriteLine($"on mesh {GeometryPointer} replacing {Shader.Id} with {shader.Id}\n");
-			Shader = shader;
-			CSycles.geometry_set_shader(Client.Scene.Id, GeometryPointer, Shader.Id);
-			TagRebuild();
-		}
-
-		/// <summary>
 		/// Tag for update and rebuild
 		/// </summary>
 		public void TagRebuild()
@@ -96,16 +83,6 @@ namespace ccl
 		public void AttrTangentSpace(string uvmap_name)
 		{
 			CSycles.mesh_attr_tangentspace(Client.Scene.Id, GeometryPointer, uvmap_name);
-		}
-
-		/// <summary>
-		/// Reserve memory for mesh data
-		/// </summary>
-		/// <param name="vcount"></param>
-		/// <param name="fcount"></param>
-		public void Reserve(uint vcount, uint fcount)
-		{
-			CSycles.mesh_reserve(Client.Scene.Id, GeometryPointer, vcount, fcount);
 		}
 
 		/// <summary>
@@ -163,33 +140,6 @@ namespace ccl
 		public void SetVertexColors(ref float[] vertexcolors)
 		{
 			CSycles.mesh_set_vertex_colors(Client.Scene.Id, GeometryPointer, ref vertexcolors, (uint)(vertexcolors.Length / 3));
-		}
-
-		/// <summary>
-		/// Add a triangle to the mesh using the given vertex coordinates, shader and smooth flag
-		/// </summary>
-		/// <param name="v0"></param>
-		/// <param name="v1"></param>
-		/// <param name="v2"></param>
-		/// <param name="shader"></param>
-		/// <param name="smooth"></param>
-		public void AddTri(uint v0, uint v1, uint v2, Shader shader, bool smooth)
-		{
-			CSycles.mesh_add_triangle(Client.Scene.Id, GeometryPointer, v0, v1, v2, shader.Id, smooth);
-		}
-
-		/// <summary>
-		/// Set a triangle to the mesh at given triangle idx using the given vertex coordinates, shader and smooth flag
-		/// </summary>
-		/// <param name="idx"></param>
-		/// <param name="v0"></param>
-		/// <param name="v1"></param>
-		/// <param name="v2"></param>
-		/// <param name="shader"></param>
-		/// <param name="smooth"></param>
-		public void SetTri(uint idx, uint v0, uint v1, uint v2, Shader shader, bool smooth)
-		{
-			CSycles.mesh_set_triangle(Client.Scene.Id, GeometryPointer, idx, v0, v1, v2, shader.Id, smooth);
 		}
 	}
 }

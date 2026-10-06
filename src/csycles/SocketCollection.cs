@@ -17,8 +17,6 @@ limitations under the License.
 using ccl.ShaderNodes.Sockets;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
 
 namespace ccl
 {
@@ -57,36 +55,6 @@ namespace ccl
 			}
 
 			throw new ArgumentException($"Socket {name} doesn't exist", nameof(name));
-		}
-
-		/// <summary>
-		/// Iterate over the available property names
-		/// </summary>
-		public IEnumerable<string> PropertyNames
-		{
-			get
-			{
-				var p = TypeDescriptor.GetProperties(this);
-
-				for (var i = 0; i < p.Count; i++)
-				{
-					if (p[i].Name.Equals("PropertyNames")) continue;
-
-					yield return p[i].Name;
-				}
-			}
-		}
-
-		/// <summary>
-		/// True if the requested property exists.
-		/// 
-		/// Case insensitive.
-		/// </summary>
-		/// <param name="n">UiName of property to search for</param>
-		/// <returns></returns>
-		public bool HasSocket(string n)
-		{
-			return PropertyNames.Any(pname => pname.ToLowerInvariant().Equals(n.ToLowerInvariant()));
 		}
 
 		/// <summary>

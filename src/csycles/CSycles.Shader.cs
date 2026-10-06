@@ -37,13 +37,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern uint cycles_scene_shader_id(IntPtr sessionId, IntPtr shaderId);
-		public static uint scene_shader_id(IntPtr sessionId, IntPtr shaderId)
-		{
-			return cycles_scene_shader_id(sessionId, shaderId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern IntPtr cycles_add_shader_node(IntPtr shaderId, [MarshalAs(UnmanagedType.LPStr)] string shnType, [MarshalAs(UnmanagedType.LPStr)] string shnName);
 		public static IntPtr add_shader_node(IntPtr shaderId, string node_type, string node_name)
 		{
@@ -64,15 +57,6 @@ namespace ccl
 		public static void shadernode_texmapping_set_mapping(IntPtr shadernodeId, uint mappingx, uint mappingy, uint mappingz)
 		{
 			cycles_shadernode_texmapping_set_mapping(shadernodeId, mappingx, mappingy, mappingz);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_shadernode_texmapping_set_projection(IntPtr shadernodeId, uint projection);
-		[Obsolete("No longer existing")]
-		public static void shadernode_texmapping_set_projection(IntPtr shadernodeId, uint projection)
-		{
-			cycles_shadernode_texmapping_set_projection(shadernodeId, projection);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false,
@@ -274,91 +258,6 @@ namespace ccl
 				}
 			}
 			return $"UiName failed for {shaderId}";
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern bool cycles_nodetype_get_name(IntPtr nodeTypePtr, IntPtr stringholder);
-		public static string nodetype_get_name(IntPtr nodeTypePtr)
-		{
-			using (CSStringHolder stringHolder = new CSStringHolder())
-			{
-				bool success = cycles_nodetype_get_name(nodeTypePtr, stringHolder.Ptr);
-				if (success)
-				{
-					string name = stringHolder.Value;
-					return name;
-				}
-			}
-			return $"UiName failed for {nodeTypePtr}";
-		}
-		[DllImport(Constants.ccycles, SetLastError = false,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern int cycles_get_shadernodetype_count();
-		public static int get_shadernodetype_count()
-		{
-			return cycles_get_shadernodetype_count();
-		}
-		[DllImport(Constants.ccycles, SetLastError = false,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern IntPtr cycles_get_shadernodetype(int idx);
-		public static IntPtr get_shadernodetype(int idx)
-		{
-			return cycles_get_shadernodetype(idx);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern int cycles_shadernode_get_socketcount(IntPtr shader, int input_output);
-		public static int shadernode_get_socketcount(IntPtr shader, int input_output)
-		{
-			return cycles_shadernode_get_socketcount(shader, input_output);
-		}
-		[DllImport(Constants.ccycles, SetLastError = false,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern IntPtr cycles_shadernode_get_sockettype(IntPtr shader, int idx, int input_output);
-		public static IntPtr shadernode_get_sockettype(IntPtr shader, int idx, int input_output)
-		{
-			return cycles_shadernode_get_sockettype(shader, idx, input_output);
-		}
-		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern int cycles_sockettype_get_type(IntPtr sockettypeId);
-		public static int sockettype_get_type(IntPtr sockettypeId)
-		{
-			return cycles_sockettype_get_type(sockettypeId);
-		}
-		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern bool cycles_sockettype_get_ui_name(IntPtr sockettypeId, IntPtr stringholder);
-		public static string sockettype_get_ui_name(IntPtr sockettypeId)
-		{
-			using (CSStringHolder stringHolder = new CSStringHolder())
-			{
-				bool success = cycles_sockettype_get_ui_name(sockettypeId, stringHolder.Ptr);
-				if (success)
-				{
-					string name = stringHolder.Value;
-					return name;
-				}
-			}
-			return $"UiName failed for {sockettypeId}";
-		}
-		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
-			CallingConvention = CallingConvention.Cdecl)]
-		private static extern bool cycles_sockettype_get_internal_name(IntPtr sockettypeId, IntPtr stringholder);
-		public static string sockettype_get_internal_name(IntPtr sockettypeId)
-		{
-			using (CSStringHolder stringHolder = new CSStringHolder())
-			{
-				bool success = cycles_sockettype_get_internal_name(sockettypeId, stringHolder.Ptr);
-				if (success)
-				{
-					string name = stringHolder.Value;
-					return name;
-				}
-			}
-			return $"UiName failed for {sockettypeId}";
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false,

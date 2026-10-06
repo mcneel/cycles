@@ -106,17 +106,6 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set the map resolution to be used with multiple importance sampling.
-		/// </summary>
-		public uint MapResolution
-		{
-			set
-			{
-				CSycles.light_set_map_resolution(Scene.Id, Id, value);
-			}
-		}
-
-		/// <summary>
 		/// Set the soft shadow size (larger generally means fewer fireflies).
 		/// </summary>
 		public float Size

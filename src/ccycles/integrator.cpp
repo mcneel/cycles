@@ -41,14 +41,6 @@ CCL_CAPI void CDECL cycles_integrator_set_max_bounce(ccl::Session* session_id, i
 	}
 }
 
-CCL_CAPI void CDECL cycles_integrator_set_min_bounce(ccl::Session* session_id, int min_bounce)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_min_bounce(min_bounce);
-	}
-}
-
 CCL_CAPI void CDECL cycles_integrator_set_no_caustics(ccl::Session* session_id, bool no_caustics)
 {
 	ccl::Scene* sce = nullptr;
@@ -127,14 +119,6 @@ CCL_CAPI void CDECL cycles_integrator_set_transparent_max_bounce(ccl::Session* s
 	}
 }
 
-CCL_CAPI void CDECL cycles_integrator_set_transparent_min_bounce(ccl::Session* session_id, int transparent_min_bounce)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_transparent_min_bounce(transparent_min_bounce);
-	}
-}
-
 CCL_CAPI void CDECL cycles_integrator_set_aa_samples(ccl::Session* session_id, int aa_samples)
 {
 	ccl::Scene* sce = nullptr;
@@ -164,14 +148,6 @@ CCL_CAPI void CDECL cycles_integrator_set_use_indirect_light(ccl::Session *sessi
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
 		sce->integrator->set_use_indirect_light(use_indirect_light);
-	}
-}
-
-CCL_CAPI void CDECL cycles_integrator_set_volume_step_rate(ccl::Session* session_id, float volume_step_rate)
-{
-	ccl::Scene* sce = nullptr;
-	if(scene_find(session_id, &sce)) {
-		sce->integrator->set_volume_step_rate(volume_step_rate);
 	}
 }
 

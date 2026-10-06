@@ -81,32 +81,13 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Start the rendering session. After this one should Wait() for
-		/// the session to complete.
+		/// Start the rendering session.
 		/// </summary>
 		public void Start()
 		{
 			if (Destroyed) return;
 			CSycles.progress_reset(Id);
 			CSycles.session_start(Id);
-		}
-
-		/// <summary>
-		/// Sample one pass. Return -1 when no pass was rendered, zero or positive when something was rendered.
-		/// </summary>
-		public int Sample()
-		{
-			if (Destroyed) return -1;
-			return CSycles.session_sample(Id);
-		}
-
-		/// <summary>
-		/// Wait for the rendering session to complete
-		/// </summary>
-		public void Wait()
-		{
-			if (Destroyed) return;
-			CSycles.session_wait(Id);
 		}
 
 		/// <summary>
@@ -132,18 +113,6 @@ namespace ccl
 		{
 			if (Destroyed) return;
 			CSycles.session_destroy(Id);
-		}
-
-		public void GetPixelBuffer(PassType pt, ref IntPtr pixel_buffer)
-		{
-			if (Destroyed)
-			{
-				pixel_buffer = IntPtr.Zero;
-			}
-			else
-			{
-				CSycles.session_get_float_buffer(Id, pt, ref pixel_buffer);
-			}
 		}
 
 		public void RetainPixelBuffer(PassType pt, int width, int height, ref IntPtr pixel_buffer, ref int pixel_size_from_cycles)
@@ -228,16 +197,6 @@ namespace ccl
 			{
 				_passes.Add(pass);
 			}
-		}
-
-		/// <summary>
-		/// Clear all passes for session.
-		/// </summary>
-		public void ClearPasses()
-		{
-			if (Destroyed) return;
-			_passes.Clear();
-			CSycles.session_clear_passes(Id);
 		}
 
 		protected virtual void Dispose(bool disposing)

@@ -55,10 +55,8 @@ namespace ccl
 		public Device Device { get; private set; }
 
 		/// <summary>
-		/// Create a new scene with the given SceneParameters and Device
+		/// Wrap the scene that the ccl::Session constructor created.
 		/// </summary>
-		/// <param name="client">The client from C[CS]ycles API</param>
-		/// <param name="sceneParams">The SceneParameters to create scene with</param>
 		/// <param name="session">The Session to create scene for</param>
 		public Scene(Session session)
 		{
@@ -68,31 +66,6 @@ namespace ccl
 			Integrator = new Integrator(session);
 			Film = new Film(session);
 			Background = new Background(session);
-#if SCENESTUFF
-// TODO: XXXX scenes are created directly by ccl::Session constructor.
-// TODO: XXXX wrap access of scene through session.
-			Client = client;
-			Id = CSycles.scene_create(sceneParams.Id, session.Id);
-			Integrator = new Integrator(this);
-			Film = new Film(this);
-
-			/* add simple wrappers for shadermanager created default shaders */
-			var surface = Shader.WrapDefaultSurfaceShader(client);
-			var light = Shader.WrapDefaultLightShader(client);
-			var background = Shader.WrapDefaultBackgroundShader(client);
-			var empty = Shader.WrapDefaultEmptyShader(client);
-
-			/* register the wrapped shaders with scene */
-			m_shader_in_scene_ids.Add(surface, surface.Id);
-			m_shader_in_scene_ids.Add(background, background.Id);
-			m_shader_in_scene_ids.Add(light, light.Id);
-			m_shader_in_scene_ids.Add(empty, empty.Id);
-
-			DefaultSurface = surface;
-
-			// set ourself to client as reference
-			client.Scene = this;
-#endif
 		}
 
 		/// <summary>
@@ -123,14 +96,6 @@ namespace ccl
 			{
 				Thread.Sleep(10);
 			}
-		}
-
-		/// <summary>
-		/// Aqcuire lock on scene mutex blocking.
-		/// </summary>
-		public void Lock()
-		{
-			CSycles.scene_lock(Id);
 		}
 
 		/// <summary>

@@ -45,13 +45,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_light_set_map_resolution(IntPtr sessionId, IntPtr lightId, uint mapResolution);
-		public static void light_set_map_resolution(IntPtr sessionId, IntPtr lightId, uint mapResolution)
-		{
-			cycles_light_set_map_resolution(sessionId, lightId, mapResolution);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_light_set_spot_angle(IntPtr sessionId, IntPtr lightId, float spotAngle);
 		public static void light_set_spot_angle(IntPtr sessionId, IntPtr lightId, float spotAngle)
 		{

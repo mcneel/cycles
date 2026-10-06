@@ -145,31 +145,11 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_scene_set_clipping_plane(IntPtr sessionId, uint cpId, float a, float b, float c, float d);
-
-		public static void scene_set_clipping_plane(IntPtr sessionId, uint cpId, float a, float b, float c, float d)
-		{
-			cycles_scene_set_clipping_plane(sessionId, cpId, a, b, c, d);
-		}
-		public static void scene_set_clipping_plane(IntPtr sessionId, uint cpId, float4 equation)
-		{
-			scene_set_clipping_plane(sessionId, cpId, equation.x, equation.y, equation.z, equation.w);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_scene_clear_clipping_planes(IntPtr sessionId);
 
 		public static void scene_clear_clipping_planes(IntPtr sessionId)
 		{
 			cycles_scene_clear_clipping_planes(sessionId);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_scene_discard_clipping_plane(IntPtr sessionId, uint cpId);
-
-		public static void scene_discard_clipping_plane(IntPtr sessionId, uint cpId)
-		{
-			cycles_scene_discard_clipping_plane(sessionId, cpId);
 		}
 
 		#endregion

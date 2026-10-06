@@ -84,8 +84,6 @@ namespace ccl.ShaderNodes
 			CSycles.shadernode_set_member_int(Id, "GradientType", (int)GradientType);
 			CSycles.shadernode_set_member_bool(Id, "FlipAlternate", FlipAlternate);
 			CSycles.shadernode_set_member_bool(Id, "UseCustomCurve", UseCustomCurve);
-			//CSycles.shadernode_set_member_int(sessionId, shaderId, Id, Type, "PointWidth", PointWidth);
-			//CSycles.shadernode_set_member_int(sessionId, shaderId, Id, Type, "PointHeight", PointHeight);
 		}
 	}
 }

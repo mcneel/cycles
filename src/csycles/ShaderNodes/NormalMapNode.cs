@@ -55,8 +55,6 @@ namespace ccl.ShaderNodes
 			Tangent,
 			Object,
 			World,
-			/*BlenderObject,
-			BlenderWorld,*/
 		}
 		public NormalMapInputs ins => (NormalMapInputs)inputs;
 		public NormalMapOutputs outs => (NormalMapOutputs)outputs;

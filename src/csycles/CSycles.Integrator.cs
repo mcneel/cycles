@@ -37,13 +37,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_integrator_set_min_bounce(IntPtr sessionId, int value);
-		public static void integrator_set_min_bounce(IntPtr sessionId, int value)
-		{
-			cycles_integrator_set_min_bounce(sessionId, value);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_integrator_set_max_diffuse_bounce(IntPtr sessionId, int value);
 		public static void integrator_set_max_diffuse_bounce(IntPtr sessionId, int value)
 		{
@@ -76,13 +69,6 @@ namespace ccl
 		public static void integrator_set_transparent_max_bounce(IntPtr sessionId, int value)
 		{
 			cycles_integrator_set_transparent_max_bounce(sessionId, value);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_integrator_set_transparent_min_bounce(IntPtr sessionId, int value);
-		public static void integrator_set_transparent_min_bounce(IntPtr sessionId, int value)
-		{
-			cycles_integrator_set_transparent_min_bounce(sessionId, value);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
@@ -160,13 +146,6 @@ namespace ccl
 		public static void integrator_set_use_indirect_light(IntPtr sessionId, bool value)
 		{
 			cycles_integrator_set_use_indirect_light(sessionId, value);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_integrator_set_volume_step_rate(IntPtr sessionId, float value);
-		public static void integrator_set_volume_step_rate(IntPtr sessionId, float value)
-		{
-			cycles_integrator_set_volume_step_rate(sessionId, value);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
