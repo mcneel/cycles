@@ -229,12 +229,6 @@ void cycles_light_set_use_mis(ccl::Session *session_id, CCyclesLight *light, uns
 	light->flush();
 }
 
-void cycles_light_set_samples(ccl::Session *session_id, CCyclesLight *light, unsigned int samples)
-{
-	light->max_bounces = (int)samples;
-	light->flush();
-}
-
 void cycles_light_set_max_bounces(ccl::Session *session_id, CCyclesLight *light, unsigned int max_bounces)
 {
 	light->max_bounces = (int)max_bounces;

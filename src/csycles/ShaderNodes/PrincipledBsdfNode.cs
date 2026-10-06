@@ -259,6 +259,7 @@ namespace ccl.ShaderNodes
 			ins.EmissionStrength.Value = 0.0f;
 			ins.Alpha.Value = 1.0f;
 			Distribution = Distributions.Multiscatter_GGX;
+			Sss = ScatterMethod.RandomWalk;
 		}
 
 		public Distributions Distribution { get; set; }

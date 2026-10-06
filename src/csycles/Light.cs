@@ -95,17 +95,6 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set sample count for light.
-		/// </summary>
-		public uint Samples
-		{
-			set
-			{
-				CSycles.light_set_samples(Scene.Id, Id, value);
-			}
-		}
-
-		/// <summary>
 		/// Set the maximum amount of bounces this light contributes per ray.
 		/// </summary>
 		public uint MaxBounces

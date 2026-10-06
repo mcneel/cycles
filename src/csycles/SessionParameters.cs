@@ -41,10 +41,11 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Change session parameters to use given Device
+		/// The device the session will be created on.
 		/// </summary>
-		public Device SetDevice
+		public Device Device
 		{
+			get => _device;
 			set
 			{
 				_device = value;

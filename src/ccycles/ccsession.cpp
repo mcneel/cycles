@@ -63,9 +63,9 @@ private:
 /* Find pointers for CCSession and ccl::Session. Return false if either fails. */
 bool session_find(ccl::Session* sid, CCSession** ccsess, ccl::Session** session)
 {
-  auto sidhit = [sid](CCSession* i) { return i->session == sid; };
-  auto found = std::find_if(sessions.cbegin(), sessions.cend(), sidhit);
+	auto sidhit = [sid](CCSession* i) { return i->session == sid; };
 	ccl::thread_scoped_lock lock(session_mutex);
+	auto found = std::find_if(sessions.cbegin(), sessions.cend(), sidhit);
 	if (found != sessions.cend()) {
 		*ccsess = (*found);
 		if(*ccsess!=nullptr) *session = (*ccsess)->session;
@@ -284,10 +284,6 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 		}
 	}
 	else {
-		/* TEMPORARY: with a shadow catcher in the scene Cycles writes the picture
-		 * across combined, shadow_catcher_matte, shadow_catcher and background,
-		 * and reading only "combined" can legitimately give black. Report what is
-		 * in each of them once, at the last sample. */
 		/* Shader flags like emission_estimate and has_surface_spatial_varying are
 		 * only filled in by ShaderManager::device_update, which runs after
 		 * session start - reading them in cycles_debug_scene_stats gives zeros
@@ -318,78 +314,6 @@ bool CCyclesOutputDriver::write_or_update_render_tile(const Tile &tile)
 					ccycles_diag("max_closures=%u (0 means no surface closure can be "
 					             "allocated at all)\n",
 					             sc->dscene.data.max_closures);
-				}
-			}
-		}
-		static const bool want_probe = getenv("CCYCLES_PASS_PROBE") != nullptr;
-		if (want_probe && tile.get_sample() > 1) {
-			static bool probed = false;
-			if (!probed) {
-				probed = true;
-				/* Film::update_passes adds the shadow-catcher passes during device
-				 * update, so the session-start dump runs too early to see them.
-				 * Reading "combined" is redirected to PASS_SHADOW_CATCHER_MATTE by
-				 * BufferParams::get_actual_display_pass, and falls back to the raw
-				 * combined pass *silently* when that matte is absent - which is a
-				 * catcher rendering as plain background with no shadow. List them
-				 * here, where the answer is final. */
-				if (ccsession_ != nullptr && ccsession_->session != nullptr) {
-					ccl::Scene *psce = ccsession_->session->scene.get();
-					if (psce != nullptr) {
-						/* These two decide whether the matte gets the backdrop
-						 * multiplied into RGB. With a transparent background,
-						 * use_approximate_shadow_catcher_background goes false and the
-						 * shadow arrives in *alpha* instead - which looks identical to
-						 * "no shadow" to anything that blits RGB over white. */
-						ccycles_diag("probe: approx_shadow_catcher=%d background_transparent=%d\n",
-						             (int)psce->film->get_use_approximate_shadow_catcher(),
-						             (int)psce->background->get_transparent());
-						ccycles_diag("probe: has_shadow_catcher=%d passes=%zu\n",
-						             (int)psce->has_shadow_catcher(), psce->passes.size());
-						for (const auto &p : psce->passes) {
-							ccycles_diag("probe:   pass type=%d mode=%d name='%s' written=%d\n",
-							             (int)p->get_type(), (int)p->get_mode(),
-							             p->get_name().c_str(), (int)p->is_written());
-						}
-					}
-				}
-				const char *names[] = {"combined", "shadow_catcher_matte",
-				                       "shadow_catcher", "background"};
-				const int w = tile.full_size.x, h = tile.full_size.y;
-				std::vector<float> probe(size_t(w) * size_t(h) * 4);
-				for (const char *nm : names) {
-					if (!tile.get_pass_pixels(nm, 4, probe.data())) {
-						ccycles_diag("probe: pass '%s' unavailable\n", nm);
-						continue;
-					}
-					float lo = probe[0], hi = probe[0];
-					double sum = 0.0;
-					size_t nz = 0;
-					for (float v : probe) {
-						if (v < lo) lo = v;
-						if (v > hi) hi = v;
-						sum += v;
-						if (v != 0.0f) nz++;
-					}
-					ccycles_diag("probe: '%s' %dx%d nonzero=%zu min=%f max=%f mean=%f\n",
-					             nm, w, h, nz, lo, hi, sum / double(probe.size()));
-					/* Per-channel, because a shadow that lives in alpha and a shadow
-					 * that lives in RGB are the same mean and completely different
-					 * bugs. */
-					for (int c = 0; c < 4; c++) {
-						float clo = probe[c], chi = probe[c];
-						double csum = 0.0;
-						size_t cn = 0;
-						for (size_t i = size_t(c); i < probe.size(); i += 4) {
-							const float v = probe[i];
-							if (v < clo) clo = v;
-							if (v > chi) chi = v;
-							csum += v;
-							cn++;
-						}
-						ccycles_diag("probe:   '%s' ch%d min=%f max=%f mean=%f\n",
-						             nm, c, clo, chi, csum / double(cn ? cn : 1));
-					}
 				}
 			}
 		}
@@ -543,19 +467,22 @@ extern "C" {
 
 CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_parameters)
 {
-	ccl::thread_scoped_lock lock(session_mutex);
+	ccl::SessionParams params;
+	{
+		ccl::thread_scoped_lock lock(session_mutex);
+		auto found = session_params.find(_session_parameters);
+		if (found == session_params.end())
+			return nullptr;
+		params = **found;
+	}
 
-	ccl::SessionParams *params = (*(session_params.find(_session_parameters)));
-	if (params == nullptr)
-		return nullptr;
-
-	int csesid{ -1 };
-	int hid{ 0 };
-
+	/* Rhino: no lock while the device is created. HIP device creation occasionally never
+	 * returns; RhinoCycles then gives up on it and creates a CPU session, which must not
+	 * wait for this one. RhinoCycles serialises session creation itself. */
 	CCSession* session = CCSession::create(10, 10, 4);
 
 	// TODO: XXXX these are hardcoded params/sceneparams
-	session->params = *params;
+	session->params = params;
 	session->params.tile_size = 512;
 	session->params.use_auto_tile = false;
 	/* SessionParams::experimental was removed in 5.2. */
@@ -567,8 +494,8 @@ CCL_CAPI ccl::Session* CDECL cycles_session_create(ccl::SessionParams* _session_
 
 	prep_session(session->session, &session->passes, session);
 
+	ccl::thread_scoped_lock lock(session_mutex);
 	sessions.insert(session);
-	csesid = (unsigned int)(sessions.size() - 1);
 
 	return session->session;
 }
@@ -578,10 +505,9 @@ CCL_CAPI void CDECL cycles_session_destroy(ccl::Session* session_id)
 	CCSession* ccsess = nullptr;
 	ccl::Session* session = nullptr;
 	if (session_find(session_id, &ccsess, &session)) {
-		sessions.erase(ccsess);
-		if (auto search = session_params.find(&ccsess->params); search != session_params.end()) {
-			session_params.erase(*search);
-			delete *search;
+		{
+			ccl::thread_scoped_lock lock(session_mutex);
+			sessions.erase(ccsess);
 		}
 		delete ccsess;
 	}

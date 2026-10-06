@@ -528,7 +528,6 @@ CCL_CAPI void CDECL cycles_light_set_spot_angle(ccl::Session *session_id, CCycle
 CCL_CAPI void CDECL cycles_light_set_spot_smooth(ccl::Session *session_id, CCyclesLight *light_id, float spot_smooth);
 CCL_CAPI void CDECL cycles_light_set_cast_shadow(ccl::Session *session_id, CCyclesLight *light_id, unsigned int cast_shadow);
 CCL_CAPI void CDECL cycles_light_set_use_mis(ccl::Session *session_id, CCyclesLight *light_id, unsigned int use_mis);
-CCL_CAPI void CDECL cycles_light_set_samples(ccl::Session *session_id, CCyclesLight *light_id, unsigned int samples);
 CCL_CAPI void CDECL cycles_light_set_max_bounces(ccl::Session *session_id, CCyclesLight *light_id, unsigned int max_bounces);
 CCL_CAPI void CDECL cycles_light_set_map_resolution(ccl::Session *session_id, CCyclesLight *light_id, unsigned int map_resolution);
 CCL_CAPI void CDECL cycles_light_set_sizeu(ccl::Session *session_id, CCyclesLight *light_id, float sizeu);

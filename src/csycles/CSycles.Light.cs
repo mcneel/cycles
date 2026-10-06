@@ -38,13 +38,6 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_light_set_samples(IntPtr sessionId, IntPtr lightId, uint samples);
-		public static void light_set_samples(IntPtr sessionId, IntPtr lightId, uint samples)
-		{
-			cycles_light_set_samples(sessionId, lightId, samples);
-		}
-
-		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_light_set_max_bounces(IntPtr sessionId, IntPtr lightId, uint maxBounces);
 		public static void light_set_max_bounces(IntPtr sessionId, IntPtr lightId, uint maxBounces)
 		{

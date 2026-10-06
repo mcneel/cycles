@@ -69,22 +69,10 @@ static void ccycles_dump_svm_node(const char *shader_name,
                                   ShaderType type,
                                   const ShaderNode *node)
 {
-  static FILE *svm_file = nullptr;
-  static bool tried = false;
-  static thread_mutex svm_dump_mutex;
-
-  /* Shaders compile on a task pool, so one fprintf per line interleaves records
-   * from several shaders and the result cannot be read. Build the whole record
-   * first and write it under a lock. */
-  const thread_scoped_lock lock(svm_dump_mutex);
-
-  if (!tried) {
-    tried = true;
+  static FILE *svm_file = [] {
     const char *path = getenv("CCYCLES_DUMP_SVM");
-    if (path != nullptr && path[0] != 0) {
-      svm_file = fopen(path, "a");
-    }
-  }
+    return (path != nullptr && path[0] != 0) ? fopen(path, "a") : nullptr;
+  }();
   if (svm_file == nullptr) {
     return;
   }
@@ -151,6 +139,9 @@ static void ccycles_dump_svm_node(const char *shader_name,
                          it->handle.empty() ? -1 : it->handle.kernel_id());
   }
 
+  /* Shaders compile on a task pool; write each record whole so they do not interleave. */
+  static thread_mutex svm_dump_mutex;
+  const thread_scoped_lock lock(svm_dump_mutex);
   fputs(rec.c_str(), svm_file);
   fflush(svm_file);
 }
@@ -174,13 +165,6 @@ void SVMShaderManager::device_update_shader(Scene *scene,
   SVMCompiler::Summary summary;
   SVMCompiler compiler(scene, progress);
   compiler.background = (shader == scene->background->get_shader(scene));
-  /* Rhino: whether a shader compiles as the background decides what the
-   * texture coordinate node emits for Generated - the ray direction, or an
-   * ATTR_STD_GENERATED lookup that reads zero when there is no geometry. Worth
-   * being able to see. */
-  LOG_INFO << "SVM compile \"" << shader->name << "\" background="
-           << compiler.background << " (scene background shader is \""
-           << scene->background->get_shader(scene)->name << "\")";
   compiler.compile(shader, *svm_nodes, 0, &summary);
 
   LOG_DEBUG << "Compilation summary:\n"

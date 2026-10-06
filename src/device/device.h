@@ -112,14 +112,7 @@ class DeviceInfo {
   {
     if (id == "MULTI" && info.id == "MULTI") {
       /* Rhino: MULTI devices compare by their constituent devices. */
-      bool rc = false;
-      if (multi_devices.size() != info.multi_devices.size()) {
-        return false;
-      }
-      for (int i = 0; i < multi_devices.size(); i++) {
-        rc |= multi_devices[i] == info.multi_devices[i];
-      }
-      return rc;
+      return multi_devices == info.multi_devices;
     }
 
     /* Multiple Devices with the same ID would be very bad. Rhino: this was an

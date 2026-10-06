@@ -988,8 +988,11 @@ void ObjectManager::device_update(Device *device,
 
     int index = 0;
     for (Object *object : scene->objects) {
-      /* Rhino: only index objects whose geometry actually has triangles. */
-      if (static_cast<Mesh *>(object->geometry)->triangles.size() > 0) {
+      /* Rhino: meshes without triangles get no index (OOB crash fix from 3.5). Lights are
+       * objects too in Cycles 5 and always get one. */
+      if (!object->geometry->is_mesh() ||
+          static_cast<Mesh *>(object->geometry)->num_triangles() > 0)
+      {
         object->index = index++;
       }
 
