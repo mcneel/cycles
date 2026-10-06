@@ -37,6 +37,34 @@ CCL_NAMESPACE_BEGIN
  * graph dumps cannot see that, and it is the failure mode behind the black
  * environment projections and the black bump surfaces. Set CCYCLES_DUMP_SVM to a
  * path to get it; SVM_STACK_INVALID prints as -1. */
+/* The constant an unlinked input holds. Without it the dump shows the wiring but not
+ * the values, so a material whose Sheen Weight went from 0.96 to 0 compiled to an
+ * identical-looking record. */
+static string ccycles_dump_svm_value(const ShaderInput *in)
+{
+  const Node *node = in->parent;
+  const SocketType &st = in->socket_type;
+  switch (in->type()) {
+    case SocketType::FLOAT:
+      return string_printf(" val=%g", node->get_float(st));
+    case SocketType::INT:
+      return string_printf(" val=%d", node->get_int(st));
+    case SocketType::BOOLEAN:
+      return string_printf(" val=%d", node->get_bool(st) ? 1 : 0);
+    case SocketType::COLOR:
+    case SocketType::VECTOR:
+    case SocketType::POINT:
+    case SocketType::NORMAL: {
+      const float3 v = node->get_float3(st);
+      return string_printf(" val=(%g %g %g)", v.x, v.y, v.z);
+    }
+    case SocketType::STRING:
+      return string_printf(" val='%s'", node->get_string(st).c_str());
+    default:
+      return "";
+  }
+}
+
 static void ccycles_dump_svm_node(const char *shader_name,
                                   ShaderType type,
                                   const ShaderNode *node)
@@ -71,10 +99,11 @@ static void ccycles_dump_svm_node(const char *shader_name,
                              node->name.c_str(),
                              node->type->name.c_str());
   for (const ShaderInput *in : node->inputs) {
-    rec += string_printf("    in  %-28s off=%d link=%s\n",
+    rec += string_printf("    in  %-28s off=%d link=%s%s\n",
                          in->socket_type.name.c_str(),
                          (int)in->stack_offset,
-                         in->link == nullptr ? "-" : in->link->parent->name.c_str());
+                         in->link == nullptr ? "-" : in->link->parent->name.c_str(),
+                         in->link == nullptr ? ccycles_dump_svm_value(in).c_str() : "");
   }
   for (const ShaderOutput *out : node->outputs) {
     rec += string_printf("    out %-28s off=%d users=%d\n",
