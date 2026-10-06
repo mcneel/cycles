@@ -9,7 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="csycles">
-      <HintPath>$(MSBuildThisFileDirectory)..\src\csycles\bin\x64\Debug\csycles.dll</HintPath>
+      <HintPath>$(MSBuildThisFileDirectory)..\src\csycles\bin\Debug\csycles.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

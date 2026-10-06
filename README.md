@@ -1,147 +1,58 @@
-﻿Cycles Renderer
-===============
+Cycles for Rhino
+================
 
-Cycles is a path tracing renderer focused on interactivity and ease of use, while supporting many production features.
+McNeel's fork of [Cycles](https://www.cycles-renderer.org), Blender's path tracer,
+as used by Rhino's Raytraced viewport and Rhino Render. It is upstream Cycles v5.2.0
+plus:
 
-https://www.cycles-renderer.org
+- **ccycles** (`src/ccycles`): a C API over Cycles, built as `ccycles.dll` /
+  `libccycles.dylib`.
+- **csycles** (`src/csycles`): the C# P/Invoke wrapper over ccycles.
+- **Rhino's shader nodes and edits inside upstream files**: Rhino's procedural
+  textures as SVM nodes, in-memory images, decal masking and mirrored tiling on the
+  image texture node, and light handling.
 
-## Building
+`src/util/version.h` reads 5.3.0: upstream bumps the number right after tagging 5.2.0.
 
-Cycles can be built as a standalone application or a Hydra render delegate. See [BUILDING.md](BUILDING.md) for instructions.
+## How it fits into Rhino
 
-## Examples
+Paths from the root of the Rhino repository:
 
-The repository contains example xml scenes which could be used for testing.
-
-Example usage:
-
-    ./cycles scene_monkey.xml
-
-You can also use optional parameters (see `./cycles --help`), like:
-
-    ./cycles --samples 100 --output ./image.png scene_monkey.xml
-
-For the OSL scene you need to enable the OSL shading system:
-
-    ./cycles --shadingsys osl scene_osl_stripes.xml
-	
-## Building ccycles for Rhino
-
-**In a hurry: [QUICKSTART.md](QUICKSTART.md).** One page, no history.
-
-Run `bootstrap.exe /cycles` from the repo root once, which installs the GPU SDKs
-on top of a normal bootstrap. Then Cycles builds from Visual Studio like any
-other Rhino project: build `src4/BuildSolutions/Rhino.sln` in the `Debug+Cycles`
-or `ReleaseDebuggable+Cycles` configuration and `ccycles.vcxproj` configures and
-builds Cycles, installs it into a payload under
-`big_libs/RhinoCycles/ccycles/win`, and `RhinoCyclesCore.csproj` copies it into
-the plug-in output. The plain `Debug` and `Release` configurations use the
-prebuilt payload instead, so no CMake, CUDA or OptiX SDK is needed. RhinoBuilder
-offers the same configurations. Both `+Cycles` configurations build Cycles as
-RelWithDebInfo: a Debug Rhino has always run release Cycles kernels, and an
-unoptimised kernel makes CPU renders about ten times slower for nothing. The
-PDBs stay next to the build, so `ccycles` remains steppable.
-
-Such a build makes kernels for the GPUs in your own machine only - a kernel for
-a card you do not own cannot be tested - and fills the rest in from the committed
-payload; with no GPU SDK installed that means all of them, and the GPU still
-renders. It writes a gitignored `local` payload rather than the committed one, so
-it cannot replace what everyone else runs with kernels for a single card.
-`RhinoCyclesCore` prefers `local` while it is newer than the committed payload,
-so your Rhino runs what you built and a pull that republishes takes over again by
-itself.
-
-Building a single project is the usual mistake: `ccycles.vcxproj` alone updates
-the payload but not the plug-in output, and `RhinoCyclesCore.csproj` alone copies
-whatever the payload already holds without rebuilding Cycles. Do both, or the
-solution.
-
-`csycles.csproj` has one more job, inherited from CCSycles: it copies RhinoCore's
-OpenImageIO runtime closure - `OpenImageIORH`, `OpenImageIO_UtilRH`, `jpeg62`,
-OpenEXR 2.5 and boost filesystem/thread from `big_libs` - into `bin\<Config>`.
-`Rhino.vcxproj` links those libraries but never deploys them, so without this
-step a fresh checkout dies at startup with "Error Loading RhinoCore.dll". Debug
-takes the debug-CRT flavours, including `lib\Debug\jpeg62.dll`; the release
-`jpeg62.dll` beside the debug OpenImageIO crashes Rhino in `fread` the first
-time a bitmap texture is sized, because the two CRTs do not share a `FILE*`.
-
-To publish a payload - which is what a kernel change needs before it merges, or
-everyone on a plain build gets a new `ccycles.dll` with the old kernels:
-
-    powershell -File publish_payload.ps1
-
-One command. It builds every backend for every shipping architecture, checks the
-result file by file, writes a manifest, and stages the payload in `big_libs`; it
-prints the two commits to make and does not make them. It requires all four
-SDKs, and stops rather than shipping a payload missing a backend.
-
-`tools/run_checks.ps1` answers whether the tree is sound, including whether the
-committed payload still matches the kernel sources. A second, and its exit code
-gates.
-
-See `RHINO-CYCLES-5.md` for the state of the port, and `tools/DIAGNOSTICS.md` for
-the diagnostic switches and what each one established.
-
-All of the above is Windows. The Mac needs far less of it, because Metal compiles
-its kernels from the shipped `source/` tree at runtime - there are no kernel
-binaries to build, verify or inherit. A Mac payload is the dylib, its dependency
-dylibs, and `source/`.
-
-## Building Cycles on macOS
-
-One command, from `RDK/cycles-core`:
-
-    make payload
-
-That fetches the dependency libraries, builds, applies the two fixups the payload
-is not fit to ship without, and copies the result into `big_libs`. Then commit it
-from `big_libs`, on a branch.
-
-The steps are also available separately:
-
-| | |
+| Path | What |
 | --- | --- |
-| `make deps` | fetch Blender's dependency libraries at the pinned commit |
-| `make release` | build, then run both fixups |
-| `make publish` | copy `install/` into `big_libs` |
-| `make clean` | remove `build/` **and** `install/` |
+| `src4/rhino4/Plug-ins/RDK/cycles-core` | this repository (a submodule) |
+| `src4/rhino4/Plug-ins/RDK/RhinoCycles` | the Rhino plug-in that uses it ([README](../RhinoCycles/README.md)) |
+| `big_libs/RhinoCycles/ccycles/win/`, `.../osx/` | the prebuilt Cycles payload: library, dependency libraries, GPU kernels (`lib/`), kernel sources (`source/`) |
 
-Notes on why each exists, since none of them is guessable:
+A normal Rhino build never compiles Cycles. `RhinoCyclesCore.csproj` (Windows) and
+`src4/BuildSolutions/MacDotNetMakefile` (macOS) copy the payload from `big_libs`
+into the build output, and RhinoCyclesCore loads it through csycles. Building
+Cycles from source writes a new payload into `big_libs` and takes the same route.
+See [BUILDING.md](BUILDING.md).
 
-- **`make deps`** is needed because the dependency submodule is declared
-  `update = none`, so `git submodule update --init` silently skips it and a fresh
-  checkout has an empty `lib/`. It fetches only the pinned commit, shallow - about
-  2.4 GB once, rather than the repository's full history.
-- **`make release`** runs `fix-cycles-rpaths.sh`, which replaces the
-  machine-specific absolute rpaths the build bakes into `libccycles.dylib` with
-  portable `@loader_path` ones (RH-96549) - `MacDotNetMakefile` fails the Rhino
-  build if this was skipped - and `fix-cycles-tbb.sh`, which renames the payload's
-  oneTBB to `libtbb.12.cycles.dylib`. Rhino and Cycles otherwise both want to own
-  `libtbb.dylib` in `Contents/Frameworks`, and they are not interchangeable:
-  Rhino's is TBB 2020.3, which USD needs, and Cycles' is oneTBB (RH-98415).
-- **`make publish`** uses `rsync --delete`, not `cp -r`. `cp` merges the new
-  `source/` over the old one and leaves both kernel generations in place, and on
-  Mac `source/` completeness is the correctness condition.
-- **`make clean`** removes `install/` too. It is only ever added to, so libraries
-  and CMake cache values from a previous configuration otherwise survive and get
-  published.
+## Where things are
 
-The payload is arm64. Blender stopped publishing Intel macOS dependencies after
-4.5, and Intel Mac support is not wanted; `make release MAC_ARCHS="x86_64;arm64"`
-if that ever changes.
+| Path | What |
+| --- | --- |
+| `src/ccycles` | C API; `ccycles.vcxproj` drives `build_cycles.ps1` from `Rhino.sln` |
+| `src/csycles` | C# wrapper; `csycles.csproj` is in `Rhino.sln` |
+| `src/scene/rhino_shader_nodes.*`, `src/kernel/svm/svm_rhino_*.h` | Rhino's SVM nodes |
+| `src/scene/image_rhino.*` | in-memory images handed over by Rhino |
+| `build_cycles.ps1`, `kernel_arches.ps1`, `publish_payload.ps1` | Windows build, shipping GPU architectures, full payload |
+| `GNUmakefile`, `fix-cycles-rpaths.sh`, `fix-cycles-tbb.sh` | macOS build and payload fixups |
+| `make.bat` | upstream wrapper; `make.bat update` fetches the Windows libraries |
+| `lib/` | Blender's precompiled libraries, as submodules fetched on demand |
+| `tools/run_checks.ps1`, `tools/audit_*.py`, `tools/check_lib_bundle.ps1` | static checks |
+| `tools/render_regression.ps1`, `tools/reference/`, `tools/driver.py` | golden-image render test |
+| `tools/DIAGNOSTICS.md` | runtime diagnostic switches |
+| `smoketest/` | console harness that renders through csycles without Rhino |
 
-[MACOS-PLAN.md](MACOS-PLAN.md) has the state of the port, what is still missing,
-and the reasoning behind each of these.
+Upstream only, not used by Rhino: `src/app`, `src/hydra`, `web/`, `.gitea/`,
+`tools/sync_*.py`, `tools/update_lib_submodules.py`.
 
-The previous procedure for this - twelve manual steps per platform, editing
-`cycles_device.vcxproj` by hand, ResourceHacker, and copying DLLs into `big_libs`
-- no longer applies: it assumed a nested `RDK/cycles/cycles` directory and a
-`Cycles.sln`, neither of which exists since the submodule collapse. It is
-preserved in this file's history (`git log -p -- README.md`) in case the Mac
-notes are still wanted.
+## More
 
-## Contact
-
-For help building or running Cycles, see the channels listed here:
-
-https://www.cycles-renderer.org/development/
+- [BUILDING.md](BUILDING.md): build on Windows and macOS, publish a payload.
+- [KNOWN-ISSUES.md](KNOWN-ISSUES.md): open issues and expected look changes from Cycles 3.5.
+- After merging upstream, run `tools/run_checks.ps1`. Rhino's edits inside upstream
+  files fail silently when a merge drops them; the audits catch the known ways.
