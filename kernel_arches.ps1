@@ -17,18 +17,14 @@
     Passing them with -D keeps upstream's CMakeLists untouched, so it takes merges
     cleanly.
 
-    Adding a GPU generation is one line. Note that no hardware of that generation is
-    needed to build for it: nvcc and hipcc both cross-compile, verified by building
-    gfx1201 on a gfx1150-only machine. It does mean nobody can *test* it here, which
-    is what the render verifier is for.
+    Adding a GPU generation is one line. nvcc and hipcc cross-compile, so no hardware
+    of that generation is needed to build for it - only to test it.
 #>
 
 # AMD, HIP. 22 targets.
 #
-# gfx906, gfx1152, gfx1200 and gfx1201 are the additions over upstream. The RDNA4 pair
-# matters most: without them an RX 9070 finds no kernel and falls back to the CPU. They
-# were already known in this tree - sitting in make_hip.sh, which the Windows build
-# never called.
+# gfx906, gfx1152, gfx1200 and gfx1201 are the additions over upstream. Without the RDNA4
+# pair an RX 9070 finds no kernel and falls back to the CPU.
 $CyclesHipShippingArches = @(
     'gfx900', 'gfx902', 'gfx906', 'gfx90c'                                  # Vega
     'gfx1010', 'gfx1011', 'gfx1012'                                         # RDNA
