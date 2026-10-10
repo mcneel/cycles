@@ -83,6 +83,9 @@ class Shader : public Node {
   NODE_SOCKET_API(bool, use_bump_map_correction)
   NODE_SOCKET_API(VolumeSampling, volume_sampling_method)
   NODE_SOCKET_API(int, volume_interpolation_method)
+  /* Rhino: 5.2 dropped this socket and derives heterogeneity from the graph alone. RhinoCycles
+   * sets it false; without it Rhino's volumes ray-march where 3.5 treated them as homogeneous. */
+  NODE_SOCKET_API(bool, heterogeneous_volume)
   NODE_SOCKET_API(float, volume_step_rate)
 
   /* displacement */
@@ -127,6 +130,9 @@ class Shader : public Node {
   float3 emission_estimate;
   EmissionSampling emission_sampling;
   bool emission_is_constant;
+  /* Rhino: power of distance a Light Falloff node multiplies the emission by: 0 Quadratic,
+   * 1 Linear, 2 Constant. The light tree's importance assumes inverse-square falloff. */
+  int emission_falloff_power;
 
   /* requested mesh attributes */
   AttributeRequestSet attributes;
@@ -216,7 +222,11 @@ class ShaderManager {
   /* Selective nodes compilation. */
   uint get_kernel_features(Scene *scene);
 
+  static void free_memory();
+
   float linear_rgb_to_gray(const float3 c);
+  float linear_rgb_to_luminance(const float3 c);
+
   float3 rec709_to_scene_linear(const float3 c);
 
   string get_cryptomatte_materials(Scene *scene);
@@ -231,6 +241,13 @@ class ShaderManager {
   {
     return scene_linear_interop_id;
   }
+
+  void set_rhino_perlin_noise_table(const vector<float> &perlin_noise_table);
+  void set_rhino_impulse_noise_table(const vector<float> &impulse_noise_table);
+  void set_rhino_vc_noise_table(const vector<float> &vc_noise_table);
+  void set_rhino_aaltonen_noise_table(const vector<float> &aaltonen_noise_table);
+  void set_rhino_dots_dot_data_table(const vector<float> &dot_data_table);
+  void set_rhino_dots_tree_data_table(const vector<float> &tree_data_table);
 
  protected:
   ShaderManager();
@@ -279,6 +296,22 @@ class ShaderManager {
 
   void device_update_common(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
   void device_free_common(Device *device, DeviceScene *dscene, Scene *scene);
+
+  /* Rhino: luminance weights, separate from upstream's rgb_to_y. */
+  float3 rgb_to_lum;
+
+  static vector<float> rhino_perlin_noise_table;
+  static vector<float> rhino_impulse_noise_table;
+  static vector<float> rhino_vc_noise_table;
+  static vector<float> rhino_aaltonen_noise_table;
+  static vector<float> rhino_dots_tree_data_table;
+  static vector<float> rhino_dots_dot_data_table;
+  size_t rhino_perlin_noise_table_offset;
+  size_t rhino_impulse_noise_table_offset;
+  size_t rhino_vc_noise_table_offset;
+  size_t rhino_aaltonen_noise_table_offset;
+  size_t rhino_dots_tree_data_table_offset;
+  size_t rhino_dots_dot_data_table_offset;
 };
 
 CCL_NAMESPACE_END

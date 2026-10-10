@@ -82,6 +82,13 @@ CCL_NAMESPACE_BEGIN
 /* Light tree. */
 #define KERNEL_FEATURE_LIGHT_TREE (1U << 31U)
 
+/* Rhino: clipping planes.
+ *
+ * All 32 bits are already assigned upstream. Rhino builds without OSL, so this
+ * shares the OSL camera bit. If OSL is ever enabled for Rhino, kernel_features
+ * must be widened and this given a bit of its own. */
+#define KERNEL_FEATURE_CLIPPING_PLANES KERNEL_FEATURE_OSL_CAMERA
+
 /* Shader node feature mask, to specialize shader evaluation for kernels. */
 
 #define KERNEL_FEATURE_NODE_MASK_SURFACE_LIGHT \

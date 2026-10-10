@@ -366,6 +366,18 @@ ccl_device_inline float3 object_dupli_uv(KernelGlobals kg, const int object)
 
 /* Volume density */
 
+/* Rhino: object-level shader, used wherever Rhino overrides the
+ * per-primitive shader lookup. */
+
+ccl_device_inline int object_shader(KernelGlobals kg, const int object)
+{
+  if (object == OBJECT_NONE) {
+    return 0;
+  }
+
+  return kernel_data_fetch(objects, object).shader;
+}
+
 ccl_device_inline float object_volume_density(KernelGlobals kg, const int object)
 {
   if (object == OBJECT_NONE) {

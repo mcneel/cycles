@@ -58,6 +58,9 @@ CCL_NAMESPACE_BEGIN
 #define INTEGRATOR_SHADOW_ISECT_SIZE_CPU 1024U
 #define INTEGRATOR_SHADOW_ISECT_SIZE_GPU 4U
 
+#define RHINO_PERLIN_NOISE_PERM_SIZE 256
+#define RHINO_PERLIN_NOISE_TABLE_SIZE (2 * RHINO_PERLIN_NOISE_PERM_SIZE)
+
 #ifdef __KERNEL_GPU__
 #  define INTEGRATOR_SHADOW_ISECT_SIZE INTEGRATOR_SHADOW_ISECT_SIZE_GPU
 #else
@@ -386,6 +389,8 @@ enum PassType {
   PASS_AOV_VALUE,
   PASS_ADAPTIVE_AUX_BUFFER,
   PASS_SAMPLE_COUNT,
+  PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT,
+  PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT,
   PASS_DIFFUSE_COLOR,
   PASS_GLOSSY_COLOR,
   PASS_TRANSMISSION_COLOR,
@@ -1005,6 +1010,10 @@ enum ShaderDataObjectFlag : uint {
   SD_OBJECT_HAS_VOLUME_MOTION = (1u << 11),
   /* Geometry has per-corner normals instead of per-vertex. */
   SD_OBJECT_HAS_CORNER_NORMALS = (1u << 12),
+  /* object is mesh lamp, but doesn't cast shadows */
+  SD_OBJECT_LIGHT_NO_CAST_SHADOWS = (1u << 13),
+  /* object represents solid geometry */
+  SD_OBJECT_IS_SOLID = (1u << 14),
 
   /* object is using caustics */
   SD_OBJECT_CAUSTICS = (SD_OBJECT_CAUSTICS_CASTER | SD_OBJECT_CAUSTICS_RECEIVER),
@@ -1013,7 +1022,8 @@ enum ShaderDataObjectFlag : uint {
                      SD_OBJECT_NEGATIVE_SCALE | SD_OBJECT_HAS_VOLUME |
                      SD_OBJECT_INTERSECTS_VOLUME | SD_OBJECT_SHADOW_CATCHER |
                      SD_OBJECT_HAS_VOLUME_ATTRIBUTES | SD_OBJECT_CAUSTICS |
-                     SD_OBJECT_HAS_VOLUME_MOTION | SD_OBJECT_HAS_CORNER_NORMALS)
+                     SD_OBJECT_HAS_VOLUME_MOTION | SD_OBJECT_HAS_CORNER_NORMALS |
+                     SD_OBJECT_IS_SOLID)
 };
 
 struct ccl_align(16) ShaderData {
@@ -1230,6 +1240,8 @@ struct KernelCamera {
   ProjectionTransform worldtondc;
   Transform worldtocamera;
 
+  Transform cameratondc;
+
   /* Stores changes in the projection matrix. Use for camera zoom motion
    * blur and motion pass output for perspective camera. */
   ProjectionTransform perspective_pre;
@@ -1261,6 +1273,8 @@ struct KernelFilmConvert {
 
   int pass_combined;
   int pass_sample_count;
+  int pass_shadow_catcher_transparent_sample_count;
+  int pass_shadow_catcher_background_sample_count;
   int pass_adaptive_aux_buffer;
   int pass_motion_weight;
   int pass_shadow_catcher;
@@ -1287,6 +1301,8 @@ struct KernelFilmConvert {
 
   /* Padding. */
   int pad1;
+  int pad2;
+  int pad3;
 };
 static_assert_align(KernelFilmConvert, 16);
 
@@ -1343,7 +1359,18 @@ struct KernelTables {
   int ggx_gen_schlick_ior_s;
   int ggx_gen_schlick_s;
   int thin_film_table;
+
+  /* Rhino procedural noise tables. */
+  int rhino_perlin_noise_offset;
+  int rhino_impulse_noise_offset;
+  int rhino_vc_noise_offset;
+  int rhino_aaltonen_noise_offset;
+  int rhino_dots_tree_data_offset;
+  int rhino_dots_dot_data_offset;
+
   int pad2;
+  int pad3;
+  int pad4;
 };
 static_assert_align(KernelTables, 16);
 
@@ -1428,6 +1455,9 @@ struct KernelObject {
   int numverts;
   int numprims;
 
+  int shader;
+
+  uint patch_map_offset;
   uint attribute_map_offset;
   uint motion_offset;
 
@@ -1456,6 +1486,16 @@ struct KernelObject {
   uint receiver_light_set;
   uint64_t shadow_set_membership;
   uint blocker_shadow_set;
+
+  /* Rhino properties */
+  bool use_ocs_frame;
+  Transform ocs_frame; /* OCS frame for controlling WCS and WCS Box. */
+  Transform ocs_frame_normal; /* OCS frame for controlling WCS and WCS Box normals. */
+
+  bool use_planar_uvw;
+  bool planar_uvw_capped;
+  Transform planar_uvw_xform;
+  /* Rhino properties end */
 };
 static_assert_align(KernelObject, 16);
 
@@ -1586,11 +1626,15 @@ struct KernelLightTreeNode {
   /* Bit trail. */
   uint bit_trail;
 
+  /* Rhino: highest Light Falloff power among the node's emitters, see
+   * `Shader::emission_falloff_power`. Taken out of the padding, so the size is unchanged. */
+  int falloff_power;
+
   /* Bits to skip in the bit trail, to skip nodes in for specialized trees. */
   uint8_t bit_skip;
 
   /* Padding. */
-  uint8_t pad[11];
+  uint8_t pad[7];
 };
 static_assert_align(KernelLightTreeNode, 16);
 
@@ -1645,6 +1689,12 @@ struct KernelLightTreeEmitter {
 
   /* Bit trail from root node to leaf node containing emitter. */
   int bit_trail;
+
+  /* Rhino: Light Falloff power of the emitter's shader, see `Shader::emission_falloff_power`. */
+  int falloff_power;
+
+  /* Padding. */
+  int pad[3];
 };
 static_assert_align(KernelLightTreeEmitter, 16);
 
@@ -1789,6 +1839,8 @@ enum DeviceKernel : int {
   DECLARE_FILM_CONVERT_KERNEL(MIST),
   DECLARE_FILM_CONVERT_KERNEL(VOLUME_MAJORANT),
   DECLARE_FILM_CONVERT_KERNEL(SAMPLE_COUNT),
+  DECLARE_FILM_CONVERT_KERNEL(SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT),
+  DECLARE_FILM_CONVERT_KERNEL(SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT),
   DECLARE_FILM_CONVERT_KERNEL(FLOAT),
   DECLARE_FILM_CONVERT_KERNEL(LIGHT_PATH),
   DECLARE_FILM_CONVERT_KERNEL(RGBE),

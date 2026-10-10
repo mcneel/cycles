@@ -211,6 +211,8 @@ function(set_and_warn_library_found
     else()
       message(STATUS "${_library_name} not found, disabling ${_setting}")
     endif()
-    set(${_setting} OFF)
+    # Rhino: PARENT_SCOPE, or the switch is turned off inside this function only and the
+    # caller goes on building what was not found (OptiX kernels against a too-old SDK).
+    set(${_setting} OFF PARENT_SCOPE)
   endif()
 endfunction()

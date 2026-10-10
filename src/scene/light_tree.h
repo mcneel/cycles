@@ -17,6 +17,13 @@
 
 CCL_NAMESPACE_BEGIN
 
+class Mesh;
+
+/* Rhino overrides the surface shader per object, where Cycles picks it per primitive. Prefer
+ * the object override, then the mesh's own shader as upstream does, then the default surface;
+ * without the fallbacks an object with no override dereferences null on the render thread. */
+Shader *rhino_emission_shader(const Scene *scene, Object *object, Mesh *mesh, int prim_id);
+
 /* Orientation Bounds
  *
  * Bounds the normal axis of the lights,
@@ -65,6 +72,8 @@ struct LightTreeMeasure {
   BoundBox bbox = BoundBox::empty;
   OrientationBounds bcone = OrientationBounds::empty;
   float energy = 0.0f;
+  /* Rhino: `Shader::emission_falloff_power` of the emitter, or the highest of a cluster's. */
+  int falloff_power = 0;
 
   enum empty_t { empty = 0 };
 
@@ -94,6 +103,7 @@ struct LightTreeMeasure {
       bbox.grow(measure.bbox);
       bcone = merge(bcone, measure.bcone);
       energy += measure.energy;
+      falloff_power = max(falloff_power, measure.falloff_power);
     }
   }
 
@@ -455,7 +465,7 @@ class LightTree {
                     int &split_dim);
 
   /* Check whether the light tree can use this triangle as light-emissive. */
-  bool triangle_usable_as_light(Mesh *mesh, const int prim_id);
+  bool triangle_usable_as_light(Scene *scene, Object *object, Mesh *mesh, const int prim_id);
 
   /* Add all the emissive triangles of a mesh to the light tree. */
   void add_mesh(Scene *scene, Mesh *mesh, const int object_id);

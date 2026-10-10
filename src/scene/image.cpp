@@ -358,6 +358,15 @@ ImageSingle *ImageManager::add_image_texture(unique_ptr<ImageLoader> &&loader,
   for (image_texture_id = 0; image_texture_id < images.size(); image_texture_id++) {
     ImageSingle *img = images[image_texture_id];
     if (img && ImageLoader::equals(img->loader.get(), loader.get()) && img->params == params) {
+      /* Rhino: the file may have been edited elsewhere since it was loaded; without this
+       * the cache hit keeps handing out the stale pixels (RH-98332). */
+      const uint64_t version = img->loader->source_version();
+      if (!img->need_load && version != 0 && version != img->loaded_version) {
+        img->need_metadata = true;
+        img->need_load = true;
+        img->need_reload = true;
+        tag_update();
+      }
       return img;
     }
   }
@@ -477,6 +486,15 @@ void ImageManager::device_load_image(Device *device,
 
   progress.set_status("Updating Images", "Loading " + img->loader->name());
 
+  /* Rhino: free the stale pixels of an edited file before reading it again (RH-98332). */
+  if (img->need_reload) {
+    image_cache.free_image(scene->dscene, scene->dscene.image_textures[image_texture_id]);
+    img->need_reload = false;
+  }
+
+  /* Rhino: sample before reading, so an edit made during the load is noticed next time. */
+  img->loaded_version = img->loader->source_version();
+
   load_image_metadata(img, progress);
 
   KernelImageTexture tex;
@@ -529,7 +547,8 @@ void ImageManager::device_free_image(Scene *scene, size_t image_texture_id)
     return;
   }
 
-  if (!img->need_load) {
+  /* Rhino: an image waiting for a reload still holds its old pixels. */
+  if (!img->need_load || img->need_reload) {
     const KernelImageTexture &tex = scene->dscene.image_textures[image_texture_id];
     image_cache.free_image(scene->dscene, tex);
   }
@@ -674,6 +693,56 @@ void ImageManager::device_update(Device *device, Scene *scene, Progress &progres
   device_copy_image_textures(device, scene);
 
   need_update_ = false;
+
+  /* CCYCLES_DUMP_IMAGES=<path>: what each slot holds. Graph and SVM dumps only show the
+   * slot id, so they cannot tell an unloaded slot from all-zero pixels. */
+  const char *dumpimages = getenv("CCYCLES_DUMP_IMAGES");
+  if (dumpimages != nullptr && dumpimages[0] != 0) {
+    FILE *f = fopen(dumpimages, "a");
+    if (f != nullptr) {
+      for (auto [image_texture_id, img] : images.enumerate()) {
+        if (img == nullptr) {
+          fprintf(f, "image slot %d: <empty>\n", (int)image_texture_id);
+          continue;
+        }
+        const ImageMetaData &md = img->metadata;
+        fprintf(f,
+                "image slot %d: id=%d users=%d need_load=%d need_metadata=%d builtin=%d\n",
+                (int)image_texture_id,
+                img->image_texture_id,
+                (int)img->users,
+                (int)img->need_load,
+                (int)img->need_metadata,
+                (int)img->builtin);
+        fprintf(f,
+                "    %lldx%lld ch=%d type=%d avg=(%f %f %f %f)\n",
+                (long long)md.width,
+                (long long)md.height,
+                md.channels,
+                (int)md.type,
+                md.average_color.x,
+                md.average_color.y,
+                md.average_color.z,
+                md.average_color.w);
+        fprintf(f,
+                "    colorspace='%s' srgb=%d unassoc_alpha=%d ignore_alpha=%d\n",
+                md.colorspace.c_str(),
+                (int)md.is_compressible_as_srgb,
+                (int)md.is_unassociated_alpha,
+                (int)md.ignore_alpha);
+        fprintf(f,
+                "    params ext=%d interp=%d alpha_type=%d colorspace='%s'\n",
+                (int)img->params.extension,
+                (int)img->params.interpolation,
+                (int)img->params.alpha_type,
+                img->params.colorspace.c_str());
+        fprintf(f,
+                "    loader='%s'\n",
+                img->loader == nullptr ? "<null>" : img->loader->name().c_str());
+      }
+      fclose(f);
+    }
+  }
 }
 
 void ImageManager::device_load_images(Device *device,

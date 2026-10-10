@@ -659,6 +659,8 @@ bool oneapi_enqueue_kernel(KernelContext *kernel_context,
       DEVICE_KERNEL_FILM_CONVERT(mist, MIST);
       DEVICE_KERNEL_FILM_CONVERT(volume_majorant, VOLUME_MAJORANT);
       DEVICE_KERNEL_FILM_CONVERT(sample_count, SAMPLE_COUNT);
+      DEVICE_KERNEL_FILM_CONVERT(shadow_catcher_transparent_sample_count, SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT);
+      DEVICE_KERNEL_FILM_CONVERT(shadow_catcher_background_sample_count, SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
       DEVICE_KERNEL_FILM_CONVERT(float, FLOAT);
       DEVICE_KERNEL_FILM_CONVERT(light_path, LIGHT_PATH);
       DEVICE_KERNEL_FILM_CONVERT(rgbe, RGBE);

@@ -418,6 +418,9 @@ void BVH2::refit_primitives(const int start, const int end, BoundBox &bbox, uint
       else {
         /* Triangles. */
         const Mesh *mesh = static_cast<const Mesh *>(ob->get_geometry());
+        if (mesh->triangles.size() == 0) {
+          continue;
+        }
         const int prim_offset = (params.top_level) ? mesh->prim_offset : 0;
         const Mesh::Triangle triangle = mesh->get_triangle(pidx - prim_offset);
         const packed_float3 *vpos = mesh->get_position();
@@ -492,6 +495,9 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
 
   for (Geometry *geom : geometry) {
     BVH2 *bvh = static_cast<BVH2 *>(geom->bvh.get());
+    if (bvh == nullptr) {
+      continue;
+    }
 
     if (geom->need_build_bvh(params.bvh_layout)) {
       prim_index_size += bvh->pack.prim_index.size();
@@ -548,6 +554,9 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
     }
 
     BVH2 *bvh = static_cast<BVH2 *>(geom->bvh.get());
+    if (bvh == nullptr) {
+      continue;
+    }
 
     const int noffset = nodes_offset;
     const int noffset_leaf = nodes_leaf_offset;

@@ -119,6 +119,19 @@ ccl_device void light_tree_to_local_space(KernelGlobals kg,
   }
 }
 
+/* Rhino: distance term of the importance. It assumes inverse-square falloff, but a Light Falloff
+ * node's Linear/Constant output multiplies the emission by distance/distance^2, cancelling that
+ * much of it. Rhino lights default to Constant, so without this a lamp away from the model is
+ * rated far too weak and hardly ever sampled (RH-98418). */
+template<bool in_volume_segment>
+ccl_device_inline float light_tree_falloff_divisor(const float distance, const int falloff_power)
+{
+  if (in_volume_segment) {
+    return (falloff_power == 0) ? distance : 1.0f;
+  }
+  return (falloff_power >= 2) ? 1.0f : (falloff_power == 1) ? distance : sqr(distance);
+}
+
 /* This is the general function for calculating the importance of either a cluster or an emitter.
  * Both of the specialized functions obtain the necessary data before calling this function. */
 template<bool in_volume_segment>
@@ -131,6 +144,7 @@ ccl_device void light_tree_importance(const float3 N_or_D,
                                       const float min_distance,
                                       const float energy,
                                       const float theta_d,
+                                      const int falloff_power,
                                       ccl_private float &max_importance,
                                       ccl_private float &min_importance)
 {
@@ -212,8 +226,10 @@ ccl_device void light_tree_importance(const float3 N_or_D,
   /* TODO: find a good approximation for f_a. */
   const float f_a = 1.0f;
   /* Use `(theta_b - theta_a) / d` for volume, see Eq. (4) in the paper. */
-  max_importance = fabsf(f_a * cos_min_incidence_angle * energy * cos_min_outgoing_angle *
-                         (in_volume_segment ? theta_d / min_distance : 1.0f / sqr(min_distance)));
+  max_importance = fabsf(
+      f_a * cos_min_incidence_angle * energy * cos_min_outgoing_angle *
+      ((in_volume_segment ? theta_d : 1.0f) /
+       light_tree_falloff_divisor<in_volume_segment>(min_distance, falloff_power)));
 
   /* TODO: compute proper min importance for volume. */
   if (in_volume_segment) {
@@ -234,7 +250,7 @@ ccl_device void light_tree_importance(const float3 N_or_D,
     cos_max_outgoing_angle = cos_theta_plus_theta_u * cos_theta_o -
                              sin_theta_plus_theta_u * sin_theta_o;
     min_importance = fabsf(f_a * cos_max_incidence_angle * energy * cos_max_outgoing_angle /
-                           sqr(max_distance));
+                           light_tree_falloff_divisor<false>(max_distance, falloff_power));
   }
 }
 
@@ -389,6 +405,7 @@ ccl_device void light_tree_node_importance(const float3 P,
                                            distance,
                                            knode->energy,
                                            theta_d,
+                                           knode->falloff_power,
                                            max_importance,
                                            min_importance);
 }
@@ -513,6 +530,7 @@ ccl_device void light_tree_emitter_importance(KernelGlobals kg,
                                            distance.y,
                                            energy,
                                            theta_d,
+                                           kemitter->falloff_power,
                                            max_importance,
                                            min_importance);
 }

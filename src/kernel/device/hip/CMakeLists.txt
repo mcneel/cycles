@@ -65,9 +65,17 @@ if(WITH_CYCLES_HIP_BINARIES AND WITH_CYCLES_DEVICE_HIP)
       set(hip_opt_flags "")
     endif()
 
+    # Vega drivers (AMD legacy branch) can't load code object v5+ (RH-75469).
+    if(${arch} MATCHES "^gfx9")
+      set(hip_cov_flags "-mcode-object-version=4")
+    else()
+      set(hip_cov_flags "")
+    endif()
+
     set(hip_flags
       ${hip_flags}
       --offload-arch=${arch}
+      ${hip_cov_flags}
       ${HIP_HIPCC_FLAGS}
       --genco
       ${CMAKE_CURRENT_SOURCE_DIR}${hip_kernel_src}

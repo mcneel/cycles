@@ -85,11 +85,24 @@ class SVMCompiler {
   SVMInputFloat3 input_float3(const char *name);
   SVMInputFloat3 input_float3_from_offset(SVMStackOffset offset);
   SVMStackOffset input_link(const char *name);
+  /* Rhino compatibility: stack_assign(ShaderInput *) is protected in 5.2. */
+  SVMStackOffset input_link(ShaderInput *input);
+  SVMStackOffset stack_assign_if_linked(ShaderInput *input);
+  SVMStackOffset stack_assign_if_linked(ShaderOutput *output);
   SVMStackOffset output(const char *name);
   SVMStackOffset output(ShaderOutput *shader_output);
 
   /* Add simple SVM node without parameters. */
   void add_node(ShaderNodeType type);
+
+  /* Rhino compatibility layer: the packed add_node(type, a, b, c) / encode_uchar4 API that
+   * 5.2 replaced with typed structs. Rhino's SVM nodes and their kernel readers in
+   * svm_rhino_procedurals.h still share that packed layout. */
+  void add_node_packed(ShaderNodeType type, uint a = 0, uint b = 0, uint c = 0);
+  void add_node_packed(uint a = 0, uint b = 0, uint c = 0, uint d = 0);
+  void add_node_packed(ShaderNodeType type, const float3 &f);
+  void add_node_packed(const float4 &f);
+  static uint encode_uchar4(uint x, uint y = 0, uint z = 0, uint w = 0);
 
   /* Add SVM node with parameters in struct T. */
   template<typename T>

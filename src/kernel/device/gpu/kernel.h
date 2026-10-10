@@ -940,6 +940,8 @@ KERNEL_FILM_CONVERT_VARIANT(depth, 1)
 KERNEL_FILM_CONVERT_VARIANT(mist, 1)
 KERNEL_FILM_CONVERT_VARIANT(volume_majorant, 1)
 KERNEL_FILM_CONVERT_VARIANT(sample_count, 1)
+KERNEL_FILM_CONVERT_VARIANT(shadow_catcher_transparent_sample_count, 1)
+KERNEL_FILM_CONVERT_VARIANT(shadow_catcher_background_sample_count, 1)
 KERNEL_FILM_CONVERT_VARIANT(float, 1)
 
 /* 3 channel inputs */

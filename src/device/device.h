@@ -12,6 +12,7 @@
 #include "device/denoise.h"
 #include "device/memory.h"
 
+#include "util/log.h"
 #include "util/profiling.h"
 #include "util/stats.h"
 #include "util/string.h"
@@ -109,9 +110,21 @@ class DeviceInfo {
 
   bool operator==(const DeviceInfo &info) const
   {
-    /* Multiple Devices with the same ID would be very bad. */
-    assert(id != info.id ||
-           (type == info.type && num == info.num && description == info.description));
+    if (id == "MULTI" && info.id == "MULTI") {
+      /* Rhino: MULTI devices compare by their constituent devices. */
+      return multi_devices == info.multi_devices;
+    }
+
+    /* Multiple Devices with the same ID would be very bad. Rhino: log the pair rather
+     * than assert, which kills a debug build without naming them. */
+    if (id == info.id &&
+        !(type == info.type && num == info.num && description == info.description))
+    {
+      LOG_WARNING << "Two devices share the id '" << id << "': type " << (int)type
+                  << "/" << (int)info.type << ", num " << num << "/" << info.num
+                  << ", description '" << description << "'/'" << info.description
+                  << "'.";
+    }
     return id == info.id && use_hardware_raytracing == info.use_hardware_raytracing &&
            kernel_optimization_level == info.kernel_optimization_level;
   }
@@ -330,6 +343,11 @@ class Device {
   static string string_from_type(DeviceType type);
   static vector<DeviceType> available_types();
   static vector<DeviceInfo> available_devices(const uint device_type_mask = DEVICE_MASK_ALL);
+
+  /* Rhino: surfaced through the C API (see ccycles.cpp). */
+  static uint failed_gpus_mask();
+  static string gpu_init_error(DeviceType type);
+
   static DeviceInfo dummy_device(const string &error_msg = "");
   static string device_capabilities(const uint device_type_mask = DEVICE_MASK_ALL);
   static DeviceInfo get_multi_device(const vector<DeviceInfo> &subdevices,

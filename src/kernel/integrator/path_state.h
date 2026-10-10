@@ -7,6 +7,7 @@
 #include "kernel/integrator/state.h"
 
 #include "kernel/sample/pattern.h"
+#include "kernel/bvh/util.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -273,6 +274,37 @@ ccl_device_inline PathRayVisibility path_state_ray_visibility(ConstIntegratorSta
 
   return visibility;
 }
+
+ccl_device_forceinline bool path_clip_ray(
+    KernelGlobals kg,
+    IntegratorState state,
+    ccl_private ShaderData* sd,
+    ccl_private Ray* ray)
+{
+  /* 3.5 asked `path_flag & PATH_RAY_CAMERA` here. 5.x removed PATH_RAY_CAMERA from
+   * PathRayFlag and moved camera-ness to the separate path visibility mask, so testing a
+   * path flag against PATH_RAY_VISIBILITY_CAMERA reads bit 0 of the wrong word - which is
+   * now PATH_RAY_REFLECT. That clips reflection rays and leaves camera rays unclipped. */
+  const PathRayVisibility path_visibility = INTEGRATOR_STATE(state, path, visibility);
+
+  if (path_visibility & PATH_RAY_VISIBILITY_CAMERA) {
+    for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+      float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
+      float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
+      if (testdist < 0) {
+        ray->P = ray_offset(
+            sd->P, -sd->Ng);  // start ray a bit after hit point, using negative geometry normal
+        return true;
+      }
+    }
+  }
+
+    return false;
+}
+
+
+
+
 
 ccl_device_inline float path_state_continuation_probability(KernelGlobals kg,
                                                             ConstIntegratorState state,

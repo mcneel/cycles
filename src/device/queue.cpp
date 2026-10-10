@@ -4,6 +4,7 @@
 
 #include <iomanip>
 
+#include "device/device.h"
 #include "device/kernel.h"
 #include "device/queue.h"
 
@@ -69,7 +70,11 @@ void DeviceQueue::debug_enqueue_begin(DeviceKernel kernel, const int work_size)
 
 void DeviceQueue::debug_enqueue_end()
 {
-  if (LOG_IS_ON(LOG_LEVEL_TRACE) && is_per_kernel_performance_) {
+  /* Rhino: HIP queues synchronise after every kernel, for stability on AMD drivers. Only
+   * HIP: a build with HIP support also runs CUDA, OptiX and oneAPI, which do not need it. */
+  if (device->info.type == DEVICE_HIP ||
+      (LOG_IS_ON(LOG_LEVEL_TRACE) && is_per_kernel_performance_))
+  {
     synchronize();
   }
 }

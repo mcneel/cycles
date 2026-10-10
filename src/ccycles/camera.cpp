@@ -1,0 +1,180 @@
+/**
+Copyright 2014-2017 Robert McNeel and Associates
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+**/
+
+#include "internal_types.h"
+
+void cycles_camera_set_size(ccl::Session* session_id, unsigned int width, unsigned int height)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		/* The raster transform uses full_width/full_height, not the screen size, so
+		 * set both or the image maps onto a corner of the frame. Border renders set
+		 * the full size explicitly afterwards. */
+		sce->camera->set_screen_size(width, height);
+		sce->camera->set_full_width(width);
+		sce->camera->set_full_height(height);
+		// TODO: APIfy need_[device_]update
+		sce->camera->need_flags_update = true;
+		sce->camera->need_device_update = true;
+	}
+}
+
+unsigned int cycles_camera_get_width(ccl::Session* session_id)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		return (unsigned int)sce->camera->get_full_width();
+	}
+
+	return 0;
+}
+
+unsigned int cycles_camera_get_height(ccl::Session* session_id)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		return (unsigned int)sce->camera->get_full_height();
+	}
+
+	return 0;
+}
+
+void cycles_camera_set_type(ccl::Session* session_id, camera_type type)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_camera_type((ccl::CameraType)type);
+	}
+}
+
+void cycles_camera_set_matrix(ccl::Session* session_id,
+	float a, float b, float c, float d,
+	float e, float f, float g, float h,
+	float i, float j, float k, float l
+	)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		ccl::Transform mat = ccl::make_transform(a, b, c, d, e, f, g, h, i, j, k, l);
+		sce->camera->set_matrix(mat);
+	}
+}
+
+void cycles_camera_compute_auto_viewplane(ccl::Session* session_id)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->compute_auto_viewplane();
+	}
+}
+
+void cycles_camera_set_viewplane(ccl::Session* session_id, float left, float right, float top, float bottom)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->viewplane.left = left;
+		sce->camera->viewplane.right = right;
+		sce->camera->viewplane.top = top;
+		sce->camera->viewplane.bottom = bottom;
+	}
+
+}
+
+void cycles_camera_update(ccl::Session* session_id)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->update(sce);
+
+		// RH-74901 hack: without tag_modified() need_update() is false and
+		// Scene::update_kernel_features() ignores the camera. Better: skip
+		// camera->update() while rendering and, like the standalone app, call
+		// set_matrix() and set need_flags_update and need_device_update.
+		sce->camera->tag_modified();
+	}
+}
+
+void cycles_camera_set_fov(ccl::Session* session_id, float fov)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_fov(fov);
+	}
+}
+
+void cycles_camera_set_sensor_width(ccl::Session* session_id, float sensor_width)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_sensorwidth(sensor_width);
+	}
+}
+
+void cycles_camera_set_sensor_height(ccl::Session* session_id, float sensor_height)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_sensorheight(sensor_height);
+	}
+}
+
+void cycles_camera_set_farclip(ccl::Session* session_id, float farclip)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_farclip(farclip);
+	}
+}
+
+void cycles_camera_set_aperturesize(ccl::Session* session_id, float aperturesize)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_aperturesize(aperturesize);
+	}
+}
+
+void cycles_camera_set_aperture_ratio(ccl::Session* session_id, float aperture_ratio)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_aperture_ratio(aperture_ratio);
+	}
+}
+
+void cycles_camera_set_blades(ccl::Session* session_id, unsigned int blades)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_blades(blades);
+	}
+}
+
+void cycles_camera_set_bladesrotation(ccl::Session* session_id, float bladesrotation)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_bladesrotation(bladesrotation);
+	}
+}
+
+void cycles_camera_set_focaldistance(ccl::Session* session_id, float focaldistance)
+{
+	ccl::Scene* sce = nullptr;
+	if(scene_find(session_id, &sce)) {
+		sce->camera->set_focaldistance(focaldistance);
+	}
+}

@@ -271,6 +271,23 @@ void GeometryManager::update_interactive_motion(Scene *scene)
   }
 }
 
+void GeometryManager::prune(Scene* scene)
+{
+	/* Same type check as ObjectManager::prune: 5.2 lights are Geometry, and casting one to
+	 * Mesh is undefined and deletes the light whenever triangles.size() reads zero. */
+	vector<Geometry *> geom_to_prune;
+	for(Geometry* geom: scene->geometry) {
+		if(geom != nullptr && geom->is_mesh() &&
+		   static_cast<const Mesh *>(geom)->triangles.size() == 0) {
+			geom_to_prune.push_back(geom);
+		}
+	}
+
+	for(Geometry* geom: geom_to_prune) {
+		scene->delete_node(geom);
+	}
+}
+
 void GeometryManager::update_osl_globals(Device *device, Scene *scene)
 {
 #ifdef WITH_OSL

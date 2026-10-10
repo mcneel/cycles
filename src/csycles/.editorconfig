@@ -1,0 +1,10 @@
+# EditorConfig is awesome: http://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# use tabs by default for everything
+[*]
+indent_style = tab
+indent_size = 2
+tab_size = 2

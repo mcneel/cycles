@@ -38,6 +38,7 @@
 #define ccl_global
 #define ccl_always_inline __attribute__((always_inline))
 #define ccl_device_inline __attribute__((always_inline))
+#define ccl_device_rhino_inline __attribute__((always_inline))
 #define ccl_noinline __attribute__((noinline))
 #define ccl_inline_constant const constexpr
 #define ccl_device_constant static constexpr

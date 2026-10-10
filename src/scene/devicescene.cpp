@@ -60,7 +60,8 @@ DeviceScene::DeviceScene(Device *device)
       image_textures(device, "image_textures", MEM_GLOBAL),
       image_texture_tile_descriptors(device, "image_texture_tile_descriptors", MEM_GLOBAL),
       image_texture_tile_access_state(device, "image_texture_tile_access_state", MEM_GLOBAL),
-      image_texture_udims(device, "image_texture_udims", MEM_GLOBAL)
+      image_texture_udims(device, "image_texture_udims", MEM_GLOBAL),
+      clipping_planes(device, "clipping_planes", MEM_GLOBAL)
 {
   memset((void *)&data, 0, sizeof(data));
 }

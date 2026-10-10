@@ -107,6 +107,8 @@ DEFINE_PASS_ACCESSOR(depth)
 DEFINE_PASS_ACCESSOR(mist)
 DEFINE_PASS_ACCESSOR(volume_majorant)
 DEFINE_PASS_ACCESSOR(sample_count)
+DEFINE_PASS_ACCESSOR(shadow_catcher_transparent_sample_count)
+DEFINE_PASS_ACCESSOR(shadow_catcher_background_sample_count)
 DEFINE_PASS_ACCESSOR(float)
 
 /* Float3 passes. */

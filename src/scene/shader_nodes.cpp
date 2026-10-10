@@ -11,6 +11,7 @@
 #include "scene/constant_fold.h"
 #include "scene/film.h"
 #include "scene/image.h"
+#include "scene/image_rhino.h"
 #include "scene/image_sky.h"
 #include "scene/integrator.h"
 #include "scene/light.h"
@@ -210,7 +211,7 @@ SVMStackOffset TextureMapping::compile_begin(SVMCompiler &compiler,
                                              ShaderNode *node)
 {
   if (!skip()) {
-    const SVMStackOffset offset_in = compiler.stack_assign(vector_in);
+    const SVMStackOffset offset_in = compiler.input_link(vector_in);
     assert(vector_in->type() == SocketType::VECTOR || vector_in->type() == SocketType::POINT);
     const SVMStackOffset offset_out = compiler.stack_find_offset(vector_in);
 
@@ -219,7 +220,7 @@ SVMStackOffset TextureMapping::compile_begin(SVMCompiler &compiler,
     return offset_out;
   }
 
-  return compiler.stack_assign(vector_in);
+  return compiler.input_link(vector_in);
 }
 
 void TextureMapping::compile_end(SVMCompiler &compiler,
@@ -249,6 +250,7 @@ NODE_DEFINE(ImageTextureNode)
 
   SOCKET_STRING(filename, "Filename", ustring());
   SOCKET_STRING(colorspace, "Colorspace", u_colorspace_auto);
+  SOCKET_BOOLEAN(alternate_tiles, "Alternate Tiles", false);
 
   static NodeEnum alpha_type_enum;
   alpha_type_enum.insert("auto", IMAGE_ALPHA_AUTO);
@@ -286,6 +288,9 @@ NODE_DEFINE(ImageTextureNode)
 
   SOCKET_IN_POINT(vector, "Vector", zero_float3(), SocketType::LINK_TEXTURE_UV);
 
+  SOCKET_IN_FLOAT(decalforward, "DecalForward", 0.5f);
+  SOCKET_IN_FLOAT(decalusage, "DecalUsage", 0.0f);
+
   SOCKET_OUT_COLOR(color, "Color");
   SOCKET_OUT_FLOAT(alpha, "Alpha");
 
@@ -318,6 +323,9 @@ ImageParams ImageTextureNode::image_params() const
 
 void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
 {
+  tiles.clear();
+  return;
+#if DONTUSEUVTILINGYET
   /* Box projection computes its own UVs that always lie in the
    * 1001 tile, so there's no point in loading any others. */
   if (projection == NODE_IMAGE_PROJ_BOX) {
@@ -348,7 +356,7 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
       UVMapNode *uvmap = (UVMapNode *)node;
       attribute = uvmap->get_attribute();
     }
-    else if (node->type == TextureCoordinateNode::get_node_type()) {
+    else if (node->type == RhinoTextureCoordinateNode::get_node_type()) {
       if (vector_in->link != node->output("UV")) {
         return;
       }
@@ -378,6 +386,7 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
     }
   }
   tiles.steal_data(new_tiles);
+#endif
 }
 
 void ImageTextureNode::attributes(Shader *shader, AttributeRequestSet *attributes)
@@ -403,8 +412,35 @@ ShaderNodeType ImageTextureNode::shader_node_type() const
   return NODE_TEX_IMAGE_BOX;
 }
 
+void ImageTextureNode::set_rhino_memory_image(const char *name,
+                                              const void *pixels,
+                                              const int width,
+                                              const int height,
+                                              const int channels,
+                                              const bool is_float)
+{
+  rhino_mem_name = (name != nullptr) ? name : "";
+  rhino_mem_pixels = pixels;
+  rhino_mem_width = width;
+  rhino_mem_height = height;
+  rhino_mem_channels = channels;
+  rhino_mem_is_float = is_float;
+}
+
 void ImageTextureNode::update_images(const SVMCompiler &compiler)
 {
+  if (handle.empty() && rhino_mem_pixels != nullptr) {
+    /* Rhino gave us the pixels directly, so there is no file to load. */
+    ImageManager *image_manager = compiler.scene->image_manager.get();
+    handle = image_manager->add_image(make_unique<RhinoMemoryImageLoader>(rhino_mem_name,
+                                                                         rhino_mem_pixels,
+                                                                         rhino_mem_width,
+                                                                         rhino_mem_height,
+                                                                         rhino_mem_channels,
+                                                                         rhino_mem_is_float),
+                                      image_params());
+  }
+
   if (handle.empty()) {
     ImageManager *image_manager = compiler.scene->image_manager.get();
     const bool use_cache = image_manager->get_use_texture_cache();
@@ -457,15 +493,20 @@ void ImageTextureNode::compile(SVMCompiler &compiler)
   }
 
   if (projection != NODE_IMAGE_PROJ_BOX) {
+    /* Rhino's two extras on this node (a second packed word before 5.2). Dropping them is
+     * silent: mirrored textures repeat instead of folding, decals cover the whole surface. */
     compiler.add_node(this,
                       NODE_TEX_IMAGE,
                       SVMNodeTexImage{
                           .id = handle.kernel_id(),
                           .projection = uint(projection),
                           .flags = uint8_t(flags),
+                          .alternate_tiles = uint8_t(alternate_tiles ? 1 : 0),
                           .co = vector_offset,
                           .out_offset = compiler.output("Color"),
                           .alpha_offset = compiler.output("Alpha"),
+                          .decal_usage_offset = compiler.stack_assign_if_linked(
+                              input("DecalUsage")),
                       });
   }
   else {
@@ -1919,6 +1960,48 @@ void RGBToBWNode::compile(OSLCompiler &compiler)
   compiler.add(this, "node_rgb_to_bw");
 }
 
+/* RGB to Luminance */
+
+NODE_DEFINE(RGBToLuminanceNode)
+{
+	NodeType* type = NodeType::add("rgb_to_luminance", create, NodeType::SHADER);
+	SOCKET_IN_COLOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
+	SOCKET_OUT_FLOAT(val, "Val");
+
+	return type;
+}
+
+RGBToLuminanceNode::RGBToLuminanceNode()
+	: ShaderNode(get_node_type())
+{
+}
+
+void RGBToLuminanceNode::constant_fold(const ConstantFolder& folder)
+{
+	if (folder.all_inputs_constant()) {
+		float val = folder.scene->shader_manager->linear_rgb_to_luminance(color);
+		folder.make_constant(val);
+	}
+}
+
+void RGBToLuminanceNode::compile(SVMCompiler& compiler)
+{
+	/* NODE_CONVERT is a stock node, so it needs 5.2's structured form; add_node_packed is
+	 * only for RHINO_NODE_* types, whose kernel readers keep the old packed layout. */
+	compiler.add_node(this,
+		NODE_CONVERT,
+		SVMNodeConvert{
+			.convert_type = NODE_CONVERT_CF2,
+			.from_offset = compiler.input_link(inputs[0]),
+			.to_offset = compiler.output(outputs[0]),
+		});
+}
+
+void RGBToLuminanceNode::compile(OSLCompiler& compiler)
+{
+	compiler.add(this, "node_rgb_to_luminance");
+}
+
 /* Convert */
 
 const NodeType *(&ConvertNode::get_node_types())[ConvertNode::MAX_TYPE][ConvertNode::MAX_TYPE]
@@ -1927,10 +2010,11 @@ const NodeType *(&ConvertNode::get_node_types())[ConvertNode::MAX_TYPE][ConvertN
   static std::once_flag node_types_flag;
 
   std::call_once(node_types_flag, [&] {
-    const int num_types = 8;
+    const int num_types = 9;
     const SocketType::Type types[num_types] = {SocketType::FLOAT,
                                                SocketType::INT,
                                                SocketType::COLOR,
+                                               SocketType::COLOR2,
                                                SocketType::VECTOR,
                                                SocketType::POINT,
                                                SocketType::NORMAL,
@@ -2033,6 +2117,11 @@ void ConvertNode::constant_fold(const ConstantFolder &folder)
           /* color to scalar */
           val = folder.scene->shader_manager->linear_rgb_to_gray(value_color);
         }
+        else if (from == SocketType::COLOR2) {
+          /* color to float */
+          float val = folder.scene->shader_manager->linear_rgb_to_luminance(value_color);
+          folder.make_constant(val);
+        }
         else {
           /* vector/point/normal to scalar */
           val = average(value_vector);
@@ -2088,6 +2177,10 @@ NodeConvert ConvertNode::convert_type()
     if (from == SocketType::COLOR) {
       /* color to float */
       return NODE_CONVERT_CF;
+    }
+    if (from == SocketType::COLOR2) {
+      /* Rhino: color to float via luminance weights. */
+      return NODE_CONVERT_CF2;
     }
     /* vector/point/normal to float */
     return NODE_CONVERT_VF;
@@ -2146,6 +2239,10 @@ void ConvertNode::compile(OSLCompiler &compiler)
     compiler.add(this, "node_convert_from_int");
   }
   else if (from == SocketType::COLOR) {
+    compiler.add(this, "node_convert_from_color");
+  }
+  else if (from == SocketType::COLOR2) {
+    /* Rhino: shares the colour OSL shader. */
     compiler.add(this, "node_convert_from_color");
   }
   else if (from == SocketType::VECTOR) {
@@ -2695,6 +2792,8 @@ NODE_DEFINE(PrincipledBsdfNode)
 PrincipledBsdfNode::PrincipledBsdfNode() : BsdfBaseNode(get_node_type())
 {
   closure = CLOSURE_BSDF_PRINCIPLED_ID;
+  /* Looks wrong but is not: the kernel reads MULTI_GGX_GLASS as "principled uses multiscatter
+   * GGX" (svm/closure.h); it does not request a glass closure. */
   distribution = CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_ID;
 }
 
@@ -4285,6 +4384,345 @@ void TextureCoordinateNode::compile(OSLCompiler &compiler)
   compiler.add(this, "node_texture_coordinate");
 }
 
+/* RhinoTextureCoordinate */
+
+NODE_DEFINE(RhinoTextureCoordinateNode)
+{
+  NodeType *type = NodeType::add("rhino_texture_coordinate", create, NodeType::SHADER);
+
+  SOCKET_BOOLEAN(from_dupli, "From Dupli", false);
+  SOCKET_BOOLEAN(use_transform, "Use Transform", false);
+  SOCKET_TRANSFORM(ob_tfm, "Object Transform", transform_identity());
+
+  SOCKET_IN_NORMAL(normal_osl,
+                   "NormalIn",
+                   make_float3(0.0f, 0.0f, 0.0f),
+                   SocketType::LINK_NORMAL | SocketType::OSL_INTERNAL);
+
+  SOCKET_FLOAT(horizontal_sweep_start, "Horizontal Sweep Start", 0.0);
+  SOCKET_FLOAT(horizontal_sweep_end, "Horizontal Sweep End", 1.0);
+  SOCKET_FLOAT(vertical_sweep_start, "Vertical Sweep Start", 0.0);
+  SOCKET_FLOAT(vertical_sweep_end, "Vertical Sweep End", 1.0);
+  SOCKET_FLOAT(height, "Height", 1.0);
+  SOCKET_FLOAT(radius, "Radius", 1.0);
+
+  static NodeEnum decal_projection_enum;
+  decal_projection_enum.insert("both", NODE_IMAGE_DECAL_BOTH);
+  decal_projection_enum.insert("forward", NODE_IMAGE_DECAL_FORWARD);
+  decal_projection_enum.insert("backward", NODE_IMAGE_DECAL_BACKWARD);
+  SOCKET_ENUM(decal_projection, "Decal Direction", decal_projection_enum, NODE_IMAGE_DECAL_BOTH);
+
+  SOCKET_OUT_POINT(generated, "Generated");
+  SOCKET_OUT_NORMAL(normal, "Normal");
+  SOCKET_OUT_POINT(UV, "UV");
+  SOCKET_OUT_POINT(object, "Object");
+  SOCKET_OUT_POINT(camera, "Camera");
+  SOCKET_OUT_POINT(window, "Window");
+  SOCKET_OUT_NORMAL(reflection, "Reflection");
+
+  SOCKET_OUT_POINT(wcsbox, "WcsBox");
+  SOCKET_OUT_POINT(envspherical, "EnvSpherical");
+  SOCKET_OUT_POINT(envemap, "EnvEmap");
+  SOCKET_OUT_POINT(envbox, "EnvBox");
+  SOCKET_OUT_POINT(envlightprobe, "EnvLightProbe");
+  SOCKET_OUT_POINT(envcubemap, "EnvCubemap");
+  SOCKET_OUT_POINT(envcubemapverticalcross, "EnvCubemapVerticalCross");
+  SOCKET_OUT_POINT(envcubemaphorizontalcross, "EnvCubemapHorizontalCross");
+  SOCKET_OUT_POINT(envhemi, "EnvHemi");
+  SOCKET_OUT_POINT(decaluv, "DecalUv");
+  SOCKET_OUT_POINT(decalplanar, "DecalPlanar");
+  SOCKET_OUT_POINT(decalspherical, "DecalSpherical");
+  SOCKET_OUT_POINT(decalcylindrical, "DecalCylindrical");
+
+  SOCKET_OUT_FLOAT(decalforward, "DecalForward");
+  SOCKET_OUT_FLOAT(decalusage, "DecalUsage");
+
+  return type;
+}
+
+RhinoTextureCoordinateNode::RhinoTextureCoordinateNode() : ShaderNode(get_node_type())
+{
+}
+
+void RhinoTextureCoordinateNode::attributes(Shader *shader, AttributeRequestSet *attributes)
+{
+  if (shader->has_surface) {
+    if (!from_dupli) {
+      if (!output("Generated")->links.empty())
+        attributes->add(ATTR_STD_GENERATED);
+      if (!output("UV")->links.empty())
+        attributes->add(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
+      if (!output("DecalUv")->links.empty())
+        attributes->add(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
+    }
+  }
+
+  if (shader->has_volume) {
+    if (!from_dupli) {
+      if (!output("Generated")->links.empty()) {
+        attributes->add(ATTR_STD_GENERATED_TRANSFORM);
+      }
+    }
+  }
+
+  ShaderNode::attributes(shader, attributes);
+}
+
+void RhinoTextureCoordinateNode::decal_setup(ShaderOutput *out,
+                                        ShaderNodeType texco_node,
+                                        NodeTexCoord texcoord,
+                                        SVMCompiler &compiler)
+{
+  ShaderOutput *decalforward_out = output("DecalForward");
+  ShaderOutput *decalusage_out = output("DecalUsage");
+  uint encoded = compiler.encode_uchar4(compiler.stack_assign_if_linked(decalforward_out),
+                                        compiler.stack_assign_if_linked(decalusage_out));
+  compiler.add_node_packed(texco_node, texcoord, compiler.output(out), encoded);
+  compiler.add_node_packed(pxyz.x);
+  compiler.add_node_packed(pxyz.y);
+  compiler.add_node_packed(pxyz.z);
+  compiler.add_node_packed(nxyz.x);
+  compiler.add_node_packed(nxyz.y);
+  compiler.add_node_packed(nxyz.z);
+  compiler.add_node_packed(uvw.x);
+  compiler.add_node_packed(uvw.y);
+  compiler.add_node_packed(uvw.z);
+  // Decal projection, radius and height.
+  uint encode = compiler.encode_uchar4(0, decal_projection);
+  compiler.add_node_packed(encode, __float_as_int(radius), __float_as_int(height));
+  // Decal sweeps, then origin, across and up.
+  compiler.add_node_packed(make_float4(
+      horizontal_sweep_start, horizontal_sweep_end, vertical_sweep_start, vertical_sweep_end));
+  compiler.add_node_packed(make_float4(decal_origin.x, decal_origin.y, decal_origin.z, 0.0f));
+  compiler.add_node_packed(make_float4(decal_across.x, decal_across.y, decal_across.z, 0.0f));
+  compiler.add_node_packed(make_float4(decal_up.x, decal_up.y, decal_up.z, 0.0f));
+}
+
+void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
+{
+  ShaderOutput *out;
+  ShaderNodeType texco_node = RHINO_NODE_TEX_COORD;
+  ShaderNodeType attr_node = NODE_ATTR;
+  ShaderNodeType geom_node = NODE_GEOMETRY;
+
+  /* Bump needs the centre, DX and DY copies of this node to see shifted coordinates, or the
+   * gradient is zero and bump silently does nothing. 5.2 dropped NODE_*_BUMP_DX/DY, so
+   * RHINO_NODE_TEX_COORD_BUMP_DX/DY do it here; the upstream nodes emitted below take
+   * bump_offset as a field. */
+  const NodeBumpOffset bump_offset = shader_bump_to_node_bump_offset(bump);
+  const bool use_derivative = need_derivatives() || (bump != SHADER_BUMP_NONE);
+  const uint8_t store_derivatives = need_derivatives();
+
+  if (bump == SHADER_BUMP_DX) {
+    texco_node = RHINO_NODE_TEX_COORD_BUMP_DX;
+  }
+  else if (bump == SHADER_BUMP_DY) {
+    texco_node = RHINO_NODE_TEX_COORD_BUMP_DY;
+  }
+
+  out = output("Generated");
+  if (!out->links.empty()) {
+    if (compiler.background) {
+      compiler.add_node(this,
+                        geom_node,
+                        SVMNodeGeometry{
+                            .geom_type = NODE_GEOM_P,
+                            .bump_offset = bump_offset,
+                            .store_derivatives = store_derivatives,
+                            .out_offset = compiler.output(out),
+                            .bump_filter_width = bump_filter_width,
+                        },
+                        use_derivative);
+    }
+    else {
+      if (from_dupli) {
+        compiler.add_node_packed(texco_node, NODE_TEXCO_DUPLI_GENERATED, compiler.output(out));
+      }
+      else if (compiler.output_type() == SHADER_TYPE_VOLUME) {
+        compiler.add_node_packed(texco_node, NODE_TEXCO_VOLUME_GENERATED, compiler.output(out));
+      }
+      else {
+        int attr = compiler.attribute(ATTR_STD_GENERATED);
+        compiler.add_node(this,
+                          attr_node,
+                          SVMNodeAttr{
+                              .attr = attr,
+                              .out_offset = compiler.output(out),
+                              .output_type = NODE_ATTR_OUTPUT_FLOAT3,
+                              .bump_offset = bump_offset,
+                              .store_derivatives = store_derivatives,
+                              .bump_filter_width = bump_filter_width,
+                          },
+                          use_derivative);
+      }
+    }
+  }
+
+  out = output("Normal");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_NORMAL, compiler.output(out));
+  }
+
+  out = output("UV");
+  if (!out->links.empty()) {
+    if (from_dupli) {
+      compiler.add_node_packed(texco_node, NODE_TEXCO_DUPLI_UV, compiler.output(out));
+    }
+    else {
+      int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
+      compiler.add_node_packed(texco_node, NODE_TEXCO_UV_MAYBE_PLANAR, compiler.output(out), attr);
+    }
+  }
+
+  out = output("Object");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_OBJECT, compiler.output(out), use_transform);
+    if (use_transform) {
+      compiler.add_node_packed(ob_tfm.x);
+      compiler.add_node_packed(ob_tfm.y);
+      compiler.add_node_packed(ob_tfm.z);
+    }
+  }
+
+  out = output("Camera");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_CAMERA, compiler.output(out));
+  }
+
+  out = output("Window");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_WINDOW, compiler.output(out));
+  }
+
+  out = output("Reflection");
+  if (!out->links.empty()) {
+    if (compiler.background) {
+      compiler.add_node(this,
+                        geom_node,
+                        SVMNodeGeometry{
+                            .geom_type = NODE_GEOM_I,
+                            .bump_offset = bump_offset,
+                            .store_derivatives = store_derivatives,
+                            .out_offset = compiler.output(out),
+                            .bump_filter_width = bump_filter_width,
+                        },
+                        use_derivative);
+    }
+    else {
+      compiler.add_node_packed(texco_node, NODE_TEXCO_REFLECTION, compiler.output(out));
+    }
+  }
+
+  out = output("WcsBox");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_WCS_BOX, compiler.output(out), use_transform);
+    if (use_transform) {
+      Transform ob_itfm = transform_inverse(ob_tfm);
+      compiler.add_node_packed(ob_itfm.x);
+      compiler.add_node_packed(ob_itfm.y);
+      compiler.add_node_packed(ob_itfm.z);
+    }
+  }
+
+  out = output("EnvSpherical");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_SPHERICAL, compiler.output(out));
+  }
+
+  out = output("EnvEmap");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_EMAP, compiler.output(out));
+  }
+
+  out = output("EnvBox");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_BOX, compiler.output(out));
+  }
+
+  out = output("EnvLightProbe");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_LIGHTPROBE, compiler.output(out));
+  }
+
+  out = output("EnvCubemap");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_CUBEMAP, compiler.output(out));
+  }
+
+  out = output("EnvCubemapVerticalCross");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(
+        texco_node, NODE_TEXCO_ENV_CUBEMAP_VERTICAL_CROSS, compiler.output(out));
+  }
+
+  out = output("EnvCubemapHorizontalCross");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(
+        texco_node, NODE_TEXCO_ENV_CUBEMAP_HORIZONTAL_CROSS, compiler.output(out));
+  }
+
+  out = output("EnvHemi");
+  if (!out->links.empty()) {
+    compiler.add_node_packed(texco_node, NODE_TEXCO_ENV_HEMI, compiler.output(out));
+  }
+
+  out = output("DecalUv");
+
+  if (!out->links.empty()) {
+    int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
+    /* NODE_ATTR_OUTPUT_FLOAT3, not NODE_ATTR_FLOAT3: this field is a NodeAttributeOutputType. */
+    compiler.add_node(this,
+                      attr_node,
+                      SVMNodeAttr{
+                          .attr = attr,
+                          .out_offset = compiler.output(out),
+                          .output_type = NODE_ATTR_OUTPUT_FLOAT3,
+                          .bump_offset = bump_offset,
+                          .store_derivatives = store_derivatives,
+                          .bump_filter_width = bump_filter_width,
+                      },
+                      use_derivative);
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_UV, compiler);
+  }
+
+  out = output("DecalPlanar");
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_PLANAR, compiler);
+  }
+
+  out = output("DecalSpherical");
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_SPHERICAL, compiler);
+  }
+
+  out = output("DecalCylindrical");
+  if (!out->links.empty()) {
+    decal_setup(out, texco_node, NODE_TEXCO_ENV_DECAL_CYLINDRICAL, compiler);
+  }
+}
+
+void RhinoTextureCoordinateNode::compile(OSLCompiler &compiler)
+{
+  if (bump == SHADER_BUMP_DX)
+    compiler.parameter("bump_offset", "dx");
+  else if (bump == SHADER_BUMP_DY)
+    compiler.parameter("bump_offset", "dy");
+  else
+    compiler.parameter("bump_offset", "center");
+
+  if (compiler.background)
+    compiler.parameter("is_background", true);
+  if (compiler.output_type() == SHADER_TYPE_VOLUME)
+    compiler.parameter("is_volume", true);
+  compiler.parameter(this, "use_transform");
+  Transform ob_itfm = transform_inverse(ob_tfm);
+  compiler.parameter("object_itfm", ob_itfm);
+
+  compiler.parameter(this, "from_dupli");
+
+  compiler.add(this, "node_texture_coordinate");
+}
+
 /* UV Map */
 
 NODE_DEFINE(UVMapNode)
@@ -5557,7 +5995,9 @@ bool MixNode::is_linear_operation()
     default:
       return false;
   }
-  return use_clamp == false && input("Factor")->link == nullptr;
+  /* "Fac", not MixColorNode's "Factor": input() returns nullptr for an unknown name, so
+   * "Factor" dereferences null on every blend, add, multiply or subtract mix. */
+  return use_clamp == false && input("Fac")->link == nullptr;
 }
 
 /* Mix Color */

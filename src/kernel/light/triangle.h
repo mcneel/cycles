@@ -166,6 +166,7 @@ ccl_device_forceinline bool triangle_light_sample(KernelGlobals kg,
   const float area = 0.5f * Nl;
 
   ls->eval_fac = 1.0f;
+  ls->shader = object_shader(kg, object);// kernel_data_fetch(tri_shader, prim);
   ls->object = object;
   ls->prim = prim;
   ls->shader |= SHADER_USE_MIS;

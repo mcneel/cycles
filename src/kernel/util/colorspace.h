@@ -36,6 +36,14 @@ template<class T> ccl_device auto linear_rgb_to_gray(KernelGlobals kg, const T c
   return dot(c, make_float3(kernel_data.film.rgb_to_y));
 }
 
+/* Rhino: luminance uses its own weights, distinct from rgb_to_y. Ported here
+ * when 5.2 replaced kernel/util/color.h with this file. Used by the COLOR2
+ * path in svm/convert.h. */
+template<class T> ccl_device auto linear_rgb_to_luminance(KernelGlobals kg, const T c)
+{
+  return dot(c, make_float3(kernel_data.film.rgb_to_lum));
+}
+
 ccl_device_inline Spectrum rgb_to_spectrum(const float3 rgb)
 {
   return rgb;

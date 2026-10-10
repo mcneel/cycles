@@ -695,6 +695,13 @@ void MetalKernelPipeline::compile()
     metalbin_name = path_join(metalbin_name, local_md5.get_hex() + ".bin");
 
     metalbin_path = path_cache_get(path_join("kernels", metalbin_name));
+
+    /* @(path) is nil for an empty or non-UTF-8 path, and fileURLWithPath:nil then throws
+     * on this compile thread and kills the process (RH-97035). Compile uncached instead. */
+    use_binary_archive = !metalbin_path.empty() && @(metalbin_path.c_str()) != nil;
+  }
+
+  if (use_binary_archive) {
     path_create_directories(metalbin_path);
 
     /* Check if shader binary exists on disk, and if so, update the file timestamp for LRU purging

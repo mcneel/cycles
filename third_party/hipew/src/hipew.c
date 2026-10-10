@@ -431,6 +431,7 @@ static int hipewHipInit(void)
   return result;
 }
 
+
 int hipewInit(hipuint32_t flags)
 {
   int result = HIPEW_SUCCESS;

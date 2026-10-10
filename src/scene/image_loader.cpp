@@ -15,6 +15,11 @@ int ImageLoader::get_tile_number() const
   return 0;
 }
 
+uint64_t ImageLoader::source_version() const
+{
+  return 0;
+}
+
 bool ImageLoader::equals(const ImageLoader *a, const ImageLoader *b)
 {
   if (a == nullptr && b == nullptr) {

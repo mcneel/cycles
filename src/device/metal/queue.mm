@@ -600,9 +600,15 @@ bool MetalDeviceQueue::enqueue(DeviceKernel kernel,
                                device_kernel_as_string(kernel),
                                errCStr);
         }
+        id<MTLLogContainer> logs = command_buffer.logs;
+        for (id<MTLFunctionLog> log in logs) {
+          NSLog(@"%@", log);
+        }
       }
       if (!str.empty()) {
         metal_device_->set_error(str);
+        /* Close the encoder on error, or leaving Raytraced crashes another Metal thread. */
+        close_compute_encoder();
       }
     }];
 

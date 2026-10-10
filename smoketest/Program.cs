@@ -1,0 +1,324 @@
+using System;
+using System.IO;
+using ccl;
+
+// Minimal end-to-end check of the Cycles build: render a few samples and write them out.
+// Not a correctness test; it covers everything between "it links" and "it renders".
+internal static class Program
+{
+    private static IntPtr FindOutputNode(IntPtr shader)
+    {
+        int count = CSycles.shader_node_count(shader);
+        for (int i = 0; i < count; i++)
+        {
+            IntPtr n = CSycles.shader_node_get(shader, i);
+            string name = CSycles.shadernode_get_name(n);
+            Console.WriteLine("  graph node " + i + ": " + name);
+            if (name.IndexOf("output", StringComparison.OrdinalIgnoreCase) >= 0)
+                return n;
+        }
+        return IntPtr.Zero;
+    }
+    [System.Runtime.InteropServices.DllImport("ccycles", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void cycles_debug_scene_stats(IntPtr session);
+
+    [System.Runtime.InteropServices.DllImport("ccycles", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void cycles_debug_install_crash_handler();
+
+    private static void Main()
+    {
+        string path = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".";
+        string userpath = Path.Combine(path, "userpath");
+        Directory.CreateDirectory(userpath);
+
+        Console.WriteLine("path_init  : " + path);
+        // Tolerate a ccycles without the crash handler, so this can A/B against a 3.5 build.
+        try { cycles_debug_install_crash_handler(); }
+        catch (EntryPointNotFoundException) { Console.WriteLine("crashhandler: absent (old ccycles)"); }
+        CSycles.path_init(path, userpath);
+        // SMOKE_DEVMASK: Rhino defaults to a GPU device, a path CPU-only init never reaches.
+        string devMask = Environment.GetEnvironmentVariable("SMOKE_DEVMASK");
+        DeviceTypeMask mask = DeviceTypeMask.CPU;
+        if (!string.IsNullOrEmpty(devMask)) {
+            mask = (DeviceTypeMask)Enum.Parse(typeof(DeviceTypeMask), devMask, true);
+        }
+        Console.WriteLine("devmask    : " + mask);
+        CSycles.initialise(mask);
+        CSycles.log_to_stdout(true);
+        Console.WriteLine("devices    : " + CSycles.number_devices());
+        for (int i = 0; i < CSycles.number_devices(); i++)
+            Console.WriteLine("   [" + i + "] " + CSycles.device_decription(i));
+
+        const uint W = 160, H = 120;
+
+        IntPtr sp = CSycles.session_params_create(0);
+        CSycles.session_params_set_samples(sp, 4);
+
+        IntPtr session = CSycles.session_create(sp);
+        Console.WriteLine("session    : " + (session != IntPtr.Zero ? "created" : "NULL"));
+
+        CSycles.camera_set_size(session, W, H);
+        CSycles.camera_compute_auto_viewplane(session);
+        CSycles.camera_update(session);
+
+        // ---- a real scene -------------------------------------------------
+        // A ground quad lit by a point light: exercises the mesh upload and the light's
+        // object transform built from co/dir, the riskiest parts of the 5.2 port.
+        IntPtr diffuse = CSycles.create_shader(session);
+        CSycles.shader_new_graph(diffuse);
+        // Diffuse by default. SMOKE_EMIT=1 uses emission, which puts a texture's output
+        // straight into the pixels; under diffuse it is multiplied by the light and
+        // quantises to almost nothing.
+        bool emit = Environment.GetEnvironmentVariable("SMOKE_EMIT") == "1";
+        IntPtr bsdf = CSycles.add_shader_node(diffuse, emit ? "emission" : "diffuse_bsdf", "surf");
+        if (emit) {
+            // Strength is not 1 by default here; with only Color wired it renders black.
+            CSycles.shadernode_set_member_float(bsdf, "strength", 4.0f);
+        }
+
+        // SMOKE_IMAGE: colour from a file through a stock image_texture node, to test the
+        // kernel's image lookup with Rhino out of the picture.
+        string imagePath = Environment.GetEnvironmentVariable("SMOKE_IMAGE");
+        if (!string.IsNullOrEmpty(imagePath)) {
+            IntPtr imtex = CSycles.add_shader_node(diffuse, "image_texture", "imtex");
+            Console.WriteLine("image      : node created=" + (imtex != IntPtr.Zero));
+            if (imtex == IntPtr.Zero) { Console.WriteLine("RESULT     : NOT-CREATED"); return; }
+            CSycles.shadernode_set_member_string(imtex, "filename", imagePath);
+            Console.WriteLine("image      : '" + imagePath + "' exists=" + System.IO.File.Exists(imagePath));
+
+            // Generated coordinates span the quad; without UVs it evaluates at one point.
+            IntPtr texco2 = CSycles.add_shader_node(diffuse, "texture_coordinate", "imtexco");
+            foreach (string inName in new[] { "Vector", "UVW" }) {
+                if (CSycles.shader_connect_nodes(diffuse, texco2, "Generated", imtex, inName)) {
+                    Console.WriteLine("image      : uv via " + inName);
+                    break;
+                }
+            }
+            bool imwired = CSycles.shader_connect_nodes(diffuse, imtex, "Color", bsdf, "Color");
+            Console.WriteLine("image      : wired=" + imwired);
+            if (!imwired) { Console.WriteLine("RESULT     : NOT-WIRED"); return; }
+        }
+
+        // SMOKE_NODE: colour from one Rhino shader node, the only way this reaches the Rhino
+        // SVM nodes. One node per process, so a crash in one does not hide the rest.
+        string nodeName = Environment.GetEnvironmentVariable("SMOKE_NODE");
+        if (!string.IsNullOrEmpty(nodeName)) {
+            IntPtr tex = CSycles.add_shader_node(diffuse, nodeName, "tex");
+            Console.WriteLine("node       : " + nodeName + " created=" + (tex != IntPtr.Zero));
+            if (tex == IntPtr.Zero) { Console.WriteLine("RESULT     : NOT-CREATED"); return; }
+            // Unconnected UVW evaluates at one point; flat output would hide a broken encoding.
+            IntPtr texco = CSycles.add_shader_node(diffuse, "texture_coordinate", "texco");
+            foreach (string inName in new[] { "UVW", "Vector", "UVW1" }) {
+                if (CSycles.shader_connect_nodes(diffuse, texco, "Generated", tex, inName)) {
+                    Console.WriteLine("node       : uvw via " + inName);
+                    break;
+                }
+            }
+
+            bool wired = false;
+            foreach (string outName in new[] { "Color", "Vector", "UVW1", "Alpha" }) {
+                if (CSycles.shader_connect_nodes(diffuse, tex, outName, bsdf, "Color")) {
+                    Console.WriteLine("node       : wired via " + outName);
+                    wired = true;
+                    break;
+                }
+            }
+            if (!wired) { Console.WriteLine("RESULT     : NOT-WIRED"); return; }
+        }
+        // shader_new_graph already made the output node; another would be an orphan.
+        IntPtr outNode = FindOutputNode(diffuse);
+        bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, emit ? "Emission" : "BSDF", outNode, "Surface");
+        Console.WriteLine("shader     : connected=" + connected);
+
+        IntPtr mesh = CSycles.scene_add_mesh(session, diffuse);
+        float[] verts = new float[] {
+            -5f, -5f, 0f,
+             5f, -5f, 0f,
+             5f,  5f, 0f,
+            -5f,  5f, 0f,
+        };
+        int[] tris = new int[] { 0, 1, 2, 0, 2, 3 };
+        CSycles.mesh_set_verts(session, mesh, ref verts, 4);
+        CSycles.mesh_set_tris(session, mesh, ref tris, 2, diffuse, false);
+        Console.WriteLine("mesh       : 4 verts, 2 tris");
+
+        if (Environment.GetEnvironmentVariable("SMOKE_NOMESH") != "1") {
+        IntPtr obj = CSycles.scene_add_object(session);
+        CSycles.object_set_geometry(session, obj, mesh);
+        CSycles.object_set_matrix(session, obj, new Transform(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f));
+        // This fork shades per object, not per triangle (kernel/geom/triangle.h), so an
+        // object without a shader renders the magenta default_surface.
+        CSycles.object_set_shader(session, obj, diffuse);
+        Console.WriteLine("object     : added, shader bound");
+        }
+
+        IntPtr lightShader = CSycles.create_shader(session);
+        CSycles.shader_new_graph(lightShader);
+        IntPtr emission = CSycles.add_shader_node(lightShader, "emission", "emit");
+        IntPtr lightOut = FindOutputNode(lightShader);
+        CSycles.shader_connect_nodes(lightShader, emission, "Emission", lightOut, "Surface");
+
+        if (Environment.GetEnvironmentVariable("SMOKE_NOLIGHT") != "1") {
+        IntPtr light = CSycles.create_light(session, lightShader);
+        // SMOKE_SPOTZ: a spot also tests the light's orientation, not just its position.
+        string spotDir = Environment.GetEnvironmentVariable("SMOKE_SPOTZ");
+        bool spot = spotDir != null;
+        bool area = Environment.GetEnvironmentVariable("SMOKE_AREA") == "1";
+        CSycles.light_set_type(session, light, area ? LightType.Area : spot ? LightType.Spot : LightType.Point);
+        float lightX = float.Parse(Environment.GetEnvironmentVariable("SMOKE_LIGHTX") ?? "4",
+            System.Globalization.CultureInfo.InvariantCulture);
+        float lightZ = float.Parse(Environment.GetEnvironmentVariable("SMOKE_LIGHTZ") ?? "-6",
+            System.Globalization.CultureInfo.InvariantCulture);
+        CSycles.light_set_co(session, light, lightX, 0f, lightZ);
+        CSycles.light_set_dir(session, light, 0f, 0f, spot ? float.Parse(spotDir,
+            System.Globalization.CultureInfo.InvariantCulture) : 1f);
+        if (area) {
+            // 4x4 in the XY plane: an axis/dir mix-up shows as a misplaced or dark quad.
+            CSycles.light_set_axisu(session, light, 1f, 0f, 0f);
+            CSycles.light_set_axisv(session, light, 0f, 1f, 0f);
+            CSycles.light_set_sizeu(session, light, 4f);
+            CSycles.light_set_sizev(session, light, 4f);
+        }
+        if (spot) {
+            CSycles.light_set_spot_angle(session, light, 1.2f);
+            CSycles.light_set_spot_smooth(session, light, 0.1f);
+        }
+        CSycles.light_set_size(session, light, 1.0f);
+        CSycles.light_tag_update(session, light);
+        Console.WriteLine("light      : at (" + lightX + ",0," + lightZ + ")");
+        }
+
+        // Black world: the default background is a random colour that swamps the light.
+        IntPtr worldShader = CSycles.create_shader(session);
+        CSycles.shader_new_graph(worldShader);
+        CSycles.scene_set_background_shader(session, worldShader);
+        CSycles.shader_set_name(worldShader, "black_world");
+
+        // Camera above the quad, looking down -Z.
+        CSycles.camera_set_matrix(session, new Transform(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, float.Parse(Environment.GetEnvironmentVariable("SMOKE_CAMZ") ?? "-12",
+                System.Globalization.CultureInfo.InvariantCulture)));
+        CSycles.camera_set_type(session, CameraType.Perspective);
+        CSycles.camera_set_fov(session, 0.8f);
+        CSycles.camera_update(session);
+
+        CSycles.session_add_pass(session, PassType.Combined);
+        CSycles.session_set_samples(session, 4);
+
+        if (Environment.GetEnvironmentVariable("SMOKE_NOSTART") == "1")
+        {
+            Console.WriteLine("skipping start");
+            CSycles.session_destroy(session);
+            CSycles.shutdown();
+            Console.WriteLine("clean exit without start");
+            return;
+        }
+        cycles_debug_scene_stats(session);
+        int rc = CSycles.session_reset(session, (int)W, (int)H, 4, 0, 0, (int)W, (int)H, 1);
+        Console.WriteLine("reset      : rc=" + rc);
+
+        Console.WriteLine("rendering  ...");
+        CSycles.session_start(session);
+
+        // Poll rather than session_wait, so a stall shows instead of hanging. The budget
+        // covers a debug ccycles' long "Updating Shaders"; SMOKE_TIMEOUT overrides it.
+        double budget = 600.0;
+        var budgetEnv = Environment.GetEnvironmentVariable("SMOKE_TIMEOUT");
+        if (!string.IsNullOrEmpty(budgetEnv))
+        {
+            double parsed;
+            if (double.TryParse(budgetEnv, System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out parsed) &&
+                parsed > 0.0)
+            {
+                budget = parsed;
+            }
+        }
+        Console.WriteLine("timeout    : " + budget.ToString("F0") + "s");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        float progress = 0.0f;
+        int lastSample = -1;
+        while (sw.Elapsed.TotalSeconds < budget)
+        {
+            CSycles.progress_get_progress(session, out progress);
+            int sample = CSycles.progress_get_sample(session);
+            if (sample != lastSample)
+            {
+                Console.WriteLine("  sample " + sample + "  progress " + progress.ToString("P1") +
+                                  "  status " + CSycles.progress_get_status(session));
+                lastSample = sample;
+            }
+            if (progress >= 1.0f) break;
+            System.Threading.Thread.Sleep(250);
+        }
+        Console.WriteLine("render     : progress=" + progress.ToString("P1") + " after " +
+                          sw.Elapsed.TotalSeconds.ToString("F1") + "s");
+        CSycles.session_cancel(session, "done");
+
+        IntPtr pixels = IntPtr.Zero;
+        int pixelSize = 0;
+        CSycles.session_retain_float_buffer(session, PassType.Combined, (int)W, (int)H, ref pixels, ref pixelSize);
+        Console.WriteLine("buffer     : ptr=" + (pixels != IntPtr.Zero ? "ok" : "NULL") + " stride=" + pixelSize);
+
+        if (pixels != IntPtr.Zero && pixelSize > 0)
+        {
+            // pixelSize is the reset pixel_size (supersampling), not the component
+            // count. The Combined pass is RGBA.
+            const int comps = 4;
+            int n = (int)(W * H) * comps;
+            float[] buf = new float[n];
+            System.Runtime.InteropServices.Marshal.Copy(pixels, buf, 0, n);
+
+            double sum = 0.0;
+            for (int i = 0; i < n; i++) sum += buf[i];
+            Console.WriteLine("buffer sum : " + sum.ToString("F4"));
+            float mn = float.MaxValue, mx = float.MinValue;
+            for (int i = 0; i < n; i++) { if (buf[i] < mn) mn = buf[i]; if (buf[i] > mx) mx = buf[i]; }
+            Console.WriteLine("buffer rng : min=" + mn + " max=" + mx);
+            int mid = (int)((H / 2) * W + W / 2) * comps;
+            Console.WriteLine("centre px  : " + buf[mid] + " " + buf[mid+1] + " " + buf[mid+2] + " " + buf[mid+3]);
+            Console.WriteLine("corner px  : " + buf[0] + " " + buf[1] + " " + buf[2] + " " + buf[3]);
+
+            // Per-channel statistics. A neutral scene (grey light, grey BSDF) must give
+            // R==G==B; anything else localises the fault to a channel rather than a device.
+            for (int c = 0; c < comps; c++) {
+                double csum = 0.0; float cmn = float.MaxValue, cmx = float.MinValue;
+                int nonzero = 0;
+                for (int i = c; i < n; i += comps) {
+                    csum += buf[i];
+                    if (buf[i] < cmn) cmn = buf[i];
+                    if (buf[i] > cmx) cmx = buf[i];
+                    if (buf[i] != 0.0f) nonzero++;
+                }
+                Console.WriteLine("chan " + "RGBA"[c] + "     : sum=" + csum.ToString("F4")
+                    + " min=" + cmn + " max=" + cmx + " nonzero=" + nonzero);
+            }
+
+            string ppm = Path.Combine(path, "smoketest.ppm");
+            using (var fs = new FileStream(ppm, FileMode.Create))
+            using (var w = new StreamWriter(fs))
+            {
+                w.Write("P3\n" + W + " " + H + "\n255\n");
+                for (int i = 0; i < (int)(W * H); i++)
+                {
+                    int o = i * comps;
+                    int r = (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o])) * 255);
+                    int g = (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o + 1])) * 255);
+                    int b = (int)(Math.Min(1.0f, Math.Max(0.0f, buf[o + 2])) * 255);
+                    w.Write(r + " " + g + " " + b + "\n");
+                }
+            }
+            Console.WriteLine("wrote      : " + ppm);
+            CSycles.session_release_float_buffer(session, PassType.Combined);
+        }
+
+        CSycles.session_destroy(session);
+        CSycles.shutdown();
+        Console.WriteLine("done");
+    }
+}

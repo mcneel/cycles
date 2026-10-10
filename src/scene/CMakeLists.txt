@@ -28,6 +28,7 @@ set(SRC
   image_cache.cpp
   image_loader.cpp
   image_oiio.cpp
+  image_rhino.cpp
   image_sky.cpp
   image_vdb.cpp
   integrator.cpp
@@ -54,6 +55,7 @@ set(SRC
   tables.cpp
   tabulated_sobol.cpp
   volume.cpp
+  rhino_shader_nodes.cpp
 )
 
 set(SRC_HEADERS
@@ -70,6 +72,7 @@ set(SRC_HEADERS
   image_cache.h
   image_loader.h
   image_oiio.h
+  image_rhino.h
   image_sky.h
   image_vdb.h
   integrator.h
@@ -93,6 +96,7 @@ set(SRC_HEADERS
   tables.h
   tabulated_sobol.h
   volume.h
+  rhino_shader_nodes.h
 )
 
 set(LIB

@@ -167,7 +167,8 @@ ccl_device_inline float3 triangle_point_from_uv_and_verts(KernelGlobals kg,
 
 ccl_device_inline void triangle_shader_setup(KernelGlobals kg, ccl_private ShaderData *sd)
 {
-  sd->shader = kernel_data_fetch(tri_shader, sd->prim);
+  /* Rhino: object-level shader rather than the per-triangle shader. */
+  sd->shader = object_shader(kg, sd->object);
 
   sd->P = triangle_point_from_uv(kg, sd, sd->prim, sd->u, sd->v);
 

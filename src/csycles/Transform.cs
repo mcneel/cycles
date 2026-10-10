@@ -1,0 +1,227 @@
+/**
+Copyright 2014-2024 Robert McNeel and Associates
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+**/
+
+using System;
+
+namespace ccl
+{
+	/// <summary>
+	/// Transformation matrix.
+	/// </summary>
+	public class Transform
+	{
+		/// <summary>
+		/// Conversion matrix for rhino-cycles camera
+		/// </summary>
+		static public Transform RhinoToCyclesCam { get; } = new Transform(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, -1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, -1.0f, 0.0f
+		);
+		static public Transform RhinoToCyclesCamNoFlip { get; } = new Transform(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, -1.0f, 0.0f
+		);
+		static public Transform RhinoToCyclesCamReflected { get; } = new Transform(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, -1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, -1.0f, 0.0f
+		);
+
+		/// <summary>
+		/// X row, elements M00-M03
+		/// </summary>
+		public float4 x;
+		/// <summary>
+		/// Y row, elements M10-M13
+		/// </summary>
+		public float4 y;
+		/// <summary>
+		/// Z row, elements M20-M23
+		/// </summary>
+		public float4 z;
+
+		/// <summary>
+		/// Create a new transform from 12 floats, row by row: a-d are M00-M03, e-h M10-M13, i-l M20-M23.
+		/// </summary>
+		public Transform(
+			float a, float b, float c, float d,
+			float e, float f, float g, float h,
+			float i, float j, float k, float l
+		)
+		{
+			x = new float4(a, b, c, d);
+			y = new float4(e, f, g, h);
+			z = new float4(i, j, k, l);
+
+		}
+		/// <summary>
+		/// Create new transform with all cells set to 0.0f
+		/// </summary>
+		public Transform()
+			: this(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
+		{
+		}
+
+		/// <summary>
+		/// Copy constructor
+		/// </summary>
+		public Transform(Transform old)
+			: this(
+				old.x.x, old.x.y, old.x.z, old.x.w,
+				old.y.x, old.y.y, old.y.z, old.y.w,
+				old.z.x, old.z.y, old.z.z, old.z.w
+			)
+		{
+		}
+
+		/// <summary>
+		/// Construct a Transform using a float array
+		/// </summary>
+		/// <param name="m">Array of 12 floats</param>
+		public Transform(float[] m)
+			: this(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11])
+		{
+		}
+
+		/// <summary>
+		/// Set all matrix cells with elements from the given float array.
+		/// </summary>
+		/// <param name="m">At least 12 floats; any beyond the first 12 are ignored.</param>
+		public void SetMatrix(float[] m)
+		{
+			if (m.Length < 12) throw new ArgumentException("float array too short, must contain at least 12 float elements.");
+			x.x = m[0];
+			x.y = m[1];
+			x.z = m[2];
+			x.w = m[3];
+			y.x = m[4];
+			y.y = m[5];
+			y.z = m[6];
+			y.w = m[7];
+			z.x = m[8];
+			z.y = m[9];
+			z.z = m[10];
+			z.w = m[11];
+		}
+
+		/// <summary>
+		/// Index the transformation, 0=x, 1=y, 2=z
+		/// </summary>
+		public float4 this[int index]
+		{
+			get
+			{
+				switch (index)
+				{
+					case 0:
+						return x;
+					case 1:
+						return y;
+					case 2:
+						return z;
+					default:
+						throw new IndexOutOfRangeException("Only indices [0..2] are acceptable");
+				}
+			}
+			set
+			{
+				switch (index)
+				{
+					case 0:
+						x = value;
+						break;
+					case 1:
+						y = value;
+						break;
+					case 2:
+						z = value;
+						break;
+					default:
+						throw new IndexOutOfRangeException("Only indices [0..2] are acceptable");
+				}
+
+			}
+		}
+
+		/// <summary>
+		/// The identity matrix
+		/// </summary>
+		static public Transform Identity()
+		{
+			return Scale(1.0f, 1.0f, 1.0f);
+		}
+
+		/// <summary>
+		/// Matrix product a * b, with the implicit fourth row (0, 0, 0, 1)
+		/// </summary>
+		static public Transform operator *(Transform a, Transform b)
+		{
+			float4 c_x = new float4(b.x.x, b.y.x, b.z.x, 0.0f);
+			float4 c_y = new float4(b.x.y, b.y.y, b.z.y, 0.0f);
+			float4 c_z = new float4(b.x.z, b.y.z, b.z.z, 0.0f);
+			float4 c_w = new float4(b.x.w, b.y.w, b.z.w, 1.0f);
+			return new Transform(
+				float4.Dot(a.x, c_x), float4.Dot(a.x, c_y), float4.Dot(a.x, c_z), float4.Dot(a.x, c_w),
+				float4.Dot(a.y, c_x), float4.Dot(a.y, c_y), float4.Dot(a.y, c_z), float4.Dot(a.y, c_w),
+				float4.Dot(a.z, c_x), float4.Dot(a.z, c_y), float4.Dot(a.z, c_z), float4.Dot(a.z, c_w)
+			);
+		}
+
+		/// <summary>
+		/// Give translation matrix for vector t
+		/// </summary>
+		static public Transform Translate(float4 t)
+		{
+			return new Transform(
+				1, 0, 0, t.x,
+				0, 1, 0, t.y,
+				0, 0, 1, t.z
+				);
+		}
+
+		/// <summary>
+		/// Give translation matrix for translation vector (x,y,z)
+		/// </summary>
+		static public Transform Translate(float x, float y, float z)
+		{
+			return Translate(new float4(x, y, z));
+		}
+
+		/// <summary>
+		/// Give scale matrix for scale vector (x,y,z)
+		/// </summary>
+		static public Transform Scale(float x, float y, float z)
+		{
+			return new Transform(
+				x, 0.0f, 0.0f, 0.0f,
+				0.0f, y, 0.0f, 0.0f,
+				0.0f, 0.0f, z, 0.0f
+				);
+		}
+
+		/// <summary>
+		/// Textual representation of the matrix
+		/// </summary>
+		override public string ToString()
+		{
+			return
+				$"[{x.x}, {x.y}, {x.z}, {x.w}, {y.x}, {y.y}, {y.z}, {y.w}, {z.x}, {z.y}, {z.z}, {z.w}]";
+		}
+	}
+
+}

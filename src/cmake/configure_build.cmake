@@ -46,7 +46,9 @@ if(APPLE)
   list(APPEND CMAKE_EXE_LINKER_FLAGS "-Xlinker -no_warn_duplicate_libraries")
   list(APPEND CMAKE_SHARED_LINKER_FLAGS "-Xlinker -no_warn_duplicate_libraries")
 elseif(MSVC)
-  set(CMAKE_CXX_FLAGS "/nologo /J /Gd /EHsc /bigobj /MP /std:c++17 /utf-8" CACHE STRING "MSVC MD C++ flags " FORCE)
+  # No /std: here: CMake already appends /std:c++20 from CMAKE_CXX_STANDARD, and
+  # upstream's stale /std:c++17 makes MSVC warn D9025 once per translation unit.
+  set(CMAKE_CXX_FLAGS "/nologo /J /Gd /EHsc /bigobj /MP /utf-8" CACHE STRING "MSVC MD C++ flags " FORCE)
   set(CMAKE_C_FLAGS "/nologo /J /Gd /MP /bigobj /utf-8" CACHE STRING "MSVC MD C++ flags " FORCE)
 
   if(CMAKE_CL_64)

@@ -5,6 +5,12 @@
 #include <cstdlib>
 #include <cstring>
 
+#ifdef _WIN32
+#include <eh.h>
+#endif
+
+#include <exception>
+
 #include "bvh/bvh2.h"
 
 #include "device/device.h"
@@ -249,7 +255,77 @@ vector<DeviceType> Device::available_types()
   return types;
 }
 
-vector<DeviceInfo> Device::available_devices(const uint mask)
+
+class CyclesDriverCrashException : std::exception
+{
+public:
+    CyclesDriverCrashException() : m_nVDE(-1) {}
+    CyclesDriverCrashException(unsigned int n) : m_nVDE(n) {}
+
+    unsigned int VDENumber() const { return m_nVDE; }
+
+private:
+    unsigned int m_nVDE;
+};
+
+#ifdef _WIN32
+
+static
+void crash_translator_function(unsigned int eCode, EXCEPTION_POINTERS*)
+{
+    throw CyclesDriverCrashException(eCode);
+}
+
+class CrashTranslatorHelper
+{
+private:
+    const _se_translator_function old_SE_translator;
+public:
+    CrashTranslatorHelper(_se_translator_function new_SE_translator) noexcept
+        : old_SE_translator{ _set_se_translator(new_SE_translator) } {}
+    ~CrashTranslatorHelper() noexcept { _set_se_translator(old_SE_translator); }
+};
+#endif
+
+struct GpuInitFailure {
+  DeviceType type;
+  string message;
+};
+
+static std::vector<GpuInitFailure> g_gpu_init_failures;
+
+uint Device::failed_gpus_mask()
+{
+  uint mask = 0;
+  for (const GpuInitFailure &f : g_gpu_init_failures) {
+    mask |= (1u << f.type);
+  }
+  return mask;
+}
+
+string Device::gpu_init_error(DeviceType type)
+{
+  for (const GpuInitFailure &f : g_gpu_init_failures) {
+    if (f.type == type) return f.message;
+  }
+  return "";
+}
+
+static void record_gpu_failure(DeviceType type, const string &message)
+{
+  g_gpu_init_failures.push_back({type, message});
+}
+
+#include <sstream>
+
+static string crash_message(const CyclesDriverCrashException &e)
+{
+  std::ostringstream oss;
+  oss << "driver crash (code 0x" << std::hex << e.VDENumber() << ")";
+  return oss.str();
+}
+
+vector<DeviceInfo> Device::available_devices(uint mask)
 {
   /* Lazy initialize devices. On some platforms OpenCL or CUDA drivers can
    * be broken and cause crashes when only trying to get device info, so
@@ -257,85 +333,134 @@ vector<DeviceInfo> Device::available_devices(const uint mask)
   const thread_scoped_lock lock(device_mutex);
   vector<DeviceInfo> devices;
 
+  g_gpu_init_failures.clear();
+
+#ifdef _WIN32
+  CrashTranslatorHelper se_translator(crash_translator_function);
+#endif
+
 #if defined(WITH_CUDA) || defined(WITH_OPTIX)
   if (mask & (DEVICE_MASK_CUDA | DEVICE_MASK_OPTIX)) {
-    if (!(devices_initialized_mask & DEVICE_MASK_CUDA)) {
-      if (device_cuda_init()) {
-        device_cuda_info(cuda_devices());
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_CUDA)) {
+              if (device_cuda_init()) {
+                  device_cuda_info(cuda_devices());
+              }
+              devices_initialized_mask |= DEVICE_MASK_CUDA;
+          }
+          if (mask & DEVICE_MASK_CUDA) {
+              for (DeviceInfo &info : cuda_devices()) {
+                  devices.push_back(info);
+              }
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_CUDA;
-    }
-    if (mask & DEVICE_MASK_CUDA) {
-      for (DeviceInfo &info : cuda_devices()) {
-        devices.push_back(info);
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_CUDA, crash_message(e));
       }
-    }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_CUDA, e.what());
+      }
   }
 #endif
 
 #ifdef WITH_OPTIX
   if (mask & DEVICE_MASK_OPTIX) {
-    if (!(devices_initialized_mask & DEVICE_MASK_OPTIX)) {
-      if (device_optix_init()) {
-        device_optix_info(cuda_devices(), optix_devices());
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_OPTIX)) {
+              if (device_optix_init()) {
+                  device_optix_info(cuda_devices(), optix_devices());
+              }
+              devices_initialized_mask |= DEVICE_MASK_OPTIX;
+          }
+          for (DeviceInfo &info : optix_devices()) {
+              devices.push_back(info);
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_OPTIX;
-    }
-    for (DeviceInfo &info : optix_devices()) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_OPTIX, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_OPTIX, e.what());
+      }
   }
 #endif
 
 #ifdef WITH_HIP
   if (mask & DEVICE_MASK_HIP) {
-    if (!(devices_initialized_mask & DEVICE_MASK_HIP)) {
-      if (device_hip_init()) {
-        device_hip_info(hip_devices());
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_HIP)) {
+              if (device_hip_init()) {
+                  device_hip_info(hip_devices());
+              }
+              devices_initialized_mask |= DEVICE_MASK_HIP;
+          }
+          for (DeviceInfo &info : hip_devices()) {
+              devices.push_back(info);
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_HIP;
-    }
-    for (DeviceInfo &info : hip_devices()) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_HIP, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_HIP, e.what());
+      }
   }
 #endif
 
 #ifdef WITH_ONEAPI
   if (mask & DEVICE_MASK_ONEAPI) {
-    if (!(devices_initialized_mask & DEVICE_MASK_ONEAPI)) {
-      if (device_oneapi_init()) {
-        device_oneapi_info(oneapi_devices());
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_ONEAPI)) {
+              if (device_oneapi_init()) {
+                  device_oneapi_info(oneapi_devices());
+              }
+              devices_initialized_mask |= DEVICE_MASK_ONEAPI;
+          }
+          for (DeviceInfo &info : oneapi_devices()) {
+              devices.push_back(info);
+          }
       }
-      devices_initialized_mask |= DEVICE_MASK_ONEAPI;
-    }
-    for (DeviceInfo &info : oneapi_devices()) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_ONEAPI, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_ONEAPI, e.what());
+      }
   }
 #endif
 
   if (mask & DEVICE_MASK_CPU) {
-    if (!(devices_initialized_mask & DEVICE_MASK_CPU)) {
-      device_cpu_info(cpu_devices());
-      devices_initialized_mask |= DEVICE_MASK_CPU;
-    }
-    for (const DeviceInfo &info : cpu_devices()) {
-      devices.push_back(info);
-    }
+      try {
+          if (!(devices_initialized_mask & DEVICE_MASK_CPU)) {
+              device_cpu_info(cpu_devices());
+              devices_initialized_mask |= DEVICE_MASK_CPU;
+          }
+          for (DeviceInfo &info : cpu_devices()) {
+              devices.push_back(info);
+          }
+      }
+      catch (CyclesDriverCrashException&) {}
   }
 
 #ifdef WITH_METAL
   if (mask & DEVICE_MASK_METAL) {
-    if (!(devices_initialized_mask & DEVICE_MASK_METAL)) {
-      if (device_metal_init()) {
-        device_metal_info(metal_devices());
+      try {
+        if (!(devices_initialized_mask & DEVICE_MASK_METAL)) {
+          if (device_metal_init()) {
+            device_metal_info(metal_devices());
+          }
+          devices_initialized_mask |= DEVICE_MASK_METAL;
+        }
+        for (DeviceInfo &info : metal_devices()) {
+          devices.push_back(info);
+        }
       }
-      devices_initialized_mask |= DEVICE_MASK_METAL;
-    }
-    for (const DeviceInfo &info : metal_devices()) {
-      devices.push_back(info);
-    }
+      catch (CyclesDriverCrashException& e) {
+          record_gpu_failure(DEVICE_METAL, crash_message(e));
+      }
+      catch (std::exception& e) {
+          record_gpu_failure(DEVICE_METAL, e.what());
+      }
   }
 #endif
 

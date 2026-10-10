@@ -14,12 +14,15 @@
 #include "scene/shader.h"
 #include "scene/shader_graph.h"
 #include "scene/shader_nodes.h"
+#include "scene/rhino_shader_nodes.h"
 #include "scene/stats.h"
 #include "scene/svm.h"
 
 #include "kernel/svm/node_types.h"
 
 #include "util/log.h"
+#include "util/string.h"
+#include "util/thread.h"
 #include "util/map.h"
 #include "util/math_float3.h"
 #include "util/progress.h"
@@ -27,6 +30,111 @@
 #include "util/task.h"
 
 CCL_NAMESPACE_BEGIN
+
+/* The constant an unlinked input holds, so the dump shows values as well as wiring. */
+static string ccycles_dump_svm_value(const ShaderInput *in)
+{
+  const Node *node = in->parent;
+  const SocketType &st = in->socket_type;
+  switch (in->type()) {
+    case SocketType::FLOAT:
+      return string_printf(" val=%g", node->get_float(st));
+    case SocketType::INT:
+      return string_printf(" val=%d", node->get_int(st));
+    case SocketType::BOOLEAN:
+      return string_printf(" val=%d", node->get_bool(st) ? 1 : 0);
+    case SocketType::COLOR:
+    case SocketType::VECTOR:
+    case SocketType::POINT:
+    case SocketType::NORMAL: {
+      const float3 v = node->get_float3(st);
+      return string_printf(" val=(%g %g %g)", v.x, v.y, v.z);
+    }
+    case SocketType::STRING:
+      return string_printf(" val='%s'", node->get_string(st).c_str());
+    default:
+      return "";
+  }
+}
+
+/* CCYCLES_DUMP_SVM=<path>: every emitted node with each socket's stack offset (-1 for
+ * SVM_STACK_INVALID), which shows wrong stack reads that identical graph dumps hide. */
+static void ccycles_dump_svm_node(const char *shader_name,
+                                  ShaderType type,
+                                  const ShaderNode *node)
+{
+  static FILE *svm_file = [] {
+    const char *path = getenv("CCYCLES_DUMP_SVM");
+    return (path != nullptr && path[0] != 0) ? fopen(path, "a") : nullptr;
+  }();
+  if (svm_file == nullptr) {
+    return;
+  }
+
+  const char *type_name = (type == SHADER_TYPE_SURFACE)      ? "surface" :
+                          (type == SHADER_TYPE_VOLUME)       ? "volume" :
+                          (type == SHADER_TYPE_DISPLACEMENT) ? "displacement" :
+                                                               "bump";
+  string rec = string_printf("[%s] shader '%s' node '%s' (%s)\n",
+                             type_name,
+                             shader_name == nullptr ? "?" : shader_name,
+                             node->name.c_str(),
+                             node->type->name.c_str());
+  for (const ShaderInput *in : node->inputs) {
+    rec += string_printf("    in  %-28s off=%d link=%s%s\n",
+                         in->socket_type.name.c_str(),
+                         (int)in->stack_offset,
+                         in->link == nullptr ? "-" : in->link->parent->name.c_str(),
+                         in->link == nullptr ? ccycles_dump_svm_value(in).c_str() : "");
+  }
+  for (const ShaderOutput *out : node->outputs) {
+    rec += string_printf("    out %-28s off=%d users=%d\n",
+                         out->socket_type.name.c_str(),
+                         (int)out->stack_offset,
+                         (int)out->links.size());
+  }
+  /* tfm is a node member, not a socket, so graph dumps never show it. A zero row means the
+   * texture gets a zero coordinate whatever texco produced. */
+  if (node->type == MatrixMathNode::get_node_type()) {
+    const MatrixMathNode *mm = static_cast<const MatrixMathNode *>(node);
+    const Transform t = mm->tfm;
+    rec += string_printf("    matrix_math tfm type=%d\n", (int)mm->type);
+    rec += string_printf("      x %f %f %f %f\n", t.x.x, t.x.y, t.x.z, t.x.w);
+    rec += string_printf("      y %f %f %f %f\n", t.y.x, t.y.y, t.y.z, t.y.w);
+    rec += string_printf("      z %f %f %f %f\n", t.z.x, t.z.y, t.z.z, t.z.w);
+  }
+
+  /* Node members too. CLIP returns transparent black outside 0..1, which looks exactly like
+   * a texture that failed to load. */
+  if (node->type == ImageTextureNode::get_node_type()) {
+    const ImageTextureNode *it = static_cast<const ImageTextureNode *>(node);
+    rec += string_printf(
+        "    image_texture params ext=%d interp=%d alpha_type=%d proj=%d alt_tiles=%d\n",
+        (int)it->get_extension(),
+        (int)it->get_interpolation(),
+        (int)it->get_alpha_type(),
+        (int)it->get_projection(),
+        (int)it->get_alternate_tiles());
+    rec += string_printf("      colorspace='%s'\n", it->get_colorspace().c_str());
+    rec += string_printf("      filename='%s'\n", it->get_filename().c_str());
+    rec += string_printf("      mem name='%s' %dx%d ch=%d float=%d pixels=%s\n",
+                         it->rhino_mem_name.c_str(),
+                         it->rhino_mem_width,
+                         it->rhino_mem_height,
+                         it->rhino_mem_channels,
+                         (int)it->rhino_mem_is_float,
+                         it->rhino_mem_pixels == nullptr ? "null" : "set");
+    rec += string_printf("      handle empty=%d kernel_id=%d\n",
+                         (int)it->handle.empty(),
+                         it->handle.empty() ? -1 : it->handle.kernel_id());
+  }
+
+  /* Shaders compile on a task pool; write each record whole so they do not interleave. */
+  static thread_mutex svm_dump_mutex;
+  const thread_scoped_lock lock(svm_dump_mutex);
+  fputs(rec.c_str(), svm_file);
+  fflush(svm_file);
+}
 
 /* Shader Manager */
 
@@ -437,6 +545,68 @@ void SVMCompiler::add_node(ShaderNodeType type)
   current_svm_nodes.push_back_slow(type);
 }
 
+/* Rhino compatibility layer - see svm.h. */
+SVMStackOffset SVMCompiler::stack_assign_if_linked(ShaderInput *input)
+{
+  if (input->link || input->constant_folded_in) {
+    return stack_assign(input);
+  }
+  return SVM_STACK_INVALID;
+}
+
+SVMStackOffset SVMCompiler::stack_assign_if_linked(ShaderOutput *output)
+{
+  if (!output->links.empty()) {
+    return stack_assign(output);
+  }
+  return SVM_STACK_INVALID;
+}
+
+SVMStackOffset SVMCompiler::input_link(ShaderInput *input)
+{
+  return stack_assign(input);
+}
+
+void SVMCompiler::add_node_packed(ShaderNodeType type, uint a, uint b, uint c)
+{
+  svm_node_types_used[type] = true;
+  current_svm_nodes.push_back_slow(type);
+  current_svm_nodes.push_back_slow(a);
+  current_svm_nodes.push_back_slow(b);
+  current_svm_nodes.push_back_slow(c);
+}
+
+void SVMCompiler::add_node_packed(uint a, uint b, uint c, uint d)
+{
+  current_svm_nodes.push_back_slow(a);
+  current_svm_nodes.push_back_slow(b);
+  current_svm_nodes.push_back_slow(c);
+  current_svm_nodes.push_back_slow(d);
+}
+
+void SVMCompiler::add_node_packed(ShaderNodeType type, const float3 &f)
+{
+  svm_node_types_used[type] = true;
+  current_svm_nodes.push_back_slow(type);
+  current_svm_nodes.push_back_slow(__float_as_int(f.x));
+  current_svm_nodes.push_back_slow(__float_as_int(f.y));
+  current_svm_nodes.push_back_slow(__float_as_int(f.z));
+}
+
+void SVMCompiler::add_node_packed(const float4 &f)
+{
+  current_svm_nodes.push_back_slow(__float_as_int(f.x));
+  current_svm_nodes.push_back_slow(__float_as_int(f.y));
+  current_svm_nodes.push_back_slow(__float_as_int(f.z));
+  current_svm_nodes.push_back_slow(__float_as_int(f.w));
+}
+
+uint SVMCompiler::encode_uchar4(uint x, uint y, uint z, uint w)
+{
+  assert(x <= 255 && y <= 255 && z <= 255 && w <= 255);
+  return (x) | (y << 8) | (z << 16) | (w << 24);
+}
+
 static ShaderNodeType svm_node_type_with_derivatives(ShaderNodeType type)
 {
   switch (type) {
@@ -569,6 +739,8 @@ void SVMCompiler::generate_node(ShaderNode *node, ShaderNodeSet &done)
   current_node = node;
   node->compile(*this);
   current_node = nullptr;
+  ccycles_dump_svm_node(
+      current_shader == nullptr ? nullptr : current_shader->name.c_str(), current_type, node);
   stack_zero_incomplete_derivatives(node);
   stack_clear_users(node, done);
   stack_clear_temporary(node);

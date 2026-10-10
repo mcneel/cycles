@@ -162,6 +162,9 @@ class Scene : public NodeOwner {
   unique_ptr_vector<Object> objects;
   unique_ptr_vector<Procedural> procedurals;
 
+  /* Rhino: user clipping planes, plain data rather than owned nodes. */
+  vector<float4> clipping_planes;
+
   /* data managers */
   unique_ptr<ImageManager> image_manager;
   unique_ptr<LightManager> light_manager;
@@ -183,6 +186,8 @@ class Scene : public NodeOwner {
 
   /* device */
   Device *device;
+  /* Rhino's 3.5 fork held this by pointer to dodge heap corruption in debug builds;
+   * 5.2 needs a value. */
   DeviceScene dscene;
 
   /* parameters */

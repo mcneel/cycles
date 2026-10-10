@@ -40,6 +40,8 @@ class OIIOImageLoader : public ImageLoader {
 
   bool equals(const ImageLoader &other) const override;
 
+  uint64_t source_version() const override;
+
  protected:
   const string &get_filepath() const;
 

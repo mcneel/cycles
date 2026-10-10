@@ -17,6 +17,7 @@
 
 #  include "integrator/denoiser_oidn_gpu.h"  // IWYU pragma: keep
 
+#  include <optix.h>
 #  include <optix_function_table_definition.h>
 #endif
 
@@ -27,6 +28,34 @@
 #endif
 
 CCL_NAMESPACE_BEGIN
+
+static int g_optix_init_result = 0;
+
+int device_optix_init_result()
+{
+  return g_optix_init_result;
+}
+
+int device_optix_minimum_driver()
+{
+#ifdef WITH_OPTIX
+  /* From NVIDIA's OptiX release notes. publish_payload.ps1 keeps the same table to check that
+   * the OptiX PTX never needs a newer driver than the SDK does (RH-98331). */
+#  if OPTIX_VERSION >= 90200
+  return 0;
+#  elif OPTIX_VERSION >= 90100
+  return 590;
+#  elif OPTIX_VERSION >= 90000
+  return 570;
+#  elif OPTIX_VERSION >= 80100
+  return 555;
+#  else
+  return 535;
+#  endif
+#else
+  return 0;
+#endif
+}
 
 bool device_optix_init()
 {
@@ -46,14 +75,17 @@ bool device_optix_init()
   if (result == OPTIX_ERROR_UNSUPPORTED_ABI_VERSION) {
     LOG_WARNING << "OptiX initialization failed because the installed NVIDIA driver is too old. "
                    "Please update to the latest driver first!";
+    g_optix_init_result = 1;
     return false;
   }
   if (result != OPTIX_SUCCESS) {
     LOG_WARNING << "OptiX initialization failed with error code " << (unsigned int)result;
+    g_optix_init_result = 2;
     return false;
   }
 
   /* Loaded OptiX successfully! */
+  g_optix_init_result = 0;
   return true;
 #else
   return false;

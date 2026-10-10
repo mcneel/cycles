@@ -167,7 +167,8 @@ ccl_device_forceinline bool bvh_shadow_all_anyhit_filter(
   /* Detect if this surface has a shader with transparent shadows. */
   /* TODO: optimize so primitive visibility flag indicates if the primitive has a transparent
    * shadow shader? */
-  const int shader_flags = intersection_get_shader_flags(kg, isect.prim, isect.type);
+  /* Rhino: shader flags are resolved per object, so pass the object through. */
+  const int shader_flags = intersection_get_shader_flags(kg, isect.prim, isect.object, isect.type);
   if ((shader_flags & SD_HAS_TRANSPARENT_SHADOW) == 0) {
     /* No transparent shadows for the shader, all light is blocked, and we can stop immediately. */
     payload.throughput = 0.0f;

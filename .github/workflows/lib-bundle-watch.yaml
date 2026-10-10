@@ -1,0 +1,42 @@
+# Weekly: while upstream Cycles pins a different Blender library bundle than our
+# lib/windows_x64 submodule, keep one issue open; close it when the pins agree.
+
+name: Library bundle watch
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM: https://github.com/blender/cycles.git
+      REF: main
+      TITLE: "Blender library bundle moved upstream"
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: |
+          ours=$(git ls-tree HEAD lib/windows_x64 | awk '{print $3}')
+          git clone --quiet --depth 1 --no-checkout --branch "$REF" "$UPSTREAM" upstream
+          theirs=$(git -C upstream ls-tree HEAD lib/windows_x64 | awk '{print $3}')
+          echo "ours $ours / upstream $REF $theirs"
+
+          open=$(gh issue list --search "in:title \"$TITLE\"" --state open --json number --jq '.[0].number // empty')
+
+          if [ "$theirs" != "$ours" ] && [ -z "$open" ]; then
+            gh issue create --title "$TITLE" --body "Upstream Cycles \`$REF\` pins bundle \`${theirs:0:9}\`, we pin \`${ours:0:9}\`.
+          https://projects.blender.org/blender/lib-windows_x64/commit/$theirs
+
+          To move: change the \`lib/windows_x64\` submodule commit, build, run \`publish_payload.ps1\`, commit the payload.
+          Everyone's next \`+Cycles\` build then fetches the new bundle. This issue closes itself once the pins agree."
+          elif [ "$theirs" = "$ours" ] && [ -n "$open" ]; then
+            gh issue close "$open" --comment "Pins agree again."
+          fi

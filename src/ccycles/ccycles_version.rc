@@ -1,0 +1,43 @@
+// Version resources for ccycles.dll. Numbers and copyright come from Rhino's
+// generated src4/version.h (relative path, submodule layout); CMake defines
+// STANDALONE when it is absent, falling back to the version.h beside this file.
+#if !defined(STANDALONE)
+#include "..\..\..\..\..\..\version.h"
+#else
+#include "version.h"
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION VERSION_WITH_COMMAS
+ PRODUCTVERSION VERSION_WITH_COMMAS
+ FILEFLAGSMASK RHINO_FILE_FLAGS_MASK
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080904e4"
+        BEGIN
+            VALUE "CompanyName", "Robert McNeel & Associates"
+            VALUE "FileDescription", "ccycles - C API for Cycles"
+            // Quoted form: unquoted VERSION_WITH_PERIODS compiles, but Explorer and
+            // FileVersionInfo then show a blank version.
+            VALUE "FileVersion", RMA_VERSION_WITH_PERIODS_STRING
+            VALUE "InternalName", "ccycles.dll"
+            VALUE "LegalCopyright", COPYRIGHT
+            VALUE "OriginalFilename", "ccycles.dll"
+            VALUE "ProductName", "Cycles for Rhino"
+            VALUE "ProductVersion", RMA_VERSION_WITH_PERIODS_STRING
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x809, 1252
+    END
+END

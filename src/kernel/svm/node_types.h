@@ -731,9 +731,15 @@ struct SVMNodeTexImage {
   int id;
   uint projection; /* NodeImageProjection */
   uint8_t flags;
+  /* Rhino carries two extras on the stock image node: "Mirrored" tiling, which
+   * folds the coordinate on alternate tiles instead of wrapping it, and the
+   * decal footprint mask. Both were a second packed SVM word before 5.2. */
+  uint8_t alternate_tiles;
   SVMStackOffset co;
   SVMStackOffset out_offset;
   SVMStackOffset alpha_offset;
+  SVMStackOffset decal_usage_offset;
+  uint8_t _pad[2];
 };
 static_assert(alignof(SVMNodeTexImage) <= alignof(uint));
 static_assert(sizeof(SVMNodeTexImage) % sizeof(uint) == 0);

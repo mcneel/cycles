@@ -80,6 +80,10 @@
 #include "kernel/svm/wireframe.h"
 #include "util/defines.h"
 
+#include "kernel/svm/svm_rhino_matrix_math.h"
+#include "kernel/svm/svm_rhino_azimuth_altitude_transform.h"
+#include "kernel/svm/svm_rhino_procedurals.h"
+
 #ifdef __SHADER_RAYTRACE__
 #  include "kernel/svm/ao.h"
 #  include "kernel/svm/bevel.h"
@@ -303,6 +307,161 @@ ccl_device void svm_eval_nodes(KernelGlobals kg,
       SVM_CASE(NODE_SET_BUMP)
       svm_node_set_bump<node_feature_mask>(
           kg, sd, stack, svm_node_get<SVMNodeSetBump>(kg, &offset));
+      break;
+      SVM_CASE(RHINO_NODE_TEX_COORD)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        offset = svm_rhino_node_tex_coord(kg, sd, path_visibility, stack, node, offset);
+      }
+      break;
+      /* The DX and DY copies of a bump chain, which evaluate the coordinate at a shifted
+       * position. Kept adjacent to the base case because the enum order in
+       * node_types_template.h has to match this switch. */
+      SVM_CASE(RHINO_NODE_TEX_COORD_BUMP_DX)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        offset = svm_rhino_node_tex_coord(
+            kg, sd, path_visibility, stack, node, offset, NODE_BUMP_OFFSET_DX);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_TEX_COORD_BUMP_DY)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        offset = svm_rhino_node_tex_coord(
+            kg, sd, path_visibility, stack, node, offset, NODE_BUMP_OFFSET_DY);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_MATRIX_MATH)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_matrix_math(kg, sd, stack, node.y, node.z, node.w, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_AZIMUTH_ALTITUDE_TRANSFORM)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_azimuth_altitude_transform(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_CHECKER_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_checker_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_NOISE_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_noise_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_WAVES_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_waves_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_WAVES_WIDTH_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_waves_width_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_PERTURBING_PART1_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_perturbing_part1_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_PERTURBING_PART2_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_perturbing_part2_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_GRADIENT_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_gradient_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_BLEND_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_blend_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_EXPOSURE_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_exposure_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_FBM_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_fbm_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_GRID_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_grid_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_PROJECTION_CHANGER_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_projection_changer_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_MASK_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_mask_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_PERLIN_MARBLE_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_perlin_marble_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_PHYSICAL_SKY_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_physical_sky_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_TEXTURE_ADJUSTMENT_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_texture_adjustment_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_TILE_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_tile_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_DOTS_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_dots_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_NORMAL_PART1_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_normal_part1_texture(kg, sd, stack, node, &offset);
+      }
+      break;
+      SVM_CASE(RHINO_NODE_NORMAL_PART2_TEXTURE)
+      {
+        const uint4 node = svm_rhino_read_packed(kg, node_type, &offset);
+        svm_rhino_node_normal_part2_texture(kg, sd, stack, node, &offset);
+      }
       break;
       SVM_CASE(NODE_CLOSURE_SET_NORMAL)
       IF_KERNEL_NODES_FEATURE(BUMP)

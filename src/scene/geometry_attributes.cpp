@@ -579,6 +579,13 @@ void GeometryManager::device_update_attributes(Device *device,
           break;
       }
     }
+
+    /* Rhino addition: otherwise attributes added to the geometry never reach the kernel. */
+    if (geom->is_mesh()) {
+      for (const Attribute &attr : geom->attributes.attributes) {
+        geom_attributes[i].add(attr.name);
+      }
+    }
   }
 
   /* convert object attributes to use the same data structures as geometry ones */

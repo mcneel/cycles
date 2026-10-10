@@ -75,6 +75,9 @@ class DeviceScene {
 
   /* shaders */
   device_vector<int> svm_nodes;
+
+  /* Rhino: user clipping planes. */
+  device_vector<float4> clipping_planes;
   device_vector<KernelShader> shaders;
 
   /* lookup tables */

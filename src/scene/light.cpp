@@ -598,13 +598,11 @@ void LightManager::device_update_distribution(Device * /*unused*/,
     Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
     const int mesh_num_triangles = static_cast<int>(mesh->num_triangles());
 
-    for (int i = 0; i < mesh_num_triangles; i++) {
-      const int shader_index = mesh->get_shader()[i];
-      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
-                           static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+    for (size_t i = 0; i < mesh_num_triangles; i++) {
+      /* Rhino: one shader per object, not per triangle. */
+      Shader* shader = object->get_shader();
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         num_triangles++;
       }
     }
@@ -647,12 +645,10 @@ void LightManager::device_update_distribution(Device * /*unused*/,
     const size_t mesh_num_triangles = mesh->num_triangles();
     const packed_float3 *mesh_positions = mesh->get_position();
     for (size_t i = 0; i < mesh_num_triangles; i++) {
-      const int shader_index = mesh->get_shader()[i];
-      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
-                           static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
-                           scene->default_surface;
+      /* Rhino: one shader per object, not per triangle. */
+      Shader* shader = object->get_shader();
 
-      if (shader->emission_sampling != EMISSION_SAMPLING_NONE) {
+      if (shader && shader->emission_sampling != EMISSION_SAMPLING_NONE) {
         distribution[offset].totarea = totarea;
         distribution[offset].prim = i + mesh->prim_offset;
         distribution[offset].visibility_flag = visibility_flag;
@@ -768,6 +764,7 @@ static void light_tree_node_copy_to_device(KernelLightTreeNode &knode,
 {
   /* Convert node to kernel representation. */
   knode.energy = node.measure.energy;
+  knode.falloff_power = node.measure.falloff_power;
 
   knode.bbox.min = node.measure.bbox.min;
   knode.bbox.max = node.measure.bbox.max;
@@ -810,6 +807,7 @@ static void light_tree_leaf_emitters_copy_and_flatten(LightTreeFlatten &flatten,
     KernelLightTreeEmitter &kemitter = kemitters[emitter_index];
 
     kemitter.energy = emitter.measure.energy;
+    kemitter.falloff_power = emitter.measure.falloff_power;
     kemitter.theta_o = emitter.measure.bcone.theta_o;
     kemitter.theta_e = emitter.measure.bcone.theta_e;
 
@@ -817,8 +815,8 @@ static void light_tree_leaf_emitters_copy_and_flatten(LightTreeFlatten &flatten,
       /* Triangle. */
       Object *object = flatten.scene->objects[emitter.object_id];
       Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
-      Shader *shader = static_cast<Shader *>(
-          mesh->get_used_shaders()[mesh->get_shader()[emitter.prim_id]]);
+      /* Rhino: object-level shader, with the light tree's null-safe fallbacks. */
+      Shader *shader = rhino_emission_shader(flatten.scene, object, mesh, emitter.prim_id);
 
       kemitter.triangle.id = emitter.prim_id + mesh->prim_offset;
       kemitter.visibility_flag = light_object_visibility_flags(object);
@@ -1258,7 +1256,7 @@ void LightManager::device_update_background(Device *device,
         const ShaderInput *vec_in = sky->input("Vector");
         if (vec_in && vec_in->link && vec_in->link->parent) {
           ShaderNode *vec_src = vec_in->link->parent;
-          if ((vec_src->type != TextureCoordinateNode::get_node_type()) ||
+          if ((vec_src->type != RhinoTextureCoordinateNode::get_node_type()) ||
               (vec_in->link != vec_src->output("Generated")))
           {
             environment_res.x = max(environment_res.x, 4096);

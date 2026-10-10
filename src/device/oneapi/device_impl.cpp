@@ -8,6 +8,11 @@
 #  include <algorithm>
 #  include <sycl/sycl.hpp>
 
+#  ifdef _WIN32
+/* For the Intel GPU presence check below. */
+#    include <dxgi.h>
+#  endif
+
 #  include "device/oneapi/device_impl.h"
 
 #  include "util/log.h"
@@ -1439,6 +1444,72 @@ int parse_driver_build_version(const sycl::device &device)
   return driver_build_version;
 }
 
+/* Rhino: with no Level Zero driver, sycl::platform::get_platforms() crashes in ze_loader
+ * instead of returning nothing, which took Rhino down at startup on machines without an
+ * Intel GPU. oneAPI only targets Intel GPUs, so ask DXGI (loaded by name) first; any
+ * failure there answers "present" and falls through to the guard below. */
+#ifdef _WIN32
+static bool intel_gpu_present()
+{
+  const HMODULE dxgi = LoadLibraryW(L"dxgi.dll");
+  if (dxgi == nullptr) {
+    return true;
+  }
+
+  using CreateFactoryFn = HRESULT(WINAPI *)(REFIID, void **);
+  const CreateFactoryFn create_factory = reinterpret_cast<CreateFactoryFn>(
+      GetProcAddress(dxgi, "CreateDXGIFactory1"));
+  if (create_factory == nullptr) {
+    FreeLibrary(dxgi);
+    return true;
+  }
+
+  IDXGIFactory1 *factory = nullptr;
+  if (FAILED(create_factory(__uuidof(IDXGIFactory1), reinterpret_cast<void **>(&factory))) ||
+      factory == nullptr)
+  {
+    FreeLibrary(dxgi);
+    return true;
+  }
+
+  bool found = false;
+  IDXGIAdapter1 *adapter = nullptr;
+  for (UINT i = 0; !found && factory->EnumAdapters1(i, &adapter) == S_OK; i++) {
+    DXGI_ADAPTER_DESC1 desc = {};
+    if (SUCCEEDED(adapter->GetDesc1(&desc))) {
+      /* 0x8086 is Intel. Skip the software adapter, which reports as Microsoft. */
+      if (desc.VendorId == 0x8086 && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0) {
+        found = true;
+      }
+    }
+    adapter->Release();
+    adapter = nullptr;
+  }
+
+  factory->Release();
+  FreeLibrary(dxgi);
+  return found;
+}
+
+/* Backstop for an Intel GPU with a broken Level Zero driver, which the check above cannot
+ * see. The access violation needs SEH, which cannot share a function with unwinding. */
+static void get_platforms_unguarded(std::vector<sycl::platform> *out)
+{
+  *out = sycl::platform::get_platforms();
+}
+
+static bool get_platforms_guarded(std::vector<sycl::platform> *out)
+{
+  __try {
+    get_platforms_unguarded(out);
+    return true;
+  }
+  __except (EXCEPTION_EXECUTE_HANDLER) {
+    return false;
+  }
+}
+#endif
+
 std::vector<sycl::device> available_sycl_devices(
     bool *multiple_level_zero_platforms_detected = nullptr)
 {
@@ -1450,7 +1521,22 @@ std::vector<sycl::device> available_sycl_devices(
 
   int level_zero_platform_counter = 0;
   try {
-    const std::vector<sycl::platform> &oneapi_platforms = sycl::platform::get_platforms();
+    std::vector<sycl::platform> guarded_platforms;
+#ifdef _WIN32
+    if (!intel_gpu_present()) {
+      LOG_INFO << "No Intel GPU present - not loading the SYCL platform stack.";
+      return available_devices;
+    }
+
+    if (!get_platforms_guarded(&guarded_platforms)) {
+      LOG_WARNING << "Crash while enumerating SYCL platforms - no Level Zero driver? "
+                  << "Continuing without oneAPI devices.";
+      return available_devices;
+    }
+#else
+    guarded_platforms = sycl::platform::get_platforms();
+#endif
+    const std::vector<sycl::platform> &oneapi_platforms = guarded_platforms;
 
     for (const sycl::platform &platform : oneapi_platforms) {
       /* ignore OpenCL platforms to avoid using the same devices through both Level-Zero and

@@ -452,4 +452,16 @@ bool OIIOImageLoader::equals(const ImageLoader &other) const
   return original_filepath_ == other_loader.original_filepath_;
 }
 
+uint64_t OIIOImageLoader::source_version() const
+{
+  /* The file the user edits, not a .tx made from it. */
+  const uint64_t mtime = path_modified_time(original_filepath_);
+  if (mtime == 0) {
+    return 0;
+  }
+
+  /* mtime alone only has second resolution, so mix in the size as well. */
+  return mtime ^ (uint64_t(path_file_size(original_filepath_)) << 32);
+}
+
 CCL_NAMESPACE_END

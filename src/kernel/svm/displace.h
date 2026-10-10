@@ -78,7 +78,11 @@ ccl_device_noinline void svm_node_set_bump(KernelGlobals kg,
      */
     float3 normal_out = safe_normalize(node.bump_filter_width * absdet * normal_in -
                                        scale * signf(det) * surfgrad);
-    if (is_zero(normal_out)) {
+    /* safe_normalize only guards a zero length, and is_zero is false for NaN, so a
+     * non-finite gradient used to reach the blend below - where 0 * NaN is still NaN,
+     * so even a zero bump strength could not rescue it. A NaN shading normal makes the
+     * closure render black, which is how a bump texture blacked out a whole surface. */
+    if (is_zero(normal_out) || !isfinite_safe(normal_out)) {
       normal_out = normal_in;
     }
     else {
@@ -92,7 +96,12 @@ ccl_device_noinline void svm_node_set_bump(KernelGlobals kg,
     stack_store_float3(stack, node.out_offset, normal_out);
   }
   else {
-    stack_store_float3(stack, node.out_offset, zero_float3());
+    /* Without the bump feature there is no perturbed normal to compute, but this slot
+     * is read as a shading normal by whatever the bump node feeds - the principled BSDF
+     * in Rhino's PBR materials. Storing zero there gives that closure a zero normal,
+     * which renders black. Pass the surface normal through instead, so a disabled
+     * feature costs the bump and nothing else. */
+    stack_store_float3(stack, node.out_offset, sd->N);
   }
 #endif
 }

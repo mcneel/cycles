@@ -1022,6 +1022,7 @@ int HIPDevice::get_device_default_attribute(hipDeviceAttribute_t attribute,
   return value;
 }
 
+
 CCL_NAMESPACE_END
 
 #endif

@@ -67,6 +67,10 @@ class ImageLoader {
   /* Optional for tiled textures loaded externally. */
   virtual int get_tile_number() const;
 
+  /* Rhino: fingerprint of the source data (e.g. file mtime and size), or 0 if unknown. A change
+   * makes the image manager read an already loaded image again (RH-98332). */
+  virtual uint64_t source_version() const;
+
   /* Free any memory used for loading metadata and pixels. */
   virtual void cleanup() {};
 

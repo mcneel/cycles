@@ -236,7 +236,8 @@ ccl_device float3 svm_bevel(
       /* Compute smooth normal. */
       float3 N = hit_Ng;
       const int prim = isect.hits[hit].prim;
-      const int shader = kernel_data_fetch(tri_shader, prim);
+      /* Rhino: take the shader from the object rather than the triangle. */
+      const int shader = object_shader(kg, object);
 
       if (shader & SHADER_SMOOTH_NORMAL) {
         const float u = isect.hits[hit].u;

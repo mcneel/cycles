@@ -209,6 +209,8 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
   kfilm->pass_denoising_backward_motion = PASS_UNUSED;
   kfilm->pass_sample_count = PASS_UNUSED;
   kfilm->pass_render_time = PASS_UNUSED;
+  kfilm->pass_shadow_catcher_transparent_sample_count = PASS_UNUSED;
+  kfilm->pass_shadow_catcher_background_sample_count = PASS_UNUSED;
   kfilm->pass_adaptive_aux_buffer = PASS_UNUSED;
   kfilm->pass_shadow_catcher = PASS_UNUSED;
   kfilm->pass_shadow_catcher_sample_count = PASS_UNUSED;
@@ -422,6 +424,11 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
         break;
       case PASS_RENDER_TIME:
         kfilm->pass_render_time = kfilm->pass_stride;
+      case PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT:
+        kfilm->pass_shadow_catcher_transparent_sample_count = kfilm->pass_stride;
+        break;
+      case PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT:
+        kfilm->pass_shadow_catcher_background_sample_count = kfilm->pass_stride;
         break;
 
       case PASS_AOV_COLOR:
@@ -566,6 +573,13 @@ void Film::update_passes(Scene *scene)
     add_auto_pass(scene, PASS_ADAPTIVE_AUX_BUFFER);
   }
 
+  if (scene->background->get_transparent())
+  {
+    if (!Pass::contains(scene->passes, PASS_SAMPLE_COUNT)) {
+      add_auto_pass(scene, PASS_SAMPLE_COUNT);
+    }
+  }
+
   /* Create passes needed for denoising. */
   const bool use_denoise = integrator->get_use_denoise();
   if (use_denoise) {
@@ -605,6 +619,9 @@ void Film::update_passes(Scene *scene)
     if (need_background) {
       add_auto_pass(scene, PASS_BACKGROUND);
     }
+
+    add_auto_pass(scene, PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT);
+    add_auto_pass(scene, PASS_SHADOW_CATCHER_BACKGROUND_SAMPLE_COUNT);
   }
   else if (Pass::contains(scene->passes, PASS_SHADOW_CATCHER)) {
     add_auto_pass(scene, PASS_SHADOW_CATCHER);

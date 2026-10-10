@@ -31,6 +31,13 @@ CCL_NAMESPACE_BEGIN
 
 thread_mutex ShaderManager::lookup_table_mutex;
 
+vector<float> ShaderManager::rhino_perlin_noise_table;
+vector<float> ShaderManager::rhino_impulse_noise_table;
+vector<float> ShaderManager::rhino_vc_noise_table;
+vector<float> ShaderManager::rhino_aaltonen_noise_table;
+vector<float> ShaderManager::rhino_dots_dot_data_table;
+vector<float> ShaderManager::rhino_dots_tree_data_table;
+
 /* Shader */
 
 NODE_DEFINE(Shader)
@@ -50,6 +57,8 @@ NODE_DEFINE(Shader)
 
   SOCKET_BOOLEAN(use_transparent_shadow, "Use Transparent Shadow", true);
   SOCKET_BOOLEAN(use_bump_map_correction, "Bump Map Correction", true);
+  /* Rhino extension: see the note in shader.h. Default matches 3.5. */
+  SOCKET_BOOLEAN(heterogeneous_volume, "Heterogeneous Volume", true);
 
   static NodeEnum volume_sampling_method_enum;
   volume_sampling_method_enum.insert("distance", VOLUME_SAMPLING_DISTANCE);
@@ -109,6 +118,7 @@ Shader::Shader() : Node(get_node_type())
   emission_estimate = zero_float3();
   emission_sampling = EMISSION_SAMPLING_NONE;
   emission_is_constant = true;
+  emission_falloff_power = 0;
 
   displacement_method = DISPLACE_BUMP;
 
@@ -250,6 +260,19 @@ void Shader::estimate_emission()
 
   ShaderInput *surf = graph->output()->input("Surface");
   emission_estimate = output_estimate_emission(surf->link, emission_is_constant);
+
+  /* Rhino: for the light tree, see `light_tree_falloff_divisor` (RH-98418). */
+  emission_falloff_power = 0;
+  for (ShaderNode *node : graph->nodes) {
+    if (node->type == LightFalloffNode::get_node_type()) {
+      if (!node->output("Constant")->links.empty()) {
+        emission_falloff_power = 2;
+      }
+      else if (!node->output("Linear")->links.empty()) {
+        emission_falloff_power = max(emission_falloff_power, 1);
+      }
+    }
+  }
 
   if (is_zero(emission_estimate)) {
     emission_sampling = EMISSION_SAMPLING_NONE;
@@ -456,6 +479,12 @@ ShaderManager::ShaderManager() : thin_film_table_offset_(TABLE_OFFSET_INVALID)
 {
   update_flags = UPDATE_ALL;
 
+  rhino_perlin_noise_table_offset = TABLE_OFFSET_INVALID;
+  rhino_impulse_noise_table_offset = TABLE_OFFSET_INVALID;
+  rhino_vc_noise_table_offset = TABLE_OFFSET_INVALID;
+  rhino_aaltonen_noise_table_offset = TABLE_OFFSET_INVALID;
+  rhino_dots_tree_data_table_offset = TABLE_OFFSET_INVALID;
+  rhino_dots_dot_data_table_offset = TABLE_OFFSET_INVALID;
   init_xyz_transforms();
 }
 
@@ -656,7 +685,9 @@ void ShaderManager::device_update_common(Device * /*device*/,
     if (shader->has_volume_connected && !shader->has_surface) {
       flag |= SD_HAS_ONLY_VOLUME;
     }
-    if (shader->has_volume && shader->has_volume_spatial_varying) {
+    if (shader->has_volume && shader->has_volume_spatial_varying &&
+        shader->get_heterogeneous_volume())
+    {
       flag |= SD_HETEROGENEOUS_VOLUME;
     }
     if (shader->has_volume_attribute_dependency) {
@@ -740,11 +771,54 @@ void ShaderManager::device_update_common(Device * /*device*/,
   kfilm->xyz_to_g = make_float4(xyz_to_g);
   kfilm->xyz_to_b = make_float4(xyz_to_b);
   kfilm->rgb_to_y = make_float4(rgb_to_y);
+  kfilm->rgb_to_lum = make_float4(rgb_to_lum);
   kfilm->white_xyz = make_float4(white_xyz);
   kfilm->rec709_to_r = make_float4(rec709_to_r);
   kfilm->rec709_to_g = make_float4(rec709_to_g);
   kfilm->rec709_to_b = make_float4(rec709_to_b);
   kfilm->is_rec709 = scene_linear_interop_id == "lin_rec709_scene";
+
+  /* Rhino procedural noise tables */
+  if (rhino_perlin_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_perlin_noise_table.size() > 0) {
+    rhino_perlin_noise_table_offset = scene->lookup_tables->add_table(dscene,
+                                                                      rhino_perlin_noise_table);
+  }
+  dscene->data.tables.rhino_perlin_noise_offset = (int)rhino_perlin_noise_table_offset;
+
+  if (rhino_impulse_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_impulse_noise_table.size() > 0) {
+    rhino_impulse_noise_table_offset = scene->lookup_tables->add_table(dscene,
+                                                                       rhino_impulse_noise_table);
+  }
+  dscene->data.tables.rhino_impulse_noise_offset = (int)rhino_impulse_noise_table_offset;
+
+  if (rhino_vc_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_vc_noise_table.size() > 0) {
+    rhino_vc_noise_table_offset = scene->lookup_tables->add_table(dscene, rhino_vc_noise_table);
+  }
+  dscene->data.tables.rhino_vc_noise_offset = (int)rhino_vc_noise_table_offset;
+
+  if (rhino_aaltonen_noise_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_aaltonen_noise_table.size() > 0) {
+    rhino_aaltonen_noise_table_offset = scene->lookup_tables->add_table(
+        dscene, rhino_aaltonen_noise_table);
+  }
+  dscene->data.tables.rhino_aaltonen_noise_offset = (int)rhino_aaltonen_noise_table_offset;
+
+  if (rhino_dots_tree_data_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_dots_tree_data_table.size() > 0) {
+    rhino_dots_tree_data_table_offset = scene->lookup_tables->add_table(
+        dscene, rhino_dots_tree_data_table);
+  }
+  dscene->data.tables.rhino_dots_tree_data_offset = (int)rhino_dots_tree_data_table_offset;
+
+  if (rhino_dots_dot_data_table_offset == TABLE_OFFSET_INVALID &&
+      rhino_dots_dot_data_table.size() > 0) {
+    rhino_dots_dot_data_table_offset = scene->lookup_tables->add_table(dscene,
+                                                                       rhino_dots_dot_data_table);
+  }
+  dscene->data.tables.rhino_dots_dot_data_offset = (int)rhino_dots_dot_data_table_offset;
 }
 
 void ShaderManager::device_free_common(Device * /*device*/, DeviceScene *dscene, Scene *scene)
@@ -757,6 +831,12 @@ void ShaderManager::device_free_common(Device * /*device*/, DeviceScene *dscene,
   thin_film_table_offset_ = TABLE_OFFSET_INVALID;
 
   dscene->shaders.free();
+  scene->lookup_tables->remove_table(&rhino_aaltonen_noise_table_offset);
+  scene->lookup_tables->remove_table(&rhino_perlin_noise_table_offset);
+  scene->lookup_tables->remove_table(&rhino_vc_noise_table_offset);
+  scene->lookup_tables->remove_table(&rhino_impulse_noise_table_offset);
+  scene->lookup_tables->remove_table(&rhino_dots_dot_data_table_offset);
+  scene->lookup_tables->remove_table(&rhino_dots_tree_data_table_offset);
 }
 
 void ShaderManager::add_default(Scene *scene)
@@ -888,12 +968,19 @@ uint ShaderManager::get_kernel_features(Scene *scene)
     kernel_features |= KERNEL_FEATURE_OSL_SHADING;
   }
 
+  kernel_features |= KERNEL_FEATURE_CLIPPING_PLANES;
+
   return kernel_features;
 }
 
 float ShaderManager::linear_rgb_to_gray(const float3 c)
 {
   return dot(c, rgb_to_y);
+}
+
+float ShaderManager::linear_rgb_to_luminance(const float3 c)
+{
+  return dot(c, rgb_to_lum);
 }
 
 float3 ShaderManager::rec709_to_scene_linear(const float3 c)
@@ -1017,6 +1104,9 @@ void ShaderManager::init_xyz_transforms()
 
   const Transform rgb_to_xyz = transform_inverse(xyz_to_rgb);
   rgb_to_y = make_float3(rgb_to_xyz.y);
+  /* Rhino: luminance weights, distinct from rgb_to_y. Used by
+   * ShaderManager::linear_rgb_to_luminance and the COLOR2 SVM path. */
+  rgb_to_lum = make_float3(0.2989f, 0.5870f, 0.1140f);
   white_xyz = transform_direction(&rgb_to_xyz, one_float3());
 
   compute_thin_film_table(xyz_to_rgb);
@@ -1034,5 +1124,36 @@ size_t ShaderManager::ensure_bsdf_table_impl(DeviceScene *dscene,
   }
   return bsdf_tables[table];
 }
+
+void ShaderManager::set_rhino_perlin_noise_table(const vector<float> &perlin_noise_table)
+{
+  rhino_perlin_noise_table = perlin_noise_table;
+}
+
+void ShaderManager::set_rhino_impulse_noise_table(const vector<float> &impulse_noise_table)
+{
+  rhino_impulse_noise_table = impulse_noise_table;
+}
+
+void ShaderManager::set_rhino_vc_noise_table(const vector<float> &vc_noise_table)
+{
+  rhino_vc_noise_table = vc_noise_table;
+}
+
+void ShaderManager::set_rhino_aaltonen_noise_table(const vector<float> &aaltonen_noise_table)
+{
+  rhino_aaltonen_noise_table = aaltonen_noise_table;
+}
+
+void ShaderManager::set_rhino_dots_dot_data_table(const vector<float> &dot_data_table)
+{
+  rhino_dots_dot_data_table = dot_data_table;
+}
+
+void ShaderManager::set_rhino_dots_tree_data_table(const vector<float> &tree_data_table)
+{
+  rhino_dots_tree_data_table = tree_data_table;
+}
+
 
 CCL_NAMESPACE_END

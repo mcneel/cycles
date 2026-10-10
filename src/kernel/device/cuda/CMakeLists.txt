@@ -44,6 +44,14 @@ function(cuda_add_common_flags cuda_version arch in_flags out_flags)
     --use_fast_math
     -Wno-deprecated-gpu-targets)
 
+  # The optional CUDA 11 toolkit is used for the default compute_7x PTX kernel
+  # to keep the minimum driver version low, but CUDA 11 predates current MSVC
+  # releases and its host_config.h rejects them outright. Waive the check for
+  # that toolkit only; the primary toolkit keeps its host compiler validation.
+  if("${cuda_version}" LESS 120 AND MSVC)
+    set(flags ${flags} -allow-unsupported-compiler)
+  endif()
+
   if(WITH_CYCLES_DEBUG)
     set(flags ${flags}
       -D WITH_CYCLES_DEBUG

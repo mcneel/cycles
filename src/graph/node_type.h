@@ -35,6 +35,7 @@ struct SocketType {
     UINT,
     UINT64,
     COLOR,
+    COLOR2, /* used in convert node to signal different rgb_to_luminance should be used */
     VECTOR,
     POINT,
     NORMAL,

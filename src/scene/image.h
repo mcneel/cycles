@@ -123,6 +123,11 @@ class ImageSingle : public ImageTexture {
   bool need_metadata = true;
   bool builtin = false;
 
+  /* Rhino: ImageLoader::source_version() as of the last load, and whether the loaded pixels
+   * are out of date and must be freed before the image is read again (RH-98332). */
+  uint64_t loaded_version = 0;
+  bool need_reload = false;
+
   /* Number of top mip levels in the image file to discard. */
   int miplevel_offset = 0;
 

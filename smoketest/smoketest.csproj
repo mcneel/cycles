@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>smoketest</AssemblyName>
+    <RootNamespace>smoketest</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="csycles">
+      <HintPath>$(MSBuildThisFileDirectory)..\src\csycles\bin\Debug\csycles.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
