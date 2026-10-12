@@ -29,7 +29,7 @@ HIP Extension Wrangler Library (HIPEW) N/A - https://projects.blender.org/blende
 
 OpenImageIO v3.1.13.1 - https://github.com/AcademySoftwareFoundation/OpenImageIO
     Copyright Contributors to the OpenImageIO project.
-    Ships in: OpenImageIO*.dll, libOpenImageIO*.dylib
+    Ships in: OpenImageIO_Cycles*.dll (built by McNeel from this release without libheif, with upstream fix #5133: tools/build_oiio.ps1), libOpenImageIO*.dylib
 
 oneTBB v2022.3.0 - https://software.intel.com/en-us/oneapi/onetbb
     Copyright (c) 2005-2020 Intel Corporation
@@ -246,7 +246,7 @@ BSD 2-Clause "Simplified" License
 
 Aom 3.13.1 - https://aomedia.googlesource.com/aom/
     Copyright (c) 2016, Alliance for Open Media. All rights reserved.
-    Ships in: aom.dll (Windows), inside libOpenImageIO.dylib (macOS)
+    Ships in: inside libOpenImageIO.dylib (macOS, until RH-99462 replaces it)
 
 OpenJPEG 2.5.3 - https://github.com/uclouvain/openjpeg
     Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium. Copyright (c) 2002-2014, Professor Benoit Macq. Copyright (c) 2003-2014, Antonin Descampe. Copyright (c) 2003-2009, Francois-Olivier Devaux. Copyright (c) 2005, Herve Drolon, FreeImage Team. Copyright (c) 2002-2003, Yannick Verschueren. Copyright (c) 2001-2003, David Janssens. Copyright (c) 2011-2012, Centre National d'Etudes Spatiales (CNES), France. Copyright (c) 2012, CS Systemes d'Information, France.
@@ -361,7 +361,7 @@ GNU Lesser General Public License v3.0 or later
 
 Libheif 1.20.2 - https://github.com/strukturag/libheif
     Copyright (c) 2017-2020 Struktur AG Copyright (c) 2017-2025 Dirk Farin
-    Ships in: inside OpenImageIO
+    Ships in: inside libOpenImageIO.dylib (macOS, until RH-99462 replaces it)
 
 ------------------------------------------------------------------------------
 
@@ -606,7 +606,7 @@ MIT
 
 Deflate 1.18 - https://github.com/ebiggers/libdeflate
     Copyright 2016 Eric Biggers
-    Ships in: inside OpenEXR and OpenImageIO
+    Ships in: inside OpenEXR and OpenImageIO (1.23 in OpenImageIO_Cycles)
 
 Expat 2_7_5 - https://github.com/libexpat/libexpat/
     Copyright (c) 1998-2000 Thai Open Source Software Center Ltd and Clark Cooper. Copyright (c) 2001-2025 Expat maintainers.
@@ -622,7 +622,7 @@ Pugixml 1.10 - https://pugixml.org/
 
 Robinmap v1.3.0 - https://github.com/Tessil/robin-map
     Copyright (c) 2017 Thibaut Goetghebuer-Planchon <tessil@gmx.com>
-    Ships in: inside OpenImageIO
+    Ships in: inside OpenImageIO (1.4.0 in OpenImageIO_Cycles)
 
 oneAPI Level Zero 35c037cdf4a - https://github.com/oneapi-src/level-zero
     Copyright (C) 2019-2024 Intel Corporation

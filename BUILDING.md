@@ -156,6 +156,18 @@ release's `license/license.md`:
 
     python tools\gather_licenses.py <Blender>\license\license.md
 
+### OpenImageIO_Cycles
+
+The bundle's OpenImageIO links libheif (LGPL-3.0) statically, so Cycles uses its own
+build instead: the same release with Blender's options, without libheif, named
+`OpenImageIO_Cycles`, committed prebuilt in `big_libs/OpenImageIO-<version>-Cycles`
+(RH-99462). Builds pick it up from there and fall back to the bundle's with a warning.
+After moving the bundle pin, rebuild it for the bundle's OpenImageIO version and commit
+the result in big_libs:
+
+    tools\build_oiio.ps1 -Version <bundle's OpenImageIO version>
+    tools/build_oiio.sh <bundle's OpenImageIO version>          (macOS)
+
 ### Publish a payload
 
 Needed whenever kernel code (`src/kernel`, `src/util`) changes, or everyone on a

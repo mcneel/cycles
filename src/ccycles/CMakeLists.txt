@@ -94,10 +94,15 @@ if(WITH_CYCLES_STANDALONE)
     # of, named as installed. A wrong name silently loses isolation for that DLL,
     # so recheck against <install>/Plug-ins after a library bundle update.
     # fix-cycles-sxs.ps1 reads this list back from the built manifest.
+    if(RHINO_OPENIMAGEIO_CYCLES)
+      set(_oiio_suffix _Cycles)
+    else()
+      set(_oiio_suffix "")
+    endif()
     set(CCYCLES_SXS_FILES
       ccycles.dll
-      OpenImageIO.dll
-      OpenImageIO_Util.dll
+      OpenImageIO${_oiio_suffix}.dll
+      OpenImageIO_Util${_oiio_suffix}.dll
       OpenColorIO_2_5.dll
       openvdb.dll
       tbb12.dll
