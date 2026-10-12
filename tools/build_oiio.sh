@@ -49,17 +49,49 @@ dep() {
 
 dep libdeflate https://github.com/ebiggers/libdeflate.git v1.23 \
     -DLIBDEFLATE_BUILD_SHARED_LIB=OFF -DLIBDEFLATE_BUILD_GZIP=OFF
+# zlib is the SDK's: the macOS bundle has none, and Blender links the system one there.
 dep libtiff https://gitlab.com/libtiff/libtiff.git v4.7.1 \
-    -DZLIB_LIBRARY="$LIB/zlib/lib/libz.a" -DZLIB_INCLUDE_DIR="$LIB/zlib/include" \
     -DJPEG_LIBRARY="$LIB/jpeg/lib/libjpeg.a" -DJPEG_INCLUDE_DIR="$LIB/jpeg/include" \
     -DDeflate_LIBRARY="$DEPS/libdeflate/lib/libdeflate.a" -DDeflate_INCLUDE_DIR="$DEPS/libdeflate/include" \
     -Dzlib=ON -Djpeg=ON -Dlibdeflate=ON -Dlzma=OFF -Djbig=OFF -Dzstd=OFF -Dwebp=OFF -Dlerc=OFF -Dcxx=OFF \
     -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF
 
+# The macOS bundle's WebP has no CMake package, and OpenImageIO's webp plugin links the
+# WebP:: targets one defines. Describe the bundle's static libraries in a minimal one.
+step "WebP package for the bundle's libraries"
+WEBP_CONFIG="$WORK/webp-config"
+webp_version="$(sed -n 's/^| `WEBP` | `\([0-9.]*\)`.*/\1/p' "$LIB/deps.md")"
+[ -n "$webp_version" ] || { echo "No WEBP version in $LIB/deps.md." >&2; exit 1; }
+mkdir -p "$WEBP_CONFIG"
+cat > "$WEBP_CONFIG/WebPConfig.cmake" <<EOF
+set(WebP_VERSION $webp_version)
+set(WebP_INCLUDE_DIRS "$LIB/webp/include")
+foreach(_name sharpyuv webp webpdemux libwebpmux)
+  string(REGEX REPLACE "^lib" "" _file "\${_name}")
+  add_library(WebP::\${_name} STATIC IMPORTED)
+  set_target_properties(WebP::\${_name} PROPERTIES
+    IMPORTED_LOCATION "$LIB/webp/lib/lib\${_file}.a"
+    INTERFACE_INCLUDE_DIRECTORIES "$LIB/webp/include")
+endforeach()
+set_target_properties(WebP::webp PROPERTIES INTERFACE_LINK_LIBRARIES WebP::sharpyuv)
+set_target_properties(WebP::webpdemux WebP::libwebpmux PROPERTIES INTERFACE_LINK_LIBRARIES WebP::webp)
+set(WebP_LIBRARIES WebP::webp WebP::webpdemux WebP::libwebpmux)
+EOF
+cat > "$WEBP_CONFIG/WebPConfigVersion.cmake" <<EOF
+set(PACKAGE_VERSION $webp_version)
+set(PACKAGE_VERSION_COMPATIBLE FALSE)
+if(NOT PACKAGE_FIND_VERSION VERSION_GREATER PACKAGE_VERSION)
+  set(PACKAGE_VERSION_COMPATIBLE TRUE)
+endif()
+EOF
+
+# CMAKE_PLATFORM_NO_VERSIONED_SONAME: one unversioned file per library with an
+# @rpath/libX.dylib id, as in Blender's bundle, so the payload has no symlinks.
 step Configure
 cmake -S "$SRC" -B "$WORK/build" "${COMMON[@]}" -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_INSTALL_PREFIX="$INSTALL" \
     -DOIIO_LIBNAME_SUFFIX=_Cycles -DBUILD_SHARED_LIBS=ON -DLINKSTATIC=ON \
+    -DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON \
     "-DOpenImageIO_REQUIRED_DEPS=WebP;JPEG;TIFF;OpenEXR;PNG;OpenJPEG;fmt;Robinmap;ZLIB;pugixml;openjph;TBB" \
     -DOpenImageIO_BUILD_MISSING_DEPS=Robinmap \
     -DTIFF_LIBRARY="$DEPS/libtiff/lib/libtiff.a" -DTIFF_INCLUDE_DIR="$DEPS/libtiff/include" \
@@ -69,7 +101,6 @@ cmake -S "$SRC" -B "$WORK/build" "${COMMON[@]}" -DCMAKE_CXX_STANDARD=20 \
     -DUSE_GIF=OFF -DUSE_OPENCV=OFF -DUSE_OPENJPEG=ON -DUSE_FFMPEG=OFF -DUSE_PTEX=OFF -DUSE_LIBRAW=OFF \
     -DUSE_JXL=OFF -DUSE_OPENCOLORIO=ON -DUSE_WEBP=ON -DSTOP_ON_WARNING=OFF \
     -DOIIO_BUILD_TESTS=OFF -DBUILD_TESTING=OFF -DBUILD_DOCS=OFF -DINSTALL_DOCS=OFF -DINSTALL_FONTS=OFF \
-    -DZLIB_LIBRARY="$LIB/zlib/lib/libz.a" -DZLIB_INCLUDE_DIR="$LIB/zlib/include" \
     -DPNG_LIBRARY="$LIB/png/lib/libpng.a" -DPNG_PNG_INCLUDE_DIR="$LIB/png/include" \
     -DJPEG_LIBRARY="$LIB/jpeg/lib/libjpeg.a" -DJPEG_INCLUDE_DIR="$LIB/jpeg/include" \
     -DOpenJPEG_ROOT="$LIB/openjpeg" -DCMAKE_IGNORE_PATH="$LIB/openjpeg/lib/cmake/openjpeg-2.5" \
@@ -78,7 +109,7 @@ cmake -S "$SRC" -B "$WORK/build" "${COMMON[@]}" -DCMAKE_CXX_STANDARD=20 \
     -DPUGIXML_LIBRARY="$LIB/pugixml/lib/libpugixml.a" -DPUGIXML_INCLUDE_DIR="$LIB/pugixml/include" \
     -DOpenColorIO_DIR="$LIB/opencolorio/lib/cmake/OpenColorIO" \
     -DFMT_INCLUDE_DIR="$LIB/fmt/include" -Dfmt_ROOT="$LIB/fmt" \
-    -DWebP_ROOT="$LIB/webp" -DOpenEXR_ROOT="$LIB/openexr" -DImath_ROOT="$LIB/imath" \
+    -DWebP_DIR="$WEBP_CONFIG" -DOpenEXR_ROOT="$LIB/openexr" -DImath_ROOT="$LIB/imath" \
     -DTBB_ROOT="$LIB/tbb" -Dopenjph_DIR="$LIB/openjph/lib/cmake/openjph"
 
 step Build
@@ -87,8 +118,22 @@ cmake --build "$WORK/build" -j "$JOBS"
 step "Install to $INSTALL"
 rm -rf "$INSTALL"
 cmake --install "$WORK/build"
+# Unused, and it names this machine's install path; Blender's bundle has none either.
+rm -rf "$INSTALL/lib/pkgconfig"
 
-dylib="$(ls "$INSTALL"/lib/libOpenImageIO_Cycles.*.dylib | head -1)"
+# The install rpaths include the bundle's absolute lib dirs (OpenImageIO sets
+# CMAKE_INSTALL_RPATH_USE_LINK_PATH); keep only @loader_path, as Blender's do.
+for f in "$INSTALL"/lib/*.dylib; do
+    for rp in $(otool -l "$f" | awk '/LC_RPATH/{r=1} r && / path /{print $2; r=0}' | sort -u); do
+        install_name_tool -delete_rpath "$rp" "$f"
+    done
+    install_name_tool -add_rpath @loader_path "$f"
+done
+
+dylib="$INSTALL/lib/libOpenImageIO_Cycles.dylib"
+[ -f "$dylib" ] && [ ! -L "$dylib" ] || { echo "Expected $dylib as a plain file after install." >&2; exit 1; }
+if [ -n "$(find "$INSTALL/lib" -maxdepth 1 -type l)" ]; then echo "Symlinks in $INSTALL/lib." >&2; exit 1; fi
 if strings "$dylib" | grep -q heif_context; then echo "$dylib still contains libheif." >&2; exit 1; fi
-if otool -L "$dylib" | grep -qi aom; then echo "$dylib still links aom." >&2; exit 1; fi
+# Blender's links aom statically: its symbols, not a load command, give it away.
+if nm "$dylib" | grep -q ' _aom_' || otool -L "$dylib" | grep -qi aom; then echo "$dylib still links aom." >&2; exit 1; fi
 echo "   OK: $(cd "$INSTALL/lib" && ls libOpenImageIO*.dylib | tr '\n' ' '); no libheif, no aom"
