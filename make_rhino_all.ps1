@@ -562,6 +562,17 @@ function Copy-AllOutputs {
     Copy-KernelSources
 }
 
+# RH-99525: ccycles.dll without oneAPI loads fine and just never offers an Intel GPU, so check.
+function Assert-OneApiCompiledIn {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($Path))
+    if (-not $text.Contains("oneAPI device capabilities")) {
+        throw "'$Path' was built without oneAPI (Intel GPU) support; not copying it (RH-99525)."
+    }
+    Write-Log "ccycles.dll has oneAPI support."
+}
+
 function Copy-WrapperOnlyOutputs {
     New-Item -ItemType Directory -Path $dllDest -Force | Out-Null
 
@@ -760,7 +771,8 @@ try {
                 "-DCUDA_NVCC_EXECUTABLE=$cudaRoot/bin/nvcc.exe",
                 "-DWITH_CYCLES_DEVICE_HIP=ON",
                 "-DWITH_CYCLES_HIP_BINARIES=OFF",
-                "-DWITH_CYCLES_DEVICE_ONEAPI=OFF",
+                # RH-99525: never OFF - a ccycles.dll without oneAPI silently drops every Intel GPU.
+                "-DWITH_CYCLES_DEVICE_ONEAPI=ON",
                 "-DWITH_CYCLES_ONEAPI_BINARIES=OFF"
             )
         }
@@ -847,6 +859,7 @@ try {
     }
 
     Invoke-TimedStage -Name "Copy Build Outputs" -Action {
+        Assert-OneApiCompiledIn -Path (Join-Path $installDir "ccycles.dll")
         if ($isWrapperMode) {
             Copy-WrapperOnlyOutputs
         }
