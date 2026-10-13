@@ -457,6 +457,14 @@ else {
                    "/cycles installs the GPU SDKs, or set the matching environment " +
                    "variable, or drop it from -Devices.")
         }
+        # The shipping PTX kernel must load on every driver the cubins load on, and only
+        # CUDA 11 writes PTX that old (kernel_arches.ps1). publish_payload.ps1 would find
+        # out after an hour of building.
+        if ($d -eq 'cuda' -and $AllArches -and -not $cuda11Path) {
+            throw ("Publishing needs CUDA 11.8 as well as CUDA 12: built by CUDA 12, the generic " +
+                   "kernel for NVIDIA cards with no kernel of their own needs a much newer " +
+                   "driver. bootstrap.exe /cycles installs CUDA 11.8.")
+        }
     }
 }
 

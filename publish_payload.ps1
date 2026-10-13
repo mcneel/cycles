@@ -240,9 +240,9 @@ foreach ($arch in $CyclesCudaShippingArches | Where-Object { $_ -like 'compute_*
     $isa = Get-ShippedPtxIsa (Join-Path $buildRoot "src\kernel\device\cuda\kernel_$arch.ptx") (Join-Path $libDir "kernel_$arch.ptx.zst")
     $driver = Get-PtxMinimumDriver $isa "CUDA kernel $arch"
     if ($driver -gt $cubinDriver) {
-        throw ("kernel_$arch.ptx is PTX $isa, which needs driver $driver, but the CUDA $cudaToolkit cubins " +
-               "run from $cubinDriver, so the fallback would fail first (RH-98331). Build it with the " +
-               "CUDA 11 toolkit, as build_cycles.ps1 does when one is installed.")
+        throw ("kernel_$arch.ptx, the generic kernel for NVIDIA cards with no kernel of their own, " +
+               "needs driver $driver; the rest need $cubinDriver. Install CUDA 11.8 " +
+               "(bootstrap.exe /cycles) and publish again.")
     }
     if ($driver -ge $cudaPtxDriver) { $cudaPtxDriver = $driver; $cudaIsa = $isa }
 }

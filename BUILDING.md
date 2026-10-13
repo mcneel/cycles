@@ -43,9 +43,12 @@ A pull that republishes `release` makes it newer, so it wins again by itself.
     Windows" (CMake and Ninja come from there).
   - MSVC v143 14.4x. Required whenever GPU kernels are compiled: nvcc and ROCm's
     clang reject newer MSVC.
-- `bootstrap.exe /cycles`, once. Also installs the CUDA 12.9 toolkit (winget) and the
-  OptiX headers (cloned from NVIDIA's public `optix-dev` repository into
-  `C:\ProgramData\NVIDIA Corporation\OptiX SDK <version>`).
+- `bootstrap.exe /cycles`, once, from PowerShell or cmd: Git Bash turns `/cycles` into
+  a path. Also installs the CUDA 12.9 and 11.8 toolkits
+  (winget) and the OptiX headers (cloned from NVIDIA's public `optix-dev` repository
+  into `C:\ProgramData\NVIDIA Corporation\OptiX SDK <version>`). Only publishing needs
+  CUDA 11.8: built by CUDA 12, the generic kernel for NVIDIA cards with no kernel of
+  their own needs a much newer driver (RH-98331).
 - ROCm / HIP SDK 6.x, by hand: bootstrap offers AMD's download page. Only needed to
   build AMD kernels, which publishing requires. No AMD GPU is needed.
 - git, python and Git LFS on `PATH` for the first `+Cycles` build, which fetches
@@ -167,9 +170,9 @@ It builds every backend for every architecture in `kernel_arches.ps1` (22 HIP
 fatbins, 9 CUDA cubins plus one PTX, 3 OptiX modules, oneAPI), checks the files by
 name, writes `ccycles_payload.json` (including a hash of the kernel sources), stages
 `win/release` in `big_libs` and prints the two commits to make: `big_libs`, then the
-`big_libs` pointer in the Rhino repository. It needs CUDA, OptiX and ROCm (oneAPI
-comes from the library bundle) and no GPU, and takes about an hour. It stops rather
-than stage an incomplete payload, or one without the side-by-side manifests.
+`big_libs` pointer in the Rhino repository. It needs CUDA 12 and 11.8, OptiX and ROCm
+(oneAPI comes from the library bundle) and no GPU, and takes about an hour. It stops
+rather than stage an incomplete payload, or one without the side-by-side manifests.
 `-SkipBuild` re-checks and re-stages.
 
 ### Check
