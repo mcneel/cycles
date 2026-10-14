@@ -1403,7 +1403,8 @@ void MetalDevice::update_bvh(BVHMetal *bvh_metal)
   }
 
   // Allocate required buffers for BLAS array.
-  uint64_t buffer_size = blas_array.size() * sizeof(uint64_t);
+  // Rhino: never zero-length, an empty scene has no BLAS (RH-99346, see BVHMetal::build_TLAS).
+  uint64_t buffer_size = max(blas_array.size(), (size_t)1) * sizeof(uint64_t);
   blas_buffer = [mtlDevice newBufferWithLength:buffer_size options:MTLResourceStorageModeShared];
   metal_mem_alloc(blas_buffer);
 }

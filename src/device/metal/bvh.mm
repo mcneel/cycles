@@ -1094,9 +1094,12 @@ bool BVHMetal::build_TLAS(Progress &progress,
       instance_size = sizeof(MTLAccelerationStructureUserIDInstanceDescriptor);
     }
 
-    /* Allocate a GPU buffer for the instance data and populate it */
-    id<MTLBuffer> instanceBuf = [mtl_device newBufferWithLength:num_instances * instance_size
-                                                        options:MTLResourceStorageModeShared];
+    /* Allocate a GPU buffer for the instance data and populate it.
+     * Rhino: at least one instance's worth, like make_null_BLAS's nullBuf. An empty scene has
+     * no instances, and Metal API validation aborts on a zero-length buffer (RH-99346). */
+    id<MTLBuffer> instanceBuf = [mtl_device
+        newBufferWithLength:max(num_instances, 1u) * instance_size
+                    options:MTLResourceStorageModeShared];
     id<MTLBuffer> motion_transforms_buf = nil;
     MTLPackedFloat4x3 *matrix_motion_transforms = nullptr;
 #  if defined(MAC_OS_VERSION_15_0)
