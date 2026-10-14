@@ -17,14 +17,13 @@ and the kernel sources (`source/`). They live in `big_libs/RhinoCycles/ccycles/`
 | Folder | Written by | In git |
 | --- | --- | --- |
 | `win/release`, `osx/release` | `publish_payload.ps1` (Windows), `make payload` (macOS) | yes |
-| `win/local` | `ReleaseDebuggable+Cycles` (a build with fewer kernels than `release` holds is diverted here) | no |
-| `win/debug` | `Debug+Cycles` | no |
+| `win/local` | `Debug+Cycles` and `ReleaseDebuggable+Cycles` | no |
 | `osx/local` | the macOS Cycles schemes | no |
 
 Which one a build deploys:
 
 - **Windows** (`RhinoCyclesCore.csproj`): `local` if its `ccycles.dll` is newer than
-  `release`'s; otherwise `debug` in a Debug build if it exists; otherwise `release`.
+  `release`'s, otherwise `release`.
   The build prints `RhinoCycles: deployed Cycles payload from ...`. Output:
   `src4/bin/<Debug|Release>/Plug-ins/`, kernels in `Plug-ins/RhinoCycles/lib`,
   sources in `Plug-ins/RhinoCycles/source`.
@@ -74,8 +73,7 @@ Open `src4/BuildSolutions/Rhino.sln` and build the solution in one of:
 | Configuration | Cycles |
 | --- | --- |
 | `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload; no CMake or SDK needed |
-| `Debug+Cycles` | built from source into `win/debug` |
-| `ReleaseDebuggable+Cycles` | built from source into `win/local` |
+| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source into `win/local` |
 
 RhinoBuilder lists the same configurations. From a shell:
 
@@ -117,7 +115,7 @@ Run directly, `build_cycles.ps1` also takes `-Devices`, `-AllArches`, `-Force`
 `Cycles.sln` to open), `-Jobs` and `-BuildDir`. `-InstallDir` must be absolute. An
 unoptimised Cycles, for example:
 
-    powershell -File build_cycles.ps1 -Configuration Debug -InstallDir <rhino>\big_libs\RhinoCycles\ccycles\win\debug
+    powershell -File build_cycles.ps1 -Configuration Debug -InstallDir <rhino>\big_libs\RhinoCycles\ccycles\win\local
 
 ### What your build got
 

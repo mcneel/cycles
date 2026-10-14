@@ -13,7 +13,7 @@
     republish necessary. No GPU needed: nvcc and hipcc cross-compile.
 
 .PARAMETER Configuration
-    Release (the default) writes the tracked payload. Debug writes the gitignored debug
+    Release (the default) writes the tracked payload. Debug writes the gitignored local
     one, for local use only.
 
 .PARAMETER SkipBuild
@@ -53,7 +53,7 @@ function Write-Bad($what, $detail) { Write-Host ("   {0,-22} {1}" -f $what, $det
 
 # cycles -> RDK -> Plug-ins -> rhino4 -> src4 -> repo root
 $repoRoot = Resolve-Path (Join-Path $cyclesRoot '..\..\..\..\..')
-$payloadName = if ($Configuration -eq 'Debug') { 'debug' } else { 'release' }
+$payloadName = if ($Configuration -eq 'Debug') { 'local' } else { 'release' }
 $payloadDir = Join-Path $repoRoot "big_libs\RhinoCycles\ccycles\win\$payloadName"
 $libDir = Join-Path $payloadDir 'lib'
 
@@ -61,7 +61,7 @@ Write-Step "Publishing the $payloadName payload"
 Write-Ok 'payload' $payloadDir
 
 if ($Configuration -eq 'Debug') {
-    Write-Warn 'note' 'the debug payload is gitignored; this will build one but not stage it'
+    Write-Warn 'note' 'the local payload is gitignored; this will build one but not stage it'
 }
 
 # ---------------------------------------------------------------------------- build
@@ -353,7 +353,7 @@ Write-Ok 'kernel source hash' $manifest.kernelSourceHash.Substring(0, 16)
 # --------------------------------------------------------------------------- staging
 
 if ($Configuration -eq 'Debug') {
-    Write-Step "Done - debug payload built and checked, nothing to stage (it is gitignored)"
+    Write-Step "Done - local payload built and checked, nothing to stage (it is gitignored)"
     return
 }
 

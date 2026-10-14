@@ -15,7 +15,7 @@ From this folder, with a payload in `big_libs` (the committed one will do):
     bin\Release\net48\smoketest.exe
 
 The `xcopy` puts `ccycles.dll`, its DLLs, `lib/` and `source/` beside the executable,
-which is where it tells Cycles to look. Use `win\local` or `win\debug` instead of
+which is where it tells Cycles to look. Use `win\local` instead of
 `win\release` to test your own build.
 
 On a native crash ccycles' crash handler prints the native stack (Windows only).

@@ -608,13 +608,13 @@ elseif ($InstallDir -notmatch '^([A-Za-z]:[\\/]|\\\\)') {
 
 # ---------------------------------------------------------------- payload guard
 #
-# A narrow local build must not replace the shared payload in big_libs that
-# ccycles.vcxproj installs into, so it goes to a sibling gitignored "local" payload,
-# which RhinoCyclesCore prefers. The debug payload is gitignored already. -Force
-# overwrites and deletes the manifest, which would no longer be true.
+# A narrow build run by hand into the committed payload in big_libs must not replace it,
+# so it goes to the sibling gitignored "local" payload, which RhinoCyclesCore prefers and
+# ccycles.vcxproj installs into anyway. -Force overwrites and deletes the manifest, which
+# would no longer be true.
 if (-not $AllArches) {
     $targetManifest = Join-Path $InstallDir 'ccycles_payload.json'
-    $targetIsLocal = (Split-Path -Leaf $InstallDir) -eq 'debug'
+    $targetIsLocal = (Split-Path -Leaf $InstallDir) -eq 'local'
 
     if ((Test-Path $targetManifest) -and -not $targetIsLocal) {
         $existing = Get-Content -LiteralPath $targetManifest -Raw | ConvertFrom-Json
@@ -874,10 +874,10 @@ if (Test-Path $hipBuilt) {
 
 # --------------------------------------------------- inherit the kernels we did not build
 #
-# CUDA and HIP device support is always compiled in, but a debug or local payload starts
-# empty, and a device with no kernels can take Rhino down. So copy in the committed
-# payload's kernels this build did not make (never into release, which publish_payload.ps1
-# owns), and say they predate local kernel edits.
+# CUDA and HIP device support is always compiled in, but a local payload starts empty,
+# and a device with no kernels can take Rhino down. So copy in the committed payload's
+# kernels this build did not make (never into release, which publish_payload.ps1 owns),
+# and say they predate local kernel edits.
 function Copy-InheritedKernels {
     param(
         [Parameter(Mandatory)][string]$TargetPayload,

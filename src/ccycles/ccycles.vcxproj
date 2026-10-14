@@ -57,9 +57,7 @@
     <!-- build_cycles.ps1 takes Debug / Release / RelWithDebInfo. Debug+Cycles builds
          RelWithDebInfo: an unoptimised kernel makes CPU renders ten times slower,
          and the PDBs keep ccycles steppable. For a true Debug:
-             build_cycles.ps1 -Configuration Debug -InstallDir <the debug payload>
-         The payload dir stays "debug" (below), so RhinoCyclesCore still prefers a
-         locally built payload in Debug. -->
+             build_cycles.ps1 -Configuration Debug -InstallDir <the local payload> -->
     <CyclesConfiguration>Release</CyclesConfiguration>
     <CyclesConfiguration Condition="$(Configuration.StartsWith('Debug'))">RelWithDebInfo</CyclesConfiguration>
     <CyclesConfiguration Condition="$(Configuration.StartsWith('ReleaseDebuggable'))">RelWithDebInfo</CyclesConfiguration>
@@ -71,11 +69,10 @@
     <CyclesBinDir Condition="'$(RhinoBinDir)'!=''">$(RhinoBinDir)</CyclesBinDir>
     <CyclesBinDir Condition="'$(RhinoBinDir)'==''">$(MSBuildThisFileDirectory)..\..\..\..\..\..\bin</CyclesBinDir>
     <!-- Install into big_libs, where the prebuilt Cycles lives, so a rebuilt Cycles
-         reaches bin through RhinoCyclesCore like everyone else's. Commit the
-         big_libs change to share it. -->
-    <CyclesPayloadDir>release</CyclesPayloadDir>
-    <CyclesPayloadDir Condition="$(Configuration.StartsWith('Debug'))">debug</CyclesPayloadDir>
-    <CyclesInstallDir>$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\$(CyclesPayloadDir)</CyclesInstallDir>
+         reaches bin through RhinoCyclesCore like everyone else's. Always the gitignored
+         "local" payload, which RhinoCyclesCore prefers while it is newer than the
+         committed "release" one; only publish_payload.ps1 writes that. -->
+    <CyclesInstallDir>$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\local</CyclesInstallDir>
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
     <!-- Only the +Cycles configurations build from source (see the top of this
