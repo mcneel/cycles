@@ -49,22 +49,15 @@ A pull that republishes `release` makes it newer, so it wins again by itself.
   CUDA 11.8: built by CUDA 12, the generic kernel for NVIDIA cards with no kernel of
   their own needs a much newer driver (RH-98331).
 - ROCm / HIP SDK 6.x, by hand: bootstrap offers AMD's download page. Only needed to
-  build AMD kernels, which publishing requires. No AMD GPU is needed.
+  build AMD kernels, which publishing requires. No AMD GPU is needed. To have bootstrap
+  launch a copy of the installer instead, set `RHINO_ROCM_INSTALLER` to its path with
+  `setx` (user or machine level, because bootstrap relaunches itself elevated).
 - git, python and Git LFS on `PATH` for the first `+Cycles` build, which fetches
   Blender's precompiled libraries (about 6.5 GB) into `lib/windows_x64`.
 
 No SDK is fatal. CUDA and HIP device support is compiled in regardless; a missing SDK
 only means those kernels are copied from the committed payload instead of built.
 OptiX without an 8.0+ SDK is compiled out of your build.
-
-bootstrap's `/cycles` overrides, all optional. Set them with `setx` (machine or user
-level), because bootstrap relaunches itself elevated:
-
-| Variable | Default |
-| --- | --- |
-| `RHINO_CUDA_VERSION` | `12.9` |
-| `RHINO_OPTIX_REPO` | `https://github.com/NVIDIA/optix-dev.git` |
-| `RHINO_ROCM_INSTALLER` | unset: open AMD's download page. Set to a path to launch that HIP SDK installer. |
 
 ### Build
 
