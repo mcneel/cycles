@@ -1301,9 +1301,15 @@ typedef struct KernelObject {
   Transform ocs_frame; /* OCS frame for controlling WCS and WCS Box. */
   Transform ocs_frame_normal; /* OCS frame for controlling WCS and WCS Box normals. */
 
-  bool use_planar_uvw;
-  bool planar_uvw_capped;
-  Transform planar_uvw_xform;
+  /* Planar, spherical or cylindrical mapping evaluated per shading point for one UV map,
+   * see rhino_primitive_mapping(). */
+  int primitive_mapping_type; /* NodeRhinoPrimitiveMapping */
+  uint primitive_mapping_attr;
+  bool primitive_mapping_capped;
+  bool primitive_mapping_divided;
+  Transform primitive_mapping_P;
+  Transform primitive_mapping_N;
+  Transform primitive_mapping_uvw;
 
   /* RH-98012: bit i is set when clipping plane i clips this object. Planes at
    * index >= 32 always clip. */

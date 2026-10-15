@@ -128,8 +128,16 @@ typedef enum NodeTexCoord {
   NODE_TEXCO_ENV_DECAL_PLANAR,
   NODE_TEXCO_ENV_DECAL_SPHERICAL,
   NODE_TEXCO_ENV_DECAL_CYLINDRICAL,
-  NODE_TEXCO_UV_MAYBE_PLANAR,
+  NODE_TEXCO_UV_MAYBE_PRIMITIVE,
 } NodeTexCoord;
+
+/* Values match ON_TextureMapping::TYPE. */
+typedef enum NodeRhinoPrimitiveMapping {
+  NODE_RHINO_MAPPING_NONE = 0,
+  NODE_RHINO_MAPPING_PLANE = 2,
+  NODE_RHINO_MAPPING_CYLINDER = 3,
+  NODE_RHINO_MAPPING_SPHERE = 4,
+} NodeRhinoPrimitiveMapping;
 
 typedef enum NodeImageDecalProjection {
   NODE_IMAGE_DECAL_BOTH = 0,

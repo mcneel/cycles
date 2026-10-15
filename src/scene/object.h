@@ -77,9 +77,14 @@ class Object : public Node {
   NODE_SOCKET_API(Transform, ocs_frame) /* OCS frame for controlling WCS and WCS Box. */
   NODE_SOCKET_API(Transform, ocs_frame_normal) /* OCS frame for controlling WCS and WCS Box normal. */
 
-  NODE_SOCKET_API(bool, use_planar_uvw)
-  NODE_SOCKET_API(Transform, planar_uvw_xform)
-  NODE_SOCKET_API(bool, planar_uvw_capped)
+  /* Planar, spherical or cylindrical mapping evaluated per shading point for one UV map. */
+  NODE_SOCKET_API(int, primitive_mapping_type) /* NodeRhinoPrimitiveMapping */
+  NODE_SOCKET_API(uint, primitive_mapping_attr) /* Attribute id of the UV map it replaces. */
+  NODE_SOCKET_API(bool, primitive_mapping_capped)
+  NODE_SOCKET_API(bool, primitive_mapping_divided)
+  NODE_SOCKET_API(Transform, primitive_mapping_P) /* Object space to mapping primitive space. */
+  NODE_SOCKET_API(Transform, primitive_mapping_N)
+  NODE_SOCKET_API(Transform, primitive_mapping_uvw)
 
   /* RH-98012: bit i set when clipping plane i clips this object. */
   NODE_SOCKET_API(uint, clipping_plane_mask)
