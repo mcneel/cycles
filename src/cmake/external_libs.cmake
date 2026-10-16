@@ -296,7 +296,7 @@ if(NOT USD_OVERRIDE_OPENIMAGEIO)
     find_package(OpenImageIO REQUIRED CONFIG)
   endif()
 
-  # Rhino: OpenImageIO_Cycles has no libheif, so nothing needs aom.
+  # Rhino: OpenImageIO_Cycles has no libheif, so what ships needs no aom.
   if(RHINO_OPENIMAGEIO_CYCLES AND WIN32)
     # It is release only, and a /MDd ccycles cannot use a /MD OpenImageIO: standard library
     # types cross its API, and it imports the release OpenEXR, OpenColorIO and tbb a Debug
