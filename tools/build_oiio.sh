@@ -133,7 +133,11 @@ done
 dylib="$INSTALL/lib/libOpenImageIO_Cycles.dylib"
 [ -f "$dylib" ] && [ ! -L "$dylib" ] || { echo "Expected $dylib as a plain file after install." >&2; exit 1; }
 if [ -n "$(find "$INSTALL/lib" -maxdepth 1 -type l)" ]; then echo "Symlinks in $INSTALL/lib." >&2; exit 1; fi
-if strings "$dylib" | grep -q heif_context; then echo "$dylib still contains libheif." >&2; exit 1; fi
+# Not grep -q: it stops reading at the first match, the writer dies of SIGPIPE, and pipefail
+# turns a found library into a passed check.
+if strings "$dylib" | grep heif_context >/dev/null; then echo "$dylib still contains libheif." >&2; exit 1; fi
 # Blender's links aom statically: its symbols, not a load command, give it away.
-if nm "$dylib" | grep -q ' _aom_' || otool -L "$dylib" | grep -qi aom; then echo "$dylib still links aom." >&2; exit 1; fi
+if nm "$dylib" | grep ' _aom_' >/dev/null || otool -L "$dylib" | grep -i aom >/dev/null; then
+    echo "$dylib still links aom." >&2; exit 1
+fi
 echo "   OK: $(cd "$INSTALL/lib" && ls libOpenImageIO*.dylib | tr '\n' ' '); no libheif, no aom"
