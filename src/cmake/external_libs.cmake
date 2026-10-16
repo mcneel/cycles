@@ -101,6 +101,24 @@ if(EXISTS ${_cycles_lib_dir} AND WITH_LIBS_PRECOMPILED)
   _set_default(OPENCOLORIO_ROOT_DIR "${_cycles_lib_dir}/opencolorio")
   _set_default(OPENEXR_ROOT_DIR "${_cycles_lib_dir}/openexr")
   _set_default(OPENIMAGEDENOISE_ROOT_DIR "${_cycles_lib_dir}/openimagedenoise")
+  # Rhino: OpenImageIO_Cycles (tools/build_oiio.ps1) from big_libs when it is there; the
+  # bundle's OpenImageIO links libheif, LGPL-3.0, statically (RH-99462).
+  file(GLOB _rhino_oiio_dirs
+    "${CMAKE_CURRENT_LIST_DIR}/../../../../../../../big_libs/OpenImageIO-*-Cycles/${_cycles_lib_platform}")
+  if(_rhino_oiio_dirs)
+    list(GET _rhino_oiio_dirs -1 _rhino_oiio_dir)
+    get_filename_component(OPENIMAGEIO_ROOT_DIR "${_rhino_oiio_dir}" ABSOLUTE)
+    set(OpenImageIO_DIR "${OPENIMAGEIO_ROOT_DIR}/lib/cmake/OpenImageIO" CACHE PATH "" FORCE)
+    set(RHINO_OPENIMAGEIO_CYCLES ON)
+    message(STATUS "Using OpenImageIO_Cycles at ${OPENIMAGEIO_ROOT_DIR}")
+  else()
+    if(OpenImageIO_DIR MATCHES "-Cycles/")
+      unset(OpenImageIO_DIR CACHE)
+    endif()
+    message(WARNING "No OpenImageIO_Cycles in big_libs: using the bundle's OpenImageIO, which links libheif (RH-99462).")
+  endif()
+  unset(_rhino_oiio_dirs)
+  unset(_rhino_oiio_dir)
   _set_default(OPENIMAGEIO_ROOT_DIR "${_cycles_lib_dir}/openimageio")
   _set_default(openjph_ROOT "${_cycles_lib_dir}/openjph")
   _set_default(OPENSUBDIV_ROOT_DIR "${_cycles_lib_dir}/opensubdiv")
@@ -278,7 +296,31 @@ if(NOT USD_OVERRIDE_OPENIMAGEIO)
     find_package(OpenImageIO REQUIRED CONFIG)
   endif()
 
-  if(WIN32)
+  # Rhino: OpenImageIO_Cycles has no libheif, so what ships needs no aom.
+  if(RHINO_OPENIMAGEIO_CYCLES AND WIN32)
+    # It is release only, and a /MDd ccycles cannot use a /MD OpenImageIO: standard library
+    # types cross its API, and it imports the release OpenEXR, OpenColorIO and tbb a Debug
+    # install leaves out. Debug links and installs the bundle's OpenImageIO_d (libheif, aom
+    # and all) instead; the headers are the same, and Debug builds are never shipped.
+    foreach(_rhino_oiio_lib OpenImageIO OpenImageIO_Util)
+      set_property(TARGET OpenImageIO::${_rhino_oiio_lib} APPEND PROPERTY IMPORTED_CONFIGURATIONS DEBUG)
+      set_target_properties(OpenImageIO::${_rhino_oiio_lib} PROPERTIES
+        IMPORTED_IMPLIB_DEBUG "${_cycles_lib_dir}/openimageio/lib/${_rhino_oiio_lib}_d.lib"
+        IMPORTED_LOCATION_DEBUG "${_cycles_lib_dir}/openimageio/bin/${_rhino_oiio_lib}_d.dll")
+    endforeach()
+    unset(_rhino_oiio_lib)
+    file(GLOB _rhino_oiio_dlls ${OPENIMAGEIO_ROOT_DIR}/bin/*.dll)
+    list(APPEND PLATFORM_BUNDLED_LIBRARIES_RELEASE ${_rhino_oiio_dlls})
+    list(APPEND PLATFORM_BUNDLED_LIBRARIES_DEBUG
+      ${_cycles_lib_dir}/openimageio/bin/OpenImageIO_d.dll
+      ${_cycles_lib_dir}/openimageio/bin/OpenImageIO_Util_d.dll
+      ${_cycles_lib_dir}/aom/bin/aom.dll)
+    list(APPEND PLATFORM_BUNDLED_LIBRARY_DIRS
+      ${OPENIMAGEIO_ROOT_DIR}/bin ${_cycles_lib_dir}/openimageio/bin ${_cycles_lib_dir}/aom/bin)
+    unset(_rhino_oiio_dlls)
+  elseif(RHINO_OPENIMAGEIO_CYCLES)
+    add_bundled_libraries(${OPENIMAGEIO_ROOT_DIR}/lib)
+  elseif(WIN32)
     add_bundled_libraries(openimageio/bin)
     add_bundled_libraries(aom/bin)
   else()

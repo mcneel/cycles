@@ -83,7 +83,7 @@ internal static class Program
             IntPtr imtex = CSycles.add_shader_node(diffuse, "image_texture", "imtex");
             Console.WriteLine("image      : node created=" + (imtex != IntPtr.Zero));
             if (imtex == IntPtr.Zero) { Console.WriteLine("RESULT     : NOT-CREATED"); return; }
-            CSycles.shadernode_set_member_string(imtex, "filename", imagePath);
+            CSycles.shadernode_set_attribute_string(imtex, "filename", imagePath);
             Console.WriteLine("image      : '" + imagePath + "' exists=" + System.IO.File.Exists(imagePath));
 
             // Generated coordinates span the quad; without UVs it evaluates at one point.
