@@ -16,7 +16,7 @@ import sys
 LIBRARIES = {
     "Embree": "embree4.dll, libembree4.dylib",
     "oneTBB": "tbb12.dll, tbbmalloc*.dll, libtbb.12.cycles.dylib",
-    "OpenImageIO": "OpenImageIO_Cycles*.dll, libOpenImageIO_Cycles*.dylib (built by McNeel from "
+    "OpenImageIO": "OpenImageIO*_Cycles.dll, libOpenImageIO*_Cycles.dylib (built by McNeel from "
                    "this release without libheif, with upstream fix #5133: tools/build_oiio.ps1 "
                    "and tools/build_oiio.sh)",
     "DPC++": "sycl8.dll, ur_*.dll (Windows)",
@@ -24,7 +24,7 @@ LIBRARIES = {
     "HIP Extension Wrangler Library (HIPEW)": "ccycles",
     "OpenJPEG": "inside OpenImageIO",
     "OpenJPH": "openjph*.dll, libopenjph.dylib",
-    "xxHash Library": "inside OpenImageIO_Util",
+    "xxHash Library": "inside OpenImageIO_Util_Cycles",
     "Imath": "imath.dll, libImath.dylib",
     "Openexr": "Iex, IlmThread, OpenEXR*.dll and .dylib",
     "OpenColorIO": "OpenColorIO*.dll, libOpenColorIO.dylib",

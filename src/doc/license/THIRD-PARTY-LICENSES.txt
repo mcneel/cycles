@@ -29,7 +29,7 @@ HIP Extension Wrangler Library (HIPEW) N/A - https://projects.blender.org/blende
 
 OpenImageIO v3.1.13.1 - https://github.com/AcademySoftwareFoundation/OpenImageIO
     Copyright Contributors to the OpenImageIO project.
-    Ships in: OpenImageIO_Cycles*.dll, libOpenImageIO_Cycles*.dylib (built by McNeel from this release without libheif, with upstream fix #5133: tools/build_oiio.ps1 and tools/build_oiio.sh)
+    Ships in: OpenImageIO*_Cycles.dll, libOpenImageIO*_Cycles.dylib (built by McNeel from this release without libheif, with upstream fix #5133: tools/build_oiio.ps1 and tools/build_oiio.sh)
 
 oneTBB v2022.3.0 - https://software.intel.com/en-us/oneapi/onetbb
     Copyright (c) 2005-2020 Intel Corporation
@@ -254,7 +254,7 @@ OpenJPH 0.25.2 - https://github.com/aous72/OpenJPH
 
 xxHash Library v0.8.2 (202 - https://xxhash.com/
     Copyright (c) 2012-2021 Yann Collet
-    Ships in: inside OpenImageIO_Util
+    Ships in: inside OpenImageIO_Util_Cycles
 
 ------------------------------------------------------------------------------
 
