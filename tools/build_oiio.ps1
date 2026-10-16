@@ -63,8 +63,14 @@ if (-not (Test-Path (Join-Path $srcDir '.git'))) {
     if ($LASTEXITCODE) { throw 'git clone failed.' }
 }
 foreach ($patch in Get-ChildItem (Join-Path $PSScriptRoot 'oiio') -Filter *.diff | Sort-Object Name) {
+    # EAP Continue: Windows PowerShell turns redirected stderr into errors, and Stop would end
+    # here on the "patch does not apply" of an unpatched tree.
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     git -C $srcDir apply --check --reverse $patch.FullName 2>$null
-    if ($LASTEXITCODE -eq 0) { Write-Host "   $($patch.Name): already applied"; continue }
+    $applied = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $eap
+    if ($applied) { Write-Host "   $($patch.Name): already applied"; continue }
     git -C $srcDir apply $patch.FullName
     if ($LASTEXITCODE) { throw "Patch $($patch.Name) does not apply." }
     Write-Host "   $($patch.Name): applied"
