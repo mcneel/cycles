@@ -95,11 +95,12 @@ if (Test-Path -LiteralPath $installManifest) {
     $payloadRoot = [IO.Path]::GetFullPath($payloadDir).TrimEnd('\')
     $installed = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($line in Get-Content -LiteralPath $installManifest) {
+        if (-not $line.Trim()) { continue }
         $path = [IO.Path]::GetFullPath($line)
         if ([IO.Path]::GetDirectoryName($path) -ieq $payloadRoot) { [void]$installed.Add([IO.Path]::GetFileName($path)) }
     }
     if (-not $installed.Count) {
-        Write-Warn 'not pruning' "install_manifest.txt in $buildRoot is from an install into another folder"
+        Write-Warn 'not pruning' "install_manifest.txt in $buildRoot names nothing in this payload"
     }
     else {
         $staleDlls = @(Get-ChildItem $payloadDir -File -Filter '*.dll' | Where-Object { -not $installed.Contains($_.Name) })
