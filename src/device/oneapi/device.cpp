@@ -54,6 +54,11 @@ bool device_oneapi_init()
   if (getenv("SYCL_PI_LEVEL_ZERO_USE_COPY_ENGINE_FOR_IN_ORDER_QUEUE") == nullptr) {
     _putenv_s("SYCL_PI_LEVEL_ZERO_USE_COPY_ENGINE_FOR_IN_ORDER_QUEUE", "0");
   }
+  /* RH-99497: list GPUs only. Listing all devices asks an Intel NPU for its type, which this
+   * SYCL runtime rejects (-30), and that drops every Intel GPU. */
+  if (getenv("SYCL_DEVICE_TYPE") == nullptr && getenv("CYCLES_ONEAPI_ALL_DEVICES") == nullptr) {
+    _putenv_s("SYCL_DEVICE_TYPE", "GPU");
+  }
 #  elif __linux__
   setenv("SYCL_CACHE_PERSISTENT", "1", false);
   setenv("SYCL_CACHE_THRESHOLD", "0", false);
