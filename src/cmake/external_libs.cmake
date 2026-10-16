@@ -298,7 +298,26 @@ if(NOT USD_OVERRIDE_OPENIMAGEIO)
 
   # Rhino: OpenImageIO_Cycles has no libheif, so nothing needs aom.
   if(RHINO_OPENIMAGEIO_CYCLES AND WIN32)
-    add_bundled_libraries(${OPENIMAGEIO_ROOT_DIR}/bin)
+    # It is release only, and a /MDd ccycles cannot use a /MD OpenImageIO: standard library
+    # types cross its API, and it imports the release OpenEXR, OpenColorIO and tbb a Debug
+    # install leaves out. Debug links and installs the bundle's OpenImageIO_d (libheif, aom
+    # and all) instead; the headers are the same, and Debug builds are never shipped.
+    foreach(_rhino_oiio_lib OpenImageIO OpenImageIO_Util)
+      set_property(TARGET OpenImageIO::${_rhino_oiio_lib} APPEND PROPERTY IMPORTED_CONFIGURATIONS DEBUG)
+      set_target_properties(OpenImageIO::${_rhino_oiio_lib} PROPERTIES
+        IMPORTED_IMPLIB_DEBUG "${_cycles_lib_dir}/openimageio/lib/${_rhino_oiio_lib}_d.lib"
+        IMPORTED_LOCATION_DEBUG "${_cycles_lib_dir}/openimageio/bin/${_rhino_oiio_lib}_d.dll")
+    endforeach()
+    unset(_rhino_oiio_lib)
+    file(GLOB _rhino_oiio_dlls ${OPENIMAGEIO_ROOT_DIR}/bin/*.dll)
+    list(APPEND PLATFORM_BUNDLED_LIBRARIES_RELEASE ${_rhino_oiio_dlls})
+    list(APPEND PLATFORM_BUNDLED_LIBRARIES_DEBUG
+      ${_cycles_lib_dir}/openimageio/bin/OpenImageIO_d.dll
+      ${_cycles_lib_dir}/openimageio/bin/OpenImageIO_Util_d.dll
+      ${_cycles_lib_dir}/aom/bin/aom.dll)
+    list(APPEND PLATFORM_BUNDLED_LIBRARY_DIRS
+      ${OPENIMAGEIO_ROOT_DIR}/bin ${_cycles_lib_dir}/openimageio/bin ${_cycles_lib_dir}/aom/bin)
+    unset(_rhino_oiio_dlls)
   elseif(RHINO_OPENIMAGEIO_CYCLES)
     add_bundled_libraries(${OPENIMAGEIO_ROOT_DIR}/lib)
   elseif(WIN32)
