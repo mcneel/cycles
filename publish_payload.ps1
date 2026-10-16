@@ -90,14 +90,25 @@ Write-Step "Pruning DLLs the install did not write"
 $buildRoot = if ([IO.Path]::IsPathRooted($BuildDir)) { $BuildDir } else { Join-Path $cyclesRoot $BuildDir }
 $installManifest = Join-Path $buildRoot 'install_manifest.txt'
 if (Test-Path -LiteralPath $installManifest) {
+    # Only what the install wrote into this payload: Debug and Release publishes share the
+    # build folder, and a Debug install's manifest would make every release DLL look stale.
+    $payloadRoot = [IO.Path]::GetFullPath($payloadDir).TrimEnd('\')
     $installed = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-    foreach ($line in Get-Content -LiteralPath $installManifest) { [void]$installed.Add([IO.Path]::GetFileName($line)) }
-    $staleDlls = @(Get-ChildItem $payloadDir -File -Filter '*.dll' | Where-Object { -not $installed.Contains($_.Name) })
-    foreach ($f in $staleDlls) {
-        Write-Warn 'removing' $f.Name
-        Remove-Item -LiteralPath $f.FullName -Force
+    foreach ($line in Get-Content -LiteralPath $installManifest) {
+        $path = [IO.Path]::GetFullPath($line)
+        if ([IO.Path]::GetDirectoryName($path) -ieq $payloadRoot) { [void]$installed.Add([IO.Path]::GetFileName($path)) }
     }
-    if (-not $staleDlls.Count) { Write-Ok 'nothing stale' 'every DLL is one this install wrote' }
+    if (-not $installed.Count) {
+        Write-Warn 'not pruning' "install_manifest.txt in $buildRoot is from an install into another folder"
+    }
+    else {
+        $staleDlls = @(Get-ChildItem $payloadDir -File -Filter '*.dll' | Where-Object { -not $installed.Contains($_.Name) })
+        foreach ($f in $staleDlls) {
+            Write-Warn 'removing' $f.Name
+            Remove-Item -LiteralPath $f.FullName -Force
+        }
+        if (-not $staleDlls.Count) { Write-Ok 'nothing stale' 'every DLL is one this install wrote' }
+    }
 }
 else { Write-Warn 'no install_manifest.txt' "in $buildRoot - stale DLLs are not pruned" }
 
