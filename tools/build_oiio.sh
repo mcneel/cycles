@@ -137,8 +137,9 @@ if [ -n "$(find "$INSTALL/lib" -maxdepth 1 -type l)" ]; then echo "Symlinks in $
 # grep also when writing to /dev/null), the writer dies of SIGPIPE, and pipefail would turn
 # a found library into a passed check.
 if grep -q heif_context <(strings "$dylib"); then echo "$dylib still contains libheif." >&2; exit 1; fi
-# Blender's links aom statically: its symbols, not a load command, give it away.
-if grep -q ' _aom_' <(nm "$dylib") || grep -qi aom <(otool -L "$dylib"); then
+# Blender's links aom statically: its symbols, not a load command, give it away. otool -L
+# starts with the dylib's own path, which can contain "aom" (/Users/naomi), so skip that line.
+if grep -q ' _aom_' <(nm "$dylib") || grep -qi aom <(otool -L "$dylib" | tail -n +2); then
     echo "$dylib still links aom." >&2; exit 1
 fi
 echo "   OK: $(cd "$INSTALL/lib" && ls libOpenImageIO*.dylib | tr '\n' ' '); no libheif, no aom"
