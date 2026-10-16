@@ -16,12 +16,12 @@ import sys
 LIBRARIES = {
     "Embree": "embree4.dll, libembree4.dylib",
     "oneTBB": "tbb12.dll, tbbmalloc*.dll, libtbb.12.cycles.dylib",
-    "OpenImageIO": "OpenImageIO_Cycles*.dll (built by McNeel from this release without libheif, "
-                   "with upstream fix #5133: tools/build_oiio.ps1), libOpenImageIO*.dylib",
+    "OpenImageIO": "OpenImageIO_Cycles*.dll, libOpenImageIO_Cycles*.dylib (built by McNeel from "
+                   "this release without libheif, with upstream fix #5133: tools/build_oiio.ps1 "
+                   "and tools/build_oiio.sh)",
     "DPC++": "sycl8.dll, ur_*.dll (Windows)",
     "Cuda Wrangler": "ccycles",
     "HIP Extension Wrangler Library (HIPEW)": "ccycles",
-    "Aom": "inside libOpenImageIO.dylib (macOS, until RH-99462 replaces it)",
     "OpenJPEG": "inside OpenImageIO",
     "OpenJPH": "openjph*.dll, libopenjph.dylib",
     "xxHash Library": "inside OpenImageIO_Util",
@@ -33,7 +33,6 @@ LIBRARIES = {
     "Pystring": "inside OpenColorIO",
     "Blosc": "inside OpenVDB",
     "Zstd": "inside OpenVDB",
-    "Libheif": "inside libOpenImageIO.dylib (macOS, until RH-99462 replaces it)",
     "libpng": "inside OpenImageIO",
     "LibTIFF": "inside OpenImageIO",
     "oneAPI Level Zero": "ze_*.dll (Windows)",
