@@ -106,11 +106,27 @@ namespace ccl
 		}
 
 		/// <summary>
-		/// Set the object Planar mapping.
+		/// Set the planar, spherical or cylindrical mapping that the kernel evaluates per
+		/// shading point for the UV map of <paramref name="channel"/>.
 		/// </summary>
-		public void SetPlanarUvwMapping(bool hasMapping, bool capped, Transform xform)
+		/// <param name="type">ON_TextureMapping::TYPE value, 0 for none</param>
+		/// <param name="channel">Mapping channel, as in the uvmap attribute name</param>
+		/// <param name="capped">Mapping primitive is capped</param>
+		/// <param name="divided">Texture space is divided</param>
+		/// <param name="p">Object space to mapping primitive space</param>
+		/// <param name="n">Object space normal to mapping primitive space</param>
+		/// <param name="uvw">Mapping primitive coordinates to texture coordinates</param>
+		public void SetPrimitiveMapping(int type, int channel, bool capped, bool divided, Transform p, Transform n, Transform uvw)
 		{
-			CSycles.object_set_planar_uvw_mapping(Client.Scene.Id, ObjectPtr, hasMapping, capped, xform);
+			CSycles.object_set_primitive_mapping(Client.Scene.Id, ObjectPtr, type, channel, capped, divided, p, n, uvw);
+		}
+
+		/// <summary>
+		/// Clear the mapping set with <see cref="SetPrimitiveMapping"/>.
+		/// </summary>
+		public void ClearPrimitiveMapping()
+		{
+			CSycles.object_clear_primitive_mapping(Client.Scene.Id, ObjectPtr);
 		}
 
 		/// <summary>

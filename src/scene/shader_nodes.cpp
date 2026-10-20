@@ -4570,7 +4570,7 @@ void RhinoTextureCoordinateNode::compile(SVMCompiler &compiler)
     }
     else {
       int attr = compiler.attribute(uvmap.length() == 0 ? ustring("uvmap1") : uvmap);
-      compiler.add_node_packed(texco_node, NODE_TEXCO_UV_MAYBE_PLANAR, compiler.output(out), attr);
+      compiler.add_node_packed(texco_node, NODE_TEXCO_UV_MAYBE_PRIMITIVE, compiler.output(out), attr);
     }
   }
 

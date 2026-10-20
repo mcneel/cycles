@@ -49,20 +49,34 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
-		private static extern void cycles_scene_object_set_planar_uvw_mapping(IntPtr sessionId, IntPtr objectId,
-			uint hasMapping,
+		private static extern void cycles_scene_object_set_primitive_mapping(IntPtr sessionId, IntPtr objectId,
+			int type,
+			int channel,
 			uint capped,
-			float a, float b, float c, float d,
-			float e, float f, float g, float h,
-			float i, float j, float k, float l);
-		public static void object_set_planar_uvw_mapping(IntPtr sessionId, IntPtr objectId, bool hasMapping, bool capped, Transform t)
+			uint divided,
+			float[] xforms);
+		public static void object_set_primitive_mapping(IntPtr sessionId, IntPtr objectId, int type, int channel, bool capped, bool divided, Transform p, Transform n, Transform uvw)
 		{
-			cycles_scene_object_set_planar_uvw_mapping(sessionId, objectId,
-				hasMapping ? 1u : 0u,
+			var xforms = new float[36];
+			int idx = 0;
+			foreach (var t in new[] { p, n, uvw })
+			{
+				foreach (var row in new[] { t.x, t.y, t.z })
+				{
+					xforms[idx++] = row.x;
+					xforms[idx++] = row.y;
+					xforms[idx++] = row.z;
+					xforms[idx++] = row.w;
+				}
+			}
+			cycles_scene_object_set_primitive_mapping(sessionId, objectId, type, channel,
 				capped ? 1u : 0u,
-				t.x.x, t.x.y, t.x.z, t.x.w,
-				t.y.x, t.y.y, t.y.z, t.y.w,
-				t.z.x, t.z.y, t.z.z, t.z.w);
+				divided ? 1u : 0u,
+				xforms);
+		}
+		public static void object_clear_primitive_mapping(IntPtr sessionId, IntPtr objectId)
+		{
+			cycles_scene_object_set_primitive_mapping(sessionId, objectId, 0, 0, 0u, 0u, null);
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]

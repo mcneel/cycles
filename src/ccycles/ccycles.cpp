@@ -39,6 +39,15 @@ void cycles_path_init(const char* path, const char* user_path)
 	ccl::path_init(std::string(path), std::string(user_path));
 }
 
+void cycles_putenv(const char* var, const char* val)
+{
+#if defined(_WIN32)
+	_putenv_s(var, val);
+#else
+	setenv(var, val, 1);
+#endif
+}
+
 /* Cycles' own log is discarded without a sink; with CCYCLES_DIAG_LOG set it goes
  * to ccycles_diag. */
 static void ccycles_cycles_log(const ccl::LogLevel level,

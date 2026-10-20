@@ -654,6 +654,111 @@ ccl_device_noinline int svm_node_tex_coord(KernelGlobals kg,
   return offset;
 }
 
+ccl_device_inline bool rhino_use_primitive_mapping(KernelGlobals kg,
+                                                   const ccl_private ShaderData *sd,
+                                                   const uint attr_id)
+{
+  return sd->object != OBJECT_NONE &&
+         kernel_data_fetch(objects, sd->object).primitive_mapping_type !=
+             NODE_RHINO_MAPPING_NONE &&
+         kernel_data_fetch(objects, sd->object).primitive_mapping_attr == attr_id;
+}
+
+/* Evaluates the object's planar, cylindrical or spherical mapping at world space P the way the
+ * display does (TextureMapping.inc.slang). Interpolated mesh UVs have no w, which 3D procedurals
+ * need, and only approximate the non-linear mappings. */
+ccl_device float3 rhino_primitive_mapping(KernelGlobals kg,
+                                          const ccl_private ShaderData *sd,
+                                          float3 P)
+{
+  const int type = kernel_data_fetch(objects, sd->object).primitive_mapping_type;
+  const bool capped = kernel_data_fetch(objects, sd->object).primitive_mapping_capped;
+  const bool divided = kernel_data_fetch(objects, sd->object).primitive_mapping_divided;
+
+  object_inverse_position_transform(kg, sd, &P);
+  Transform tfm = kernel_data_fetch(objects, sd->object).primitive_mapping_P;
+  float3 tp = transform_point(&tfm, P);
+
+  if (type == NODE_RHINO_MAPPING_PLANE) {
+    tp.x = 0.5f * tp.x + 0.5f;
+    tp.y = 0.5f * tp.y + 0.5f;
+  }
+  else if (type == NODE_RHINO_MAPPING_SPHERE) {
+    const float r = len(tp);
+    const float longitude = (tp.y != 0.0f || tp.x != 0.0f) ? atan2f(tp.y, tp.x) : 0.0f;
+    const float latitude = (tp.z != 0.0f) ? atan2f(tp.z, sqrtf(tp.x * tp.x + tp.y * tp.y)) :
+                                            0.0f;
+    tp.x = longitude * M_1_2PI_F;
+    if (tp.x < 0.0f) {
+      tp.x += 1.0f;
+    }
+    else if (tp.x > 1.0f) {
+      tp.x = 1.0f;
+    }
+    tp.y = clamp(latitude * M_1_PI_F + 0.5f, 0.0f, 1.0f);
+    tp.z = r;
+  }
+  else if (type == NODE_RHINO_MAPPING_CYLINDER) {
+    const float r = sqrtf(tp.x * tp.x + tp.y * tp.y);
+
+    /* 0 for the wall, 2 for the bottom cap and 3 for the top cap. */
+    int side = 0;
+    if (capped) {
+      if (fabsf(tp.z) >= 1.0f) {
+        if (fabsf(tp.z) > r) {
+          side = (tp.z < 0.0f) ? 2 : 3;
+        }
+      }
+      else if (r <= 1.0f) {
+        float3 N = sd->N;
+        object_inverse_normal_transform(kg, sd, &N);
+        tfm = kernel_data_fetch(objects, sd->object).primitive_mapping_N;
+        const float3 tn = transform_direction(&tfm, N);
+        if (fabsf(tn.z) > fabsf(tn.x) && fabsf(tn.z) > fabsf(tn.y)) {
+          side = (tn.z < 0.0f) ? 2 : 3;
+        }
+      }
+    }
+
+    if (side != 0) {
+      if (side == 2) {
+        tp.x = -tp.x;
+      }
+      if (r > 1.0f) {
+        tp.x /= r;
+        tp.y /= r;
+      }
+      tp.x = clamp(0.5f * tp.x + 0.5f, 0.0f, 1.0f);
+      tp.y = clamp(0.5f * tp.y + 0.5f, 0.0f, 1.0f);
+      if (divided) {
+        tp.x = (2.0f + side + tp.x) / 6.0f;
+      }
+    }
+    else {
+      tp.x = ((tp.y != 0.0f || tp.x != 0.0f) ? atan2f(tp.y, tp.x) : 0.0f) * M_1_2PI_F;
+      if (tp.x < 0.0f) {
+        tp.x += 1.0f;
+      }
+      tp.x = clamp(tp.x, 0.0f, 1.0f);
+      if (divided) {
+        tp.x *= 2.0f / 3.0f;
+      }
+      tp.y = 0.5f * tp.z + 0.5f;
+      if (capped) {
+        tp.y = clamp(tp.y, 0.0f, 1.0f);
+      }
+    }
+    tp.z = r;
+  }
+
+  tfm = kernel_data_fetch(objects, sd->object).primitive_mapping_uvw;
+  float3 uvw = transform_point(&tfm, tp);
+  if (type == NODE_RHINO_MAPPING_PLANE && !capped) {
+    uvw.z = 0.0f;
+  }
+  return uvw;
+}
+
 /* Rhino: RHINO_NODE_TEX_COORD, dispatched from svm.h. */
 
 ccl_device_noinline int svm_rhino_node_tex_coord(
@@ -868,15 +973,10 @@ ccl_device_noinline int svm_rhino_node_tex_coord(
       }
       break;
     }
-    case NODE_TEXCO_UV_MAYBE_PLANAR: {
+    case NODE_TEXCO_UV_MAYBE_PRIMITIVE: {
       const uint attr_id = node.w;
-      if (sd->object != OBJECT_NONE &&
-          kernel_data_fetch(objects, sd->object).use_planar_uvw) {
-        Transform tfm = kernel_data_fetch(objects, sd->object).planar_uvw_xform;
-        data = transform_point(&tfm, sd->P);
-        if (!kernel_data_fetch(objects, sd->object).planar_uvw_capped) {
-          data.z = 0.0f;
-        }
+      if (rhino_use_primitive_mapping(kg, sd, attr_id)) {
+        data = rhino_primitive_mapping(kg, sd, sd->P);
       }
       else if (sd->object != OBJECT_NONE) {
         AttributeDescriptor desc = find_attribute(kg, sd, attr_id);

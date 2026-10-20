@@ -217,6 +217,19 @@ namespace ccl
 			cycles_path_init(path, userPath);
 		}
 
+		[DllImport(Constants.ccycles, SetLastError = false, CharSet = CharSet.Ansi,
+			CallingConvention = CallingConvention.Cdecl)]
+		private static extern void cycles_putenv(string var, string val);
+		/// <summary>
+		/// Set an environment variable in ccycles' C runtime, which .NET's own environment does
+		/// not reach. Call before <c>initialise</c> for variables the GPU runtimes read at load.
+		/// </summary>
+		public static void putenv([MarshalAs(UnmanagedType.LPStr)] string var, [MarshalAs(UnmanagedType.LPStr)] string val)
+		{
+			LoadCCycles();
+			cycles_putenv(var, val);
+		}
+
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_shutdown();
 		/// <summary>

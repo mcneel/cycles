@@ -231,29 +231,40 @@ void cycles_scene_object_set_ocs_frame(ccl::Session* session_id, ccl::Object* ob
 		i, j, k, l);
 }
 
-void cycles_scene_object_set_planar_uvw_mapping(ccl::Session* session_id, ccl::Object* object,
-	unsigned int has_mapping,
+void cycles_scene_object_set_primitive_mapping(ccl::Session* session_id, ccl::Object* object,
+	int type,
+	int channel,
 	unsigned int capped,
-	float a, float b, float c, float d,
-	float e, float f, float g, float h,
-	float i, float j, float k, float l
+	unsigned int divided,
+	const float* xforms
 	)
 {
 	assert(object);
 
 	ccl::Scene* sce = nullptr;
 	if(scene_find(session_id, &sce)) {
-		if (has_mapping) {
-			ccl::Transform xform = ccl::make_transform(a, b, c, d, e, f, g, h, i, j, k, l);
-			object->set_planar_uvw_xform(xform);
-			object->set_use_planar_uvw(true);
-			object->set_planar_uvw_capped(capped != 0);
+		const bool use = (type == ccl::NODE_RHINO_MAPPING_PLANE || type == ccl::NODE_RHINO_MAPPING_CYLINDER ||
+		                  type == ccl::NODE_RHINO_MAPPING_SPHERE) && xforms != nullptr;
+
+		ccl::Transform tfm[3] = { ccl::transform_identity(), ccl::transform_identity(), ccl::transform_identity() };
+		if (use) {
+			for (int t = 0; t < 3; t++) {
+				const float* f = xforms + 12 * t;
+				tfm[t] = ccl::make_transform(f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11]);
+			}
 		}
-		else {
-			object->set_planar_uvw_xform(ccl::transform_identity());
-			object->set_use_planar_uvw(false);
-			object->set_planar_uvw_capped(false);
-		}
+
+		// The SVM UV lookup identifies the UV map by this id, see NODE_TEXCO_UV_MAYBE_PRIMITIVE.
+		const ccl::ustring uvmap(ccl::string_printf("uvmap%d", channel));
+		const ccl::uint attr = use ? (ccl::uint)sce->shader_manager->get_attribute_id(uvmap) : 0;
+
+		object->set_primitive_mapping_type(use ? type : ccl::NODE_RHINO_MAPPING_NONE);
+		object->set_primitive_mapping_attr(attr);
+		object->set_primitive_mapping_capped(use && capped != 0);
+		object->set_primitive_mapping_divided(use && divided != 0);
+		object->set_primitive_mapping_P(tfm[0]);
+		object->set_primitive_mapping_N(tfm[1]);
+		object->set_primitive_mapping_uvw(tfm[2]);
 		object->tag_update(sce);
 	}
 }

@@ -91,6 +91,10 @@ CCL_CAPI int CDECL cycles_optix_minimum_driver();
  * \ingroup ccycles */
 CCL_CAPI void CDECL cycles_path_init(const char* path, const char* user_path);
 
+/** Set an environment variable in ccycles' C runtime, for runtimes that read it there
+ * (SYCL_PI_TRACE, ZE_DEBUG). \ingroup ccycles */
+CCL_CAPI void CDECL cycles_putenv(const char* var, const char* val);
+
 /** Clean up everything. \ingroup ccycles
  * \todo Per-session cleanup, so sessions in progress are not deleted. */
 CCL_CAPI void CDECL cycles_shutdown();
@@ -114,13 +118,16 @@ CCL_CAPI void CDECL cycles_scene_object_set_ocs_frame(ccl::Session* session_id, 
 	float e, float f, float g, float h,
 	float i, float j, float k, float l
 	);
-/** Set the object's planar UVW mapping. */
-CCL_CAPI void CDECL cycles_scene_object_set_planar_uvw_mapping(ccl::Session* session_id, ccl::Object*,
-	unsigned int has_mapping,
+/** Set the planar, spherical or cylindrical mapping the kernel evaluates per shading point
+ * for the UV map of mapping channel `channel`. `type` is an ON_TextureMapping::TYPE value;
+ * any other than plane, cylinder or sphere, or a null `xforms`, clears it. `xforms` holds the
+ * P, N and UVW transforms, 12 floats each. \ingroup ccycles_object */
+CCL_CAPI void CDECL cycles_scene_object_set_primitive_mapping(ccl::Session* session_id, ccl::Object*,
+	int type,
+	int channel,
 	unsigned int capped,
-	float a, float b, float c, float d,
-	float e, float f, float g, float h,
-	float i, float j, float k, float l
+	unsigned int divided,
+	const float* xforms
 	);
 /** Set object mesh. \ingroup ccycles_object */
 CCL_CAPI void CDECL cycles_scene_object_set_geometry(ccl::Session* session_id, ccl::Object*, ccl::Geometry*);
