@@ -142,6 +142,13 @@ namespace ccl
 			cycles_object_set_random_id(sessionId, objectId, random_id);
 		}
 
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		private static extern void cycles_object_set_clipping_plane_mask(IntPtr sessionId, IntPtr objectId, uint mask);
+		public static void object_set_clipping_plane_mask(IntPtr sessionId, IntPtr objectId, uint mask)
+		{
+			cycles_object_set_clipping_plane_mask(sessionId, objectId, mask);
+		}
+
 		#endregion
 
 		#region clipping planes

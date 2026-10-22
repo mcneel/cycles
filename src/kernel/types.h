@@ -1501,6 +1501,10 @@ struct KernelObject {
   Transform primitive_mapping_P;
   Transform primitive_mapping_N;
   Transform primitive_mapping_uvw;
+
+  /* Bit i is set when clipping plane i clips this object. Planes at index >= 32 always clip. */
+  uint clipping_plane_mask;
+  uint clipping_plane_pad[3];
   /* Rhino properties end */
 };
 static_assert_align(KernelObject, 16);

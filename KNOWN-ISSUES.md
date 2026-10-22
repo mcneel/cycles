@@ -14,10 +14,6 @@ Known issues
 - **Built without OSL and without OIDN**, on both platforms. Rhino renders with SVM
   and uses the RDK's own denoisers, which still work. OSL-only features are
   unavailable.
-- **Clipping planes clip camera rays only, for every object.** Rhino 9's per-object
-  clipping-plane participation (RH-98012) and clipping of all rays under the Product
-  preset (RH-95655) are not ported: missing from the kernel, ccycles, csycles and
-  RhinoCycles. RH-98414.
 - **macOS: Apple Silicon only.** Blender publishes no Intel macOS libraries for
   Cycles 5.
 

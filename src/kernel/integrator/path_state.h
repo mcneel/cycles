@@ -287,15 +287,13 @@ ccl_device_forceinline bool path_clip_ray(
    * now PATH_RAY_REFLECT. That clips reflection rays and leaves camera rays unclipped. */
   const PathRayVisibility path_visibility = INTEGRATOR_STATE(state, path, visibility);
 
-  if (path_visibility & PATH_RAY_VISIBILITY_CAMERA) {
-    for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
-      float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
-      float testdist = cpeq.x * sd->P.x + cpeq.y * sd->P.y + cpeq.z * sd->P.z + cpeq.w;
-      if (testdist < 0) {
-        ray->P = ray_offset(
-            sd->P, -sd->Ng);  // start ray a bit after hit point, using negative geometry normal
-        return true;
-      }
+  /* Rhino: under clip_all_rays (Product preset) indirect rays are clipped too, so clipped
+   * geometry neither lights nor occludes the rest of the scene. */
+  if (kernel_data.integrator.clip_all_rays || (path_visibility & PATH_RAY_VISIBILITY_CAMERA)) {
+    if (point_is_clipped(kg, sd->P, sd->object)) {
+      ray->P = ray_offset(
+          sd->P, -sd->Ng);  // start ray a bit after hit point, using negative geometry normal
+      return true;
     }
   }
 

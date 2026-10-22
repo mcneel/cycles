@@ -202,5 +202,17 @@ namespace ccl
 				CSycles.object_set_random_id(Client.Scene.Id, ObjectPtr, value);
 			}
 		}
+
+		/// <summary>
+		/// Set the clipping planes that clip this object: bit i for clipping plane i.
+		/// Planes at index >= 32 always clip.
+		/// </summary>
+		public uint ClippingPlaneMask
+		{
+			set
+			{
+				CSycles.object_set_clipping_plane_mask(Client.Scene.Id, ObjectPtr, value);
+			}
+		}
 	}
 }

@@ -81,6 +81,9 @@ class Integrator : public Node {
   NODE_SOCKET_API(bool, caustics_refractive)
   NODE_SOCKET_API(float, filter_glossy)
 
+  /* Rhino: clipping planes cut every ray, not just camera rays (Product preset). */
+  NODE_SOCKET_API(bool, clip_all_rays)
+
   NODE_SOCKET_API(bool, use_direct_light);
   NODE_SOCKET_API(bool, use_indirect_light);
   NODE_SOCKET_API(bool, use_diffuse);

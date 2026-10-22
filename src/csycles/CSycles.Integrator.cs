@@ -135,6 +135,13 @@ namespace ccl
 		}
 
 		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		private static extern void cycles_integrator_set_clip_all_rays(IntPtr sessionId, bool value);
+		public static void integrator_set_clip_all_rays(IntPtr sessionId, bool value)
+		{
+			cycles_integrator_set_clip_all_rays(sessionId, value);
+		}
+
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_integrator_set_use_direct_light(IntPtr sessionId, bool value);
 		public static void integrator_set_use_direct_light(IntPtr sessionId, bool value)
 		{

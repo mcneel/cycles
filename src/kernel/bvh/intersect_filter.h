@@ -159,6 +159,16 @@ ccl_device_forceinline bool bvh_shadow_all_anyhit_filter(
     }
   }
 
+  /* Rhino: under clip_all_rays (Product preset) clipped geometry neither blocks nor tints direct
+   * light. The shadow ray in the state is the world-space ray that isect.t is measured along. */
+  if (kernel_data.integrator.clip_all_rays) {
+    const float3 ray_P = INTEGRATOR_STATE(state, shadow_ray, P);
+    const float3 ray_D = INTEGRATOR_STATE(state, shadow_ray, D);
+    if (point_is_clipped(kg, ray_P + isect.t * ray_D, isect.object)) {
+      return true;
+    }
+  }
+
 #if !defined(__TRANSPARENT_SHADOWS__)
   /* No transparent shadows in the scene, all light is blocked and we can stop immediately. */
   payload.throughput = 0.0f;

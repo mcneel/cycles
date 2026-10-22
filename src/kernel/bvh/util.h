@@ -26,6 +26,35 @@ ccl_device_inline bool intersection_ray_valid(const ccl_private Ray *ray)
          ray->tmin < FLT_MAX;
 }
 
+/* Rhino: the clipping planes an object participates in. Bit i is set when clipping plane i clips
+ * the object; planes at index >= 32 always clip. */
+ccl_device_inline uint object_clipping_plane_mask(KernelGlobals kg, const int object)
+{
+  return (object == OBJECT_NONE) ? ~0u : kernel_data_fetch(objects, object).clipping_plane_mask;
+}
+
+ccl_device_inline bool clipping_plane_clips_object(const uint mask, const int cpi)
+{
+  return cpi >= 32 || (mask & (1u << cpi)) != 0;
+}
+
+/* Rhino: whether a world-space point on the object is on the clipped-away side of a clipping
+ * plane the object participates in. */
+ccl_device_inline bool point_is_clipped(KernelGlobals kg, const float3 P, const int object)
+{
+  const uint mask = object_clipping_plane_mask(kg, object);
+  for (int cpi = 0; cpi < kernel_data.integrator.num_clipping_planes; cpi++) {
+    if (!clipping_plane_clips_object(mask, cpi)) {
+      continue;
+    }
+    const float4 cpeq = kernel_data_fetch(clipping_planes, cpi);
+    if (cpeq.x * P.x + cpeq.y * P.y + cpeq.z * P.z + cpeq.w < 0.0f) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /* Offset intersection distance by the smallest possible amount, to skip
  * intersections at this distance. This works in cases where the ray start
  * position is unchanged and only tmin is updated, since for self

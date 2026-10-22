@@ -120,6 +120,8 @@ NODE_DEFINE(Integrator)
   SOCKET_BOOLEAN(caustics_refractive, "Refractive Caustics", true);
   SOCKET_FLOAT(filter_glossy, "Filter Glossy", 0.0f);
 
+  SOCKET_BOOLEAN(clip_all_rays, "Clip All Rays", false);
+
   SOCKET_BOOLEAN(use_direct_light, "Use Direct Light", true);
   SOCKET_BOOLEAN(use_indirect_light, "Use Indirect Light", true);
   SOCKET_BOOLEAN(use_diffuse, "Use Diffuse", true);
@@ -260,6 +262,13 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
       break;
     }
   }
+
+  /* Rhino: shadow rays skip clipped hits only in the shadow_all traversal. The opaque shadow
+   * path has no per-hit test, so clip_all_rays sends every shadow ray through shadow_all. */
+  if (clip_all_rays) {
+    kintegrator->transparent_shadows = true;
+  }
+  kintegrator->clip_all_rays = clip_all_rays ? 1 : 0;
 
   kintegrator->volume_ray_marching = volume_ray_marching;
   kintegrator->volume_max_steps = volume_max_steps;
@@ -459,6 +468,11 @@ uint Integrator::get_kernel_features() const
 
   if (get_use_light_tree()) {
     kernel_features |= KERNEL_FEATURE_LIGHT_TREE;
+  }
+
+  /* Rhino: specialized kernels drop the shadow_all traversal without this, see device_update(). */
+  if (clip_all_rays) {
+    kernel_features |= KERNEL_FEATURE_TRANSPARENT;
   }
 
   return kernel_features;

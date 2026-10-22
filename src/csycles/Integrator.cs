@@ -220,6 +220,18 @@ namespace ccl
 		}
 
 		/// <summary>
+		/// Set to true to let clipping planes cut every ray, not just camera rays,
+		/// so clipped geometry no longer lights or shadows the scene (Product preset).
+		/// </summary>
+		public bool ClipAllRays
+		{
+			set
+			{
+				CSycles.integrator_set_clip_all_rays(Session.Id, value);
+			}
+		}
+
+		/// <summary>
 		/// Set to true if all direct lights should be used.
 		/// </summary>
 		public bool UseDirectLight

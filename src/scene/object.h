@@ -92,6 +92,9 @@ class Object : public Node {
   NODE_SOCKET_API(Transform, primitive_mapping_N)
   NODE_SOCKET_API(Transform, primitive_mapping_uvw)
 
+  /* Bit i is set when clipping plane i clips this object. */
+  NODE_SOCKET_API(uint, clipping_plane_mask)
+
   /* Set during device update. */
   bool intersects_volume;
 
