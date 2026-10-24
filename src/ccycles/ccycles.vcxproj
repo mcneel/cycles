@@ -1,16 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
-  Builds native Cycles + ccycles from Rhino.sln: a Makefile-style project driving
-  build_cycles.ps1, since a .sln cannot reference CMake directly.
+  Builds native Cycles + ccycles from Rhino.sln or Cycles.sln: a Makefile-style project
+  driving build_cycles.ps1, since a .sln cannot reference CMake directly.
 
     Debug / Release / ReleaseDebuggable
         Does nothing; RhinoCyclesCore.csproj restores the prebuilt binaries.
     Debug+Cycles / ReleaseDebuggable+Cycles
         Builds Cycles from source into big_libs. GPU backends are auto-detected;
-        with no GPU SDKs you still get a CPU-only build.
+        with no GPU SDKs you still get a CPU-only build. Cycles.sln's Debug and
+        Release build these.
 
-  This only updates big_libs; RhinoCyclesCore copies it into the plug-in output.
-  Build RhinoCyclesCore or the solution, or Rhino silently loads the old DLL.
+  A +Cycles build then deploys the payload into an existing src4/bin/Debug or bin/Release
+  with RhinoCyclesCore's deploy targets, so building only Cycles refreshes Rhino.
 -->
 <Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
@@ -65,9 +66,13 @@
     <CyclesScript>$(MSBuildThisFileDirectory)..\..\build_cycles.ps1</CyclesScript>
     <!-- A Makefile project imports no Rhino property sheets, so RhinoBinDir is
          empty from Rhino.sln. Derive bin from this file; RhinoBinDir wins if set.
-           src/ccycles -> src -> cycles -> RDK -> Plug-ins -> rhino4 -> src4 -->
+           src/ccycles -> src -> cycles-core -> RDK -> Plug-ins -> rhino4 -> src4 -->
     <CyclesBinDir Condition="'$(RhinoBinDir)'!=''">$(RhinoBinDir)</CyclesBinDir>
     <CyclesBinDir Condition="'$(RhinoBinDir)'==''">$(MSBuildThisFileDirectory)..\..\..\..\..\..\bin</CyclesBinDir>
+    <!-- Rhino.sln builds RhinoCyclesCore as Release in ReleaseDebuggable, so bin/Release. -->
+    <CyclesDeployConfiguration>Release</CyclesDeployConfiguration>
+    <CyclesDeployConfiguration Condition="$(Configuration.StartsWith('Debug'))">Debug</CyclesDeployConfiguration>
+    <CyclesDeployDir>$(CyclesBinDir)\$(CyclesDeployConfiguration)\Plug-ins</CyclesDeployDir>
     <!-- Install into big_libs, where the prebuilt Cycles lives, so a rebuilt Cycles
          reaches bin through RhinoCyclesCore like everyone else's. Always the gitignored
          "local" payload, which RhinoCyclesCore prefers while it is newer than the
@@ -82,7 +87,7 @@
     <CyclesBuildFromSource Condition="$(Configuration.Contains('Cycles'))">true</CyclesBuildFromSource>
 
     <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
-    <CyclesSkipMessage>echo ccycles: using the prebuilt Cycles from big_libs. Pick the Debug+Cycles or ReleaseDebuggable+Cycles configuration to build it from source.</CyclesSkipMessage>
+    <CyclesSkipMessage>echo ccycles: using the prebuilt Cycles from big_libs. Build Cycles.sln, or the Debug+Cycles or ReleaseDebuggable+Cycles configuration, to build it from source.</CyclesSkipMessage>
 
     <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
     <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>
@@ -107,4 +112,18 @@
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+  <!--
+    RhinoCyclesCore's deploy targets read only its properties, not its build output, so
+    they run without building it. A Makefile project's Rebuild does not run Build.
+    No Rhino build to refresh: the first one deploys the payload itself.
+  -->
+  <Target Name="DeployToRhinoBin" AfterTargets="Build;Rebuild" Condition="'$(CyclesBuildFromSource)'=='true'">
+    <MSBuild Condition="Exists('$(CyclesDeployDir)')"
+             Projects="$(MSBuildThisFileDirectory)..\..\..\RhinoCycles\RhinoCyclesCore.csproj"
+             Targets="DeployCyclesPayload"
+             Properties="Configuration=$(CyclesDeployConfiguration);Platform=AnyCPU" />
+    <Message Condition="!Exists('$(CyclesDeployDir)')" Importance="high"
+             Text="ccycles: no Rhino build in $([MSBuild]::NormalizePath('$(CyclesBinDir)', '$(CyclesDeployConfiguration)')), so Cycles was not deployed. Building Rhino.sln deploys it." />
+  </Target>
 </Project>

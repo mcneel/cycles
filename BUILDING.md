@@ -17,12 +17,13 @@ and the kernel sources (`source/`). They live in `big_libs/RhinoCycles/ccycles/`
 | Folder | Written by | In git |
 | --- | --- | --- |
 | `win/release`, `osx/release` | `publish_payload.ps1` (Windows), `make payload` (macOS) | yes |
-| `win/local` | `Debug+Cycles` and `ReleaseDebuggable+Cycles` | no |
+| `win/local` | `Cycles.sln`, `Debug+Cycles` and `ReleaseDebuggable+Cycles` | no |
 | `osx/local` | the macOS Cycles schemes | no |
 
 Which one a build deploys:
 
-- **Windows** (`RhinoCyclesCore.csproj`): `local` if its `ccycles.dll` is newer than
+- **Windows** (`RhinoCyclesCore.csproj`, whose deploy targets a from-source build of
+  `ccycles.vcxproj` also runs): `local` if its `ccycles.dll` is newer than
   `release`'s, otherwise `release`.
   The build prints `RhinoCycles: deployed Cycles payload from ...`. Output:
   `src4/bin/<Debug|Release>/Plug-ins/`, kernels in `Plug-ins/RhinoCycles/lib`,
@@ -52,7 +53,7 @@ A pull that republishes `release` makes it newer, so it wins again by itself.
   build AMD kernels, which publishing requires. No AMD GPU is needed. To have bootstrap
   launch a copy of the installer instead, set `RHINO_ROCM_INSTALLER` to its path with
   `setx` (user or machine level, because bootstrap relaunches itself elevated).
-- git, python and Git LFS on `PATH` for the first `+Cycles` build, which fetches
+- git, python and Git LFS on `PATH` for the first from-source build, which fetches
   Blender's precompiled libraries (about 6.5 GB) into `lib/windows_x64`.
 
 No SDK is fatal. CUDA and HIP device support is compiled in regardless; a missing SDK
@@ -61,16 +62,22 @@ OptiX without an 8.0+ SDK is compiled out of your build.
 
 ### Build
 
-Open `src4/BuildSolutions/Rhino.sln` and build the solution in one of:
+Build `src4/BuildSolutions/Cycles.sln`, Debug or Release. It holds only
+`ccycles.vcxproj`: it builds Cycles from source into `win/local`, then deploys it into
+`src4/bin/Debug` or `src4/bin/Release` if Rhino is built there (Release is where
+Rhino.sln's ReleaseDebuggable builds). Otherwise the next Rhino build deploys it.
+In RhinoBuilder, tick Cycles.sln, alone or with Rhino.sln; it builds after Rhino.sln.
+From a shell:
 
-| Configuration | Cycles |
+    msbuild src4\BuildSolutions\Cycles.sln /p:Configuration=Debug /p:Platform=x64 /m
+
+In Visual Studio, `Rhino.sln` builds Rhino and Cycles together in its `+Cycles`
+configurations. Cycles.sln's Debug and Release are these two:
+
+| Rhino.sln configuration | Cycles |
 | --- | --- |
 | `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload; no CMake or SDK needed |
 | `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source into `win/local` |
-
-RhinoBuilder lists the same configurations. From a shell:
-
-    msbuild src4\BuildSolutions\Rhino.sln /p:Configuration="Debug+Cycles" /p:Platform=x64 /m
 
 Both `+Cycles` configurations build Cycles as RelWithDebInfo: release-speed kernels,
 and `ccycles.pdb` stays in `build/bin/RelWithDebInfo`, so ccycles is steppable on the
@@ -78,7 +85,8 @@ machine that built it. `ccycles.vcxproj` runs
 
     build_cycles.ps1 -Configuration RelWithDebInfo -InstallDir <payload folder>
 
-with the CMake build tree in `build/` (Rebuild and Clean delete it).
+with the CMake build tree in `build/` (Rebuild and Clean delete it, RhinoBuilder's too:
+a Rebuild of several solutions cleans them all first).
 It builds kernels only for the GPUs in this machine (found with `amdgpu-arch` and
 `nvidia-smi`) and copies the rest from `win/release`. Those copied kernels do not
 contain your kernel changes; see [What your build got](#what-your-build-got).
@@ -89,11 +97,12 @@ that imports one ccycles' side-by-side manifest lists (`tbb12.dll`,
 a DLL of that name loaded first by something else wins: RDK's tbb12.dll 2021.11
 used to stop `ccycles.dll` loading.
 
-**Build the solution, not single projects.** `ccycles.vcxproj` alone updates
-`big_libs` but not `bin`; `RhinoCyclesCore.csproj` alone deploys whatever `big_libs`
-holds. `RhinoCyclesKernelCompiler.exe` only reaches the plug-in folder in a solution
-build. Without it no GPU kernels compile, and the compile log says it is missing: Rebuild
-the `RhinoCyclesKernelCompiler` project.
+**Cycles.sln refreshes a Rhino build; it does not make one.** Like `ccycles.vcxproj`
+built alone, it updates `big_libs` and the Cycles payload in an existing `bin`, nothing
+else; `RhinoCyclesCore.csproj` alone deploys whatever `big_libs` holds.
+`RhinoCyclesKernelCompiler.exe` only reaches the plug-in folder in a Rhino.sln build.
+Without it no GPU kernels compile, and the compile log says it is missing: Rebuild the
+`RhinoCyclesKernelCompiler` project.
 
 Environment variables `build_cycles.ps1` reads, also from Visual Studio:
 
@@ -104,21 +113,22 @@ Environment variables `build_cycles.ps1` reads, also from Visual Studio:
 | `CUDA_PATH`, `OPTIX_ROOT_DIR`, `HIP_PATH` | SDK locations, if not in the default install folders |
 
 Run directly, `build_cycles.ps1` also takes `-Devices`, `-AllArches`, `-Force`
-(overwrite `release` with a narrow build), `-ConfigureOnly`, `-Generator vs` (a
-`Cycles.sln` to open), `-Jobs` and `-BuildDir`. `-InstallDir` must be absolute. An
-unoptimised Cycles, for example:
+(overwrite `release` with a narrow build), `-ConfigureOnly`, `-Generator vs` (CMake's
+own `Cycles.sln` in the build tree, to open), `-Jobs` and `-BuildDir`. `-InstallDir`
+must be absolute. An unoptimised Cycles, for example:
 
     powershell -File build_cycles.ps1 -Configuration Debug -InstallDir <rhino>\big_libs\RhinoCycles\ccycles\win\local
 
 ### What your build got
 
-A `+Cycles` build can succeed and still lack something for this machine: no OptiX
+A from-source build can succeed and still lack something for this machine: no OptiX
 (no 8.0+ SDK), or a GPU running kernels copied from `win/release` (no SDK for it).
 Copied kernels do not contain your kernel changes, and when the kernel sources differ
 from the last publish they can render wrong or crash. None of this fails the build or
 reaches the Error List. Two places say it:
 
-- **Visual Studio's Output window**, also on a successful build: under
+- **Visual Studio's Output window** (RhinoBuilder: `LOG_<Configuration>_build_Cycles.txt`
+  in its log folder), also on a successful build: under
   `== Detecting GPU toolkits`, what was found, what was left out and which
   architectures are built.
 - **Rhino's kernel compile log** (`RhinoCyclesCompileLog`, or *Show compile log* in the
