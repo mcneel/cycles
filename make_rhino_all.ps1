@@ -849,8 +849,9 @@ try {
         Push-Location ([System.IO.Path]::GetFullPath((Join-Path $scriptRoot "..")))
         try {
             & powershell -NoProfile -ExecutionPolicy Bypass -File ".\versioninfo_changer.ps1" -RhinoBranchName $rhinoBranchName | Out-Host
+            # An unstamped or lower-stamped ccycles.dll must not reach big_libs.
             if ($LASTEXITCODE -ne 0) {
-                Write-Log "WARNING: versioninfo_changer.ps1 failed with code $LASTEXITCODE."
+                throw "versioninfo_changer.ps1 failed with code $LASTEXITCODE; not copying build outputs."
             }
         }
         finally {
