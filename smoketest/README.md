@@ -43,9 +43,10 @@ executable's folder.
 | `SMOKE_EMIT` | unset | `1`: emission instead of diffuse, so a texture lands in the pixels directly |
 | `SMOKE_NODE` | unset | Drives the surface colour from one shader node by name, e.g. `rhino_checker_texture` |
 | `SMOKE_IMAGE` | unset | Drives the surface colour from this image file through `image_texture` |
-| `SMOKE_NOMESH` | unset | `1`: no quad |
+| `SMOKE_XML` | unset | Replaces the surface shader's graph with one read from this file in Cycles' own XML (node elements and `connect` elements, as `app/cycles_xml.cpp` reads a shader body) || `SMOKE_NOMESH` | unset | `1`: no quad |
 | `SMOKE_NOLIGHT` | unset | `1`: no light |
 | `SMOKE_NOSTART` | unset | `1`: build the scene and exit without rendering |
+| `SMOKE_NODETYPES` | unset | `1`: list every shader node type with its sockets and exit, before any device or session. A node type name lists just that one. |
 | `SMOKE_TIMEOUT` | `600` | Seconds to wait for the render |
 
 `CCYCLES_DIAG_LOG` adds a scene summary (geometry, objects, lights, passes) before

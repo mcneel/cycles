@@ -242,6 +242,27 @@ namespace ccl
 			catch {}
 		}
 
+		/// <summary>
+		/// Replace the shader's graph with one read from Cycles' own XML. Unlike
+		/// <see cref="ShaderFromXml"/> this takes every node type Cycles has, but the graph has
+		/// no C# nodes: <see cref="Output"/> is null afterwards.
+		/// </summary>
+		/// <param name="shader">Shader whose graph to replace.</param>
+		/// <param name="shaderXml">Node elements and connect elements, as app/cycles_xml.cpp reads them.</param>
+		/// <param name="problems">Skipped nodes and connections, one per line; empty if none.</param>
+		/// <returns>false if the XML did not parse; the graph is then unchanged.</returns>
+		public static bool GraphFromCyclesXml(Shader shader, string shaderXml, out string problems)
+		{
+			var parsed = CSycles.shader_graph_from_xml(shader.Id, shaderXml, out problems);
+			if (parsed)
+			{
+				/* The old graph's nodes are gone; their wrappers would point at freed memory. */
+				shader.m_nodes.Clear();
+				shader.Output = null;
+			}
+			return parsed;
+		}
+
 		protected virtual void Dispose(bool disposing)
 		{
 			// C# never owns shaders, so there is nothing to dispose.

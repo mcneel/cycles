@@ -74,6 +74,7 @@
     <Compile Include="CSycles.Integrator.cs" />
     <Compile Include="CSycles.Light.cs" />
     <Compile Include="CSycles.Mesh.cs" />
+    <Compile Include="CSycles.NodeTypes.cs" />
     <Compile Include="CSycles.Object.cs" />
     <Compile Include="CSycles.Scene.cs" />
     <Compile Include="CSycles.Session.cs" />
@@ -92,6 +93,7 @@
     <Compile Include="Scene.cs" />
     <Compile Include="Session.cs" />
     <Compile Include="Shader.cs" />
+    <Compile Include="ShaderNodeTypes.cs" />
     <Compile Include="ShaderNodes\AttributeNode.cs" />
     <Compile Include="ShaderNodes\BevelNode.cs" />
     <Compile Include="ShaderNodes\ColorRamp.cs" />

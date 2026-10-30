@@ -43,6 +43,25 @@ namespace ccl
 			return cycles_add_shader_node(shaderId, node_type, node_name);
 		}
 
+		[DllImport(Constants.ccycles, SetLastError = false, CallingConvention = CallingConvention.Cdecl)]
+		[return: MarshalAs(UnmanagedType.U1)]
+		private static extern bool cycles_shader_graph_from_xml(IntPtr shaderId, [MarshalAs(UnmanagedType.LPUTF8Str)] string xml, IntPtr strHolder);
+		/// <summary>
+		/// Replace the shader's graph with one read from Cycles' own XML, as app/cycles_xml.cpp
+		/// reads a shader body. Nodes or connections with problems are skipped and listed in
+		/// problems, one per line.
+		/// </summary>
+		/// <returns>false if the XML did not parse; the graph is then unchanged.</returns>
+		public static bool shader_graph_from_xml(IntPtr shaderId, string xml, out string problems)
+		{
+			using (var stringHolder = new CSStringHolder())
+			{
+				var parsed = cycles_shader_graph_from_xml(shaderId, xml, stringHolder.Ptr);
+				problems = stringHolder.Value;
+				return parsed;
+			}
+		}
+
 		[DllImport(Constants.ccycles, SetLastError = false,
 			CallingConvention = CallingConvention.Cdecl)]
 		private static extern void cycles_shadernode_texmapping_set_transformation(IntPtr shadernodeId, uint transformType, float x, float y, float z);

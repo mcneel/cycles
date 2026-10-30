@@ -24,6 +24,24 @@ internal static class Program
 
     [System.Runtime.InteropServices.DllImport("ccycles", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
     private static extern void cycles_debug_install_crash_handler();
+    private static void DumpNodeTypes(ShaderNodeTypeInfo nodeType)
+    {
+        Console.WriteLine(nodeType.Name);
+        foreach (var s in nodeType.Inputs) {
+            string line = "  in  " + s.Name + " '" + s.UiName + "' " + s.Type;
+            if (s.Default.Length > 0) line += " = " + s.Default;
+            if (s.IsLinkable) line += " [linkable]";
+            if (s.IsInternal) line += " [internal]";
+            if (s.EnumValues.Count > 0) {
+                var values = new System.Collections.Generic.List<string>();
+                foreach (var e in s.EnumValues) values.Add(e.Key + "=" + e.Value);
+                line += " {" + string.Join(", ", values) + "}";
+            }
+            Console.WriteLine(line);
+        }
+        foreach (var s in nodeType.Outputs)
+            Console.WriteLine("  out " + s.Name + " '" + s.UiName + "' " + s.Type);
+    }
 
     private static void Main()
     {
@@ -36,6 +54,23 @@ internal static class Program
         try { cycles_debug_install_crash_handler(); }
         catch (EntryPointNotFoundException) { Console.WriteLine("crashhandler: absent (old ccycles)"); }
         CSycles.path_init(path, userpath);
+
+        // SMOKE_NODETYPES: dump the shader node registry and exit, before any device or
+        // session exists. "1" lists every type; anything else is one type's name.
+        string nodeTypes = Environment.GetEnvironmentVariable("SMOKE_NODETYPES");
+        if (!string.IsNullOrEmpty(nodeTypes)) {
+            Console.WriteLine("nodetypes  : " + ShaderNodeTypes.All.Count);
+            if (nodeTypes == "1") {
+                foreach (var nodeType in ShaderNodeTypes.All) DumpNodeTypes(nodeType);
+            }
+            else {
+                var nodeType = ShaderNodeTypes.Find(nodeTypes);
+                if (nodeType != null) DumpNodeTypes(nodeType);
+                else Console.WriteLine("nodetype   : '" + nodeTypes + "' not found");
+            }
+            return;
+        }
+
         // SMOKE_DEVMASK: Rhino defaults to a GPU device, a path CPU-only init never reaches.
         string devMask = Environment.GetEnvironmentVariable("SMOKE_DEVMASK");
         DeviceTypeMask mask = DeviceTypeMask.CPU;
@@ -129,6 +164,15 @@ internal static class Program
         IntPtr outNode = FindOutputNode(diffuse);
         bool connected = CSycles.shader_connect_nodes(diffuse, bsdf, emit ? "Emission" : "BSDF", outNode, "Surface");
         Console.WriteLine("shader     : connected=" + connected);
+
+        // SMOKE_XML: replace that graph with one read from a file in Cycles' own XML.
+        string xmlPath = Environment.GetEnvironmentVariable("SMOKE_XML");
+        if (!string.IsNullOrEmpty(xmlPath)) {
+            bool parsed = CSycles.shader_graph_from_xml(diffuse, File.ReadAllText(xmlPath), out string problems);
+            Console.WriteLine("xml        : parsed=" + parsed + " nodes=" + CSycles.shader_node_count(diffuse));
+            if (problems.Length > 0) Console.Write(problems);
+            if (!parsed) { Console.WriteLine("RESULT     : XML-FAILED"); return; }
+        }
 
         IntPtr mesh = CSycles.scene_add_mesh(session, diffuse);
         float[] verts = new float[] {
