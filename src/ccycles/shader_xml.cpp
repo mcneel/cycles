@@ -79,11 +79,20 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 		return false;
 	}
 
+	/* Cycles' example scenes wrap the body in <shader>, sometimes inside <cycles>. */
+	ccl::xml_node body = doc;
+	if (ccl::xml_node shader = doc.child("shader")) {
+		body = shader;
+	}
+	else if (ccl::xml_node scene_shader = doc.child("cycles").child("shader")) {
+		body = scene_shader;
+	}
+
 	auto graph = ccl::make_unique<ccl::ShaderGraph>();
 	ccl::XMLReader reader;
 	reader.node_map[ustring("output")] = graph->output();
 
-	for (ccl::xml_node node = doc.first_child(); node; node = node.next_sibling()) {
+	for (ccl::xml_node node = body.first_child(); node; node = node.next_sibling()) {
 		if (node.type() != PUGIXML_NAMESPACE::node_element) {
 			continue;
 		}
