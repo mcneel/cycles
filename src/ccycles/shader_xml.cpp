@@ -49,6 +49,22 @@ static ccl::ShaderInput *find_input(ccl::ShaderNode *node, const std::string &na
 	return nullptr;
 }
 
+/* ShaderGraph::connect turns one type into another with a registered convert node, and
+ * anything into a closure with an emission. For a pair with no convert node, such as a value
+ * into a boolean, it would build one from a null type and crash. */
+static bool can_connect(const ccl::ShaderOutput *output, const ccl::ShaderInput *input)
+{
+	const ccl::SocketType::Type from = output->type();
+	const ccl::SocketType::Type to = input->type();
+	if (from == to || to == ccl::SocketType::CLOSURE) {
+		return true;
+	}
+
+	const std::string convert = "convert_" + ccl::SocketType::type_name(from).string() + "_to_" +
+	                            ccl::SocketType::type_name(to).string();
+	return ccl::NodeType::find(ustring(convert)) != nullptr;
+}
+
 /* Split "node socket" into its two parts. */
 static bool split_socket_ref(const char *text, std::string &node, std::string &socket)
 {
@@ -125,6 +141,15 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 				                           output == nullptr ? from->type->name.c_str() : to->type->name.c_str(),
 				                           output == nullptr ? "output" : "input",
 				                           output == nullptr ? from_socket.c_str() : to_socket.c_str()));
+				continue;
+			}
+
+			if (!can_connect(output, input)) {
+				problem(ccl::string_printf("Cycles cannot connect %s %s (%s) to %s %s (%s)",
+				                           from_node.c_str(), from_socket.c_str(),
+				                           ccl::SocketType::type_name(output->type()).c_str(),
+				                           to_node.c_str(), to_socket.c_str(),
+				                           ccl::SocketType::type_name(input->type()).c_str()));
 				continue;
 			}
 
