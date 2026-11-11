@@ -310,7 +310,8 @@ ccl_device_forceinline bool bvh_volume_anyhit_triangle_filter(
     return true;
   }
 
-  const int shader = kernel_data_fetch(tri_shader, prim);
+  /* Rhino: the object's shader; instances share a mesh's per-triangle shaders. */
+  const int shader = kernel_data_fetch(objects, object).shader;
   const int shader_flag = kernel_data_fetch(shaders, (shader & SHADER_MASK)).flags;
   if (!(shader_flag & SD_HAS_VOLUME)) {
     return true;

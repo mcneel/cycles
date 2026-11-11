@@ -18,6 +18,7 @@ limitations under the License.
 
 #include "device/optix/device.h"
 #include "util/log.h"
+#include "util/colorspace.h"
 #include "util/path.h"
 #include "ccycles.h"
 
@@ -69,6 +70,10 @@ void cycles_initialise(unsigned int mask)
 			ccl::log_level_set(lvl != nullptr && lvl[0] != 0 ? ccl::log_string_to_level(lvl)
 			                                                 : ccl::LOG_LEVEL_INFO);
 		}
+		/* OpenColorIO's built-in raw config whatever $OCIO says: RhinoCycles gamma-decodes
+		 * textures in the shader, so Cycles must treat them as data, which it only does
+		 * without a real config. */
+		ccl::ColorSpaceManager::init_fallback_config();
 		devices.clear();
 		multi_devices.clear();
 		devices = ccl::Device::available_devices(mask);
