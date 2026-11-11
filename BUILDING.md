@@ -187,13 +187,22 @@ name, writes `ccycles_payload.json` (including a hash of the kernel sources), st
 rather than stage an incomplete payload, or one without the side-by-side manifests.
 `-SkipBuild` re-checks and re-stages.
 
+`ccycles.dll` and `cycles_kernel_oneapi_jit.dll` get their version from Rhino's
+generated, gitignored `src4/version.h`, and an installer upgrade keeps an installed DLL
+unless the new one is higher (RH-98458). So before building it checks that `version.h`
+is this branch's (`build/build_dates.msbuild`) and newer than the committed
+`ccycles.dll`; building UpdateVersionNumbers in Rhino.sln regenerates it. Before staging
+it checks that no changed DLL lost its version or went down (`payload_version_guard.ps1`).
+`-SkipVersionGuard` publishes anyway, for a payload you will not commit.
+
 ### Check
 
     powershell -ExecutionPolicy Bypass -File tools/run_checks.ps1
 
 About a second, no build needed (python for the audits). Runs the static audits,
-checks that the committed payload matches the kernel sources, that the library
-bundle is the pinned one, and that the installer's kernel list matches. Exit code is
+checks that the committed payload matches the kernel sources and carries this branch's
+version, that the library bundle is the pinned one, and that the installer's kernel
+list matches. Exit code is
 non-zero on failure.
 
 ### Run

@@ -23,6 +23,11 @@
     Passed through to build_cycles.ps1. Separate from a developer's own build directory:
     the architecture lists differ, so sharing one would force full kernel rebuilds.
 
+.PARAMETER SkipVersionGuard
+    Publish even though src4/version.h or the payload DLLs fail the version checks
+    (payload_version_guard.ps1). The installer would keep the old DLLs on upgrade, so a
+    payload published this way must not be committed.
+
 .EXAMPLE
     .\publish_payload.ps1
 
@@ -36,13 +41,16 @@ param(
 
     [switch]$SkipBuild,
 
-    [string]$BuildDir = 'build_publish'
+    [string]$BuildDir = 'build_publish',
+
+    [switch]$SkipVersionGuard
 )
 
 $ErrorActionPreference = 'Stop'
 $cyclesRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 
 . (Join-Path $cyclesRoot 'kernel_arches.ps1')
+. (Join-Path $cyclesRoot 'payload_version_guard.ps1')
 
 function Write-Step($msg) { Write-Host "`n== $msg" -ForegroundColor Cyan }
 function Write-Ok($what, $detail) { Write-Host ("   {0,-22} {1}" -f $what, $detail) -ForegroundColor Green }
@@ -56,12 +64,33 @@ $repoRoot = Resolve-Path (Join-Path $cyclesRoot '..\..\..\..\..')
 $payloadName = if ($Configuration -eq 'Debug') { 'local' } else { 'release' }
 $payloadDir = Join-Path $repoRoot "big_libs\RhinoCycles\ccycles\win\$payloadName"
 $libDir = Join-Path $payloadDir 'lib'
+$bigLibs = Join-Path $repoRoot 'big_libs'
 
 Write-Step "Publishing the $payloadName payload"
 Write-Ok 'payload' $payloadDir
 
 if ($Configuration -eq 'Debug') {
     Write-Warn 'note' 'the local payload is gitignored; this will build one but not stage it'
+}
+
+# A problem from payload_version_guard.ps1: fatal unless -SkipVersionGuard.
+function Stop-OnVersionProblems([string[]]$Problems, [string]$Context) {
+    if (-not $Problems.Count) { return }
+    $Problems | ForEach-Object { Write-Bad 'version' $_ }
+    if ($SkipVersionGuard) {
+        Write-Warn 'guard skipped' 'do not commit this payload; the installer would keep the old DLLs on upgrade'
+        return
+    }
+    throw ("$Context Windows Installer keeps an installed DLL unless the new one is higher, so " +
+           "an upgrade would keep the old one. Fix the above, or pass -SkipVersionGuard and do not commit.")
+}
+
+# ccycles.dll is stamped from src4/version.h, so check it before an hour of building.
+if ($Configuration -eq 'Release' -and -not $SkipBuild) {
+    Write-Step "Checking the version ccycles.dll will be stamped with"
+    $headerProblems = @(Get-VersionHeaderProblems $repoRoot $bigLibs | Where-Object { $_ })
+    Stop-OnVersionProblems $headerProblems 'Nothing was built.'
+    if (-not $headerProblems.Count) { Write-Ok 'src4/version.h' "$(Get-VersionHeaderVersion $repoRoot)" }
 }
 
 # ---------------------------------------------------------------------------- build
@@ -387,11 +416,18 @@ if ($Configuration -eq 'Debug') {
     return
 }
 
+Write-Step "Checking DLL versions against big_libs HEAD"
+
+$versions = Get-PayloadVersionProblems $payloadDir $bigLibs
+$versions.Notes | ForEach-Object { Write-Warn 'note' $_ }
+Stop-OnVersionProblems @($versions.Problems) ("Nothing was staged; git -C `"$bigLibs`" restore " +
+    "-- RhinoCycles/ccycles/win/release puts the committed payload back.")
+if (-not $versions.Problems.Count) { Write-Ok 'versions' 'every changed DLL keeps a version that goes up' }
+
 Write-Step "Staging in big_libs"
 
 # big_libs is a submodule, so stage inside it. That means two commits (payload, then the
 # Rhino repo's submodule pointer); both are printed, not made.
-$bigLibs = Join-Path $repoRoot 'big_libs'
 $payloadRel = "RhinoCycles/ccycles/win/$payloadName"
 
 Push-Location $bigLibs
