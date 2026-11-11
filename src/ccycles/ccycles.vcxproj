@@ -5,12 +5,14 @@
 
     Debug / Release / ReleaseDebuggable
         Does nothing; RhinoCyclesCore.csproj restores the prebuilt binaries.
+        Properties > Cycles > Build from source = Yes (saved per user in
+        ccycles.vcxproj.user) builds from source instead, as below.
     Debug+Cycles / ReleaseDebuggable+Cycles
         Builds Cycles from source into big_libs. GPU backends are auto-detected;
         with no GPU SDKs you still get a CPU-only build. Cycles.sln's Debug and
         Release build these.
 
-  A +Cycles build then deploys the payload into an existing src4/bin/Debug or bin/Release
+  A from-source build then deploys the payload into an existing src4/bin/Debug or bin/Release
   with RhinoCyclesCore's deploy targets, so building only Cycles refreshes Rhino.
 -->
 <Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
@@ -80,23 +82,8 @@
     <CyclesInstallDir>$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\big_libs\RhinoCycles\ccycles\win\local</CyclesInstallDir>
     <CyclesBuildDir>$(MSBuildThisFileDirectory)..\..\build</CyclesBuildDir>
 
-    <!-- Only the +Cycles configurations build from source (see the top of this
-         file). Not detected automatically: a Makefile project declares no sources
-         for MSBuild to compare, and checkout rewrites mtimes. -->
-    <CyclesBuildFromSource>false</CyclesBuildFromSource>
-    <CyclesBuildFromSource Condition="$(Configuration.Contains('Cycles'))">true</CyclesBuildFromSource>
-
     <CyclesInvoke>powershell -NoProfile -ExecutionPolicy Bypass -File "$(CyclesScript)" -Configuration $(CyclesConfiguration) -InstallDir "$(CyclesInstallDir)"</CyclesInvoke>
-    <CyclesSkipMessage>echo ccycles: using the prebuilt Cycles from big_libs. Build Cycles.sln, or the Debug+Cycles or ReleaseDebuggable+Cycles configuration, to build it from source.</CyclesSkipMessage>
-
-    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
-    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>
-
-    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesInvoke)</NMakeReBuildCommandLine>
-    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeReBuildCommandLine>
-
-    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul</NMakeCleanCommandLine>
-    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeCleanCommandLine>
+    <CyclesSkipMessage>echo ccycles: using the prebuilt Cycles from big_libs. Turn on Build from source in the Cycles page of the ccycles properties, or build Cycles.sln, to build it from source.</CyclesSkipMessage>
 
     <NMakeOutput>$(CyclesInstallDir)\ccycles.dll</NMakeOutput>
 
@@ -109,9 +96,31 @@
     <None Include="..\..\build_cycles.ps1" />
     <None Include="CMakeLists.txt" />
     <None Include="ccycles_manifest.xml.in" />
+    <PropertyPageSchema Include="$(MSBuildThisFileDirectory)ccycles_property_page.xml">
+      <Context>Project</Context>
+    </PropertyPageSchema>
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+  <!--
+    After Microsoft.Cpp.targets, which imports ccycles.vcxproj.user, where the Cycles
+    property page saves CyclesBuildFromSource. Not detected automatically: a Makefile
+    project declares no sources for MSBuild to compare, and checkout rewrites mtimes.
+  -->
+  <PropertyGroup>
+    <CyclesBuildFromSource Condition="$(Configuration.Contains('Cycles'))">true</CyclesBuildFromSource>
+    <CyclesBuildFromSource Condition="'$(CyclesBuildFromSource)'!='true'">false</CyclesBuildFromSource>
+
+    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">$(CyclesInvoke)</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeBuildCommandLine>
+
+    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul &amp; $(CyclesInvoke)</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeReBuildCommandLine>
+
+    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'=='true'">rmdir /s /q "$(CyclesBuildDir)" 2&gt;nul</NMakeCleanCommandLine>
+    <NMakeCleanCommandLine Condition="'$(CyclesBuildFromSource)'!='true'">$(CyclesSkipMessage)</NMakeCleanCommandLine>
+  </PropertyGroup>
 
   <!--
     RhinoCyclesCore's deploy targets read only its properties, not its build output, so

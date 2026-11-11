@@ -17,7 +17,7 @@ and the kernel sources (`source/`). They live in `big_libs/RhinoCycles/ccycles/`
 | Folder | Written by | In git |
 | --- | --- | --- |
 | `win/release`, `osx/release` | `publish_payload.ps1` (Windows), `make payload` (macOS) | yes |
-| `win/local` | `Cycles.sln`, `Debug+Cycles` and `ReleaseDebuggable+Cycles` | no |
+| `win/local` | `Cycles.sln`, or ccycles with Build from source in Rhino.sln | no |
 | `osx/local` | the macOS Cycles schemes | no |
 
 Which one a build deploys:
@@ -71,16 +71,14 @@ From a shell:
 
     msbuild src4\BuildSolutions\Cycles.sln /p:Configuration=Debug /p:Platform=x64 /m
 
-In Visual Studio, `Rhino.sln` builds Rhino and Cycles together in its `+Cycles`
-configurations. Cycles.sln's Debug and Release are these two:
+In Visual Studio, `Rhino.sln` uses the prebuilt payload; no CMake or SDK needed. To
+build Rhino and Cycles together, open the properties of ccycles (Rhino Render > Cycles >
+CCSycles) and set Cycles > Build from source to Yes. It is saved for you only, in
+`ccycles.vcxproj.user`, for every configuration. From a shell, pass
+`/p:CyclesBuildFromSource=true`.
 
-| Rhino.sln configuration | Cycles |
-| --- | --- |
-| `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload; no CMake or SDK needed |
-| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source into `win/local` |
-
-Both `+Cycles` configurations build Cycles as RelWithDebInfo: release-speed kernels,
-and `ccycles.pdb` stays in `build/bin/RelWithDebInfo`, so ccycles is steppable on the
+Debug and ReleaseDebuggable build Cycles as RelWithDebInfo, as Cycles.sln does:
+release-speed kernels, and `ccycles.pdb` stays in `build/bin/RelWithDebInfo`, so ccycles is steppable on the
 machine that built it. `ccycles.vcxproj` runs
 
     build_cycles.ps1 -Configuration RelWithDebInfo -InstallDir <payload folder>

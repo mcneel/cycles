@@ -36,7 +36,7 @@ jobs:
           https://projects.blender.org/blender/lib-windows_x64/commit/$theirs
 
           To move: change the \`lib/windows_x64\` submodule commit, build, run \`publish_payload.ps1\`, commit the payload.
-          Everyone's next \`+Cycles\` build then fetches the new bundle. This issue closes itself once the pins agree."
+          Everyone's next from-source build then fetches the new bundle. This issue closes itself once the pins agree."
           elif [ "$theirs" = "$ours" ] && [ -n "$open" ]; then
             gh issue close "$open" --comment "Pins agree again."
           fi
