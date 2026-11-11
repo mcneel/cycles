@@ -423,8 +423,9 @@ Write-Step "Checking DLL versions against big_libs HEAD"
 
 $versions = Get-PayloadVersionProblems $payloadDir $bigLibs
 $versions.Notes | ForEach-Object { Write-Warn 'note' $_ }
-Stop-OnVersionProblems @($versions.Problems) ("Nothing was staged; git -C `"$bigLibs`" restore " +
-    "-- RhinoCycles/ccycles/win/release puts the committed payload back.")
+Stop-OnVersionProblems @($versions.Problems) ("Nothing was staged. To put the committed payload back: " +
+    "git -C `"$bigLibs`" restore --source=HEAD --staged --worktree -- RhinoCycles/ccycles/win/release, " +
+    "then git -C `"$bigLibs`" clean -fd -- RhinoCycles/ccycles/win/release for files the build added.")
 if (-not $versions.Problems.Count) { Write-Ok 'versions' 'every changed DLL keeps a version that goes up' }
 
 if ($versionGuardSkipped) {

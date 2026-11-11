@@ -88,7 +88,9 @@ if (-not (Test-Path (Join-Path $bigLibs 'RhinoCycles\ccycles\win\release'))) {
 }
 else {
   . (Join-Path $repo 'payload_version_guard.ps1')
-  $check = Get-CommittedPayloadVersionProblems $rhinoRoot $bigLibs
+  # A throw (a payload DLL that is not an LFS pointer) is a failed check, not the end of the run.
+  try { $check = Get-CommittedPayloadVersionProblems $rhinoRoot $bigLibs }
+  catch { $check = [pscustomobject]@{ Problems = @($_.Exception.Message); Notes = @() } }
   $check.Problems | ForEach-Object { Write-Host "  $_" }
   $check.Notes | ForEach-Object { Write-Host "  not verifiable: $_" }
   if ($check.Problems.Count) {

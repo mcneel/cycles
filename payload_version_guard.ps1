@@ -118,7 +118,7 @@ function Get-PayloadVersionProblems([string]$PayloadDir, [string]$BigLibsRoot, [
                 $msg = "$($dll.Name) $new is not higher than $old"
                 if ($CyclesRestampedDlls -notcontains $dll.Name) {
                     $msg += ". If its kernels did not change, put the committed one back (git -C big_libs restore " +
-                            "--source=HEAD -- $CyclesPayloadRel/$($dll.Name)) and publish again with -SkipBuild"
+                            "--source=HEAD --staged --worktree -- $CyclesPayloadRel/$($dll.Name)) and publish again with -SkipBuild"
                 }
                 $problems.Add($msg)
             }
@@ -154,7 +154,11 @@ function Get-CommittedPayloadVersionProblems([string]$RepoRoot, [string]$BigLibs
         $changedIn = & git -C $BigLibsRoot log --first-parent -n 1 --format=%h $Revision -- "$CyclesPayloadRel/$name"
         if (-not $changedIn) { continue }
         $parent = & git -C $BigLibsRoot rev-parse --short --verify --quiet "$changedIn^1"
-        if (-not $parent) { continue }
+        if (-not $parent) {
+            # A shallow clone's boundary or the first commit: nothing to compare with.
+            $notes.Add("$name was last changed in $changedIn, whose parent is not here (shallow clone?); not compared with the version it replaced")
+            continue
+        }
         $previous = Get-CommittedPayloadFile $BigLibsRoot $name $parent
         if (-not $previous) { continue }
         if (-not $previous.Object) { $notes.Add((Get-NotLocalMessage $previous)); continue }
