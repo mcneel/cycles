@@ -24,9 +24,9 @@
     the architecture lists differ, so sharing one would force full kernel rebuilds.
 
 .PARAMETER SkipVersionGuard
-    Publish even though src4/version.h or the payload DLLs fail the version checks
-    (payload_version_guard.ps1). The installer would keep the old DLLs on upgrade, so a
-    payload published this way must not be committed.
+    Build and check even though src4/version.h or the payload DLLs fail the version
+    checks (payload_version_guard.ps1). The installer would keep the old DLLs on upgrade,
+    so such a payload is not staged.
 
 .EXAMPLE
     .\publish_payload.ps1
@@ -73,16 +73,19 @@ if ($Configuration -eq 'Debug') {
     Write-Warn 'note' 'the local payload is gitignored; this will build one but not stage it'
 }
 
-# A problem from payload_version_guard.ps1: fatal unless -SkipVersionGuard.
+# A problem from payload_version_guard.ps1: fatal unless -SkipVersionGuard, which then
+# skips staging so the payload is not committed by accident.
+$versionGuardSkipped = $false
 function Stop-OnVersionProblems([string[]]$Problems, [string]$Context) {
     if (-not $Problems.Count) { return }
     $Problems | ForEach-Object { Write-Bad 'version' $_ }
     if ($SkipVersionGuard) {
-        Write-Warn 'guard skipped' 'do not commit this payload; the installer would keep the old DLLs on upgrade'
+        Write-Warn 'guard skipped' 'this payload will not be staged; the installer would keep the old DLLs on upgrade'
+        $script:versionGuardSkipped = $true
         return
     }
     throw ("$Context Windows Installer keeps an installed DLL unless the new one is higher, so " +
-           "an upgrade would keep the old one. Fix the above, or pass -SkipVersionGuard and do not commit.")
+           "an upgrade would keep the old one. Fix the above, or pass -SkipVersionGuard to build and check without staging.")
 }
 
 # ccycles.dll is stamped from src4/version.h, so check it before an hour of building.
@@ -423,6 +426,11 @@ $versions.Notes | ForEach-Object { Write-Warn 'note' $_ }
 Stop-OnVersionProblems @($versions.Problems) ("Nothing was staged; git -C `"$bigLibs`" restore " +
     "-- RhinoCycles/ccycles/win/release puts the committed payload back.")
 if (-not $versions.Problems.Count) { Write-Ok 'versions' 'every changed DLL keeps a version that goes up' }
+
+if ($versionGuardSkipped) {
+    Write-Step "Done - payload built and checked but not staged, because the version guard was skipped"
+    return
+}
 
 Write-Step "Staging in big_libs"
 

@@ -7,9 +7,11 @@
 # payload DLL that does not go up is silently not installed, so ccycles.dll can end up
 # beside another build's DLLs.
 
-# Stamped from Rhino's src4/version.h (src/ccycles/CMakeLists.txt and the oneAPI kernel's
-# .rc); every other versioned DLL keeps its upstream version.
+# Stamped from Rhino's src4/version.h. ccycles.dll on every build; the oneAPI kernel only
+# when its kernels rebuild (src/kernel/device/oneapi/CMakeLists.txt), so it keeps the
+# version they were built with. Every other versioned DLL keeps its upstream version.
 $CyclesStampedDlls = @('ccycles.dll', 'cycles_kernel_oneapi_jit.dll')
+$CyclesRestampedDlls = @('ccycles.dll')
 $CyclesPayloadRel = 'RhinoCycles/ccycles/win/release'
 
 # $null for a DLL without a version resource.
@@ -84,8 +86,13 @@ function Get-VersionHeaderProblems([string]$RepoRoot, [string]$BigLibsRoot) {
     if (-not $committed) { return $null }
     if (-not $committed.Object) { return Get-NotLocalMessage $committed }
     $shipped = Get-CyclesDllVersion $committed.Object
-    if ($shipped -and $header -le $shipped) {
-        return "src4/version.h is $header, not higher than ccycles.dll $shipped in big_libs. $hint"
+    if ($shipped -and $header -eq $shipped) {
+        # Developer builds stamp every build of a day 01:00 (build_dates.msbuild).
+        return ("src4/version.h is $header, the same as ccycles.dll in big_libs: a payload was already " +
+                "published today, and every developer build of a day gets the same number. Publish again tomorrow.")
+    }
+    if ($shipped -and $header -lt $shipped) {
+        return "src4/version.h is $header, older than ccycles.dll $shipped in big_libs. $hint"
     }
     return $null
 }
@@ -107,7 +114,14 @@ function Get-PayloadVersionProblems([string]$PayloadDir, [string]$BigLibsRoot, [
             $problems.Add("$($dll.Name) lost its version (was $old)")
         }
         elseif ($CyclesStampedDlls -contains $dll.Name) {
-            if (-not $new -or ($old -and $new -le $old)) { $problems.Add("$($dll.Name) $new is not higher than $old") }
+            if (-not $new -or ($old -and $new -le $old)) {
+                $msg = "$($dll.Name) $new is not higher than $old"
+                if ($CyclesRestampedDlls -notcontains $dll.Name) {
+                    $msg += ". If its kernels did not change, put the committed one back (git -C big_libs restore " +
+                            "--source=HEAD -- $CyclesPayloadRel/$($dll.Name)) and publish again with -SkipBuild"
+                }
+                $problems.Add($msg)
+            }
         }
         elseif ($old -and $new -lt $old) {
             $problems.Add("$($dll.Name) went down from $old to $new")
@@ -119,8 +133,8 @@ function Get-PayloadVersionProblems([string]$PayloadDir, [string]$BigLibsRoot, [
     return [pscustomobject]@{ Problems = $problems; Notes = $notes }
 }
 
-# The committed payload, for reverts and merges that nothing re-stamps: stamped DLLs carry
-# this branch's version and are not lower than the ones they replaced. Returns
+# The committed payload, for reverts and merges that nothing re-stamps: ccycles.dll carries
+# this branch's version, and stamped DLLs are not lower than the ones they replaced. Returns
 # @{ Problems; Notes }; a DLL missing from the local LFS store is a note, not a failure.
 function Get-CommittedPayloadVersionProblems([string]$RepoRoot, [string]$BigLibsRoot, [string]$Revision = 'HEAD') {
     $problems = [System.Collections.Generic.List[string]]::new()
@@ -132,7 +146,8 @@ function Get-CommittedPayloadVersionProblems([string]$RepoRoot, [string]$BigLibs
         if (-not $committed.Object) { $notes.Add((Get-NotLocalMessage $committed)); continue }
         $version = Get-CyclesDllVersion $committed.Object
         if (-not $version) { $problems.Add("$name has no version"); continue }
-        if ($branch -and ($version.Major -ne $branch.Major -or $version.Minor -ne $branch.Minor)) {
+        if ($branch -and $CyclesRestampedDlls -contains $name -and
+            ($version.Major -ne $branch.Major -or $version.Minor -ne $branch.Minor)) {
             $problems.Add("$name is $version but this branch is $branch")
         }
 

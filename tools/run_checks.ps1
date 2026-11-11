@@ -98,7 +98,7 @@ else {
     Add-Result 'payload versions' 0 'partly not verifiable'
   }
   else {
-    Write-Host "  ccycles.dll and the oneAPI kernel carry $(Get-RhinoBranchVersion $rhinoRoot) and went up"
+    Write-Host "  ccycles.dll carries $(Get-RhinoBranchVersion $rhinoRoot); ccycles.dll and the oneAPI kernel went up"
     Add-Result 'payload versions' 0 ''
   }
 }

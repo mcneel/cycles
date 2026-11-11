@@ -193,7 +193,7 @@ unless the new one is higher (RH-98458). So before building it checks that `vers
 is this branch's (`build/build_dates.msbuild`) and newer than the committed
 `ccycles.dll`; building UpdateVersionNumbers in Rhino.sln regenerates it. Before staging
 it checks that no changed DLL lost its version or went down (`payload_version_guard.ps1`).
-`-SkipVersionGuard` publishes anyway, for a payload you will not commit.
+`-SkipVersionGuard` builds and checks anyway, but does not stage.
 
 ### Check
 
