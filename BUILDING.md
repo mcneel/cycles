@@ -73,8 +73,9 @@ From a shell:
 
 In Visual Studio, `Rhino.sln` uses the prebuilt payload; no CMake or SDK needed. To
 build Rhino and Cycles together, open the properties of ccycles (Rhino Render > Cycles >
-CCSycles) and set Cycles > Build from source to Yes. It is saved for you only, in
-`ccycles.vcxproj.user`, for every configuration. From a shell, pass
+CCSycles) and set Configuration Properties > Cycles > Build from source to Yes. It is
+saved for you only, in `ccycles.vcxproj.user`, per configuration; pick All Configurations
+to set it for Debug and ReleaseDebuggable at once. From a shell, pass
 `/p:CyclesBuildFromSource=true`.
 
 Debug and ReleaseDebuggable build Cycles as RelWithDebInfo, as Cycles.sln does:

@@ -5,8 +5,8 @@
 
     Debug / Release / ReleaseDebuggable
         Does nothing; RhinoCyclesCore.csproj restores the prebuilt binaries.
-        Properties > Cycles > Build from source = Yes (saved per user in
-        ccycles.vcxproj.user) builds from source instead, as below.
+        Configuration Properties > Cycles > Build from source = Yes (saved per user
+        and configuration in ccycles.vcxproj.user) builds from source instead, as below.
     Debug+Cycles / ReleaseDebuggable+Cycles
         Builds Cycles from source into big_libs. GPU backends are auto-detected;
         with no GPU SDKs you still get a CPU-only build. Cycles.sln's Debug and

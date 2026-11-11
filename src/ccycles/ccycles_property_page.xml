@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Properties > Cycles on ccycles.vcxproj. Saved per user in ccycles.vcxproj.user. -->
+<!-- Properties > Configuration Properties > Cycles on ccycles.vcxproj. Saved per user in ccycles.vcxproj.user. -->
 <Rule Name="Cycles"
       DisplayName="Cycles"
       PageTemplate="generic"
-      Order="1"
+      Description="Cycles"
       xmlns="http://schemas.microsoft.com/build/2009/properties">
   <Rule.DataSource>
-    <DataSource Persistence="UserFile" HasConfigurationCondition="false" />
+    <!-- Per configuration: Visual Studio hides all-configuration pages in solutions with other C++ projects. -->
+    <DataSource Persistence="UserFile" HasConfigurationCondition="true" />
   </Rule.DataSource>
   <Rule.Categories>
     <Category Name="General" DisplayName="General" />
