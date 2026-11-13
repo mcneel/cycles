@@ -421,15 +421,17 @@ if ($Configuration -eq 'Debug') {
 
 Write-Step "Checking DLL versions against big_libs HEAD"
 
-$versions = Get-PayloadVersionProblems $payloadDir $bigLibs
-$versions.Notes | ForEach-Object { Write-Warn 'note' $_ }
-Stop-OnVersionProblems @($versions.Problems) ("Nothing was staged. To put the committed payload back: " +
+$restoreHint = ("To put the committed payload back: " +
     "git -C `"$bigLibs`" restore --source=HEAD --staged --worktree -- RhinoCycles/ccycles/win/release, " +
     "then git -C `"$bigLibs`" clean -fd -- RhinoCycles/ccycles/win/release for files the build added.")
+$versions = Get-PayloadVersionProblems $payloadDir $bigLibs -RepoRoot $repoRoot
+$versions.Notes | ForEach-Object { Write-Warn 'note' $_ }
+Stop-OnVersionProblems @($versions.Problems) "Nothing was staged. $restoreHint"
 if (-not $versions.Problems.Count) { Write-Ok 'versions' 'every changed DLL keeps a version that goes up' }
 
 if ($versionGuardSkipped) {
     Write-Step "Done - payload built and checked but not staged, because the version guard was skipped"
+    Write-Warn 'big_libs' $restoreHint
     return
 }
 

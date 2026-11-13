@@ -88,8 +88,9 @@ function Get-VersionHeaderProblems([string]$RepoRoot, [string]$BigLibsRoot) {
     $shipped = Get-CyclesDllVersion $committed.Object
     if ($shipped -and $header -eq $shipped) {
         # Developer builds stamp every build of a day 01:00 (build_dates.msbuild).
-        return ("src4/version.h is $header, the same as ccycles.dll in big_libs: a payload was already " +
-                "published today, and every developer build of a day gets the same number. Publish again tomorrow.")
+        return ("src4/version.h is $header, the same as ccycles.dll in big_libs. Either a payload was already " +
+                "published today, and every developer build of a day gets the same number, so publish again " +
+                "tomorrow; or version.h was not regenerated since that publish. $hint")
     }
     if ($shipped -and $header -lt $shipped) {
         return "src4/version.h is $header, older than ccycles.dll $shipped in big_libs. $hint"
@@ -99,9 +100,11 @@ function Get-VersionHeaderProblems([string]$RepoRoot, [string]$BigLibsRoot) {
 
 # Before staging: every top-level DLL that differs from the committed one. Returns
 # @{ Problems; Notes }; Notes are not failures.
-function Get-PayloadVersionProblems([string]$PayloadDir, [string]$BigLibsRoot, [string]$Revision = 'HEAD') {
+function Get-PayloadVersionProblems([string]$PayloadDir, [string]$BigLibsRoot, [string]$Revision = 'HEAD', [string]$RepoRoot) {
     $problems = [System.Collections.Generic.List[string]]::new()
     $notes = [System.Collections.Generic.List[string]]::new()
+    # -SkipBuild skips the version.h check, so check the stamp itself.
+    $branch = if ($RepoRoot) { Get-RhinoBranchVersion $RepoRoot } else { $null }
     foreach ($dll in Get-ChildItem -LiteralPath $PayloadDir -File -Filter '*.dll' | Sort-Object Name) {
         $committed = Get-CommittedPayloadFile $BigLibsRoot $dll.Name $Revision
         if (-not $committed) { continue }
@@ -110,6 +113,10 @@ function Get-PayloadVersionProblems([string]$PayloadDir, [string]$BigLibsRoot, [
 
         $old = Get-CyclesDllVersion $committed.Object
         $new = Get-CyclesDllVersion $dll.FullName
+        if ($branch -and $new -and $CyclesRestampedDlls -contains $dll.Name -and
+            ($new.Major -ne $branch.Major -or $new.Minor -ne $branch.Minor)) {
+            $problems.Add("$($dll.Name) is $new but this branch is $branch; src4/version.h came from another branch's build")
+        }
         if ($old -and -not $new) {
             $problems.Add("$($dll.Name) lost its version (was $old)")
         }
