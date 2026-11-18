@@ -566,8 +566,17 @@ void CUDADevice::mem_alloc(device_memory &mem)
 void CUDADevice::mem_copy_to(device_memory &mem)
 {
   if (mem.type == MEM_GLOBAL) {
-    global_free(mem);
-    global_alloc(mem);
+    /* Reuse the allocation when it fits: freeing mapped host memory also drops the host data.
+     * Moving to host memory still needs the free and realloc. */
+    if (!move_texture_to_host && mem.device_pointer && mem.is_resident(this) &&
+        mem.device_size >= mem.memory_size())
+    {
+      generic_copy_to(mem);
+    }
+    else {
+      global_free(mem);
+      global_alloc(mem);
+    }
   }
   else if (mem.type == MEM_TEXTURE) {
     tex_free((device_texture &)mem);
