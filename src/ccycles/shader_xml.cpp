@@ -65,6 +65,30 @@ static bool can_connect(const ccl::ShaderOutput *output, const ccl::ShaderInput 
 	return ccl::NodeType::find(ustring(convert)) != nullptr;
 }
 
+/* Whether node takes anything from target, directly or through other nodes. A connect from
+ * node into target would close a loop, which Cycles' graph code recurses into for ever. */
+static bool takes_from(ccl::ShaderNode *node, const ccl::ShaderNode *target)
+{
+	std::vector<ccl::ShaderNode *> pending = {node};
+	std::unordered_set<ccl::ShaderNode *> seen;
+	while (!pending.empty()) {
+		ccl::ShaderNode *current = pending.back();
+		pending.pop_back();
+		if (current == target) {
+			return true;
+		}
+		if (!seen.insert(current).second) {
+			continue;
+		}
+		for (ccl::ShaderInput *in : current->inputs) {
+			if (in->link != nullptr) {
+				pending.push_back(in->link->parent);
+			}
+		}
+	}
+	return false;
+}
+
 /* Split "node socket" into its two parts. */
 static bool split_socket_ref(const char *text, std::string &node, std::string &socket)
 {
@@ -153,6 +177,12 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 				continue;
 			}
 
+			if (takes_from(from, to)) {
+				problem(ccl::string_printf("connect from %s %s to %s %s would make a loop",
+				                           from_node.c_str(), from_socket.c_str(), to_node.c_str(), to_socket.c_str()));
+				continue;
+			}
+
 			graph->connect(output, input);
 			continue;
 		}
@@ -169,8 +199,11 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 			node_name = ustring("background_shader");
 		}
 
+		/* Cycles adds convert nodes itself; one placed by hand can leave a dangling link. */
 		const ccl::NodeType *node_type = ccl::NodeType::find(node_name);
-		if (node_type == nullptr || node_type->type != ccl::NodeType::SHADER || node_type->create == nullptr) {
+		if (node_type == nullptr || node_type->type != ccl::NodeType::SHADER || node_type->create == nullptr ||
+		    ccl::string_startswith(node_name.string(), "convert_"))
+		{
 			problem(ccl::string_printf("'%s' is not a shader node type", node.name()));
 			continue;
 		}
@@ -192,6 +225,16 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 		}
 
 		ccl::xml_read_node(reader, snode, node);
+
+		/* The sizes of Rhino's Dots texture data, which the kernel indexes by; only Rhino sets them. */
+		if (node_name == "rhino_dots_texture") {
+			ccl::RhinoDotsTextureNode *dots = static_cast<ccl::RhinoDotsTextureNode *>(snode);
+			if (dots->dots_data_count != 0 || dots->dots_tree_node_count != 0) {
+				problem(ccl::string_printf("%s: dots_data_count and dots_tree_node_count are Rhino's, so they stay 0", node.name()));
+				dots->dots_data_count = 0;
+				dots->dots_tree_node_count = 0;
+			}
+		}
 	}
 
 	shader->set_graph(std::move(graph));
