@@ -225,11 +225,25 @@ namespace ccl
 					if (stringHolderPtr != IntPtr.Zero)
 					{
 						IntPtr strPtr = cycles_string_holder_get(stringHolderPtr);
-						string s = Marshal.PtrToStringAnsi(strPtr);
-						return s;
+						return FromUtf8(strPtr);
 					}
 					return "";
 				}
+			}
+
+			/* ccycles' strings are UTF-8, which PtrToStringAnsi reads in the Windows code page. */
+			private static string FromUtf8(IntPtr ptr)
+			{
+				if (ptr == IntPtr.Zero)
+					return null;
+
+				int length = 0;
+				while (Marshal.ReadByte(ptr, length) != 0)
+					length++;
+
+				var bytes = new byte[length];
+				Marshal.Copy(ptr, bytes, 0, length);
+				return System.Text.Encoding.UTF8.GetString(bytes);
 			}
 
 			public IntPtr Ptr { get { return stringHolderPtr; } }

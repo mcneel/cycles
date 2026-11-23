@@ -60,6 +60,11 @@ static bool can_connect(const ccl::ShaderOutput *output, const ccl::ShaderInput 
 		return true;
 	}
 
+	/* convert_closure_to_* exist, but ShaderGraph::connect leaves such a link out. */
+	if (from == ccl::SocketType::CLOSURE) {
+		return false;
+	}
+
 	const std::string convert = "convert_" + ccl::SocketType::type_name(from).string() + "_to_" +
 	                            ccl::SocketType::type_name(to).string();
 	return ccl::NodeType::find(ustring(convert)) != nullptr;
@@ -87,6 +92,53 @@ static bool takes_from(ccl::ShaderNode *node, const ccl::ShaderNode *target)
 		}
 	}
 	return false;
+}
+
+/* Why xml_read_node would leave an attribute's value out, or nothing if it reads it. */
+static std::string unread_value(const ccl::SocketType &socket, const char *value)
+{
+	if (socket.type == ccl::SocketType::CLOSURE || socket.type == ccl::SocketType::UNDEFINED ||
+	    (socket.flags & ccl::SocketType::INTERNAL))
+	{
+		return "is not read from XML";
+	}
+
+	size_t count = 0;
+	switch (socket.type) {
+		case ccl::SocketType::ENUM:
+			return socket.enum_values->exists(ustring(value)) ? std::string() : "is not one of its choices";
+		case ccl::SocketType::COLOR:
+		case ccl::SocketType::VECTOR:
+		case ccl::SocketType::POINT:
+		case ccl::SocketType::NORMAL:
+			count = 3;
+			break;
+		case ccl::SocketType::POINT2:
+			count = 2;
+			break;
+		case ccl::SocketType::TRANSFORM:
+			count = 12;
+			break;
+		default:
+			return std::string();
+	}
+
+	ccl::vector<std::string> tokens;
+	ccl::string_split(tokens, value);
+	return tokens.size() == count ? std::string() : ccl::string_printf("needs %d numbers", (int)count);
+}
+
+/* A path that does not start at a drive, a share or the root. */
+static bool is_relative_path(const char *path)
+{
+	if (path == nullptr || path[0] == '\0') {
+		return false;
+	}
+	if (path[0] == '/' || path[0] == '\\') {
+		return false;
+	}
+	const bool drive = ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':';
+	return !drive;
 }
 
 /* Split "node socket" into its two parts. */
@@ -121,21 +173,29 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 
 	/* Cycles' example scenes wrap the body in <shader>, sometimes inside <cycles>. */
 	ccl::xml_node body = doc;
-	if (ccl::xml_node shader = doc.child("shader")) {
+	ccl::xml_node shaders = doc.child("shader") ? doc : doc.child("cycles");
+	if (ccl::xml_node shader = shaders.child("shader")) {
 		body = shader;
-	}
-	else if (ccl::xml_node scene_shader = doc.child("cycles").child("shader")) {
-		body = scene_shader;
+
+		int count = 0;
+		for (ccl::xml_node s = shader; s; s = s.next_sibling("shader")) {
+			count++;
+		}
+		if (count > 1) {
+			problem(ccl::string_printf("the XML has %d shaders, and only the first, '%s', is read", count, shader.attribute("name").value()));
+		}
 	}
 
 	auto graph = ccl::make_unique<ccl::ShaderGraph>();
 	ccl::XMLReader reader;
 	reader.node_map[ustring("output")] = graph->output();
 
+	int elements = 0;
 	for (ccl::xml_node node = body.first_child(); node; node = node.next_sibling()) {
 		if (node.type() != PUGIXML_NAMESPACE::node_element) {
 			continue;
 		}
+		elements++;
 
 		ustring node_name(node.name());
 
@@ -183,6 +243,13 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 				continue;
 			}
 
+			/* ShaderGraph::connect keeps an input's first link. */
+			if (input->link != nullptr) {
+				problem(ccl::string_printf("%s %s is connected already, so the connect from %s %s is left out",
+				                           to_node.c_str(), to_socket.c_str(), from_node.c_str(), from_socket.c_str()));
+				continue;
+			}
+
 			graph->connect(output, input);
 			continue;
 		}
@@ -219,8 +286,26 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 
 		for (const ccl::xml_attribute attr : node.attributes()) {
 			const ustring attr_name(attr.name());
-			if (attr_name != "name" && snode->type->find_input(attr_name) == nullptr) {
+			if (attr_name == "name") {
+				continue;
+			}
+
+			const ccl::SocketType *socket = snode->type->find_input(attr_name);
+			if (socket == nullptr) {
 				problem(ccl::string_printf("%s has no input '%s'", node.name(), attr.name()));
+				continue;
+			}
+
+			const std::string why = unread_value(*socket, attr.value());
+			if (!why.empty()) {
+				problem(ccl::string_printf("%s input '%s': '%s' %s, so it keeps its default",
+				                           node.name(), attr.name(), attr.value(), why.c_str()));
+			}
+
+			/* Cycles' own scene files look for these next to the XML file, which text has none of. */
+			if (attr_name == "filename" && is_relative_path(attr.value())) {
+				problem(ccl::string_printf("%s input 'filename': '%s' has no folder, so it is looked for in Rhino's working folder; use a full path",
+				                           node.name(), attr.value()));
 			}
 		}
 
@@ -235,6 +320,10 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 				dots->dots_tree_node_count = 0;
 			}
 		}
+	}
+
+	if (elements == 0) {
+		problem("the XML has no elements, so the graph is empty");
 	}
 
 	shader->set_graph(std::move(graph));
