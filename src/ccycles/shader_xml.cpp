@@ -275,6 +275,16 @@ static bool shader_graph_from_xml(ccl::Shader *shader, const char *xml, std::str
 			continue;
 		}
 
+		/* "output" is the graph's output; a node of that name would take its connects. */
+		const ustring name(node.attribute("name").value());
+		if (name == "output") {
+			problem(ccl::string_printf("the %s named 'output' is left out, as 'output' is the graph's output", node.name()));
+			continue;
+		}
+		if (!name.empty() && reader.node_map.find(name) != reader.node_map.end()) {
+			problem(ccl::string_printf("two nodes are named '%s', so connects after the second use it", name.c_str()));
+		}
+
 		ccl::ShaderNode *snode = graph->create_node(node_type);
 
 		/* Rhino's UV map name, as cycles_add_shader_node sets it; XML attributes override it. */
