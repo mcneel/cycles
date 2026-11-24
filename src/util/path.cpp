@@ -56,7 +56,6 @@ typedef struct stat path_stat_t;
 
 static string cached_path = "";
 static string cached_user_path = "";
-static string cached_xdg_cache_path = "";
 
 namespace {
 
@@ -361,9 +360,10 @@ string path_user_get(const string &sub)
 string path_cache_get(const string &sub)
 {
 #if defined(__linux__) || defined(__APPLE__)
-  if (cached_xdg_cache_path == "") {
-    cached_xdg_cache_path = path_xdg_cache_get();
-  }
+  /* Function-local static: the Metal shader cache calls this from several compile
+   * threads at once, and a lazily assigned global was being read while another
+   * thread replaced it. */
+  static const string cached_xdg_cache_path = path_xdg_cache_get();
   string result = path_join(cached_xdg_cache_path, "cycles");
   return path_join(result, sub);
 #else
