@@ -337,10 +337,17 @@ function Get-CudaToolkits {
 }
 
 $cudaToolkits = @(Get-CudaToolkits)
-$cudaPath = ($cudaToolkits | Select-Object -First 1).Path
+# The shipping cubins need 12.8+ (sm_120) and a 12.x (13 dropped sm_50 to sm_70), so the
+# newest such toolkit beats a newer one; otherwise the newest, with a warning.
+$cudaChosen = $cudaToolkits | Where-Object { $_.Version.Major -eq 12 -and $_.Version.Minor -ge 8 } | Select-Object -First 1
+if (-not $cudaChosen) { $cudaChosen = $cudaToolkits | Select-Object -First 1 }
+$cudaPath = if ($cudaChosen) { $cudaChosen.Path } else { $null }
 if ($cudaPath) {
     $detected.Add('cuda')
-    Write-Found 'CUDA' ("{0}  (v{1})" -f $cudaPath, ($cudaToolkits | Select-Object -First 1).Version)
+    Write-Found 'CUDA' ("{0}  (v{1})" -f $cudaPath, $cudaChosen.Version)
+    if ($cudaChosen.Version.Major -ne 12 -or $cudaChosen.Version.Minor -lt 8) {
+        Write-Host ("   {0,-12} v{1} cannot build every shipping kernel; they need CUDA 12.8 or a later 12.x (bootstrap.exe /cycles installs 12.9)" -f '', $cudaChosen.Version) -ForegroundColor DarkYellow
+    }
 }
 else { Write-Missing 'CUDA' 'set CUDA_PATH to enable' }
 

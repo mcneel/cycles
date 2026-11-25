@@ -148,6 +148,21 @@ namespace ccl
 		public bool IsMultiOptix => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.Optix).Any();
 
 		/// <summary>
+		/// True if this is a Multi Metal device
+		/// </summary>
+		public bool IsMultiMetal => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.Metal).Any();
+
+		/// <summary>
+		/// True if this is a Multi Hip device
+		/// </summary>
+		public bool IsMultiHip => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.Hip).Any();
+
+		/// <summary>
+		/// True if this is a Multi OneApi device
+		/// </summary>
+		public bool IsMultiOneApi => Type == DeviceType.Multi && Subdevices.Where((Device d) => d.Type == DeviceType.OneApi).Any();
+
+		/// <summary>
 		/// String representation of this device
 		/// </summary>
 		public override string ToString() => $"{base.ToString()}: {Description} ({Type}), Id {Id} Num {Num} UiName {Name} DisplayDevice {DisplayDevice}";

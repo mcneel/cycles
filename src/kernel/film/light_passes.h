@@ -487,7 +487,9 @@ ccl_device_inline void film_write_emission_or_background_pass(
     // the appropriate amount and to correctly compose the background pass with the
     // matte pass when doing shadow catching.
     // Fixes RH-75422.
-    if (pass == kernel_data.film.pass_background) {
+    if (pass == kernel_data.film.pass_background &&
+        kernel_data.film.pass_shadow_catcher_background_sample_count != PASS_UNUSED)
+    {
       atomic_fetch_and_add_uint32(
           (ccl_global uint *)(buffer) + kernel_data.film.pass_shadow_catcher_background_sample_count, 1);
     }

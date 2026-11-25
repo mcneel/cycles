@@ -17,7 +17,7 @@ and the kernel sources (`source/`). They live in `big_libs/RhinoCycles/ccycles/`
 | Folder | Written by | In git |
 | --- | --- | --- |
 | `win/release`, `osx/release` | `publish_payload.ps1` (Windows), `make payload` (macOS) | yes |
-| `win/local` | `Cycles.sln`, `Debug+Cycles` and `ReleaseDebuggable+Cycles` | no |
+| `win/local` | `Cycles.sln`, or ccycles with Build from source in Rhino.sln | no |
 | `osx/local` | the macOS Cycles schemes | no |
 
 Which one a build deploys:
@@ -71,16 +71,15 @@ From a shell:
 
     msbuild src4\BuildSolutions\Cycles.sln /p:Configuration=Debug /p:Platform=x64 /m
 
-In Visual Studio, `Rhino.sln` builds Rhino and Cycles together in its `+Cycles`
-configurations. Cycles.sln's Debug and Release are these two:
+In Visual Studio, `Rhino.sln` uses the prebuilt payload; no CMake or SDK needed. To
+build Rhino and Cycles together, open the properties of ccycles (Rhino Render > Cycles >
+cycles-core) and set Configuration Properties > Cycles > Build from source to Yes. It is
+saved for you only, in `ccycles.vcxproj.user`, per configuration; pick All Configurations
+to set it for Debug and ReleaseDebuggable at once. From a shell, pass
+`/p:CyclesBuildFromSource=true`.
 
-| Rhino.sln configuration | Cycles |
-| --- | --- |
-| `Debug`, `Release`, `ReleaseDebuggable` | prebuilt payload; no CMake or SDK needed |
-| `Debug+Cycles`, `ReleaseDebuggable+Cycles` | built from source into `win/local` |
-
-Both `+Cycles` configurations build Cycles as RelWithDebInfo: release-speed kernels,
-and `ccycles.pdb` stays in `build/bin/RelWithDebInfo`, so ccycles is steppable on the
+Debug and ReleaseDebuggable build Cycles as RelWithDebInfo, as Cycles.sln does:
+release-speed kernels, and `ccycles.pdb` stays in `build/bin/RelWithDebInfo`, so ccycles is steppable on the
 machine that built it. `ccycles.vcxproj` runs
 
     build_cycles.ps1 -Configuration RelWithDebInfo -InstallDir <payload folder>
@@ -188,13 +187,22 @@ name, writes `ccycles_payload.json` (including a hash of the kernel sources), st
 rather than stage an incomplete payload, or one without the side-by-side manifests.
 `-SkipBuild` re-checks and re-stages.
 
+`ccycles.dll` and `cycles_kernel_oneapi_jit.dll` get their version from Rhino's
+generated, gitignored `src4/version.h`, and an installer upgrade keeps an installed DLL
+unless the new one is higher (RH-98458). So before building it checks that `version.h`
+is this branch's (`build/build_dates.msbuild`) and newer than the committed
+`ccycles.dll`; building UpdateVersionNumbers in Rhino.sln regenerates it. Before staging
+it checks that no changed DLL lost its version or went down (`payload_version_guard.ps1`).
+`-SkipVersionGuard` builds and checks anyway, but does not stage.
+
 ### Check
 
     powershell -ExecutionPolicy Bypass -File tools/run_checks.ps1
 
 About a second, no build needed (python for the audits). Runs the static audits,
-checks that the committed payload matches the kernel sources, that the library
-bundle is the pinned one, and that the installer's kernel list matches. Exit code is
+checks that the committed payload matches the kernel sources and carries this branch's
+version, that the library bundle is the pinned one, and that the installer's kernel
+list matches. Exit code is
 non-zero on failure.
 
 ### Run

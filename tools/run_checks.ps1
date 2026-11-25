@@ -78,6 +78,33 @@ else {
   }
 }
 
+# A revert or a merge from an older branch commits DLLs nothing re-stamps (RH-98458).
+Write-Host '--- payload versions'
+$rhinoRoot = Join-Path $repo '..\..\..\..\..'
+$bigLibs = Join-Path $rhinoRoot 'big_libs'
+if (-not (Test-Path (Join-Path $bigLibs 'RhinoCycles\ccycles\win\release'))) {
+  Write-Host '  no big_libs payload here - skipped'
+  Add-Result 'payload versions' 0 'no big_libs'
+}
+else {
+  . (Join-Path $repo 'payload_version_guard.ps1')
+  # A throw (a payload DLL that is not an LFS pointer) is a failed check, not the end of the run.
+  try { $check = Get-CommittedPayloadVersionProblems $rhinoRoot $bigLibs }
+  catch { $check = [pscustomobject]@{ Problems = @($_.Exception.Message); Notes = @() } }
+  $check.Problems | ForEach-Object { Write-Host "  $_" }
+  $check.Notes | ForEach-Object { Write-Host "  not verifiable: $_" }
+  if ($check.Problems.Count) {
+    Add-Result 'payload versions' 1 'an upgrade would keep the old DLLs'
+  }
+  elseif ($check.Notes.Count) {
+    Add-Result 'payload versions' 0 'partly not verifiable'
+  }
+  else {
+    Write-Host "  ccycles.dll carries $(Get-RhinoBranchVersion $rhinoRoot); ccycles.dll and the oneAPI kernel went up"
+    Add-Result 'payload versions' 0 ''
+  }
+}
+
 # Unverifiable or missing is reported, not failed: a standalone tree may have no bundle.
 Write-Host '--- library bundle'
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $toolsDir 'check_lib_bundle.ps1') -CyclesRoot $repo 2>&1 | ForEach-Object { "  $_" }

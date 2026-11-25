@@ -424,6 +424,7 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
         break;
       case PASS_RENDER_TIME:
         kfilm->pass_render_time = kfilm->pass_stride;
+        break;
       case PASS_SHADOW_CATCHER_TRANSPARENT_SAMPLE_COUNT:
         kfilm->pass_shadow_catcher_transparent_sample_count = kfilm->pass_stride;
         break;

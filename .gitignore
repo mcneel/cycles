@@ -18,6 +18,7 @@ CMakeLists.txt.user
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+*.vcxproj.user
 
 # Local patches
 /*.patch

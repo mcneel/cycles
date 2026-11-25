@@ -151,8 +151,9 @@ ccl_device_forceinline bool triangle_light_sample(KernelGlobals kg,
     N0 = -N0;
   }
 
-  /* Do not draw samples from the side without MIS. */
-  ls->shader = kernel_data_fetch(tri_shader, prim);
+  /* Do not draw samples from the side without MIS. Rhino: the object's shader, as below;
+   * a mesh shared by instances keeps only the last instance's per-triangle shader. */
+  ls->shader = object_shader(kg, object);
   const float distance_to_plane = dot(N0, V[0] - P) / dot(N0, N0);
   const int ls_shader_flag = kernel_data_fetch(shaders, ls->shader & SHADER_MASK).flags;
   if (!in_volume_segment &&
@@ -170,6 +171,10 @@ ccl_device_forceinline bool triangle_light_sample(KernelGlobals kg,
   ls->object = object;
   ls->prim = prim;
   ls->shader |= SHADER_USE_MIS;
+  /* Rhino: a mesh light set not to cast shadows; shadow rays then skip the occlusion test. */
+  if (object_flag & SD_OBJECT_LIGHT_NO_CAST_SHADOWS) {
+    ls->shader &= ~SHADER_CAST_SHADOW;
+  }
   ls->type = LIGHT_TRIANGLE;
   ls->group = object_lightgroup(kg, object);
 

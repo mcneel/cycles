@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Properties > Configuration Properties > Cycles on ccycles.vcxproj. Saved per user in ccycles.vcxproj.user. -->
+<Rule Name="Cycles"
+      DisplayName="Cycles"
+      PageTemplate="generic"
+      Description="Cycles"
+      xmlns="http://schemas.microsoft.com/build/2009/properties">
+  <Rule.DataSource>
+    <!-- Per configuration: Visual Studio hides all-configuration pages in solutions with other C++ projects. -->
+    <DataSource Persistence="UserFile" HasConfigurationCondition="true" />
+  </Rule.DataSource>
+  <Rule.Categories>
+    <Category Name="General" DisplayName="General" />
+  </Rule.Categories>
+  <BoolProperty Name="CyclesBuildFromSource"
+                DisplayName="Build from source"
+                Description="Build Cycles from cycles-core into big_libs\RhinoCycles\ccycles\win\local instead of using the prebuilt payload. Needs the GPU SDKs from bootstrap.exe /cycles for GPU kernels."
+                Category="General" />
+</Rule>
