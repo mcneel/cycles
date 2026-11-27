@@ -350,12 +350,6 @@ if(WITH_CYCLES_PUGIXML OR OPENIMAGEIO_PUGIXML_FOUND)
   endif()
 endif()
 
-if(CYCLES_STANDALONE_REPOSITORY)
-  include_directories(../third_party/atomic)
-else()
-  include_directories(../atomic)
-endif()
-
 # Warnings
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_C_COMPILER_ID MATCHES "Clang")
   add_check_cxx_compiler_flags(
