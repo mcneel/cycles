@@ -595,7 +595,9 @@ void ShaderManager::device_update_common(Device * /*device*/,
   KernelIntegrator *kintegrator = &dscene->data.integrator;
   kintegrator->use_volumes = has_volumes;
   /* TODO(sergey): De-duplicate with flags set in integrator.cpp. */
-  kintegrator->transparent_shadows = has_transparent_shadow;
+  /* Keep the clip_all_rays override from Integrator::device_update on shader-only updates. */
+  kintegrator->transparent_shadows = has_transparent_shadow ||
+                                     scene->integrator->get_clip_all_rays();
 
   /* film */
   KernelFilm *kfilm = &dscene->data.film;
